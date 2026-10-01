@@ -9,7 +9,7 @@ import { cn } from "@/components/ui";
  */
 
 /** Карточка админки — как на публичном сайте */
-export const ADMIN_CARD = "rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80";
+export const ADMIN_CARD = "rounded-[10px] border border-[#17243a] bg-[#0a111b]/90";
 
 /** Заголовки колонок таблиц: капс с разрядкой, как подписи сайта */
 export const TH =
@@ -92,7 +92,7 @@ export function TableBox({ children, minWidth = 760, maxHeight }: { children: Re
       className={cn(
         ADMIN_CARD,
         "overflow-x-auto",
-        !!maxHeight && "overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-[#0b1420]",
+        !!maxHeight && "overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-[#0a111b]",
       )}
       style={maxHeight ? { maxHeight } : undefined}
     >

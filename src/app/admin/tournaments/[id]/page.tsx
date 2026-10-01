@@ -142,14 +142,14 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Panel title="Регламент" action={<Link href={tabHref("settings")} className="text-[12px] text-accent hover:underline">Изменить</Link>}>
             {t.rules ? (
-              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
+              <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
             ) : (
               <EmptyState compact title="Регламент не заполнен" description="Задаётся в Настройках → Правила матча." />
             )}
           </Panel>
           <Panel title="Требования к участникам">
             {t.requirements ? (
-              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
+              <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
             ) : (
               <EmptyState compact title="Стандартные требования" description="Свои требования задаются в Настройках → Правила матча." />
             )}
@@ -293,7 +293,7 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
       </div>
 
       <Panel title="Автопилот">
-        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-[13px]">
               <Dot tone={t.autopilot ? "ok" : "muted"} />
@@ -331,7 +331,7 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
                   "w-full h-full text-left rounded-[8px] border px-3 py-2.5 transition",
                   t.status === f.status
                     ? "border-accent/50 bg-accent/[0.08]"
-                    : "border-white/[0.08] bg-[#0b1420]/80 hover:border-white/20 hover:bg-white/[0.02]",
+                    : "border-white/[0.08] bg-[#0a111b]/90 hover:border-white/20 hover:bg-white/[0.02]",
                   f.status === "cancelled" && t.status !== f.status && "hover:border-danger/40",
                 )}
               >
@@ -354,7 +354,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
   return (
     <div className="max-w-3xl">
       {t.bracket_published_at ? (
-        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 space-y-4">
+        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 space-y-4">
           <div className="flex items-center gap-2 text-[13px]">
             <Dot tone="ok" />
             <span className="text-fg">Сетка опубликована {formatShortDateTime(t.bracket_published_at)}</span>
@@ -378,7 +378,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
         </div>
       ) : (
         <ActionForm action={generateBracketAction}>
-          <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 space-y-4">
+          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 space-y-4">
             <input type="hidden" name="tournamentId" value={t.id} />
             <div className="text-[13px] text-fg-2">
               Одобрено <span className="num text-fg">{approved}</span>, прошли check-in <span className="num text-fg">{checkedIn}</span>. Пустые места
@@ -454,7 +454,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
   return (
     <div className="space-y-8 max-w-3xl">
       <Panel title="Карты турнира">
-        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
+        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
           {t.map_pool.map((m) => {
             const id = m.split("@")[1];
             const i = id ? info[id] : null;
@@ -482,7 +482,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
       </Panel>
       {ws.length > 0 && (
         <Panel title="Прогрев Workshop-карт">
-          <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-center justify-between gap-4">
             <p className="text-[13px] text-fg-2 max-w-lg">
               Карты из Workshop скачиваются на сервер автоматически при открытии check-in. Прогрев сейчас — чтобы к первому матчу они
               уже были в кэше.
@@ -527,7 +527,7 @@ async function RegistrationTab({
         .filter((g) => g.items.length > 0)
         .map((g) => (
           <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
-            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
+            <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
               <RegistrationHead />
               {g.items.map((r) => (
                 <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} />

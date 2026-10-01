@@ -43,7 +43,7 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
         <div key={`empty-${i}`} className="flex min-h-[76px] items-center gap-4 border-b border-white/[0.05] py-3 text-fg-3 last:border-0 sm:gap-5">
           <div className="size-12 shrink-0 rounded-full border border-dashed border-white/15" />
           <span className="text-[15px]">Свободный слот</span>
-          <span className="ml-auto text-[12px] uppercase tracking-[0.16em] text-fg-4">ожидает игрока</span>
+          <span className="ml-auto hidden text-[12px] uppercase tracking-[0.16em] text-fg-4 sm:inline">ожидает игрока</span>
         </div>
       ))}
     </div>

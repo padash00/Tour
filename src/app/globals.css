@@ -433,3 +433,20 @@ summary,
     transform: rotate(360deg);
   }
 }
+
+/* ───────────────────────── F16 Control: режим пульта
+   Холоднее и темнее публичного сайта, едва заметная инженерная сетка на фоне. */
+.control-mode {
+  --color-bg: #05090f;
+  --color-bg-2: #070c14;
+  --color-surface: #0a111b;
+  --color-surface-2: #0d1621;
+  --color-surface-3: #111c29;
+  --color-line: #ffffff10;
+  background-color: #05090f;
+  background-image:
+    linear-gradient(to right, #8ab8ff07 1px, transparent 1px),
+    linear-gradient(to bottom, #8ab8ff07 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+}

@@ -95,19 +95,40 @@ export function VetoBoard({
         </div>
       )}
 
-      <ol className={cn("flex flex-wrap gap-x-6 gap-y-2 text-[14px]", compact ? "" : "mt-8")}>
+      {/* хронология вето: шаги плиткой — кто, что, какая карта */}
+      <ol className={cn("grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7", compact ? "" : "mt-8")}>
         {state.plan.map((s) => {
           const done = m.veto.find((a) => a.step === s.step);
           const t = s.team === 1 ? m.team1?.tag : s.team === 2 ? m.team2?.tag : null;
           const current = state.current?.step === s.step && active;
+          const act = s.action === "ban" ? "Бан" : s.action === "pick" ? "Пик" : "Decider";
           return (
-            <li key={s.step} className={cn("inline-flex items-center gap-2", done ? "text-fg-2" : current ? "text-warn" : "text-fg-3")}>
-              <span className="num text-[11px] text-fg-3">{s.step}</span>
-              <span>
-                {t ? `${t} ` : ""}
-                {s.action === "ban" ? "бан" : s.action === "pick" ? "пик" : "decider"}
-                {done ? ` · ${mapName(done.map_name)}` : ""}
-              </span>
+            <li
+              key={s.step}
+              className={cn(
+                "rounded-[8px] border px-3 py-2.5",
+                current
+                  ? "border-warn/50 bg-warn/[0.06]"
+                  : done
+                    ? "border-white/[0.08] bg-[#0b1420]/80"
+                    : "border-dashed border-white/[0.08]",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="num text-fg-3">{String(s.step).padStart(2, "0")}</span>
+                <span
+                  className={cn(
+                    "font-medium uppercase tracking-[0.14em]",
+                    s.action === "ban" ? "text-danger/90" : s.action === "pick" ? "text-accent" : "text-ok",
+                  )}
+                >
+                  {act}
+                </span>
+              </div>
+              <div className={cn("mt-1.5 truncate text-[14px] font-semibold", done ? "text-fg" : current ? "text-warn" : "text-fg-3")}>
+                {done ? mapName(done.map_name) : current ? "выбирает…" : "—"}
+              </div>
+              <div className="mt-0.5 truncate text-[12px] text-fg-3">{t ?? "по остатку"}</div>
             </li>
           );
         })}

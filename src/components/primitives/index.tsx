@@ -267,7 +267,7 @@ export function PageHero({
       <div className={cn(WRAP, "relative", compact ? "pt-12 pb-12 lg:pt-16 lg:pb-14" : "pt-14 pb-14 lg:pt-20 lg:pb-16")}>
         <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 flex-col gap-8 sm:flex-row sm:items-end">
-            {media}
+            {media && <div className="shrink-0 self-start sm:self-end">{media}</div>}
             <div className="min-w-0">
               {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
               <h1

@@ -150,7 +150,7 @@ function Section({
               <div
                 key={r}
                 className={cn(
-                  "absolute flex h-8 items-center justify-between rounded-[8px] border px-3 text-[11px] uppercase tracking-[0.2em] whitespace-nowrap",
+                  "absolute flex h-8 items-center justify-between gap-2 rounded-[8px] border px-3 text-[10.5px] uppercase tracking-[0.12em] whitespace-nowrap",
                   live ? "border-live/40 text-fg" : done ? "border-white/[0.06] text-fg-3" : "border-white/[0.1] text-fg-2",
                 )}
                 style={{ left: col * (W + GAP_X), top: 0, width: W }}
@@ -189,8 +189,8 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
 
   return (
     <BracketHover>
-    <div className="space-y-14">
-      <p className="-mb-8 text-[13px] text-fg-3">Наведите на команду, чтобы увидеть её путь по сетке.</p>
+    <div className="space-y-12">
+      <p className="text-[13px] text-fg-3">Наведите на команду, чтобы увидеть её путь по сетке.</p>
       <Section
         title={lower.length ? "Верхняя сетка" : "Плей-офф"}
         matches={upperWithFinal}

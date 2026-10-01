@@ -42,7 +42,7 @@ export function ServerReady({
           </span>
           {waiting ? "Сервер готов — подключайтесь" : "Матч идёт"}
         </Eyebrow>
-        <div className="mt-6 num text-[30px] sm:text-[48px] lg:text-[60px] font-semibold tracking-[-0.03em] leading-none break-all text-fg">
+        <div className="mt-6 num text-[clamp(22px,7vw,30px)] sm:text-[48px] lg:text-[60px] font-semibold tracking-[-0.03em] leading-none whitespace-nowrap text-fg">
           {address}
         </div>
         <div className="mt-10 flex flex-wrap items-end gap-x-12 gap-y-7">

@@ -9,7 +9,7 @@ import { cn } from "@/components/ui";
  */
 
 /** Поверхность-карточка как на сайте */
-export const CARD = "rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80";
+export const CARD = "rounded-[12px] border border-[#17243a] bg-[#0a111b]/90";
 /** Карточка-список со строками */
 export const CARD_LIST = `${CARD} divide-y divide-white/[0.06]`;
 

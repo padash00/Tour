@@ -120,63 +120,65 @@ export default async function AdminOverview() {
         />
       </Strip>
 
-      {/* ── очередь тревог по приоритету ── */}
-      <Section title="Требует внимания" count={alerts}>
-        {alerts === 0 ? (
-          <Quiet>
-            <span className="text-ok">●</span> Всё спокойно: агент на связи, матчи идут, решений не ждём.
-          </Quiet>
-        ) : (
-          <div className="space-y-2">
-            {!servers.online && (
-              <AlertRow tone="danger" title="Агент не на связи" action={{ href: "/admin/servers", label: "Серверы" }}>
-                Матчи не загрузятся, пока серверный ПК не выйдет на связь
-                {servers.host?.last_seen_at ? ` (последний сигнал ${formatShortDateTime(servers.host.last_seen_at)})` : ""}.
-              </AlertRow>
-            )}
-            {serverErrors.map((m) => (
-              <AlertRow key={m.id} tone="danger" title={`Матч #${m.number}: сервер`} action={{ href: `/admin/matches/${m.id}`, label: "Перенести" }}>
-                {m.team1?.tag} vs {m.team2?.tag} — карта не загрузилась, нужен другой сервер.
-              </AlertRow>
-            ))}
-            {noShow.map((m) => (
-              <AlertRow key={m.id} tone="warn" title={`Матч #${m.number}: неявка`} action={{ href: `/admin/matches/${m.id}`, label: "Открыть" }}>
-                {m.team1?.tag} vs {m.team2?.tag} — игроки не подключились {minutesSince(m.server_ready_at, now)} мин.
-              </AlertRow>
-            ))}
-            {disputeMatches.map((m) => (
-              <AlertRow key={m.id} tone="warn" title={`Спор · матч #${m.number}`} action={{ href: `/admin/matches/${m.id}`, label: "Разобрать" }}>
-                Капитан оспаривает результат или ход матча.
-              </AlertRow>
-            ))}
-            {pendingTournaments.map((t) => (
-              <AlertRow
-                key={t.id}
-                tone="accent"
-                title={`Заявки: ${pending.filter((p) => p.tournament.id === t.id).length}`}
-                action={{ href: `/admin/tournaments/${t.id}?tab=registration`, label: "Рассмотреть" }}
-              >
-                {t.name} — команды ждут одобрения.
-              </AlertRow>
-            ))}
-          </div>
-        )}
-      </Section>
-
-      {/* ── живая сетка серверов ── */}
-      <Section title="Серверы" action={<SectionLink href="/admin/servers">Стойка</SectionLink>}>
-        {servers.instances.length === 0 ? (
-          <Quiet>Инстансы появятся, когда агент на серверном ПК выйдет на связь.</Quiet>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-            {servers.instances.map((i) => (
-              <InstanceCard key={i.name} i={i} match={byInstance.get(i.name)} online={servers.online} now={now} />
-            ))}
-          </div>
-        )}
-      </Section>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-8">
+      {/* ── серверы — главный блок пульта; тревоги и очередь рядом ── */}
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,1fr)]">
+        <div className="min-w-0">
+        {/* ── живая сетка серверов ── */}
+        <Section title="Серверы" action={<SectionLink href="/admin/servers">Стойка</SectionLink>}>
+          {servers.instances.length === 0 ? (
+            <Quiet>Инстансы появятся, когда агент на серверном ПК выйдет на связь.</Quiet>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+              {servers.instances.map((i) => (
+                <InstanceCard key={i.name} i={i} match={byInstance.get(i.name)} online={servers.online} now={now} hero />
+              ))}
+            </div>
+          )}
+        </Section>
+        </div>
+        <div className="min-w-0 space-y-8">
+        {/* ── очередь тревог по приоритету ── */}
+        <Section title="Требует внимания" count={alerts}>
+          {alerts === 0 ? (
+            <Quiet>
+              <span className="text-ok">●</span> Всё спокойно: агент на связи, матчи идут, решений не ждём.
+            </Quiet>
+          ) : (
+            <div className="space-y-2">
+              {!servers.online && (
+                <AlertRow tone="danger" title="Агент не на связи" action={{ href: "/admin/servers", label: "Серверы" }}>
+                  Матчи не загрузятся, пока серверный ПК не выйдет на связь
+                  {servers.host?.last_seen_at ? ` (последний сигнал ${formatShortDateTime(servers.host.last_seen_at)})` : ""}.
+                </AlertRow>
+              )}
+              {serverErrors.map((m) => (
+                <AlertRow key={m.id} tone="danger" title={`Матч #${m.number}: сервер`} action={{ href: `/admin/matches/${m.id}`, label: "Перенести" }}>
+                  {m.team1?.tag} vs {m.team2?.tag} — карта не загрузилась, нужен другой сервер.
+                </AlertRow>
+              ))}
+              {noShow.map((m) => (
+                <AlertRow key={m.id} tone="warn" title={`Матч #${m.number}: неявка`} action={{ href: `/admin/matches/${m.id}`, label: "Открыть" }}>
+                  {m.team1?.tag} vs {m.team2?.tag} — игроки не подключились {minutesSince(m.server_ready_at, now)} мин.
+                </AlertRow>
+              ))}
+              {disputeMatches.map((m) => (
+                <AlertRow key={m.id} tone="warn" title={`Спор · матч #${m.number}`} action={{ href: `/admin/matches/${m.id}`, label: "Разобрать" }}>
+                  Капитан оспаривает результат или ход матча.
+                </AlertRow>
+              ))}
+              {pendingTournaments.map((t) => (
+                <AlertRow
+                  key={t.id}
+                  tone="accent"
+                  title={`Заявки: ${pending.filter((p) => p.tournament.id === t.id).length}`}
+                  action={{ href: `/admin/tournaments/${t.id}?tab=registration`, label: "Рассмотреть" }}
+                >
+                  {t.name} — команды ждут одобрения.
+                </AlertRow>
+              ))}
+            </div>
+          )}
+        </Section>
         {/* ── очередь матчей ── */}
         <Section title="Очередь матчей" count={queue.length} action={<SectionLink href="/admin/matches">Все матчи</SectionLink>}>
           {queue.length === 0 ? (
@@ -213,8 +215,11 @@ export default async function AdminOverview() {
             </div>
           )}
         </Section>
+        </div>
+      </div>
 
-        <div className="space-y-8 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="contents">
           {/* ── текущий турнир ── */}
           <Section title="Текущий турнир" action={<SectionLink href="/admin/tournaments">Все турниры</SectionLink>}>
             {current ? (

@@ -27,56 +27,98 @@ export function humanPlayers(i: Pick<ServerInstance, "running" | "players">) {
  * Карточка инстанса в «живой сетке» обзора: цветная полоса состояния, матч и счёт,
  * карта, игроки, таймер ожидания, быстрые действия.
  */
-export function InstanceCard({ i, match, online, now }: { i: ServerInstance; match?: InstanceMatch; online: boolean; now: number }) {
+export function InstanceCard({
+  i,
+  match,
+  online,
+  now,
+  hero,
+}: {
+  i: ServerInstance;
+  match?: InstanceMatch;
+  online: boolean;
+  now: number;
+  /** крупная карточка для главного блока пульта */
+  hero?: boolean;
+}) {
   const st = instanceState(i, online);
   const live = st.text === "LIVE";
   const waited = match?.status === "ready" && match.server_state === "ready" ? minutesSince(match.server_ready_at, now) : null;
   const players = humanPlayers(i);
 
   return (
-    <div className={cn(ADMIN_CARD, "relative flex flex-col overflow-hidden", live && "bg-danger/[0.03]")}>
-      <span className={cn("absolute inset-x-0 top-0 h-[3px]", toneBar[st.tone], live && "animate-pulse")} />
-      <div className="flex items-start justify-between gap-2 px-4 pt-4">
-        <div>
-          <div className="num text-[15px] font-semibold text-fg">{i.name}</div>
+    <div
+      className={cn(
+        ADMIN_CARD,
+        "relative flex flex-col overflow-hidden pl-[3px]",
+        live && "bg-danger/[0.04] border-danger/30",
+        hero && "min-h-[228px]",
+      )}
+    >
+      {/* полоса состояния слева */}
+      <span className={cn("absolute inset-y-0 left-0 w-[3px]", toneBar[st.tone], live && "animate-pulse")} />
+
+      <div className={cn("flex items-start justify-between gap-3", hero ? "px-5 pt-5" : "px-4 pt-4")}>
+        <div className="min-w-0">
+          <div className={cn("num font-semibold text-fg", hero ? "text-[18px]" : "text-[15px]")}>{i.name}</div>
           <div className="num text-[11px] text-fg-3">
             :{i.port}
             {i.role === "reserve" ? " · резерв" : ""}
           </div>
         </div>
-        <span className={cn("text-[12px] font-medium", toneText[st.tone])}>{st.text}</span>
+        <span
+          className={cn(
+            "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 font-mono text-[10px] uppercase tracking-[0.12em]",
+            toneText[st.tone],
+            "border-current/30 bg-current/[0.06]",
+          )}
+        >
+          <span className={cn("size-1.5 rounded-full bg-current", live && "animate-pulse")} />
+          {st.text}
+        </span>
       </div>
 
-      <div className="px-4 pt-3 pb-3 flex-1 space-y-1.5 text-[13px]">
+      <div className={cn("flex-1 space-y-2", hero ? "px-5 pt-4 pb-4" : "px-4 pt-3 pb-3 text-[13px]")}>
         {match ? (
-          <Link href={`/admin/matches/${match.id}`} className="flex items-center justify-between gap-2 hover:text-accent">
-            <span className="truncate font-medium">
-              #{match.number} {match.team1?.tag ?? "TBD"} <span className="text-fg-3">vs</span> {match.team2?.tag ?? "TBD"}
-            </span>
-            {match.status === "live" && (
-              <span className="num text-fg">
-                {match.team1_score}:{match.team2_score}
+          <Link href={`/admin/matches/${match.id}`} className="group block">
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fg-3">Матч #{match.number}</div>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <span className={cn("truncate font-semibold group-hover:text-accent", hero ? "text-[20px]" : "text-[14px]")}>
+                {match.team1?.tag ?? "TBD"} <span className="font-normal text-fg-3">vs</span> {match.team2?.tag ?? "TBD"}
               </span>
-            )}
+              {(match.status === "live" || match.team1_score + match.team2_score > 0) && (
+                <span className={cn("num shrink-0 font-semibold", hero ? "text-[30px] leading-none" : "text-[15px]", live && "text-fg")}>
+                  {match.team1_score}
+                  <span className="text-fg-3">:</span>
+                  {match.team2_score}
+                </span>
+              )}
+            </div>
           </Link>
         ) : (
-          <div className="text-fg-3">{i.running ? "Матча нет" : "—"}</div>
+          <div className={cn("text-fg-3", hero && "text-[15px] pt-1")}>{i.running ? "Свободен — матча нет" : "Не запущен"}</div>
         )}
-        <div className="flex items-center justify-between gap-2 text-[12px] text-fg-3">
-          <span className="num truncate">{i.map ?? "—"}</span>
-          <span className="num">{players != null ? `${players}/10` : "—"}</span>
+
+        <div className="flex items-center justify-between gap-2 font-mono text-[12px] text-fg-3">
+          <span className="truncate">{i.map ?? "—"}</span>
+          <span className={cn(players ? "text-fg-2" : undefined)}>{players != null ? `${players}/10` : "—"}</span>
         </div>
+        {hero && players != null && (
+          <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className={cn("h-full rounded-full", live ? "bg-danger/80" : "bg-accent/70")} style={{ width: `${Math.min(100, players * 10)}%` }} />
+          </div>
+        )}
         {match?.server_state === "loading" && <div className="text-[12px] text-warn">загружает матч…</div>}
         {match?.server_state === "error" && <div className="text-[12px] text-danger">карта не загрузилась</div>}
         {waited != null && (
-          <div className={cn("text-[12px] num", waited >= 15 ? "text-danger font-semibold" : waited >= 10 ? "text-warn" : "text-ok")}>
+          <div className={cn("num text-[12px]", waited >= 15 ? "font-semibold text-danger" : waited >= 10 ? "text-warn" : "text-ok")}>
             ждём игроков {waited} мин{waited >= 15 ? " · неявка" : ""}
           </div>
         )}
       </div>
 
       {online && (
-        <div className="border-t border-white/[0.06] px-2 py-2">
+        <div className="border-t border-white/[0.06] bg-black/20 px-2 py-2">
           <ServerActions instance={i.name} running={!!i.running} align="start" />
         </div>
       )}

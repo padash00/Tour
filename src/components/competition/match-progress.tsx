@@ -54,7 +54,7 @@ export function MatchProgress({ status, singleMap }: { status: MatchStatus; sing
             </div>
             <div
               className={cn(
-                "mt-2.5 truncate text-[11px] font-medium uppercase tracking-[0.2em] sm:text-[12px]",
+                "mt-2.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] sm:text-[12px] sm:tracking-[0.2em]",
                 now ? (s.key === "live" ? "text-live" : "text-fg") : done ? "text-fg-2" : "text-fg-4",
               )}
             >

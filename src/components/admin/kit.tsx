@@ -128,19 +128,19 @@ export type LifeStep = { key: string; label: string; hint?: string; at?: string 
  */
 export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; current: number; cancelled?: boolean }) {
   return (
-    <ol className="grid grid-flow-col auto-cols-fr gap-1.5 overflow-x-auto [scrollbar-width:none]">
+    <ol className="grid grid-flow-col auto-cols-[minmax(120px,1fr)] gap-1.5 overflow-x-auto [scrollbar-width:none]">
       {steps.map((s, i) => {
         const done = i < current;
         const now = i === current;
         return (
-          <li key={s.key} className="min-w-[96px]">
+          <li key={s.key} className="min-w-[120px]">
             <div
               className={cn(
                 "h-1 rounded-full",
                 cancelled ? "bg-danger/30" : done ? "bg-accent" : now ? "bg-accent/60" : "bg-white/[0.08]",
               )}
             />
-            <div className={cn("mt-2 text-[12px] font-medium", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
+            <div className={cn("mt-2 truncate text-[12px] font-medium", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
               {done && <span className="mr-1 text-accent">✓</span>}
               {s.label}
             </div>
@@ -178,7 +178,7 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
   return (
     <ol className="grid grid-cols-2 sm:grid-cols-5 gap-px overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.06]">
       {items.map((it) => (
-        <li key={it.label} className="relative bg-[#0b1420] px-4 py-3 min-w-0">
+        <li key={it.label} className="relative bg-[#0a111b] px-4 py-3 min-w-0">
           <span
             className={cn(
               "absolute left-0 top-0 h-[2px] w-full",
@@ -218,11 +218,11 @@ export function RailGroup({ title, children, tone }: { title: string; children: 
 /** Сетка «подпись — значение» в одну строку с разделителями */
 export function FactRow({ items, className }: { items: { label: ReactNode; value: ReactNode }[]; className?: string }) {
   return (
-    <div className={cn(ADMIN_CARD, "grid divide-white/[0.06] max-md:divide-y md:divide-x", className)}>
+    <div className={cn(ADMIN_CARD, "grid divide-white/[0.06] max-md:divide-y md:grid-flow-col md:auto-cols-fr md:divide-x", className)}>
       {items.map((it, i) => (
         <div key={i} className="px-4 py-3 min-w-0">
-          <div className="text-[11px] text-fg-3">{it.label}</div>
-          <div className="mt-0.5 text-[13px] text-fg truncate">{it.value}</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fg-3">{it.label}</div>
+          <div className="mt-1 text-[13px] text-fg truncate">{it.value}</div>
         </div>
       ))}
     </div>

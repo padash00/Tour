@@ -140,7 +140,7 @@ function NextStep({
   return (
     <div
       className={cn(
-        "relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 pl-6 pr-5 py-4",
+        "relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 pl-6 pr-5 py-4",
         "before:absolute before:left-0 before:inset-y-3 before:w-[3px] before:rounded-full",
         bar,
       )}
