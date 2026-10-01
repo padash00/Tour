@@ -12,7 +12,7 @@ import { MatchRow, MatchStatusBadge } from "@/components/match-bits";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { NotificationRow } from "@/components/competition/notification-row";
 import { Avatar, ButtonLink, EmptyState, FaceitLevel, Pill, TeamLogo, buttonClass, cn } from "@/components/ui";
-import { CARD, PageHero, SectionHead, Wrap } from "@/components/public/page-kit";
+import { CARD, PageHero, SectionHead, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Профиль" };
 

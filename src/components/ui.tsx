@@ -28,20 +28,11 @@ const sizes: Record<Size, string> = {
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
   return cn(
-    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] whitespace-nowrap outline-none transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none",
+    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent/60 transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none",
     variants[variant],
     sizes[size],
     extra,
   );
-}
-
-export function Button({
-  variant,
-  size,
-  className,
-  ...props
-}: ComponentProps<"button"> & { variant?: Variant; size?: Size }) {
-  return <button className={buttonClass(variant, size, className)} {...props} />;
 }
 
 export function ButtonLink({
@@ -82,15 +73,6 @@ export function Pill({ tone = "neutral", children, dot }: { tone?: Tone; childre
   );
 }
 
-/** Метка-факт без статуса: формат, режим. Используется редко */
-export function Tag({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center h-6 px-2 rounded-md bg-white/[0.04] text-[12px] text-fg-2 whitespace-nowrap">
-      {children}
-    </span>
-  );
-}
-
 /** Строка фактов через точку: CS2 · 5×5 · LAN */
 export function Meta({ items, className }: { items: ReactNode[]; className?: string }) {
   const list = items.filter((x) => x !== null && x !== undefined && x !== false && x !== "");
@@ -126,73 +108,6 @@ export function Container({
   size?: keyof typeof widths;
 }) {
   return <div className={cn("mx-auto w-full px-4 sm:px-6 lg:px-10", widths[size], className)}>{children}</div>;
-}
-
-export function PageHeader({
-  eyebrow,
-  title,
-  description,
-  actions,
-}: {
-  eyebrow?: ReactNode;
-  title: ReactNode;
-  description?: ReactNode;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between pt-14 pb-10 md:pt-20 md:pb-12">
-      <div className="max-w-3xl">
-        {eyebrow && <div className="text-sm text-fg-3 mb-4">{eyebrow}</div>}
-        <h1 className="text-[36px] md:text-[48px] font-bold tracking-[-0.035em] leading-[1.02]">{title}</h1>
-        {description && <p className="mt-4 text-fg-2 text-base md:text-[17px] leading-relaxed max-w-2xl">{description}</p>}
-      </div>
-      {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
-    </div>
-  );
-}
-
-export function SectionTitle({ title, action, eyebrow }: { title: ReactNode; action?: ReactNode; eyebrow?: ReactNode }) {
-  return (
-    <div className="flex items-end justify-between gap-4 mb-6">
-      <div>
-        {eyebrow && <div className="text-sm text-fg-3 mb-2">{eyebrow}</div>}
-        <h2 className="text-[22px] md:text-[28px] font-bold tracking-[-0.025em] leading-tight">{title}</h2>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-export function Card({ children, className, hover }: { children: ReactNode; className?: string; hover?: boolean }) {
-  return <div className={cn("card", hover && "card-hover", className)}>{children}</div>;
-}
-
-/** Цифра с подписью — без рамки */
-export function Stat({ label, value, hint }: { label: ReactNode; value: ReactNode; hint?: ReactNode }) {
-  return (
-    <div>
-      <div className="label">{label}</div>
-      <div className="mt-1.5 text-lg font-semibold text-fg">{value}</div>
-      {hint && <div className="mt-1 text-xs text-fg-3">{hint}</div>}
-    </div>
-  );
-}
-
-/** Крупная цифра — для ключевой статистики профиля и матча */
-export function BigStat({ label, value, tone }: { label: ReactNode; value: ReactNode; tone?: "ok" | "danger" | "accent" }) {
-  return (
-    <div>
-      <div
-        className={cn(
-          "num text-[32px] md:text-[40px] font-semibold tracking-[-0.03em] leading-none",
-          tone === "ok" ? "text-ok" : tone === "danger" ? "text-danger" : tone === "accent" ? "text-accent" : "text-fg",
-        )}
-      >
-        {value}
-      </div>
-      <div className="mt-2 text-[13px] text-fg-3">{label}</div>
-    </div>
-  );
 }
 
 export function KV({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -358,68 +273,6 @@ export function IconArrow({ className = "size-4" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden>
       <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function IconSpark({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function IconUsers({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <circle cx="9" cy="8" r="3.5" />
-      <path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" strokeLinecap="round" />
-      <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.6.8 2.6 2.6 3 5.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function IconTrophy({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
-      <path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8M9 17h6v3H9z" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function IconChart({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function IconServer({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <rect x="3" y="4" width="18" height="7" rx="2" />
-      <rect x="3" y="13" width="18" height="7" rx="2" />
-      <path d="M7 7.5h.01M7 16.5h.01" strokeLinecap="round" strokeWidth="2.4" />
-    </svg>
-  );
-}
-
-export function IconShield({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z" />
-      <path d="m9 12 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-export function IconBracket({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className={className} aria-hidden>
-      <path d="M3 5h5v6H3M3 13h5v6H3M8 8h4v8H8M12 12h9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

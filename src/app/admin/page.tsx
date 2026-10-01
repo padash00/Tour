@@ -41,6 +41,8 @@ export default async function AdminOverview() {
   const waiting = (waitingRows ?? []).filter(
     (m) => m.server_state === "error" || (m.server_ready_at && now - new Date(m.server_ready_at).getTime() > 10 * 60_000),
   );
+  const serverErrors = waiting.filter((m) => m.server_state === "error");
+  const noShow = waiting.filter((m) => m.server_state !== "error");
   const disputes = (openDisputes ?? []) as unknown as { id: string; match: { id: string; number: number } }[];
   const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
@@ -63,32 +65,46 @@ export default async function AdminOverview() {
         actions={<ButtonLink href="/admin/tournaments/new" size="sm" className="rounded-[8px]">Новый турнир</ButtonLink>}
       />
 
-      {/* сигналы, требующие действия */}
-      {(waiting.length > 0 || disputeMatches.length > 0 || pendingTournaments.length > 0 || !servers.online) && (
+      {/* сигналы по приоритету: агент → ошибка сервера → неявка → споры → заявки */}
+      {(!servers.online || serverErrors.length > 0 || noShow.length > 0 || disputeMatches.length > 0 || pendingTournaments.length > 0) && (
         <div className="space-y-2">
           {!servers.online && (
-            <AlertRow tone="danger" title="Агент не на связи">
-              Серверы не управляются.{" "}
-              <Link href="/admin/servers" className="text-accent hover:underline">Серверы →</Link>
+            <AlertRow tone="danger" title="Агент не на связи" action={{ href: "/admin/servers", label: "Серверы" }}>
+              Серверы не управляются: матчи не загрузятся, пока серверный ПК не выйдет на связь.
             </AlertRow>
           )}
-          {waiting.length > 0 && (
-            <AlertRow tone="danger" title="Матчи стоят">
-              {waiting.map((m, i) => (
+          {serverErrors.length > 0 && (
+            <AlertRow
+              tone="danger"
+              title={`Ошибка сервера: ${serverErrors.length}`}
+              action={{ href: `/admin/matches/${serverErrors[0].id}`, label: "Перенести" }}
+            >
+              {serverErrors.map((m, i) => (
+                <span key={m.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
+                    #{m.number}
+                  </Link>
+                </span>
+              ))}{" "}
+              — карта не загрузилась
+            </AlertRow>
+          )}
+          {noShow.length > 0 && (
+            <AlertRow tone="warn" title="Матчи стоят" action={{ href: `/admin/matches/${noShow[0].id}`, label: "Открыть" }}>
+              {noShow.map((m, i) => (
                 <span key={m.id}>
                   {i > 0 && ", "}
                   <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
                     #{m.number}
                   </Link>{" "}
-                  {m.server_state === "error"
-                    ? "— ошибка сервера"
-                    : `— игроки не подключились ${Math.floor((now - new Date(m.server_ready_at!).getTime()) / 60000)} мин`}
+                  — игроки не подключились {Math.floor((now - new Date(m.server_ready_at!).getTime()) / 60000)} мин
                 </span>
               ))}
             </AlertRow>
           )}
           {disputeMatches.length > 0 && (
-            <AlertRow tone="warn" title="Споры">
+            <AlertRow tone="warn" title={`Споры: ${disputes.length}`} action={{ href: `/admin/matches/${disputeMatches[0].id}`, label: "Разобрать" }}>
               {disputeMatches.map((m, i) => (
                 <span key={m.id}>
                   {i > 0 && ", "}
@@ -100,7 +116,11 @@ export default async function AdminOverview() {
             </AlertRow>
           )}
           {pendingTournaments.length > 0 && (
-            <AlertRow tone="warn" title={`Заявки ждут: ${pending.length}`}>
+            <AlertRow
+              tone="accent"
+              title={`Заявки ждут: ${pending.length}`}
+              action={{ href: `/admin/tournaments/${pendingTournaments[0].id}?tab=registration`, label: "Рассмотреть" }}
+            >
               {pendingTournaments.map((t, i) => (
                 <span key={t.id}>
                   {i > 0 && ", "}

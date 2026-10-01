@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { OutlineBtn, PrimaryBtn, WRAP } from "@/components/public/home";
-import { PageHero, SectionLabel } from "@/components/public/page-hero";
+import { OutlineBtn, PageHero, PrimaryBtn, SectionHead, WRAP } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "О платформе" };
 
@@ -32,7 +31,7 @@ export default function AboutPage() {
       </p>
 
       <section className="pt-16">
-        <SectionLabel>Как проходит турнир</SectionLabel>
+        <SectionHead>Как проходит турнир</SectionHead>
         <ol className="mt-2">
           {FLOW.map((f, i) => (
             <li key={f.stage} className="grid sm:grid-cols-[48px_200px_1fr] gap-2 sm:gap-6 py-6 border-t border-white/[0.06]">
@@ -48,7 +47,7 @@ export default function AboutPage() {
       </section>
 
       <section className="pt-16">
-        <SectionLabel>Принципы</SectionLabel>
+        <SectionHead>Принципы</SectionHead>
         <div className="mt-6 grid sm:grid-cols-2 gap-4">
           {PRINCIPLES.map((b) => (
             <div key={b.t} className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-8">
@@ -60,7 +59,7 @@ export default function AboutPage() {
       </section>
 
       <section className="pt-16">
-        <SectionLabel>Связаться</SectionLabel>
+        <SectionHead>Связаться</SectionHead>
         <p className="text-fg-2 leading-relaxed max-w-xl lg:text-[17px]">
           Хотите провести турнир в F16 или стать партнёром — напишите клубу.
         </p>

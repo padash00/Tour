@@ -42,7 +42,7 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
       {teams.length === 0 ? (
         <EmptyState compact title={q ? "Ничего не найдено" : "Команд пока нет"} />
       ) : (
-        <TableBox minWidth={900}>
+        <TableBox minWidth={900} maxHeight={720}>
           <thead>
             <tr>
               <th>Команда</th>

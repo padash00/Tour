@@ -6,9 +6,9 @@ import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
 import { getPlayerLeaderboard } from "@/lib/stats";
 import { MatchLine, TStatus } from "@/components/public/bits";
-import { CARD, HeroNumber, PageHero, SectionHead, Wrap } from "@/components/public/page-kit";
 import { ratingColor } from "@/components/stats-table";
 import { Avatar, FaceitLevel, Pill, TeamLogo, cn } from "@/components/ui";
+import { CARD, HeroNumber, PageHero, SectionHead, Wrap } from "@/components/primitives";
 
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;

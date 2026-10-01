@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "node scripts/apply-migrations.mjs --ci && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check": "tsc --noEmit && eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

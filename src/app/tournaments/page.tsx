@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
 import { TournamentLine } from "@/components/public/bits";
-import { OutlineBtn, TournamentCard, WRAP } from "@/components/public/home";
-import { PageHero, SectionLabel } from "@/components/public/page-hero";
+import { TournamentCard } from "@/components/public/home";
 import { cn } from "@/components/ui";
+import { OutlineBtn, PageHero, SectionHead, WRAP } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Турниры" };
 
@@ -22,7 +22,7 @@ export default async function TournamentsPage() {
 
       <div className={cn(WRAP, "pt-14")}>
         <section>
-          <SectionLabel>Текущий турнир</SectionLabel>
+          <SectionHead>Текущий турнир</SectionHead>
           {current ? (
             <TournamentCard t={current} approved={counts[current.id] ?? 0} isFirst={isFirst} />
           ) : (
@@ -37,7 +37,7 @@ export default async function TournamentsPage() {
         </section>
 
         <section className="mt-16 lg:mt-20">
-          <SectionLabel>Следующие турниры</SectionLabel>
+          <SectionHead>Следующие турниры</SectionHead>
           {upcoming.length > 0 ? (
             <div className="border-t border-white/[0.06]">
               {upcoming.map((t) => (
@@ -54,9 +54,9 @@ export default async function TournamentsPage() {
 
         {archive.length > 0 && (
           <section className="mt-16 lg:mt-20">
-            <SectionLabel action={<Link href="/stats" className="text-[14px] text-fg-3 hover:text-fg">Статистика →</Link>}>
+            <SectionHead action={<Link href="/stats" className="text-[14px] text-fg-3 hover:text-fg">Статистика →</Link>}>
               Архив
-            </SectionLabel>
+            </SectionHead>
             <div className="border-t border-white/[0.06]">
               {archive.map((t) => (
                 <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />

@@ -4,7 +4,7 @@ import type { PlayerAgg } from "@/lib/stats";
 import type { Player } from "@/lib/types";
 import { fmt, ratingColor, swingColor } from "./stats-table";
 import { Avatar, FaceitLevel, TeamLogo, cn } from "./ui";
-import { CARD, PageHero, SectionHead, Wrap } from "./public/page-kit";
+import { CARD, PageHero, SectionHead, Wrap } from "./primitives";
 
 export type MapHistoryItem = {
   key: string;

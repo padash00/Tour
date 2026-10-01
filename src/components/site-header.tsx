@@ -49,7 +49,7 @@ export async function SiteHeader() {
             <>
               <Link
                 href="/notifications"
-                className="relative grid place-items-center size-10 rounded-md text-fg-3 hover:text-fg hover:bg-white/[0.04] transition"
+                className="relative grid place-items-center size-11 rounded-md text-fg-3 hover:text-fg hover:bg-white/[0.04] transition"
                 aria-label="Уведомления"
               >
                 <IconBell className="size-[18px]" />

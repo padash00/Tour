@@ -17,8 +17,8 @@ import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 
 import { MapTile } from "@/components/competition/map-tile";
 import Image from "next/image";
-import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "@/components/public/home";
 import { tournamentStatusLabel } from "@/lib/format";
+import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "@/components/primitives";
 import {
   Avatar,
   ButtonLink,

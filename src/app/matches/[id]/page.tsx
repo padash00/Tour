@@ -18,7 +18,7 @@ import { MatchHero } from "@/components/competition/match-hero";
 import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
 import { VetoBoard } from "@/components/competition/veto-board";
 import { ButtonLink, EmptyState, Pill, cn } from "@/components/ui";
-import { Eyebrow, WRAP } from "@/components/public/home";
+import { Eyebrow, WRAP } from "@/components/primitives";
 
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;

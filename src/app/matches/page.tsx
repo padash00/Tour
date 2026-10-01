@@ -6,8 +6,7 @@ import { MatchLine } from "@/components/public/bits";
 import { visibleMatches } from "@/components/match-bits";
 import { LiveRefresh } from "@/components/live-refresh";
 import { EmptyState } from "@/components/ui";
-import { WRAP } from "@/components/public/home";
-import { PageHero, SectionLabel } from "@/components/public/page-hero";
+import { PageHero, SectionHead, WRAP } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Матчи" };
 
@@ -43,14 +42,14 @@ export default async function MatchesPage() {
         <div className="space-y-16">
           {live.length > 0 && (
             <section>
-              <SectionLabel>Сейчас в игре</SectionLabel>
+              <SectionHead>Сейчас в игре</SectionHead>
               {live.map((m) => (
                 <MatchLine key={m.id} m={m} />
               ))}
             </section>
           )}
           <section>
-            <SectionLabel>Ближайшие</SectionLabel>
+            <SectionHead>Ближайшие</SectionHead>
             {next.length > 0 ? (
               next.map((m) => <MatchLine key={m.id} m={m} />)
             ) : (
@@ -61,7 +60,7 @@ export default async function MatchesPage() {
           </section>
           {finished.length > 0 && (
             <section>
-              <SectionLabel>Завершённые</SectionLabel>
+              <SectionHead>Завершённые</SectionHead>
               {finished.map((m) => (
                 <MatchLine key={m.id} m={m} />
               ))}

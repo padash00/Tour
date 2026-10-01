@@ -40,6 +40,135 @@ function ActionBlock({ title, children, tone }: { title: string; children: React
   );
 }
 
+/** Время запроса (серверный компонент рендерится один раз на запрос) */
+function serverNow() {
+  return Date.now();
+}
+
+/**
+ * «Следующий шаг» — одно главное действие оператора для текущего этапа матча.
+ * Использует те же серверные действия, что и правая колонка.
+ */
+function NextStep({
+  id,
+  status,
+  serverInstance,
+  serverState,
+  serverReadyAt,
+  vetoSteps,
+  agentOnline,
+  liveMap,
+  score,
+  winner,
+}: {
+  id: string;
+  status: string;
+  serverInstance: string | null;
+  serverState: string | null;
+  serverReadyAt: string | null;
+  vetoSteps: number;
+  agentOnline: boolean;
+  liveMap: string | null;
+  score: string;
+  winner: string | null;
+}) {
+  let tone: "accent" | "warn" | "danger" | "ok" | "muted" = "accent";
+  let title: string;
+  let text: ReactNode = null;
+  let action: ReactNode = null;
+
+  if (status === "pending") {
+    tone = "muted";
+    title = "Ждём соперников";
+    text = "Матч откроется, когда определятся обе команды.";
+  } else if (status === "upcoming") {
+    title = "Начать вето";
+    text = "Команды готовы. На шаг вето — 60 секунд.";
+    action = (
+      <ActionForm action={startVeto}>
+        <input type="hidden" name="matchId" value={id} />
+        <SubmitButton size="sm">Начать вето</SubmitButton>
+      </ActionForm>
+    );
+  } else if (status === "veto") {
+    tone = "warn";
+    title = `Идёт вето · шаг ${vetoSteps + 1}`;
+    text = "Капитаны выбирают карты на странице матча.";
+    action = (
+      <Link href={`/matches/${id}`} className="text-[13px] text-accent hover:underline">
+        Смотреть вето →
+      </Link>
+    );
+  } else if (status === "ready" && (!serverInstance || serverState === "error")) {
+    tone = serverState === "error" ? "danger" : "accent";
+    title = serverState === "error" ? "Сервер не загрузил матч" : "Отправить на сервер";
+    text = !agentOnline
+      ? "Агент не на связи — сначала проверьте серверный ПК."
+      : serverState === "error"
+        ? "Перенесите матч на свободный сервер."
+        : "Сайт выберет свободный сервер и выдаст адрес игрокам.";
+    action = (
+      <ActionForm action={sendMatchToServer}>
+        <input type="hidden" name="matchId" value={id} />
+        <input type="hidden" name="instance" value="" />
+        <SubmitButton size="sm" variant={serverState === "error" ? "danger" : "primary"}>
+          {serverState === "error" ? "Перенести на свободный" : "Отправить на сервер"}
+        </SubmitButton>
+      </ActionForm>
+    );
+  } else if (status === "ready" && serverState !== "ready") {
+    tone = "warn";
+    title = `${serverInstance} загружает матч`;
+    text = "Адрес появится у игроков, когда на сервере будет нужная карта.";
+  } else if (status === "ready") {
+    const waited = serverReadyAt ? Math.floor((serverNow() - new Date(serverReadyAt).getTime()) / 60000) : 0;
+    tone = waited >= 15 ? "danger" : waited >= 10 ? "warn" : "ok";
+    title = waited >= 15 ? `Неявка: ждём ${waited} мин` : `Ждём игроков · ${waited} мин`;
+    text = `Сервер ${serverInstance} готов. Матч станет LIVE сам, когда игроки начнут.`;
+    action = (
+      <ActionForm action={setMatchLive}>
+        <input type="hidden" name="matchId" value={id} />
+        <SubmitButton size="sm" variant="secondary">
+          Отметить LIVE вручную
+        </SubmitButton>
+      </ActionForm>
+    );
+  } else if (status === "live") {
+    tone = "danger";
+    title = `LIVE · ${score}`;
+    text = liveMap ?? "Матч идёт на сервере.";
+    action = (
+      <a href="#maps" className="text-[13px] text-accent hover:underline">
+        Счёт карт ↓
+      </a>
+    );
+  } else {
+    tone = "ok";
+    title = winner ? `Завершён · победа ${winner}` : "Матч завершён";
+    text = `Итог ${score}.`;
+  }
+
+  const bar = { accent: "before:bg-accent", warn: "before:bg-warn", danger: "before:bg-danger", ok: "before:bg-ok", muted: "before:bg-fg-3/60" }[tone];
+  const label = { accent: "text-accent", warn: "text-warn", danger: "text-danger", ok: "text-ok", muted: "text-fg-3" }[tone];
+
+  return (
+    <div
+      className={cn(
+        "relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 pl-6 pr-5 py-4",
+        "before:absolute before:left-0 before:inset-y-3 before:w-[3px] before:rounded-full",
+        bar,
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", label)}>Следующий шаг</div>
+        <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.01em]">{title}</div>
+        {text && <div className="mt-0.5 text-[13px] text-fg-3">{text}</div>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
 export default async function AdminMatchPage(props: PageProps<"/admin/matches/[id]">) {
   const { id } = await props.params;
   await applyVetoTimeouts(id);
@@ -101,6 +230,19 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
         {/* ── состояние ── */}
         <div className="space-y-6 min-w-0">
+          <NextStep
+            id={m.id}
+            status={m.status}
+            serverInstance={m.server_instance}
+            serverState={m.server_state}
+            serverReadyAt={m.server_ready_at}
+            vetoSteps={m.veto.length}
+            agentOnline={servers.online}
+            liveMap={currentMap ? `Карта ${currentMap.map_number} · ${mapName(currentMap.map_name)}` : null}
+            score={`${m.team1_score}:${m.team2_score}`}
+            winner={m.winner_id ? (m.winner_id === m.team1_id ? t1 : t2) : null}
+          />
+
           {/* табло */}
           <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 px-7 py-7">
@@ -174,7 +316,8 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
 
           {/* карты */}
           {m.maps.length > 0 && (
-            <Panel title="Карты">
+            <Panel title="Карты" className="scroll-mt-6">
+              <span id="maps" className="block -mt-2" />
               <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
                 {m.maps.map((map) => (
                   <div key={map.id} className={cn("p-4", map.status === "live" && "bg-danger/[0.03]")}>

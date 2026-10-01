@@ -7,9 +7,9 @@ import { getEntrantTeam, getRegistration, getTournamentBySlug, getTournamentRegi
 import { formatDateTime, formatTime } from "@/lib/format";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Flow, FlowHeader } from "@/components/public/flow";
 import { TimeLeft } from "@/components/competition/time-left";
 import { Avatar, EmptyState, Notice, TeamLogo, cn } from "@/components/ui";
+import { Flow, FlowHeader } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Check-in" };
 

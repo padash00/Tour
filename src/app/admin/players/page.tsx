@@ -32,7 +32,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
       {players.length === 0 ? (
         <EmptyState compact title="Игроков не найдено" />
       ) : (
-        <TableBox minWidth={940}>
+        <TableBox minWidth={940} maxHeight={720}>
           <thead>
             <tr>
               <th>SteamID64</th>

@@ -6,7 +6,7 @@ import { getMapTable, getPlayerLeaderboard, getTeamTable } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer } from "@/components/stats-table";
 import { SelectNav } from "@/components/public/select-nav";
 import { Tabs, TeamLogo, cn } from "@/components/ui";
-import { CARD, PageHero, Wrap } from "@/components/public/page-kit";
+import { CARD, PageHero, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Статистика" };
 

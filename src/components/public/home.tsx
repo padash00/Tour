@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { bracketLabel, formatDate, tournamentStatusLabel } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import type { Tournament, TournamentStatus } from "@/lib/types";
 import { IconArrow, cn } from "../ui";
+import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "../primitives";
 
 /*
  * Главная F16 Arena — по утверждённому макету (F16_Homepage_Approved_Reference.png).
@@ -19,38 +19,6 @@ export type HomeData = {
   upcoming: Tournament[];
   loggedIn: boolean;
 };
-
-export const WRAP = "mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-16";
-
-// ───────────────────────── общие элементы
-
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("text-[11px] sm:text-[12px] lg:text-[14px] font-medium uppercase tracking-[0.34em] text-[#7f93b0]", className)}>{children}</div>
-  );
-}
-
-export function PrimaryBtn({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex h-[52px] lg:h-[60px] min-w-[230px] lg:min-w-[300px] items-center justify-center gap-3 rounded-[8px] bg-accent px-8 text-[15px] lg:text-[17px] font-semibold text-[#07101b] transition-colors duration-150 hover:bg-accent-strong"
-    >
-      {children}
-    </Link>
-  );
-}
-
-export function OutlineBtn({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex h-[52px] lg:h-[60px] min-w-[200px] lg:min-w-[250px] items-center justify-center gap-3 rounded-[8px] border border-white/25 px-8 text-[15px] lg:text-[17px] font-semibold text-fg transition-colors duration-150 hover:border-white/45 hover:bg-white/[0.03]"
-    >
-      {children}
-    </Link>
-  );
-}
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 

@@ -26,8 +26,7 @@ import { RosterList } from "@/components/roster-list";
 import { TeamForm } from "@/components/team-form";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { EmptyState, Notice, Pill, TeamLogo, cn } from "@/components/ui";
-import { OutlineBtn, PrimaryBtn } from "@/components/public/home";
-import { CARD, HeroNumber, PageHero, SectionHead, Wrap } from "@/components/public/page-kit";
+import { CARD, HeroNumber, OutlineBtn, PageHero, PrimaryBtn, SectionHead, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Моя команда" };
 

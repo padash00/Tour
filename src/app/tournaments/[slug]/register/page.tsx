@@ -9,8 +9,8 @@ import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
-import { Flow, FlowHeader, Step } from "@/components/public/flow";
 import { Avatar, ButtonLink, FaceitLevel, Notice, Pill, TeamLogo } from "@/components/ui";
+import { Flow, FlowHeader, Step } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Регистрация на турнир" };
 

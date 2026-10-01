@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
-import { OutlineBtn, PrimaryBtn } from "@/components/public/home";
-import { CARD, PageHero, SearchField, Wrap } from "@/components/public/page-kit";
 import { IconArrow, TeamLogo, cn } from "@/components/ui";
+import { CARD, OutlineBtn, PageHero, PrimaryBtn, SearchField, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Команды" };
 

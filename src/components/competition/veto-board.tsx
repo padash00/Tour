@@ -4,9 +4,9 @@ import { mapName } from "@/lib/format";
 import type { vetoState } from "@/lib/veto";
 import { ActionForm } from "../forms";
 import { Countdown } from "../live-refresh";
-import { Eyebrow } from "../public/home";
 import { cn } from "../ui";
 import { MapTile, type MapTileState } from "./map-tile";
+import { Eyebrow } from "@/components/primitives";
 
 type VetoState = ReturnType<typeof vetoState>;
 

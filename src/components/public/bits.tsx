@@ -1,53 +1,24 @@
 import Link from "next/link";
-import { bracketLabel, formatDate, formatDateTime, formatTime, tournamentStatusLabel } from "@/lib/format";
+import { bracketLabel, formatDate, formatTime } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { MatchStatus, Tournament, TournamentStatus } from "@/lib/types";
-import { ButtonLink, IconArrow, Meta, Pill, TeamLogo, cn } from "../ui";
+import { IconArrow, Meta, TeamLogo, cn } from "../ui";
+import { MatchStatusChip, TournamentStatusChip } from "../primitives";
 
-// ───────────────────────── статусы
-
-const tStatusTone: Record<TournamentStatus, "neutral" | "accent" | "ok" | "warn" | "danger" | "live"> = {
-  draft: "neutral",
-  registration: "ok",
-  registration_closed: "neutral",
-  checkin: "warn",
-  live: "live",
-  finished: "neutral",
-  cancelled: "danger",
-};
+// ───────────────────────── статусы (общие чипы)
 
 export function TStatus({ status }: { status: TournamentStatus }) {
-  return <Pill tone={tStatusTone[status]}>{status === "live" ? "Live" : tournamentStatusLabel[status]}</Pill>;
+  return <TournamentStatusChip status={status} size="sm" />;
 }
 
-const mStatusTone: Record<MatchStatus, "neutral" | "accent" | "ok" | "warn" | "danger" | "live"> = {
-  pending: "neutral",
-  upcoming: "neutral",
-  veto: "warn",
-  ready: "accent",
-  live: "live",
-  finished: "neutral",
-  cancelled: "neutral",
-};
-
-const mStatusLabel: Record<MatchStatus, string> = {
-  pending: "Ожидает",
-  upcoming: "Скоро",
-  veto: "Вето",
-  ready: "Сервер готов",
-  live: "Live",
-  finished: "Завершён",
-  cancelled: "Отменён",
-};
-
 export function MStatus({ status }: { status: MatchStatus }) {
-  return <Pill tone={mStatusTone[status]}>{mStatusLabel[status]}</Pill>;
+  return <MatchStatusChip status={status} />;
 }
 
 // ───────────────────────── факты турнира
 
-export function tournamentFacts(t: Tournament, approved?: number) {
+function tournamentFacts(t: Tournament, approved?: number) {
   const mode = modeOf(t.format);
   return [
     t.game,
@@ -59,88 +30,13 @@ export function tournamentFacts(t: Tournament, approved?: number) {
 }
 
 /** Фото турнира: обложка из базы или кадр из утверждённого макета главной, затемнённый снизу */
-export function CoverImage({ url, className }: { url: string | null; className?: string }) {
+function CoverImage({ url, className }: { url: string | null; className?: string }) {
   return (
     <div className={cn("relative overflow-hidden bg-bg-2", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url ?? "/home/tournament.jpg"} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.8]" />
       <div className="absolute inset-0 bg-gradient-to-t from-bg/80 via-bg/20 to-transparent" />
     </div>
-  );
-}
-
-/** Главная секция текущего турнира: одна, крупная, без карточки-коробки */
-export function CurrentTournament({ t, approved }: { t: Tournament; approved: number }) {
-  const mode = modeOf(t.format);
-  const cta =
-    t.status === "registration"
-      ? { href: `/tournaments/${t.slug}/register`, label: mode.size === 1 ? "Зарегистрироваться" : "Зарегистрировать команду" }
-      : t.status === "checkin"
-        ? { href: `/tournaments/${t.slug}/checkin`, label: "Пройти check-in" }
-        : t.status === "live"
-          ? { href: `/tournaments/${t.slug}?tab=bracket`, label: "Смотреть сетку" }
-          : null;
-  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? t.prize_pool : null;
-  const facts: { label: string; value: string }[] = [
-    { label: mode.size === 1 ? "Участники" : "Команды", value: `${approved} / ${t.max_teams}` },
-    { label: "Режим", value: mode.size === 5 ? "5×5" : mode.size === 2 ? "2×2" : "1×1" },
-    { label: "Формат", value: bracketLabel[t.bracket_type] ?? t.bracket_type },
-    { label: "Старт", value: formatDate(t.starts_at) },
-    ...(prize ? [{ label: "Призовой фонд", value: prize }] : []),
-    ...(t.status === "registration" && t.registration_closes_at
-      ? [{ label: "Регистрация до", value: formatDateTime(t.registration_closes_at) }]
-      : []),
-  ];
-
-  return (
-    <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-stretch">
-      <div className="flex flex-col">
-        <TStatus status={t.status} />
-        <h2 className="mt-5 text-[40px] sm:text-[56px] font-bold tracking-[-0.04em] leading-[0.98]">{t.name}</h2>
-        <Meta className="mt-5 text-[15px]" items={[t.game, t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн")]} />
-        {t.description && <p className="mt-6 max-w-xl text-fg-2 leading-relaxed line-clamp-3">{t.description}</p>}
-        <div className="mt-10 lg:mt-auto lg:pt-10 flex flex-wrap gap-3">
-          {cta && (
-            <ButtonLink href={cta.href} size="lg">
-              {cta.label}
-            </ButtonLink>
-          )}
-          <ButtonLink href={`/tournaments/${t.slug}`} variant={cta ? "secondary" : "primary"} size="lg">
-            Подробнее
-            <IconArrow />
-          </ButtonLink>
-        </div>
-      </div>
-
-      {t.cover_url ? (
-        <div className="flex flex-col gap-4">
-          <CoverImage url={t.cover_url} className="min-h-[240px] lg:min-h-[300px] rounded-[16px]" />
-          <FactsGrid facts={facts} />
-        </div>
-      ) : (
-        <FactsGrid facts={facts} />
-      )}
-    </div>
-  );
-}
-
-function FactsGrid({ facts }: { facts: { label: string; value: string }[] }) {
-  return (
-    <dl className="grid grid-cols-2 rounded-[16px] border border-line bg-surface overflow-hidden self-start w-full">
-      {facts.map((f, i) => (
-        <div
-          key={f.label}
-          className={cn(
-            "px-6 py-5",
-            i % 2 === 1 && "border-l border-line",
-            i >= 2 && "border-t border-line",
-          )}
-        >
-          <dt className="text-[13px] text-fg-3">{f.label}</dt>
-          <dd className="mt-1.5 text-[20px] font-semibold tracking-[-0.02em] truncate">{f.value}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 

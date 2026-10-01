@@ -4,8 +4,7 @@ import { getCurrentPlayer } from "@/lib/auth";
 import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamByInvite, getTeamMembers } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Avatar, ButtonLink, Container, EmptyState, IconSteam, Notice, TeamLogo, buttonClass } from "@/components/ui";
-import { CARD } from "@/components/public/page-kit";
-import { Eyebrow } from "@/components/public/home";
+import { CARD, Eyebrow } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Приглашение в команду" };
 

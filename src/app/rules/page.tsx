@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { WRAP } from "@/components/public/home";
-import { PageHero } from "@/components/public/page-hero";
+import { PageHero, WRAP } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Правила" };
 

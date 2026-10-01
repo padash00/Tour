@@ -1,4 +1,4 @@
-import { Eyebrow, OutlineBtn, WRAP } from "@/components/public/home";
+import { Eyebrow, OutlineBtn, WRAP } from "@/components/primitives";
 
 export default function NotFound() {
   return (

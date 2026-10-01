@@ -100,7 +100,23 @@ export default async function ServersPage() {
       </div>
 
       {/* инстансы */}
-      <Panel title="Инстансы">
+      <Panel
+        title="Инстансы"
+        action={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-fg-3">
+            <span className="flex items-center gap-1.5">
+              <Dot tone="ok" /> свободно {instances.filter((i) => i.running && (i.gamestate ?? "none") === "none").length}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot tone="danger" /> в матче {instances.filter((i) => i.running && (i.gamestate ?? "none") !== "none").length}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Dot tone="muted" /> выключено {instances.filter((i) => !i.running).length}
+            </span>
+            {busy && <span className="text-warn">агент занят: {busy}</span>}
+          </div>
+        }
+      >
         <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06] overflow-x-auto">
           <div className="min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_260px] gap-4 px-4 h-10 items-center text-[10px] uppercase tracking-[0.2em] font-medium text-[#7f93b0]">
             <span>Инстанс</span>

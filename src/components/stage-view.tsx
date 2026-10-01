@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Eyebrow } from "./public/home";
+import { Eyebrow } from "./primitives";
 import type { StandingRow } from "@/lib/formats";
 import type { Match, Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";

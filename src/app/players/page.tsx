@@ -3,8 +3,8 @@ import Link from "next/link";
 import { listPlayers } from "@/lib/data";
 import { getPlayerLeaderboard } from "@/lib/stats";
 import { ratingColor } from "@/components/stats-table";
-import { CARD, PageHero, SearchField, Wrap } from "@/components/public/page-kit";
 import { Avatar, FaceitLevel, cn } from "@/components/ui";
+import { CARD, PageHero, SearchField, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Игроки" };
 

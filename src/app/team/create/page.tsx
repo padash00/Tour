@@ -4,7 +4,7 @@ import { createTeam } from "@/app/actions/team";
 import { requirePlayer } from "@/lib/auth";
 import { getActiveMembership } from "@/lib/data";
 import { TeamForm } from "@/components/team-form";
-import { CARD, PageHero, Wrap } from "@/components/public/page-kit";
+import { CARD, PageHero, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Создать команду" };
 

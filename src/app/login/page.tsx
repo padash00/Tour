@@ -4,7 +4,7 @@ import { getCurrentPlayer } from "@/lib/auth";
 import { safeNext } from "@/lib/redirect";
 import { BrandLogo } from "@/components/brand";
 import { IconSteam, Notice } from "@/components/ui";
-import { Eyebrow } from "@/components/public/home";
+import { Eyebrow } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Вход" };
 

@@ -1,7 +1,7 @@
 import { mapName } from "@/lib/format";
 import { CopyField } from "../forms";
 import { Countdown } from "../live-refresh";
-import { Eyebrow } from "../public/home";
+import { Eyebrow } from "@/components/primitives";
 
 /** Сервер готов: адрес и одна главная кнопка. Технику игрокам не показываем */
 export function ServerReady({

@@ -8,7 +8,7 @@ import { AdminNav } from "./admin-nav";
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await requireAdmin();
   return (
-    <div className="lg:flex min-h-screen bg-bg">
+    <div className="lg:flex min-h-screen bg-bg [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-2 [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-offset-2 [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-accent/80">
       <aside className="lg:w-[244px] lg:shrink-0 lg:h-screen lg:sticky lg:top-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.06] bg-[#080d15]">
         <div className="h-14 lg:h-[76px] px-6 flex items-center shrink-0">
           <Link href="/admin" aria-label="F16 Control">

@@ -57,6 +57,35 @@ body {
   background: #8ab8ff40;
 }
 
+/* декоративные слои hero не дают горизонтальной прокрутки на телефоне (clip, не hidden — sticky-шапка работает) */
+html,
+body {
+  overflow-x: clip;
+}
+
+a,
+button,
+summary,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* фокус с клавиатуры — акцентное кольцо; мышью — без него */
+:where(a, button, summary, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid #8ab8ffb3;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
   /* мягкий холодный свет сверху — только для hero-зон */
   .atmos {

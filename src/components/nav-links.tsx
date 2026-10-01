@@ -74,7 +74,7 @@ export function MobileMenu({ items }: { items: Item[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="grid place-items-center size-10 rounded-lg text-fg-2 hover:bg-white/[0.04]"
+        className="grid place-items-center size-11 rounded-lg text-fg-2 hover:bg-white/[0.04]"
         aria-label="Меню"
         aria-expanded={open}
       >

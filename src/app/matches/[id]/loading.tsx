@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/ui";
-import { WRAP } from "@/components/public/home";
+import { WRAP } from "@/components/primitives";
 
 export default function Loading() {
   return (

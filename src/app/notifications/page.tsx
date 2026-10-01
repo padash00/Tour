@@ -7,7 +7,7 @@ import type { Notification } from "@/lib/types";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { NotificationRow } from "@/components/competition/notification-row";
 import { EmptyState, Tabs, cn } from "@/components/ui";
-import { CARD, PageHero, Wrap } from "@/components/public/page-kit";
+import { CARD, PageHero, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Уведомления" };
 

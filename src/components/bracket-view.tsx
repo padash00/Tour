@@ -3,7 +3,7 @@ import { roundTitle } from "@/lib/bracket";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
-import { Eyebrow } from "./public/home";
+import { Eyebrow } from "./primitives";
 import { TeamLogo, cn } from "./ui";
 
 // размеры сетки

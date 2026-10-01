@@ -3,9 +3,9 @@ import Link from "next/link";
 import { formatDateTime, mapName } from "@/lib/format";
 import type { MatchFull } from "@/lib/matches";
 import type { Team } from "@/lib/types";
-import { Eyebrow, WRAP } from "../public/home";
 import { MatchStatusBadge } from "../match-bits";
 import { Pill, TeamLogo, cn } from "../ui";
+import { Eyebrow, WRAP } from "@/components/primitives";
 
 /** Шапка матча в стиле утверждённой главной: фото события, команды, крупный счёт серии */
 export function MatchHero({

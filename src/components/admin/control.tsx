@@ -79,10 +79,23 @@ export function Panel({
   );
 }
 
-/** Таблица в карточке: прокрутка по горизонтали на узких экранах */
-export function TableBox({ children, minWidth = 760 }: { children: ReactNode; minWidth?: number }) {
+/** Числовая ячейка: моноширинно, по правому краю */
+export const NUM = "num text-right whitespace-nowrap";
+
+/**
+ * Таблица в карточке: прокрутка по горизонтали на узких экранах.
+ * maxHeight — длинные списки прокручиваются внутри, шапка закреплена.
+ */
+export function TableBox({ children, minWidth = 760, maxHeight }: { children: ReactNode; minWidth?: number; maxHeight?: number }) {
   return (
-    <div className={cn(ADMIN_CARD, "overflow-x-auto")}>
+    <div
+      className={cn(
+        ADMIN_CARD,
+        "overflow-x-auto",
+        !!maxHeight && "overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-[#0b1420]",
+      )}
+      style={maxHeight ? { maxHeight } : undefined}
+    >
       <table className={`tbl tbl-dense ${TH}`} style={{ minWidth }}>
         {children}
       </table>
@@ -104,11 +117,22 @@ export function Dot({ tone, pulse }: { tone: DotTone; pulse?: boolean }) {
 }
 
 /** Строка-сигнал: что требует внимания оператора */
-export function AlertRow({ tone, title, children }: { tone: "danger" | "warn" | "accent"; title: ReactNode; children: ReactNode }) {
+export function AlertRow({
+  tone,
+  title,
+  children,
+  action,
+}: {
+  tone: "danger" | "warn" | "accent";
+  title: ReactNode;
+  children: ReactNode;
+  /** главная ссылка-действие справа */
+  action?: { href: string; label: string };
+}) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 rounded-[10px] border text-[13px]",
+        "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-[10px] border text-[13px]",
         tone === "danger"
           ? "border-danger/30 bg-danger/[0.06]"
           : tone === "warn"
@@ -119,7 +143,22 @@ export function AlertRow({ tone, title, children }: { tone: "danger" | "warn" | 
       <span className={cn("font-semibold", tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "text-accent")}>
         {title}
       </span>
-      <span className="text-fg-2">{children}</span>
+      <span className="text-fg-2 min-w-0 flex-1">{children}</span>
+      {action && (
+        <Link
+          href={action.href}
+          className={cn(
+            "ml-auto inline-flex h-8 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors",
+            tone === "danger"
+              ? "border-danger/40 text-danger hover:bg-danger/[0.1]"
+              : tone === "warn"
+                ? "border-warn/40 text-warn hover:bg-warn/[0.1]"
+                : "border-accent/40 text-accent hover:bg-accent/[0.1]",
+          )}
+        >
+          {action.label} →
+        </Link>
+      )}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
       {matches.length === 0 ? (
         <EmptyState compact title="Матчей нет" description="Матчи создаются при генерации сетки на странице турнира." />
       ) : (
-        <TableBox minWidth={980}>
+        <TableBox minWidth={980} maxHeight={720}>
           <thead>
             <tr>
               <th>#</th>
