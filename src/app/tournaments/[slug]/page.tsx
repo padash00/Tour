@@ -14,17 +14,20 @@ import { ShareButton, StreamEmbed } from "@/components/stream";
 import { BracketView } from "@/components/bracket-view";
 import { GroupStageView, SwissView } from "@/components/stage-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
-import { TournamentCover, TournamentStatusPill } from "@/components/tournament-bits";
+
 import { MapTile } from "@/components/competition/map-tile";
+import Image from "next/image";
+import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "@/components/public/home";
+import { tournamentStatusLabel } from "@/lib/format";
 import {
   Avatar,
   ButtonLink,
-  Container,
+
   EmptyState,
   FaceitLevel,
   IconArrow,
   KV,
-  Meta,
+
   Notice,
   Pill,
   Tabs,
@@ -69,10 +72,23 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
   return (
     <>
       <section className="relative overflow-hidden">
-        {t.cover_url && <TournamentCover url={t.cover_url} strong />}
-        <Container className="relative pt-10 pb-10 md:pb-12">
+        {/* фото события: обложка турнира или кадр из утверждённого макета */}
+        <div className="pointer-events-none absolute inset-0">
+          <Image
+            src={t.cover_url ?? "/home/tournament.jpg"}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[60%_30%] opacity-70"
+            unoptimized={!!t.cover_url}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-bg/30" />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-bg to-transparent" />
+        </div>
+        <div className={`${WRAP} relative pt-10 pb-12 lg:pt-12 lg:pb-16`}>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <Link href="/tournaments" className="text-fg-3 hover:text-fg-2">
+            <Link href="/tournaments" className="text-fg-2 hover:text-fg">
               ← Турниры
             </Link>
             {isAdmin(player) && (
@@ -86,24 +102,43 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
               <Notice tone="warn">Черновик — страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать.</Notice>
             </div>
           )}
-          <div className="mt-12 md:mt-16 grid lg:grid-cols-[1fr_auto] gap-8 items-end">
-            <div>
-              <TournamentStatusPill status={t.status} />
-              <h1 className="mt-4 text-[40px] md:text-[64px] font-bold tracking-[-0.045em] leading-[0.98]">{t.name}</h1>
-              <Meta
-                className="mt-5 text-[15px]"
-                items={[
-                  formatDate(t.starts_at),
-                  t.game,
-                  modeOf(t.format).title,
-                  t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн"),
-                ]}
-              />
+          <div className="mt-16 lg:mt-24 max-w-[900px]">
+            <Eyebrow>{t.status === "draft" ? "Черновик турнира" : "Турнир F16 Arena"}</Eyebrow>
+            <h1 className="mt-6 text-[44px] sm:text-[60px] lg:text-[76px] font-semibold leading-[1.02] tracking-[-0.015em]">{t.name}</h1>
+            <div className="mt-8 flex flex-wrap items-center gap-y-3 text-[15px] lg:text-[18px] text-fg">
+              {[
+                formatDate(t.starts_at),
+                t.game,
+                modeOf(t.format).size === 5 ? "5v5" : modeOf(t.format).size === 2 ? "2v2" : "1v1",
+                bracketLabel[t.bracket_type] ?? t.bracket_type,
+                t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн"),
+              ].map((x, i) => (
+                <span key={i} className="flex items-center">
+                  {i > 0 && <span className="mx-5 h-4 w-px bg-white/20" />}
+                  {x}
+                </span>
+              ))}
             </div>
-            <HeroCta t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} />
+            <div className="mt-10 flex flex-wrap items-center gap-5">
+              <HeroCta t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} />
+              <span
+                className={`inline-flex h-10 items-center gap-2 rounded-[6px] border px-4 text-[14px] ${
+                  t.status === "registration"
+                    ? "text-ok border-ok/40 bg-ok/[0.08]"
+                    : t.status === "live"
+                      ? "text-danger border-danger/40 bg-danger/[0.08]"
+                      : t.status === "checkin"
+                        ? "text-warn border-warn/40 bg-warn/[0.08]"
+                        : "text-fg-2 border-white/15 bg-white/[0.03]"
+                }`}
+              >
+                <span className="size-1.5 rounded-full bg-current" />
+                {tournamentStatusLabel[t.status]}
+              </span>
+            </div>
           </div>
-        </Container>
-        <Container className="relative">
+        </div>
+        <div className={`${WRAP} relative`}>
           <Tabs
             active={tab}
             items={[
@@ -115,11 +150,11 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
               { key: "rules", label: "Правила", href: `${base}?tab=rules` },
             ]}
           />
-        </Container>
+        </div>
       </section>
 
-      <Container className="pt-12">
-        <div className={wide ? "" : "grid lg:grid-cols-[minmax(0,1fr)_340px] gap-x-20 gap-y-12 items-start"}>
+      <div className={`${WRAP} pt-14`}>
+        <div className={wide ? "" : "grid lg:grid-cols-[minmax(0,1fr)_400px] gap-x-16 gap-y-12 items-start"}>
           <div className="min-w-0">
             {tab === "overview" && (
               <>
@@ -158,10 +193,10 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           </div>
 
           {!wide && (
-            <aside className="lg:sticky lg:top-24 space-y-10">
+            <aside className="lg:sticky lg:top-28 space-y-10 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-8">
               <RegistrationBox t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} approvedCount={approved.length} />
               <div>
-                <h3 className="text-[15px] font-semibold mb-2">Даты</h3>
+                <Eyebrow className="mb-3">Даты</Eyebrow>
                 <KV label="Регистрация">
                   {formatDate(t.registration_opens_at)} — {formatDate(t.registration_closes_at)}
                 </KV>
@@ -175,7 +210,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
                 if (!real(t.prize_pool) && !places.length) return null;
                 return (
                   <div>
-                    <h3 className="text-[15px] font-semibold mb-2">Призовой фонд</h3>
+                    <Eyebrow className="mb-3">Призовой фонд</Eyebrow>
                     {real(t.prize_pool) && <div className="text-[26px] font-semibold tracking-[-0.02em]">{t.prize_pool}</div>}
                     {places.length > 0 && (
                       <div className="mt-3">
@@ -204,7 +239,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             </aside>
           )}
         </div>
-      </Container>
+      </div>
     </>
   );
 }
@@ -226,29 +261,23 @@ function HeroCta({
   const base = `/tournaments/${t.slug}`;
   const active = reg && (reg.status === "pending" || reg.status === "approved");
   if (t.status === "checkin" && reg?.status === "approved" && !reg.checked_in_at) {
-    return (
-      <ButtonLink href={`${base}/checkin`} size="lg">
-        Пройти check-in
-      </ButtonLink>
-    );
+    return <PrimaryBtn href={`${base}/checkin`}>Пройти check-in</PrimaryBtn>;
   }
   if (t.status !== "registration" || active) return null;
   const solo = t.format === "1v1";
-  return (
-    <ButtonLink href={!loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`} size="lg">
-      {solo ? "Участвовать" : !team && loggedIn ? "Создать команду" : isCaptain || !loggedIn ? "Зарегистрировать команду" : "Заявку подаёт капитан"}
-    </ButtonLink>
-  );
+  const label = solo ? "Участвовать" : !team && loggedIn ? "Создать команду" : isCaptain || !loggedIn ? "Зарегистрировать команду" : "Заявку подаёт капитан";
+  const href = !loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`;
+  return !team && loggedIn && !solo ? <OutlineBtn href={href}>{label}</OutlineBtn> : <PrimaryBtn href={href}>{label}</PrimaryBtn>;
 }
 
 function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, string> }) {
   const mode = modeOf(t.format);
   return (
-    <div className="space-y-16">
+    <div className="space-y-14">
       {t.stream_url && (
         <section>
           <div className="flex items-baseline justify-between mb-5">
-            <h2 className="text-[26px] font-bold tracking-[-0.025em]">Трансляция</h2>
+            <Eyebrow>Трансляция</Eyebrow>
             <a href={t.stream_url} target="_blank" rel="noreferrer" className="text-sm text-fg-3 hover:text-fg">
               Открыть отдельно ↗
             </a>
@@ -259,13 +288,13 @@ function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, s
 
       {t.description && (
         <section>
-          <h2 className="text-[26px] font-bold tracking-[-0.025em] mb-5">О турнире</h2>
+          <Eyebrow className="mb-6">О турнире</Eyebrow>
           <div className="prose-f16 max-w-[720px]">{t.description}</div>
         </section>
       )}
 
       <section>
-        <h2 className="text-[26px] font-bold tracking-[-0.025em] mb-5">Формат</h2>
+        <Eyebrow className="mb-6">Формат</Eyebrow>
         <div className="grid sm:grid-cols-2 gap-x-12">
           <div>
             <KV label="Игра">{t.game}</KV>
@@ -287,8 +316,8 @@ function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, s
       </section>
 
       <section>
-        <h2 className="text-[26px] font-bold tracking-[-0.025em] mb-5">Маппул</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        <Eyebrow className="mb-6">Маппул</Eyebrow>
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
           {t.map_pool.map((m) => (
             <MapTile key={m} map={m} image={mapImages[m]} />
           ))}
@@ -297,7 +326,7 @@ function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, s
       </section>
 
       <section>
-        <h2 className="text-[26px] font-bold tracking-[-0.025em] mb-5">Требования</h2>
+        <Eyebrow className="mb-6">Требования</Eyebrow>
         {t.requirements ? (
           <div className="prose-f16 max-w-[720px]">{t.requirements}</div>
         ) : (

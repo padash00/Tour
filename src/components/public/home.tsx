@@ -20,17 +20,17 @@ export type HomeData = {
   loggedIn: boolean;
 };
 
-const WRAP = "mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-16";
+export const WRAP = "mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-16";
 
 // ───────────────────────── общие элементы
 
-function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
+export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={cn("text-[11px] sm:text-[12px] lg:text-[14px] font-medium uppercase tracking-[0.34em] text-[#7f93b0]", className)}>{children}</div>
   );
 }
 
-function PrimaryBtn({ href, children }: { href: string; children: ReactNode }) {
+export function PrimaryBtn({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
@@ -41,7 +41,7 @@ function PrimaryBtn({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-function OutlineBtn({ href, children }: { href: string; children: ReactNode }) {
+export function OutlineBtn({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
