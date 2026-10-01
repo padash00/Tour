@@ -40,12 +40,16 @@ export async function SiteHeader() {
           {player ? (
             <>
               <Link
-                href="/me#notifications"
+                href="/notifications"
                 className="relative grid place-items-center size-9 rounded-lg text-fg-3 hover:text-fg hover:bg-white/[0.04] transition"
                 aria-label="Уведомления"
               >
                 <IconBell className="size-[18px]" />
-                {unread > 0 && <span className="absolute top-2 right-2 size-2 rounded-full bg-accent ring-2 ring-bg" />}
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-accent text-[10px] font-bold text-[#06101f] ring-2 ring-bg num">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </Link>
               <Link
                 href="/me"

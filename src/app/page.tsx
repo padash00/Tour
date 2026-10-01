@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { getCurrentPlayer } from "@/lib/auth";
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
+import { getUpcomingMatches } from "@/lib/matches";
+import { MatchRow } from "@/components/match-bits";
 import { FeaturedTournament, MapGraphic, TournamentRow } from "@/components/tournament-bits";
 import {
   ButtonLink,
@@ -16,10 +19,11 @@ import {
 } from "@/components/ui";
 
 export default async function HomePage() {
-  const [player, featured, all] = await Promise.all([
+  const [player, featured, all, upcoming] = await Promise.all([
     getCurrentPlayer(),
     getFeaturedTournament(),
     listPublicTournaments(),
+    getUpcomingMatches(6),
   ]);
   const others = all.filter(
     (t) => t.id !== featured?.id && !["finished", "cancelled"].includes(t.status),
@@ -124,6 +128,30 @@ export default async function HomePage() {
           )}
         </Container>
       </section>
+
+      {/* MATCHES */}
+      {upcoming.length > 0 && (
+        <section className="pt-20">
+          <Container>
+            <SectionTitle
+              eyebrow={upcoming.some((m) => m.status === "live") ? "Сейчас в игре" : "Расписание"}
+              title="Ближайшие матчи"
+              action={
+                featured ? (
+                  <Link href={`/tournaments/${featured.slug}?tab=matches`} className="text-sm text-fg-3 hover:text-fg">
+                    Все матчи →
+                  </Link>
+                ) : null
+              }
+            />
+            <div className="grid md:grid-cols-2 gap-3">
+              {upcoming.map((m) => (
+                <MatchRow key={m.id} m={m} stage={m.tournament.name} />
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
 
       {/* HOW IT WORKS */}
       <section className="pt-24">

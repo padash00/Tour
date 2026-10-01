@@ -21,6 +21,11 @@ export default async function AdminOverview() {
     db().from("audit_logs").select("*, actor:players(nickname)").order("created_at", { ascending: false }).limit(8),
   ]);
   const servers = await getServerState();
+  const { data: openDisputes } = await db()
+    .from("disputes")
+    .select("id, match:matches(id, number)")
+    .eq("status", "open");
+  const disputes = (openDisputes ?? []) as unknown as { id: string; match: { id: string; number: number } }[];
   const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
   const logs = (logsRes.data ?? []) as (AuditLog & { actor: Pick<Player, "nickname"> | null })[];
@@ -30,6 +35,7 @@ export default async function AdminOverview() {
     { label: "Команд", value: teams.count ?? 0 },
     { label: "Активных турниров", value: tournaments.length },
     { label: "Заявок ждут", value: pending.length, alert: pending.length > 0 },
+    { label: "Открытых споров", value: disputes.length, alert: disputes.length > 0 },
   ];
 
   return (
@@ -42,7 +48,7 @@ export default async function AdminOverview() {
         <ButtonLink href="/admin/tournaments/new">Новый турнир</ButtonLink>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {stats.map((s) => (
           <Card key={s.label} className="p-5">
             <div className="label">{s.label}</div>
@@ -50,6 +56,25 @@ export default async function AdminOverview() {
           </Card>
         ))}
       </div>
+
+      {disputes.length > 0 && (
+        <Card className="p-5 border-[#e3b46544]">
+          <div className="flex flex-wrap items-center gap-3">
+            <Pill tone="warn" dot>Споры</Pill>
+            <span className="text-sm text-fg-2">
+              На рассмотрении:{" "}
+              {[...new Map(disputes.map((d) => [d.match.id, d.match])).values()].map((m, i) => (
+                <span key={m.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
+                    матч #{m.number}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          </div>
+        </Card>
+      )}
 
       {pending.length > 0 && (
         <Card className="p-5 border-[#e3b46544]">

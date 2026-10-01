@@ -79,6 +79,7 @@ export type Tournament = {
   rules: string | null;
   requirements: string | null;
   bracket_published_at: string | null;
+  cover_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -153,6 +154,7 @@ export type Match = {
   matchzy_id: number | null;
   server_instance: string | null;
   server_state: "assigned" | "loading" | "ready" | "error" | null;
+  under_review: boolean;
   scheduled_at: string | null;
   started_at: string | null;
   finished_at: string | null;
@@ -180,5 +182,20 @@ export type VetoActionRow = {
   map_name: string;
   auto: boolean;
   actor_id: string | null;
+  created_at: string;
+};
+
+export type Dispute = {
+  id: string;
+  match_id: string;
+  opened_by: string;
+  team_id: string | null;
+  reason: string;
+  status: "open" | "resolved" | "rejected";
+  decision: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  result_before: Record<string, unknown> | null;
+  result_after: Record<string, unknown> | null;
   created_at: string;
 };

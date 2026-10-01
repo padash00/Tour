@@ -207,7 +207,16 @@ export default async function ServersPage() {
                     <td>
                       <Pill tone={c.status === "done" ? "ok" : c.status === "error" ? "danger" : "warn"}>{c.status}</Pill>
                     </td>
-                    <td className="num text-xs text-fg-3 max-w-[340px] whitespace-pre-wrap break-all">{c.result ?? ""}</td>
+                    <td className="num text-xs text-fg-3 max-w-[380px]">
+                      {c.result && c.result.length > 90 ? (
+                        <details>
+                          <summary className="cursor-pointer truncate hover:text-fg-2">{c.result.split(/\r?\n/)[0].slice(0, 90)}…</summary>
+                          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg-2 border border-line p-3">{c.result}</pre>
+                        </details>
+                      ) : (
+                        <span className="whitespace-pre-wrap break-all">{c.result ?? ""}</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -157,3 +157,15 @@ body {
 .tbl tbody tr:hover {
   background: #ffffff04;
 }
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}

@@ -87,6 +87,22 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
   };
 }
 
+async function uploadCover(tournamentId: string, formData: FormData): Promise<string | null | { error: string }> {
+  const file = formData.get("cover") as File | null;
+  if (!file || file.size === 0) return null;
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return { error: "Обложка — PNG, JPG или WEBP" };
+  if (file.size > 3 * 1024 * 1024) return { error: "Обложка — не больше 3 МБ" };
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${tournamentId}/${Date.now()}.${ext}`;
+  const { error } = await db()
+    .storage.from("tournament-covers")
+    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: true });
+  if (error) return { error: "Не удалось загрузить обложку" };
+  const url = db().storage.from("tournament-covers").getPublicUrl(path).data.publicUrl;
+  await db().from("tournaments").update({ cover_url: url }).eq("id", tournamentId);
+  return url;
+}
+
 export async function createTournament(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const parsed = tournamentSchema.safeParse(Object.fromEntries(formData));
@@ -96,6 +112,7 @@ export async function createTournament(_prev: ActionResult, formData: FormData):
   if (error || !data) {
     return { error: error?.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось создать турнир" };
   }
+  await uploadCover(data.id, formData);
   await audit(admin.id, "tournament.create", { type: "tournament", id: data.id }, { name: parsed.data.name });
   redirect(`/admin/tournaments/${data.id}`);
 }
@@ -108,6 +125,9 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
 
   const { error } = await db().from("tournaments").update(tournamentRow(parsed.data)).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось сохранить" };
+  if (formData.get("removeCover") === "on") await db().from("tournaments").update({ cover_url: null }).eq("id", id);
+  const cover = await uploadCover(id, formData);
+  if (cover && typeof cover === "object") return cover;
   await audit(admin.id, "tournament.update", { type: "tournament", id });
   revalidatePath("/", "layout");
   return { success: "Сохранено" };

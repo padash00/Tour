@@ -33,7 +33,7 @@ export default async function MePage() {
   const [members, regs, notificationsRes, teamMatches] = await Promise.all([
     membership ? getTeamMembers(membership.team.id) : Promise.resolve([]),
     membership ? getTeamRegistrations(membership.team.id) : Promise.resolve([]),
-    db().from("notifications").select("*").eq("player_id", player.id).order("created_at", { ascending: false }).limit(20),
+    db().from("notifications").select("*").eq("player_id", player.id).order("created_at", { ascending: false }).limit(5),
     membership ? getTeamMatches(membership.team.id) : Promise.resolve([]),
   ]);
   const upcoming = teamMatches.filter((m) => m.status !== "finished");
@@ -158,13 +158,18 @@ export default async function MePage() {
             <SectionTitle
               title="Уведомления"
               action={
-                unread > 0 ? (
-                  <ActionForm action={markNotificationsRead}>
-                    <SubmitButton variant="ghost" size="sm">
-                      Прочитать все
-                    </SubmitButton>
-                  </ActionForm>
-                ) : null
+                <div className="flex items-center gap-3">
+                  {unread > 0 && (
+                    <ActionForm action={markNotificationsRead}>
+                      <SubmitButton variant="ghost" size="sm">
+                        Прочитать все
+                      </SubmitButton>
+                    </ActionForm>
+                  )}
+                  <Link href="/notifications" className="text-sm text-fg-3 hover:text-fg">
+                    Все →
+                  </Link>
+                </div>
               }
             />
             {notifications.length === 0 ? (

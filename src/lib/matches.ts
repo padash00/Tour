@@ -260,3 +260,23 @@ export async function recomputeSeries(matchId: string) {
     await syncBracket(m.tournament_id);
   }
 }
+
+/** Ближайшие и идущие матчи опубликованных турниров: live/вето сверху, дальше по времени начала */
+export async function getUpcomingMatches(limit = 6) {
+  const { data } = await db()
+    .from("matches")
+    .select(`${MATCH_SELECT}, tournament:tournaments!inner(id, name, slug, status)`)
+    .in("status", ["upcoming", "veto", "ready", "live"])
+    .neq("tournament.status", "draft")
+    .not("team1_id", "is", null)
+    .not("team2_id", "is", null);
+  const order = { live: 0, veto: 1, ready: 2, upcoming: 3 } as Record<string, number>;
+  return ((data ?? []) as (MatchWithTeams & { tournament: Pick<Tournament, "id" | "name" | "slug" | "status"> })[])
+    .sort(
+      (a, b) =>
+        order[a.status] - order[b.status] ||
+        (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") ||
+        a.number - b.number,
+    )
+    .slice(0, limit);
+}

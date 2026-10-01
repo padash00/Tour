@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useActionState, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { ConfirmModal } from "./modal";
 import { buttonClass, cn } from "./ui";
 
 export type ActionResult = { error?: string; success?: string } | null;
@@ -27,19 +28,47 @@ export function SubmitButton({
   value?: string;
 }) {
   const { pending } = useFormStatus();
+  const [asking, setAsking] = useState(false);
+  const confirmed = useRef(false);
+  const button = useRef<HTMLButtonElement>(null);
+
   return (
-    <button
-      type="submit"
-      name={name}
-      value={value}
-      disabled={pending}
-      className={buttonClass(variant, size, className)}
-      onClick={(e) => {
-        if (confirm && !window.confirm(confirm)) e.preventDefault();
-      }}
-    >
-      {pending ? (pendingText ?? "Секунду…") : children}
-    </button>
+    <>
+      <button
+        ref={button}
+        type="submit"
+        name={name}
+        value={value}
+        disabled={pending}
+        className={buttonClass(variant, size, className)}
+        onClick={(e) => {
+          if (!confirm) return;
+          if (confirmed.current) {
+            confirmed.current = false;
+            return;
+          }
+          e.preventDefault();
+          setAsking(true);
+        }}
+      >
+        {pending ? (pendingText ?? "Секунду…") : children}
+      </button>
+      {confirm && (
+        <ConfirmModal
+          open={asking}
+          message={confirm}
+          danger={variant === "danger"}
+          confirmLabel={typeof children === "string" ? children : "Подтвердить"}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            confirmed.current = true;
+            // повторный клик отправит форму вместе с name/value этой кнопки
+            button.current?.click();
+          }}
+        />
+      )}
+    </>
   );
 }
 

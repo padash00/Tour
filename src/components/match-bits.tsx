@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { roundTitle } from "@/lib/bracket";
 import type { MatchWithTeams } from "@/lib/matches";
+import { formatDateTime } from "@/lib/format";
 import type { MatchStatus } from "@/lib/types";
 import { Pill, TeamLogo, cn } from "./ui";
 
@@ -70,6 +71,9 @@ export function MatchRow({ m, stage, href }: { m: MatchWithTeams; stage?: string
           <MatchStatusBadge status={m.status} compact />
         </div>
         {stage && <div className="mt-0.5 text-[11px] text-fg-3">{stage}</div>}
+        {m.scheduled_at && !["live", "finished"].includes(m.status) && (
+          <div className="mt-0.5 text-[11px] text-fg-2">{formatDateTime(m.scheduled_at)}</div>
+        )}
       </div>
       <div className="flex items-center justify-end gap-3 min-w-0">
         <span className={cn("truncate font-medium text-right", finished && m.winner_id !== m.team2_id && "text-fg-3")}>

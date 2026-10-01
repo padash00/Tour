@@ -68,6 +68,28 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       </Card>
 
       <Card className="p-6 space-y-4">
+        <div className="label">Обложка</div>
+        {t?.cover_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.cover_url} alt="" className="w-full aspect-[3/1] object-cover rounded-xl border border-line" />
+        )}
+        <Field label="Изображение" hint="PNG, JPG или WEBP до 3 МБ, лучше широкое (3:1), тёмное. Текст поверх затемняется автоматически.">
+          <input
+            name="cover"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="field py-[7px] file:mr-3 file:rounded-md file:border-0 file:bg-surface-3 file:px-3 file:py-1 file:text-xs file:text-fg-2"
+          />
+        </Field>
+        {t?.cover_url && (
+          <label className="flex items-center gap-2 text-sm text-fg-2">
+            <input type="checkbox" name="removeCover" className="size-4 accent-[#8bb8ff]" />
+            Убрать обложку
+          </label>
+        )}
+      </Card>
+
+      <Card className="p-6 space-y-4">
         <div className="label">Даты · время Алматы (UTC+5)</div>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Регистрация открывается">

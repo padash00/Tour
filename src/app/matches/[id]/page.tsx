@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { openDispute } from "@/app/actions/dispute";
 import { vetoAct } from "@/app/actions/match";
+import { db } from "@/lib/supabase";
+import type { Dispute } from "@/lib/types";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getActiveMembership } from "@/lib/data";
 import { formatDateTime, mapName } from "@/lib/format";
@@ -10,7 +13,7 @@ import type { Team } from "@/lib/types";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
 import { PlayerStatsTable } from "@/components/stats-table";
-import { ActionForm, CopyField } from "@/components/forms";
+import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
 import { Countdown, LiveRefresh } from "@/components/live-refresh";
 import { MatchStatusBadge, matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
@@ -34,6 +37,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
   ]);
+  const { data: disputeRows } = await db().from("disputes").select("*").eq("match_id", m.id).order("created_at");
+  const disputes = (disputeRows ?? []) as Dispute[];
   const membership = player ? await getActiveMembership(player.id) : null;
   const myTeam = membership && (membership.team.id === m.team1_id || membership.team.id === m.team2_id) ? membership.team : null;
   const isCaptain = !!myTeam && myTeam.captain_id === player?.id;
@@ -61,6 +66,11 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
               <span className="num">#{m.number}</span>
               <span>BO{m.best_of}</span>
               <MatchStatusBadge status={m.status} />
+              {m.under_review && (
+                <span className="h-6 px-2.5 inline-flex items-center rounded-full border border-[#e3b46544] bg-warn-dim text-warn text-[11px] font-semibold uppercase tracking-[0.08em]">
+                  На рассмотрении
+                </span>
+              )}
               {admin && (
                 <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
                   Управление →
@@ -235,6 +245,48 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                   });
                 })}
             </section>
+          )}
+
+          {/* DISPUTES */}
+          {(disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status))) && (
+            <Card className={cn("p-6", m.under_review && "border-[#e3b46544]")}>
+              <SectionTitle title="Спор по матчу" />
+              {disputes.length > 0 && (
+                <div className="space-y-3 mb-5">
+                  {disputes.map((d) => (
+                    <div key={d.id} className="rounded-xl border border-line p-4 text-sm">
+                      <div className="flex justify-between gap-2 text-xs text-fg-3">
+                        <span>
+                          {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} ·{" "}
+                          {formatDateTime(d.created_at)}
+                        </span>
+                        <span className={d.status === "open" ? "text-warn" : d.status === "resolved" ? "text-ok" : ""}>
+                          {d.status === "open" ? "рассматривается" : d.status === "resolved" ? "принят" : "отклонён"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-fg whitespace-pre-line">{d.reason}</p>
+                      {d.decision && <p className="mt-2 text-fg-2">Решение администратора: {d.decision}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
+                <ActionForm action={openDispute}>
+                  <input type="hidden" name="matchId" value={m.id} />
+                  <textarea
+                    name="reason"
+                    rows={3}
+                    placeholder="Что произошло: раунд, время, игроки. Результат не изменится без решения администратора."
+                    className="field resize-y text-sm"
+                  />
+                  <div className="mt-3">
+                    <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
+                      Открыть спор
+                    </SubmitButton>
+                  </div>
+                </ActionForm>
+              )}
+            </Card>
           )}
 
           {/* SERVER */}

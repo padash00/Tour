@@ -12,7 +12,12 @@ import {
   startVeto,
 } from "@/app/actions/admin-match";
 import { sendMatchToServer } from "@/app/actions/admin-server";
-import { mapName } from "@/lib/format";
+import { resolveDispute } from "@/app/actions/dispute";
+import { replaceRosterPlayer, setSchedule } from "@/app/actions/admin-match";
+import { getMatchRosters } from "@/lib/matches";
+import { db } from "@/lib/supabase";
+import type { Dispute, Player } from "@/lib/types";
+import { formatDateTime, mapName, toLocalInput } from "@/lib/format";
 import { getServerState } from "@/lib/server-control";
 import { applyVetoTimeouts, getMatch } from "@/lib/matches";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -27,7 +32,12 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   await applyVetoTimeouts(id);
   const m = await getMatch(id);
   if (!m) notFound();
-  const servers = await getServerState();
+  const [servers, rosters, disputesRes] = await Promise.all([
+    getServerState(),
+    getMatchRosters(m),
+    db().from("disputes").select("*, opener:players!disputes_opened_by_fkey(nickname)").eq("match_id", m.id).order("created_at", { ascending: false }),
+  ]);
+  const disputes = (disputesRes.data ?? []) as (Dispute & { opener: Pick<Player, "nickname"> | null })[];
   const t1 = m.team1?.name ?? "TBD";
   const t2 = m.team2?.name ?? "TBD";
 
@@ -95,6 +105,23 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
             </SubmitButton>
           </ActionForm>
         )}
+      </Card>
+
+      {/* Время */}
+      <Card className="p-6">
+        <div className="label mb-4">Время матча</div>
+        <ActionForm action={setSchedule}>
+          <input type="hidden" name="matchId" value={m.id} />
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Начало (Алматы)">
+              <input type="datetime-local" name="scheduledAt" defaultValue={toLocalInput(m.scheduled_at)} className="field w-60" />
+            </Field>
+            <SubmitButton variant="secondary">Сохранить</SubmitButton>
+          </div>
+          <p className="mt-2 text-xs text-fg-3">
+            {m.scheduled_at ? `Сейчас: ${formatDateTime(m.scheduled_at)}. ` : ""}Капитаны получат уведомление, матч появится в «Ближайших матчах».
+          </p>
+        </ActionForm>
       </Card>
 
       {/* 2. Сервер */}
@@ -245,6 +272,98 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               <p className="mt-2 text-xs text-fg-3">Возможно, только пока следующие матчи не начались.</p>
             </ActionForm>
           )}
+        </Card>
+      )}
+      {/* Споры */}
+      <Card className={cn("p-6", m.under_review && "border-[#e3b46555]")}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="label">Споры</div>
+          {m.under_review && <span className="text-xs font-semibold text-warn uppercase tracking-wider">На рассмотрении</span>}
+        </div>
+        {disputes.length === 0 ? (
+          <p className="text-sm text-fg-3">Споров нет. Капитаны могут открыть спор на странице матча.</p>
+        ) : (
+          <div className="space-y-4">
+            {disputes.map((d) => (
+              <div key={d.id} className="rounded-xl border border-line p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
+                  <span>
+                    {d.opener?.nickname ?? "—"}
+                    {d.team_id ? ` · ${d.team_id === m.team1_id ? t1 : t2}` : " · админ"} · {formatDateTime(d.created_at)}
+                  </span>
+                  <span className={d.status === "open" ? "text-warn" : d.status === "resolved" ? "text-ok" : "text-fg-3"}>
+                    {d.status === "open" ? "открыт" : d.status === "resolved" ? "принят" : "отклонён"}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-fg whitespace-pre-line">{d.reason}</p>
+                {d.decision && <p className="mt-2 text-sm text-fg-2">Решение: {d.decision}{d.result_after ? " · результат изменён" : ""}</p>}
+                {d.status === "open" && (
+                  <ActionForm action={resolveDispute} className="mt-3">
+                    <input type="hidden" name="disputeId" value={d.id} />
+                    <textarea name="decision" rows={2} placeholder="Решение (увидят обе команды)" className="field resize-y text-sm" />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <SubmitButton size="sm" name="outcome" value="resolved">Принять</SubmitButton>
+                      <SubmitButton size="sm" variant="secondary" name="outcome" value="rejected">Отклонить</SubmitButton>
+                    </div>
+                    <p className="mt-2 text-xs text-fg-3">
+                      Если нужно изменить результат — сначала «Отменить результат» / «Тех. победа» ниже, затем закройте спор: изменение зафиксируется в истории.
+                    </p>
+                  </ActionForm>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Составы и замены */}
+      {(m.team1_id || m.team2_id) && (
+        <Card className="p-6">
+          <div className="label mb-4">Составы и замены</div>
+          <div className="grid sm:grid-cols-2 gap-6">
+            {[
+              { name: t1, list: rosters.team1 },
+              { name: t2, list: rosters.team2 },
+            ].map((side) => (
+              <div key={side.name}>
+                <div className="text-sm font-semibold mb-2">{side.name}</div>
+                <ul className="space-y-1.5 text-sm">
+                  {side.list.map((r) => (
+                    <li key={r.player.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">{r.player.nickname}</span>
+                      <span className="num text-xs text-fg-3">{r.role === "sub" ? "запас" : ""} {r.player.steam_id}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <ActionForm action={replaceRosterPlayer} className="mt-6 border-t border-line pt-5">
+            <input type="hidden" name="matchId" value={m.id} />
+            <div className="grid sm:grid-cols-[1fr_1fr] gap-3">
+              <Field label="Кого заменить">
+                <select name="outPlayerId" className="field">
+                  {[...rosters.team1, ...rosters.team2].map((r) => (
+                    <option key={r.player.id} value={r.player.id}>
+                      {r.player.nickname}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="SteamID64 нового игрока">
+                <input name="inSteamId" placeholder="7656119…" className="field num" />
+              </Field>
+            </div>
+            <Field label="Причина" className="mt-3">
+              <input name="reason" placeholder="Игрок не пришёл / техническая проблема…" className="field" />
+            </Field>
+            <div className="mt-3">
+              <SubmitButton variant="secondary" confirm="Заменить игрока в турнирном составе?">Заменить</SubmitButton>
+            </div>
+            <p className="mt-2 text-xs text-fg-3">
+              Новый игрок должен хотя бы раз войти на сайт через Steam. Если матч уже на сервере — замена сразу уйдёт в MatchZy.
+            </p>
+          </ActionForm>
         </Card>
       )}
     </div>

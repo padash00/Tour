@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
+import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, recomputeSeries, syncBracket } from "@/lib/matches";
+import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import { VETO_STEP_SECONDS } from "@/lib/veto";
 import type { ActionResult } from "@/components/forms";
@@ -262,4 +264,77 @@ export async function reopenMatch(_prev: ActionResult, formData: FormData): Prom
   await syncBracket(m.tournament_id);
   revalidateMatch(m.id, m.tournament.slug);
   return { success: "Результат отменён" };
+}
+
+export async function setSchedule(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const { admin, m } = await loadForAdmin(formData);
+  if (!m) return { error: "Матч не найден" };
+  const raw = String(formData.get("scheduledAt") ?? "");
+  const scheduledAt = raw ? fromLocalInput(raw) : null;
+  await db().from("matches").update({ scheduled_at: scheduledAt }).eq("id", m.id);
+  if (scheduledAt && m.team1 && m.team2) {
+    await notify(
+      [m.team1.captain_id, m.team2.captain_id],
+      `Матч #${m.number}: ${m.team1.name} vs ${m.team2.name}`,
+      `Время матча: ${formatDateTime(scheduledAt)}`,
+      `/matches/${m.id}`,
+    );
+  }
+  await audit(admin.id, "match.schedule", { type: "match", id: m.id }, { scheduled_at: scheduledAt });
+  revalidateMatch(m.id, m.tournament.slug);
+  revalidatePath("/");
+  return { success: scheduledAt ? "Время сохранено, капитаны уведомлены" : "Время убрано" };
+}
+
+/** Замена игрока в турнирном составе прямо по ходу турнира; если матч на сервере — сразу и в MatchZy */
+export async function replaceRosterPlayer(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const { admin, m } = await loadForAdmin(formData);
+  if (!m) return { error: "Матч не найден" };
+  const outId = String(formData.get("outPlayerId"));
+  const inSteam = String(formData.get("inSteamId") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!/^\d{17}$/.test(inSteam)) return { error: "SteamID64 нового игрока — 17 цифр" };
+  if (!reason) return { error: "Укажите причину замены" };
+
+  const { data: outRow } = await db()
+    .from("tournament_roster_players")
+    .select("*, registration:tournament_registrations!inner(team_id), player:players(steam_id, nickname)")
+    .eq("tournament_id", m.tournament_id)
+    .eq("player_id", outId)
+    .maybeSingle();
+  if (!outRow) return { error: "Игрок не найден в составе" };
+  const teamId = outRow.registration.team_id as string;
+  if (teamId !== m.team1_id && teamId !== m.team2_id) return { error: "Игрок не из этого матча" };
+
+  const { data: inPlayer } = await db().from("players").select("id, nickname, steam_id, is_banned").eq("steam_id", inSteam).maybeSingle();
+  if (!inPlayer) return { error: "Новый игрок ещё не входил на платформу через Steam" };
+  if (inPlayer.is_banned) return { error: "Новый игрок заблокирован" };
+
+  const { error } = await db()
+    .from("tournament_roster_players")
+    .insert({ registration_id: outRow.registration_id, tournament_id: m.tournament_id, player_id: inPlayer.id, role: outRow.role });
+  if (error) return { error: "Новый игрок уже заявлен на этот турнир" };
+  await db().from("tournament_roster_players").delete().eq("id", outRow.id);
+  await db().from("roster_changes").insert({
+    tournament_id: m.tournament_id,
+    team_id: teamId,
+    match_id: m.id,
+    player_out: outId,
+    player_in: inPlayer.id,
+    reason,
+    changed_by: admin.id,
+  });
+
+  // матч уже загружен в MatchZy — меняем игрока и там
+  let onServer = "";
+  if (m.server_instance && ["ready", "live"].includes(m.status)) {
+    const side = teamId === m.team1_id ? "team1" : "team2";
+    const nick = inPlayer.nickname.replace(/"/g, "");
+    await enqueueCommand(m.server_instance, "rcon", { command: `matchzy_removeplayer ${outRow.player.steam_id}` }, admin.id);
+    await enqueueCommand(m.server_instance, "rcon", { command: `matchzy_addplayer ${inSteam} ${side} "${nick}"` }, admin.id);
+    onServer = ` и на сервере ${m.server_instance}`;
+  }
+  await audit(admin.id, "roster.replace", { type: "match", id: m.id }, { out: outRow.player.steam_id, in: inSteam, reason });
+  revalidateMatch(m.id, m.tournament.slug);
+  return { success: `${outRow.player.nickname} → ${inPlayer.nickname}: замена в составе${onServer}` };
 }

@@ -10,7 +10,7 @@ import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
 import { BracketView } from "@/components/bracket-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
-import { MapGraphic, TournamentStatusPill } from "@/components/tournament-bits";
+import { MapGraphic, TournamentCover, TournamentStatusPill } from "@/components/tournament-bits";
 import {
   Avatar,
   ButtonLink,
@@ -61,7 +61,11 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
     <>
       <section className="relative overflow-hidden border-b border-line/60">
         <div className="absolute inset-0 atmos" />
-        <MapGraphic className="absolute right-0 top-0 h-full opacity-30 hidden md:block" />
+        {t.cover_url ? (
+          <TournamentCover url={t.cover_url} strong />
+        ) : (
+          <MapGraphic className="absolute right-0 top-0 h-full opacity-30 hidden md:block" />
+        )}
         <Container className="relative pt-14 pb-10">
           <Link href="/tournaments" className="text-sm text-fg-3 hover:text-fg-2">
             ← Все турниры

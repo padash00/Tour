@@ -75,7 +75,11 @@ export function FeaturedTournament({ t, approved }: { t: Tournament; approved: n
   return (
     <div className="card relative overflow-hidden">
       <div className="absolute inset-0 atmos opacity-60" />
-      <MapGraphic className="absolute -right-10 -top-6 w-[520px] opacity-40 hidden lg:block" />
+      {t.cover_url ? (
+        <TournamentCover url={t.cover_url} strong />
+      ) : (
+        <MapGraphic className="absolute -right-10 -top-6 w-[520px] opacity-40 hidden lg:block" />
+      )}
       <div className="relative grid lg:grid-cols-[1.3fr_1fr] gap-10 p-6 sm:p-10">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +136,12 @@ export function TournamentRow({ t, approved }: { t: Tournament; approved: number
       className="card card-hover group grid gap-5 p-5 sm:grid-cols-[96px_1fr_auto] sm:items-center"
     >
       <div className="relative hidden sm:block h-[72px] w-24 overflow-hidden rounded-lg border border-line bg-bg-2">
-        <MapGraphic className="absolute inset-0 h-full w-full opacity-70" />
+        {t.cover_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={t.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <MapGraphic className="absolute inset-0 h-full w-full opacity-70" />
+        )}
       </div>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -157,5 +166,23 @@ export function TournamentRow({ t, approved }: { t: Tournament; approved: number
         </span>
       </div>
     </Link>
+  );
+}
+
+/** Обложка турнира с затемнением под текст; без обложки — сдержанная графика */
+export function TournamentCover({ url, className = "", strong }: { url: string | null; className?: string; strong?: boolean }) {
+  if (!url) return <MapGraphic className={className} />;
+  return (
+    <div className={`absolute inset-0 ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      <div
+        className={
+          strong
+            ? "absolute inset-0 bg-gradient-to-r from-bg via-bg/85 to-bg/40"
+            : "absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/20"
+        }
+      />
+    </div>
   );
 }
