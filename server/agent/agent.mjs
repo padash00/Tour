@@ -155,11 +155,20 @@ async function execute(cmd) {
       return runStartScript(inst.name, false);
     }
     case "load_match": {
-      const { url, header_key, header_value } = cmd.payload;
+      const { url, header_key, header_value, events_url } = cmd.payload;
       // на случай, если на сервере остался старый матч
       await rcon(inst.port, secrets.rcon, "get5_endmatch").catch(() => {});
       const out = await rcon(inst.port, secrets.rcon, `matchzy_loadmatch_url ${q(url)} ${q(header_key)} ${q(header_value)}`);
-      return { ok: true, result: out.trim() || "loadmatch sent" };
+      // загрузка матча сбрасывает настройки отправки событий — выставляем после неё, в кавычках
+      await sleep(2500);
+      for (const c of [
+        `matchzy_remote_log_url ${q(events_url)}`,
+        `matchzy_remote_log_header_key ${q(header_key)}`,
+        `matchzy_remote_log_header_value ${q(header_value)}`,
+      ]) {
+        await rcon(inst.port, secrets.rcon, c).catch(() => {});
+      }
+      return { ok: true, result: (out.trim() || "loadmatch sent") + " · events → site" };
     }
     case "end_match":
       return { ok: true, result: (await rcon(inst.port, secrets.rcon, "get5_endmatch")).trim() || "ended" };

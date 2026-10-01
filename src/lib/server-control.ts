@@ -13,11 +13,15 @@ function safeEqual(a: string, b: string) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+export const MATCHZY_HEADER = "X-F16-Token";
+
+/** Authorization: Bearer <token> или X-F16-Token: <token> (MatchZy не умеет значения заголовков с пробелом) */
 export function checkBearer(request: Request, envName: "AGENT_TOKEN" | "MATCHZY_TOKEN") {
   const expected = process.env[envName];
   if (!expected) return false;
-  const header = request.headers.get("authorization") ?? "";
-  return safeEqual(header, `Bearer ${expected}`);
+  const bearer = request.headers.get("authorization") ?? "";
+  const plain = request.headers.get(MATCHZY_HEADER) ?? "";
+  return safeEqual(bearer, `Bearer ${expected}`) || safeEqual(plain, expected);
 }
 
 // ───────────────────────── типы
@@ -71,7 +75,7 @@ export async function enqueueCommand(
 
 // ───────────────────────── конфиг матча для MatchZy
 
-export async function buildMatchzyConfig(matchId: string, siteOrigin: string) {
+export async function buildMatchzyConfig(matchId: string) {
   const m = await getMatch(matchId);
   if (!m || !m.team1 || !m.team2 || m.maps.length === 0 || m.matchzy_id == null) return null;
   const rosters = await getMatchRosters(m);
@@ -96,12 +100,8 @@ export async function buildMatchzyConfig(matchId: string, siteOrigin: string) {
     min_players_to_ready: 10,
     min_spectators_to_ready: 0,
     spectators: { players: Object.fromEntries(observers.map((id, i) => [id, `F16 Observer ${i + 1}`])) },
-    cvars: {
-      matchzy_remote_log_url: `${siteOrigin}/api/matchzy/events`,
-      matchzy_remote_log_header_key: "Authorization",
-      matchzy_remote_log_header_value: `Bearer ${process.env.MATCHZY_TOKEN}`,
-      hostname: `F16 Arena | ${m.team1.tag} vs ${m.team2.tag}`,
-    },
+    // адрес отправки событий агент выставляет через RCON сразу после загрузки:
+    // cvars из конфига MatchZy выполняет без кавычек, и URL с токеном портятся
   };
 }
 
@@ -207,8 +207,9 @@ export async function takePendingCommands(siteOrigin: string) {
         payload: {
           ...c.payload,
           url: `${siteOrigin}/api/matchzy/config/${c.payload.match_id}`,
-          header_key: "Authorization",
-          header_value: `Bearer ${process.env.MATCHZY_TOKEN}`,
+          header_key: MATCHZY_HEADER,
+          header_value: process.env.MATCHZY_TOKEN,
+          events_url: `${siteOrigin}/api/matchzy/events`,
         },
       };
     }

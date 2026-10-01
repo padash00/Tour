@@ -5,7 +5,7 @@ import { buildMatchzyConfig, checkBearer } from "@/lib/server-control";
 export async function GET(request: NextRequest, ctx: RouteContext<"/api/matchzy/config/[id]">) {
   if (!checkBearer(request, "MATCHZY_TOKEN")) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await ctx.params;
-  const config = await buildMatchzyConfig(id, request.nextUrl.origin);
+  const config = await buildMatchzyConfig(id);
   if (!config) return NextResponse.json({ error: "match not ready" }, { status: 404 });
   return NextResponse.json(config);
 }
