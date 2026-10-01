@@ -62,5 +62,11 @@ rcon_password "$($secrets.rcon)"
   Set-Content -Encoding ascii -Path (Join-Path $csgo "cfg\f16\$($i.name.ToLower()).cfg") -Value $cfg
 }
 Write-Host "OK  конфиги инстансов: $($instances.name -join ', ')"
+
+# 5. Скрипт запуска в путь без кириллицы — для F16-start-servers.bat / F16-stop-servers.bat
+$f16 = Join-Path $ServerDir "f16"
+New-Item -ItemType Directory -Force $f16 | Out-Null
+Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
+Write-Host "OK  $f16\start.ps1"
 Write-Host ""
 Write-Host "Готово. Запуск: powershell -ExecutionPolicy Bypass -File server\start.ps1 -Name CS2-01"
