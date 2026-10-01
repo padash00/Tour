@@ -78,16 +78,16 @@ function OptionCard({
 }
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="mb-2 text-[13px] font-medium text-fg-2">{children}</div>;
+  return <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-[#7f93b0]">{children}</div>;
 }
 
 function Section({ show, title, hint, children }: { show: boolean; title: string; hint?: string; children: ReactNode }) {
   // скрытые шаги остаются в DOM: их поля уходят вместе с формой
   return (
     <section className={cn(!show && "hidden")}>
-      <div className="mb-6">
-        <h2 className="text-[20px] font-semibold tracking-[-0.02em]">{title}</h2>
-        {hint && <p className="mt-1 text-[13px] text-fg-3">{hint}</p>}
+      <div className="mb-7 pb-5 border-b border-white/[0.06]">
+        <h2 className="text-[24px] font-semibold tracking-[-0.015em]">{title}</h2>
+        {hint && <p className="mt-1.5 text-[13px] text-fg-3">{hint}</p>}
       </div>
       <div className="space-y-6">{children}</div>
     </section>
@@ -257,11 +257,11 @@ export function TournamentForm({
               type="button"
               onClick={() => setStep(i)}
               className={cn(
-                "flex items-center gap-3 h-9 px-3 rounded-md text-[13px] whitespace-nowrap text-left transition",
-                step === i ? "bg-white/[0.06] text-fg" : "text-fg-3 hover:text-fg-2",
+                "relative flex items-center gap-3 h-10 px-3 rounded-[8px] text-[13px] whitespace-nowrap text-left transition",
+                step === i ? "bg-[#0b1420] border border-white/[0.08] text-fg" : "border border-transparent text-fg-3 hover:text-fg-2",
               )}
             >
-              <span className={cn("num text-[11px] w-4", step === i ? "text-accent" : "text-fg-3")}>{i + 1}</span>
+              <span className={cn("num text-[11px] w-5", step === i ? "text-accent" : "text-fg-3")}>{String(i + 1).padStart(2, "0")}</span>
               <span className="flex-1">{s}</span>
               {missing[i] && <span className="size-1.5 rounded-full bg-warn" title={missing[i] ?? ""} />}
             </button>
@@ -269,7 +269,7 @@ export function TournamentForm({
         </nav>
 
         {/* активный шаг */}
-        <div className="min-w-0 rounded-xl border border-line bg-surface p-6 sm:p-8">
+        <div className="min-w-0 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-6 sm:p-8">
           <Section show={step === 0} title="Основное" hint="Название, обложка и описание для страницы турнира">
             <div>
               <Label>Название</Label>
@@ -370,7 +370,7 @@ export function TournamentForm({
               </div>
             </div>
             {(bracket === "groups_playoff" || bracket === "swiss" || bracket === "swiss_playoff" || bracket === "round_robin") && (
-              <div className="grid sm:grid-cols-3 gap-5 rounded-lg bg-bg-2 p-4">
+              <div className="grid sm:grid-cols-3 gap-5 rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4">
                 {bracket === "groups_playoff" && (
                   <>
                     <div>
@@ -608,7 +608,7 @@ export function TournamentForm({
                   ))}
               </div>
             )}
-            <div className="rounded-lg bg-bg-2 p-4">
+            <div className="rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4">
               <div className="text-[13px] font-medium text-fg-2">Своя карта из Steam Workshop</div>
               <p className="mt-1 text-xs text-fg-3">
                 Только для этого турнира. Чтобы карта была всегда под рукой и прошла проверку на сервере — добавьте её в Настройки → Workshop-карты.
@@ -760,7 +760,7 @@ export function TournamentForm({
             )}
           </Section>
 
-          <div className="mt-10 pt-5 border-t border-line flex items-center justify-between gap-3">
+          <div className="mt-10 pt-5 border-t border-white/[0.06] flex items-center justify-between gap-3">
             <button type="button" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className={ghostBtn}>
               ← Назад
             </button>
@@ -773,9 +773,9 @@ export function TournamentForm({
         </div>
 
         {/* сводка */}
-        <aside className="xl:sticky xl:top-8 rounded-xl border border-line bg-bg-2 p-5">
-          <div className="text-[12px] text-fg-3">Сводка</div>
-          <div className="mt-1 text-[16px] font-semibold tracking-[-0.01em] truncate">{name || "Новый турнир"}</div>
+        <aside className="xl:sticky xl:top-8 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5">
+          <div className="text-[11px] font-medium uppercase tracking-[0.26em] text-[#7f93b0]">Сводка</div>
+          <div className="mt-2 text-[18px] font-semibold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
           <div className="mt-4">
             <SummaryRow label="Режим" value={MODES[format as ModeKey]?.title ?? format} />
             <SummaryRow label="Система" value={FORMATS[bracket].title} />

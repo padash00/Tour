@@ -41,7 +41,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
   return (
     <div className="space-y-6">
       <AdminHeader eyebrow="F16 Control" title="Матчи" />
-      <div className="flex gap-5 border-b border-line">
+      <div className="flex gap-5 border-b border-white/[0.06]">
         {FILTERS.map((f) => (
           <Link
             key={f.key}

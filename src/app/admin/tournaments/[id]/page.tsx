@@ -22,10 +22,10 @@ import { prefetchMaps, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
-import { TournamentStatusPill } from "@/components/tournament-bits";
+import { BarCell, CARD, Label, StatusChip } from "@/components/admin/tournament-kit";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
 import { Avatar, EmptyState, FaceitLevel, Pill, TeamLogo, cn } from "@/components/ui";
-import { AdminHeader, Dot, Metric, Panel, SubTabs, TableBox } from "@/components/admin/control";
+import { AdminHeader, Dot, Panel, SubTabs, TableBox } from "@/components/admin/control";
 import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
@@ -75,7 +75,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         title={
           <span className="flex flex-wrap items-center gap-3">
             {t.name}
-            <TournamentStatusPill status={t.status} />
+            <StatusChip status={t.status} />
           </span>
         }
         description={`${MODES[t.format as ModeKey]?.title ?? t.format} · ${FORMATS[t.bracket_type as FormatKind]?.title ?? t.bracket_type} · старт ${formatDateTime(t.starts_at)}`}
@@ -116,8 +116,8 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             disabledMaps={await getDisabledMaps()}
             mapImages={await getMapImages()}
           />
-          <div id="danger" className="max-w-xl pt-6 border-t border-line scroll-mt-8">
-            <div className="text-[13px] font-semibold text-danger">Опасная зона</div>
+          <div id="danger" className="max-w-2xl scroll-mt-8 rounded-[12px] border border-danger/25 bg-danger/[0.03] p-5">
+            <Label className="text-danger/90">Опасная зона</Label>
             <p className="mt-1 mb-3 text-[13px] text-fg-3">
               Удалятся сетка, матчи, заявки и статистика турнира. Это нельзя отменить.
               {t.status !== "draft" && " Матчи на серверах будут завершены. Для подтверждения введите название турнира."}
@@ -125,7 +125,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             <ActionForm action={deleteTournament} className="flex flex-wrap items-center gap-2">
               <input type="hidden" name="id" value={t.id} />
               {t.status !== "draft" && (
-                <input name="confirm" placeholder={t.name} autoComplete="off" className="field h-8 text-[13px] w-72" />
+                <input name="confirm" placeholder={t.name} autoComplete="off" className="field h-9 text-[13px] w-72" />
               )}
               <SubmitButton size="sm" variant="danger" confirm={`Удалить турнир «${t.name}» безвозвратно?`}>
                 Удалить турнир
@@ -138,25 +138,25 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Panel title="Регламент" action={<Link href={tabHref("settings")} className="text-[12px] text-accent hover:underline">Изменить</Link>}>
             {t.rules ? (
-              <div className="rounded-xl border border-line bg-surface p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
             ) : (
               <EmptyState compact title="Регламент не заполнен" description="Задаётся в Настройках → Правила матча." />
             )}
           </Panel>
           <Panel title="Требования к участникам">
             {t.requirements ? (
-              <div className="rounded-xl border border-line bg-surface p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
             ) : (
               <EmptyState compact title="Стандартные требования" description="Свои требования задаются в Настройках → Правила матча." />
             )}
           </Panel>
           <Panel title="Параметры матча" className="lg:col-span-2">
-            <div className="rounded-xl border border-line bg-surface grid grid-cols-2 md:grid-cols-5 divide-x divide-line">
-              <div className="p-4"><Metric label="Серии" value={`BO${t.default_best_of}`} hint={`финал BO${t.final_best_of}`} /></div>
-              <div className="p-4"><Metric label="Стороны" value={t.knife_round ? "Нож" : "Фикс."} /></div>
-              <div className="p-4"><Metric label="Овертайм" value={t.overtime ? "MR3" : "Нет"} /></div>
-              <div className="p-4"><Metric label="Тактические" value={t.timeouts_per_team} hint={`по ${t.timeout_seconds} с`} /></div>
-              <div className="p-4"><Metric label="Технические" value={t.tech_pauses} hint={`по ${Math.round(t.tech_pause_seconds / 60)} мин`} /></div>
+            <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-white/[0.06]`}>
+              <BarCell label="Серии" value={`BO${t.default_best_of}`} hint={`финал BO${t.final_best_of}`} />
+              <BarCell label="Стороны" value={t.knife_round ? "Нож" : "Фикс."} />
+              <BarCell label="Овертайм" value={t.overtime ? "MR3" : "Нет"} />
+              <BarCell label="Тактические" value={t.timeouts_per_team} hint={`по ${t.timeout_seconds} с`} />
+              <BarCell label="Технические" value={t.tech_pauses} hint={`по ${Math.round(t.tech_pause_seconds / 60)} мин`} />
             </div>
           </Panel>
         </div>
@@ -181,11 +181,11 @@ function OverviewTab({
 }) {
   return (
     <div className="space-y-8">
-      <div className="rounded-xl border border-line bg-surface grid grid-cols-2 md:grid-cols-4 divide-x divide-line">
-        <div className="p-5"><Metric label="Одобрено" value={`${approved}/${t.max_teams}`} /></div>
-        <div className="p-5"><Metric label="Ждут решения" value={pending} tone={pending ? "warn" : undefined} /></div>
-        <div className="p-5"><Metric label="Check-in" value={`${checkedIn}/${approved}`} /></div>
-        <div className="p-5"><Metric label="Сетка" value={t.bracket_published_at ? "Опубликована" : "Нет"} tone={t.bracket_published_at ? "ok" : undefined} /></div>
+      <div className={`${CARD} grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]`}>
+        <BarCell label="Одобрено" value={`${approved}/${t.max_teams}`} />
+        <BarCell label="Ждут решения" value={pending} tone={pending ? "warn" : undefined} />
+        <BarCell label="Check-in" value={`${checkedIn}/${approved}`} />
+        <BarCell label="Сетка" value={t.bracket_published_at ? "Есть" : "Нет"} tone={t.bracket_published_at ? "ok" : undefined} />
       </div>
 
       <Panel title="Этап турнира">
@@ -198,8 +198,10 @@ function OverviewTab({
                 type="submit"
                 disabled={t.status === f.status}
                 className={cn(
-                  "w-full h-full text-left rounded-lg border px-3 py-2.5 transition",
-                  t.status === f.status ? "border-accent/50 bg-accent-dim" : "border-line hover:border-line-strong hover:bg-white/[0.02]",
+                  "w-full h-full text-left rounded-[8px] border px-3 py-2.5 transition",
+                  t.status === f.status
+                    ? "border-accent/50 bg-accent/[0.08]"
+                    : "border-white/[0.08] bg-[#0b1420]/80 hover:border-white/20 hover:bg-white/[0.02]",
                   f.status === "cancelled" && t.status !== f.status && "hover:border-danger/40",
                 )}
               >
@@ -214,7 +216,7 @@ function OverviewTab({
       </Panel>
 
       <Panel title="Автопилот">
-        <div className="rounded-xl border border-line bg-surface p-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-[13px]">
               <Dot tone={t.autopilot ? "ok" : "muted"} />
@@ -244,7 +246,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
   return (
     <div className="max-w-3xl">
       {t.bracket_published_at ? (
-        <div className="rounded-xl border border-line bg-surface p-5 space-y-4">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 space-y-4">
           <div className="flex items-center gap-2 text-[13px]">
             <Dot tone="ok" />
             <span className="text-fg">Сетка опубликована {formatShortDateTime(t.bracket_published_at)}</span>
@@ -257,7 +259,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
               Матчи турнира
             </Link>
           </div>
-          <div className="pt-4 border-t border-line">
+          <div className="pt-4 border-t border-white/[0.06]">
             <ActionForm action={deleteBracketAction}>
               <input type="hidden" name="tournamentId" value={t.id} />
               <SubmitButton size="sm" variant="danger" confirm="Удалить сетку? Можно только пока ни один матч не начат.">
@@ -268,7 +270,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
         </div>
       ) : (
         <ActionForm action={generateBracketAction}>
-          <div className="rounded-xl border border-line bg-surface p-5 space-y-4">
+          <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 space-y-4">
             <input type="hidden" name="tournamentId" value={t.id} />
             <div className="text-[13px] text-fg-2">
               Одобрено <span className="num text-fg">{approved}</span>, прошли check-in <span className="num text-fg">{checkedIn}</span>. Пустые места
@@ -344,7 +346,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
   return (
     <div className="space-y-8 max-w-3xl">
       <Panel title="Карты турнира">
-        <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
           {t.map_pool.map((m) => {
             const id = m.split("@")[1];
             const i = id ? info[id] : null;
@@ -372,7 +374,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
       </Panel>
       {ws.length > 0 && (
         <Panel title="Прогрев Workshop-карт">
-          <div className="rounded-xl border border-line bg-surface p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-center justify-between gap-4">
             <p className="text-[13px] text-fg-2 max-w-lg">
               Карты из Workshop скачиваются на сервер автоматически при открытии check-in. Прогрев сейчас — чтобы к первому матчу они
               уже были в кэше.
@@ -417,7 +419,7 @@ async function RegistrationTab({
         .filter((g) => g.items.length > 0)
         .map((g) => (
           <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
-            <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
               {g.items.map((r) => (
                 <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} />
               ))}
@@ -493,7 +495,7 @@ function RegistrationRow({
           Состав ({r.roster.length}) <span className="group-open:hidden">▾</span>
           <span className="hidden group-open:inline">▴</span>
         </summary>
-        <div className="mt-2 divide-y divide-line border-t border-line">
+        <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
           {r.roster
             .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
             .map((p) => (

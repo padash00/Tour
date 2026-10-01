@@ -4,9 +4,9 @@ import { db } from "@/lib/supabase";
 import { formatDateTime, formatShortDateTime } from "@/lib/format";
 import type { AuditLog, Player, Tournament } from "@/lib/types";
 import type { MatchWithTeams } from "@/lib/matches";
-import { TournamentStatusPill } from "@/components/tournament-bits";
+import { BarCell, CARD, Label, StatusChip } from "@/components/admin/tournament-kit";
 import { ButtonLink, EmptyState } from "@/components/ui";
-import { AdminHeader, AlertRow, Dot, Metric, Panel } from "@/components/admin/control";
+import { AdminHeader, AlertRow, Dot, Panel } from "@/components/admin/control";
 import { getServerState } from "@/lib/server-control";
 
 export const metadata: Metadata = { title: "F16 Control" };
@@ -60,7 +60,7 @@ export default async function AdminOverview() {
         eyebrow="F16 Control"
         title="Операции турнира"
         description={`${players.count ?? 0} игроков · ${teams.count ?? 0} команд`}
-        actions={<ButtonLink href="/admin/tournaments/new" size="sm">Новый турнир</ButtonLink>}
+        actions={<ButtonLink href="/admin/tournaments/new" size="sm" className="rounded-[8px]">Новый турнир</ButtonLink>}
       />
 
       {/* сигналы, требующие действия */}
@@ -114,42 +114,42 @@ export default async function AdminOverview() {
         </div>
       )}
 
-      {/* операционная сводка: одна полоса вместо пяти одинаковых карточек */}
-      <div className="rounded-xl border border-line bg-surface">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-line">
-          <div className="p-5 min-w-0">
-            <div className="text-[12px] text-fg-3">Текущий турнир</div>
+      {/* операционная полоса: турнир и ключевые счётчики в одной строке */}
+      <div className={`${CARD} overflow-hidden`}>
+        <div className="grid grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-white/[0.06]">
+          <div className="col-span-2 lg:col-span-1 p-5 min-w-0 bg-[linear-gradient(110deg,rgba(138,184,255,0.06),transparent_60%)]">
+            <Label className="text-[10px]">Текущий турнир</Label>
             {current ? (
               <>
-                <Link href={`/admin/tournaments/${current.id}`} className="mt-1 block text-[18px] font-semibold tracking-[-0.02em] truncate hover:text-accent">
+                <Link
+                  href={`/admin/tournaments/${current.id}`}
+                  className="mt-2 block text-[20px] font-semibold tracking-[-0.015em] truncate hover:text-accent"
+                >
                   {current.name}
                 </Link>
-                <div className="mt-1.5 flex items-center gap-3 text-[12px] text-fg-3">
-                  <TournamentStatusPill status={current.status} />
-                  <span>{formatDateTime(current.starts_at)}</span>
+                <div className="mt-2 flex items-center gap-3 text-[12px] text-fg-3">
+                  <StatusChip status={current.status} />
+                  <span className="num">{formatDateTime(current.starts_at)}</span>
                 </div>
               </>
             ) : (
-              <div className="mt-1 text-[14px] text-fg-3">Нет активного турнира</div>
+              <div className="mt-2 text-[14px] text-fg-3">
+                Нет активного турнира ·{" "}
+                <Link href="/admin/tournaments/new" className="text-accent hover:underline">
+                  создать
+                </Link>
+              </div>
             )}
           </div>
-          <div className="p-5">
-            <Metric label="Матчи live" value={live.length} tone={live.length ? "danger" : undefined} hint={`${active.length} в работе`} />
-          </div>
-          <div className="p-5">
-            <Metric
-              label="Серверы"
-              value={servers.online ? `${running.length}/${servers.instances.length}` : "—"}
-              tone={servers.online ? "ok" : "danger"}
-              hint={servers.online ? `${busy.length} заняты` : "агент офлайн"}
-            />
-          </div>
-          <div className="p-5">
-            <Metric label="Заявки" value={pending.length} tone={pending.length ? "warn" : undefined} hint="на рассмотрении" />
-          </div>
-          <div className="p-5">
-            <Metric label="Споры" value={disputes.length} tone={disputes.length ? "warn" : undefined} hint="открыто" />
-          </div>
+          <BarCell label="Live" value={live.length} tone={live.length ? "danger" : undefined} hint={`${active.length} в работе`} />
+          <BarCell
+            label="Серверы"
+            value={servers.online ? `${running.length}/${servers.instances.length}` : "—"}
+            tone={servers.online ? "ok" : "danger"}
+            hint={servers.online ? `${busy.length} заняты` : "агент офлайн"}
+          />
+          <BarCell label="Заявки" value={pending.length} tone={pending.length ? "warn" : undefined} hint="на рассмотрении" />
+          <BarCell label="Споры" value={disputes.length} tone={disputes.length ? "warn" : undefined} hint="открыто" />
         </div>
       </div>
 
@@ -159,12 +159,12 @@ export default async function AdminOverview() {
             {active.length === 0 ? (
               <EmptyState compact title="Сейчас матчей нет" description="Здесь появятся матчи в вето, ожидании и live." />
             ) : (
-              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
                 {active.map((m) => (
                   <Link
                     key={m.id}
                     href={`/admin/matches/${m.id}`}
-                    className={`flex items-center gap-4 px-4 h-12 text-[13px] hover:bg-white/[0.03] ${m.status === "live" ? "bg-danger/[0.04]" : ""}`}
+                    className={`relative flex items-center gap-4 px-4 h-11 text-[13px] hover:bg-white/[0.03] ${m.status === "live" ? "bg-danger/[0.04] before:absolute before:left-0 before:inset-y-2 before:w-[2px] before:rounded-full before:bg-danger" : ""}`}
                   >
                     <span className="num text-fg-3 w-8">#{m.number}</span>
                     <span className="flex-1 min-w-0 truncate font-medium">
@@ -195,12 +195,12 @@ export default async function AdminOverview() {
                 action={<ButtonLink href="/admin/tournaments/new" variant="secondary" size="sm">Создать турнир</ButtonLink>}
               />
             ) : (
-              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
                 {tournaments.map((t) => (
-                  <Link key={t.id} href={`/admin/tournaments/${t.id}`} className="flex items-center gap-4 px-4 h-12 text-[13px] hover:bg-white/[0.03]">
+                  <Link key={t.id} href={`/admin/tournaments/${t.id}`} className="flex items-center gap-4 px-4 h-11 text-[13px] hover:bg-white/[0.03]">
                     <span className="flex-1 min-w-0 truncate font-medium">{t.name}</span>
                     <span className="text-[12px] text-fg-3 hidden sm:block">{formatShortDateTime(t.starts_at)}</span>
-                    <TournamentStatusPill status={t.status} />
+                    <StatusChip status={t.status} />
                   </Link>
                 ))}
               </div>
@@ -210,7 +210,7 @@ export default async function AdminOverview() {
 
         <div className="space-y-8 min-w-0">
           <Panel title="Серверы" action={<Link href="/admin/servers" className="text-[12px] text-fg-3 hover:text-fg">Управление →</Link>}>
-            <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
               {servers.instances.map((s) => {
                 const state = !servers.online
                   ? { t: "агент офлайн", tone: "muted" as const }
@@ -236,7 +236,7 @@ export default async function AdminOverview() {
             {logs.length === 0 ? (
               <EmptyState compact title="Журнал пуст" />
             ) : (
-              <div className="rounded-xl border border-line bg-[#060a10] px-4 py-3 font-mono text-[12px] leading-6">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#05080d] px-4 py-3 font-mono text-[12px] leading-6">
                 {logs.map((l) => (
                   <div key={l.id} className="flex gap-3 min-w-0">
                     <span className="text-fg-3 shrink-0">{formatShortDateTime(l.created_at)}</span>

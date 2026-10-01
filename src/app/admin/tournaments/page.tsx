@@ -4,7 +4,7 @@ import { approvedCounts } from "@/lib/data";
 import { formatShortDateTime } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Tournament } from "@/lib/types";
-import { TournamentStatusPill } from "@/components/tournament-bits";
+import { StatusChip } from "@/components/admin/tournament-kit";
 import { ButtonLink, EmptyState } from "@/components/ui";
 import { AdminHeader, TableBox } from "@/components/admin/control";
 
@@ -27,13 +27,13 @@ export default async function AdminTournamentsPage() {
       <AdminHeader
         eyebrow="F16 Control"
         title="Турниры"
-        actions={<ButtonLink href="/admin/tournaments/new" size="sm">Новый турнир</ButtonLink>}
+        actions={<ButtonLink href="/admin/tournaments/new" size="sm" className="rounded-[8px]">Новый турнир</ButtonLink>}
       />
       {tournaments.length === 0 ? (
         <EmptyState
           title="Турниров ещё нет"
           description="Новый турнир сохраняется как черновик и не виден игрокам, пока вы не откроете регистрацию."
-          action={<ButtonLink href="/admin/tournaments/new" size="sm">Новый турнир</ButtonLink>}
+          action={<ButtonLink href="/admin/tournaments/new" size="sm" className="rounded-[8px]">Новый турнир</ButtonLink>}
         />
       ) : (
         <TableBox minWidth={760}>
@@ -53,13 +53,13 @@ export default async function AdminTournamentsPage() {
               return (
                 <tr key={t.id}>
                   <td>
-                    <Link href={`/admin/tournaments/${t.id}`} className="font-medium text-fg hover:text-accent">
+                    <Link href={`/admin/tournaments/${t.id}`} className="font-semibold text-fg hover:text-accent">
                       {t.name}
                     </Link>
-                    <span className="ml-2 text-[12px] text-fg-3 num">/{t.slug}</span>
+                    <div className="text-[11px] text-fg-3 num">/{t.slug}</div>
                   </td>
                   <td>
-                    <TournamentStatusPill status={t.status} />
+                    <StatusChip status={t.status} />
                   </td>
                   <td className={reg.cls}>{reg.text}</td>
                   <td className="text-right num text-fg">

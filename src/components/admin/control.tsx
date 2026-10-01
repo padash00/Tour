@@ -4,8 +4,23 @@ import { cn } from "@/components/ui";
 
 /**
  * F16 Control — плотные операционные примитивы админки.
- * Те же токены, что и публичный сайт, но мельче шрифт и больше данных на экране.
+ * Язык публичного сайта (подписи разрядкой, карточки #0b1420, акцент #8AB8FF),
+ * но мельче шрифт и больше данных на экране.
  */
+
+/** Карточка админки — как на публичном сайте */
+export const ADMIN_CARD = "rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80";
+
+/** Заголовки колонок таблиц: капс с разрядкой, как подписи сайта */
+export const TH =
+  "[&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-[0.2em] [&_th]:font-medium [&_th]:text-[#7f93b0] [&_th]:h-10";
+
+/** Подпись раздела: капс с разрядкой, холодный серо-синий */
+export function AdminLabel({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("text-[11px] font-medium uppercase tracking-[0.28em] text-[#7f93b0]", className)}>{children}</div>
+  );
+}
 
 export function AdminHeader({
   eyebrow,
@@ -21,23 +36,23 @@ export function AdminHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-6 border-b border-line">
+    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-7 border-b border-white/[0.06]">
       <div className="min-w-0">
         {back && (
           <Link href={back.href} className="text-[12px] text-fg-3 hover:text-fg">
             ← {back.label}
           </Link>
         )}
-        {eyebrow && <div className={cn("text-[12px] text-fg-3", back && "mt-2")}>{eyebrow}</div>}
-        <h1 className="mt-1 text-[26px] font-semibold tracking-[-0.025em] leading-tight">{title}</h1>
-        {description && <div className="mt-1.5 text-[13px] text-fg-3">{description}</div>}
+        {eyebrow && <AdminLabel className={cn(back && "mt-3")}>{eyebrow}</AdminLabel>}
+        <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.015em] leading-tight">{title}</h1>
+        {description && <div className="mt-2 text-[13px] text-fg-3">{description}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
 
-/** Блок рабочей области: маленький заголовок, без коробки по умолчанию */
+/** Блок рабочей области: подпись разрядкой, без коробки по умолчанию */
 export function Panel({
   title,
   action,
@@ -54,21 +69,21 @@ export function Panel({
   return (
     <section className={className}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 mb-3">
-          {title && <h2 className="text-[13px] font-semibold text-fg-2">{title}</h2>}
+        <div className="flex items-center justify-between gap-3 mb-3.5">
+          {title && <AdminLabel>{title}</AdminLabel>}
           {action}
         </div>
       )}
-      {boxed ? <div className="rounded-xl border border-line bg-surface">{children}</div> : children}
+      {boxed ? <div className={ADMIN_CARD}>{children}</div> : children}
     </section>
   );
 }
 
-/** Таблица в рамке: прокрутка по горизонтали на узких экранах */
+/** Таблица в карточке: прокрутка по горизонтали на узких экранах */
 export function TableBox({ children, minWidth = 760 }: { children: ReactNode; minWidth?: number }) {
   return (
-    <div className="rounded-xl border border-line bg-surface overflow-x-auto">
-      <table className="tbl tbl-dense" style={{ minWidth }}>
+    <div className={cn(ADMIN_CARD, "overflow-x-auto")}>
+      <table className={`tbl tbl-dense ${TH}`} style={{ minWidth }}>
         {children}
       </table>
     </div>
@@ -93,8 +108,12 @@ export function AlertRow({ tone, title, children }: { tone: "danger" | "warn" | 
   return (
     <div
       className={cn(
-        "flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 border-l-2 bg-white/[0.02] rounded-r-lg text-[13px]",
-        tone === "danger" ? "border-danger" : tone === "warn" ? "border-warn" : "border-accent",
+        "flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 rounded-[10px] border text-[13px]",
+        tone === "danger"
+          ? "border-danger/30 bg-danger/[0.06]"
+          : tone === "warn"
+            ? "border-warn/30 bg-warn/[0.06]"
+            : "border-accent/30 bg-accent/[0.06]",
       )}
     >
       <span className={cn("font-semibold", tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "text-accent")}>
@@ -105,15 +124,15 @@ export function AlertRow({ tone, title, children }: { tone: "danger" | "warn" | 
   );
 }
 
-/** Значение в сводке: подпись + число/текст */
+/** Значение в сводке: подпись разрядкой + число/текст */
 export function Metric({ label, value, tone, hint }: { label: ReactNode; value: ReactNode; tone?: DotTone; hint?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[12px] text-fg-3">{label}</div>
+      <AdminLabel className="text-[10px] tracking-[0.22em]">{label}</AdminLabel>
       <div
         className={cn(
-          "mt-1 text-[20px] font-semibold tracking-[-0.02em] num",
-          tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : "text-fg",
+          "mt-2 text-[22px] font-semibold tracking-[-0.02em] num",
+          tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : tone === "accent" ? "text-accent" : "text-fg",
         )}
       >
         {value}
@@ -126,14 +145,14 @@ export function Metric({ label, value, tone, hint }: { label: ReactNode; value: 
 /** Внутренние вкладки страницы (через ?tab=) */
 export function SubTabs({ items, active }: { items: { key: string; label: ReactNode; href: string }[]; active: string }) {
   return (
-    <div className="flex gap-5 border-b border-line overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+    <div className="flex gap-6 border-b border-white/[0.06] overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
       {items.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           scroll={false}
           className={cn(
-            "relative h-10 inline-flex items-center text-[13px] font-medium whitespace-nowrap transition-colors",
+            "relative h-11 inline-flex items-center text-[13px] font-medium whitespace-nowrap transition-colors",
             t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
           )}
         >
@@ -148,11 +167,11 @@ export function SubTabs({ items, active }: { items: { key: string; label: ReactN
 export function TableSkeleton({ rows = 8, cols = 6 }: { rows?: number; cols?: number }) {
   return (
     <div className="space-y-6">
-      <div className="pb-6 border-b border-line">
+      <div className="pb-7 border-b border-white/[0.06]">
         <div className="skeleton h-3 w-24" />
-        <div className="skeleton mt-3 h-7 w-56" />
+        <div className="skeleton mt-3 h-8 w-56" />
       </div>
-      <div className="rounded-xl border border-line bg-surface p-3 space-y-2">
+      <div className={cn(ADMIN_CARD, "p-3 space-y-2")}>
         {Array.from({ length: rows }).map((_, r) => (
           <div key={r} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {Array.from({ length: cols }).map((__, c) => (

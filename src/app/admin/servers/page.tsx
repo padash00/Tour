@@ -82,7 +82,7 @@ export default async function ServersPage() {
       )}
 
       {/* хост */}
-      <div className="rounded-xl border border-line bg-surface grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 divide-x divide-line">
+      <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 divide-x divide-white/[0.06]">
         <div className="p-4"><Metric label="CPU" value={info.cpu_load != null ? `${info.cpu_load}%` : "—"} tone={cpu > 85 ? "danger" : cpu > 65 ? "warn" : undefined} /></div>
         <div className="p-4"><Metric label="RAM" value={info.ram_used_gb != null ? `${info.ram_used_gb}` : "—"} hint={info.ram_total_gb ? `из ${info.ram_total_gb} GB` : undefined} /></div>
         <div className="p-4"><Metric label="Диск D" value={info.disk_free_gb != null ? `${info.disk_free_gb}` : "—"} hint="GB свободно" /></div>
@@ -101,8 +101,8 @@ export default async function ServersPage() {
 
       {/* инстансы */}
       <Panel title="Инстансы">
-        <div className="rounded-xl border border-line bg-surface divide-y divide-line overflow-x-auto">
-          <div className="min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_260px] gap-4 px-4 h-9 items-center text-[12px] text-fg-3">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06] overflow-x-auto">
+          <div className="min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_260px] gap-4 px-4 h-10 items-center text-[10px] uppercase tracking-[0.2em] font-medium text-[#7f93b0]">
             <span>Инстанс</span>
             <span>Состояние</span>
             <span>Матч</span>
@@ -201,7 +201,7 @@ export default async function ServersPage() {
         {(commands ?? []).length === 0 ? (
           <p className="text-[13px] text-fg-3">Команд ещё не было.</p>
         ) : (
-          <div className="rounded-xl border border-line bg-[#05080d] overflow-x-auto">
+          <div className="rounded-[12px] border border-white/[0.08] bg-[#04070c] overflow-x-auto">
             <div className="min-w-[820px] py-2 font-mono text-[12px] leading-[22px]">
               {((commands ?? []) as AgentCommand[]).map((c) => (
                 <div key={c.id} className="flex gap-4 px-4 hover:bg-white/[0.03]">

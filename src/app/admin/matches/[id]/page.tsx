@@ -33,8 +33,8 @@ export const metadata: Metadata = { title: "Матч — F16 Control" };
 /** Блок действий в правой колонке */
 function ActionBlock({ title, children, tone }: { title: string; children: ReactNode; tone?: "danger" }) {
   return (
-    <div className={cn("p-4 space-y-3", tone === "danger" && "bg-danger/[0.03]")}>
-      <div className={cn("text-[12px] font-semibold", tone === "danger" ? "text-danger" : "text-fg-2")}>{title}</div>
+    <div className={cn("p-5 space-y-3", tone === "danger" && "bg-danger/[0.04] border-t border-danger/20")}>
+      <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", tone === "danger" ? "text-danger" : "text-[#7f93b0]")}>{title}</div>
       {children}
     </div>
   );
@@ -102,21 +102,21 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
         {/* ── состояние ── */}
         <div className="space-y-6 min-w-0">
           {/* табло */}
-          <div className="rounded-xl border border-line bg-surface">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 p-5">
+          <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 px-7 py-7">
               <div className="flex items-center gap-3 min-w-0">
-                {m.team1 && <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={40} />}
-                <span className={cn("font-semibold truncate", m.winner_id && m.winner_id === m.team1_id && "text-ok")}>{t1}</span>
+                {m.team1 && <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={52} />}
+                <span className={cn("text-[18px] font-semibold truncate", m.winner_id && m.winner_id === m.team1_id && "text-ok")}>{t1}</span>
               </div>
-              <div className="num text-[32px] font-semibold tracking-[-0.03em] text-center">
+              <div className="num text-[44px] font-semibold tracking-[-0.03em] text-center leading-none">
                 {["live", "finished"].includes(m.status) ? `${m.team1_score} : ${m.team2_score}` : "— : —"}
               </div>
               <div className="flex items-center gap-3 justify-end min-w-0">
-                <span className={cn("font-semibold truncate text-right", m.winner_id && m.winner_id === m.team2_id && "text-ok")}>{t2}</span>
-                {m.team2 && <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={40} />}
+                <span className={cn("text-[18px] font-semibold truncate text-right", m.winner_id && m.winner_id === m.team2_id && "text-ok")}>{t2}</span>
+                {m.team2 && <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={52} />}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 border-t border-line divide-x divide-line text-[13px]">
+            <div className="grid grid-cols-2 md:grid-cols-4 border-t border-white/[0.06] divide-x divide-white/[0.06] text-[13px]">
               <div className="px-5 py-3">
                 <div className="text-[12px] text-fg-3">Формат</div>
                 <div className="mt-0.5">BO{m.best_of}</div>
@@ -138,7 +138,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
 
           {/* сервер */}
           <Panel title="Сервер">
-            <div className="rounded-xl border border-line bg-surface grid grid-cols-2 md:grid-cols-5 divide-x divide-line text-[13px]">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 grid grid-cols-2 md:grid-cols-5 divide-x divide-white/[0.06] text-[13px]">
               <div className="px-4 py-3">
                 <div className="text-[12px] text-fg-3">Инстанс</div>
                 <div className="mt-0.5 num">{m.server_instance ?? "—"}</div>
@@ -175,7 +175,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           {/* карты */}
           {m.maps.length > 0 && (
             <Panel title="Карты">
-              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
                 {m.maps.map((map) => (
                   <div key={map.id} className={cn("p-4", map.status === "live" && "bg-danger/[0.03]")}>
                     <div className="flex items-center gap-3 text-[13px]">
@@ -222,7 +222,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           {/* составы */}
           {(m.team1_id || m.team2_id) && (
             <Panel title="Составы">
-              <div className="rounded-xl border border-line bg-surface grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-line">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.06]">
                 {[
                   { name: t1, list: rosters.team1 },
                   { name: t2, list: rosters.team2 },
@@ -258,7 +258,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
             {disputes.length === 0 ? (
               <p className="text-[13px] text-fg-3">Споров нет. Капитаны могут открыть спор на странице матча.</p>
             ) : (
-              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
                 {disputes.map((d) => (
                   <div key={d.id} className="p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-fg-3">
@@ -302,7 +302,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
         </div>
 
         {/* ── действия ── */}
-        <aside className="xl:sticky xl:top-6 rounded-xl border border-line bg-bg-2 divide-y divide-line">
+        <aside className="xl:sticky xl:top-6 overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
           {openDisputes > 0 && (
             <div className="px-4 py-3 text-[12px] text-warn">Открытых споров: {openDisputes}</div>
           )}

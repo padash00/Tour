@@ -95,7 +95,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
       {logs.length === 0 ? (
         <EmptyState compact title="Записей нет" />
       ) : (
-        <div className="rounded-xl border border-line bg-[#05080d] overflow-x-auto">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#04070c] overflow-x-auto">
           <div className="min-w-[820px] py-2 font-mono text-[12px] leading-[22px]">
             {logs.map((l) => {
               const s = severityOf(l.action);
