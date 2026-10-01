@@ -1,5 +1,5 @@
 import "server-only";
-import { env } from "./env";
+import { getSetting } from "./settings";
 
 const OPENID_ENDPOINT = "https://steamcommunity.com/openid/login";
 const CLAIMED_ID_RE = /^https:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
@@ -65,7 +65,7 @@ export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> 
     country: null,
   };
 
-  const key = env.steamApiKey;
+  const key = await getSetting("STEAM_API_KEY");
   try {
     if (key) {
       const res = await fetch(

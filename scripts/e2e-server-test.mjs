@@ -106,7 +106,7 @@ const match = must(
 must(await db.from("match_maps").insert({ match_id: match.id, map_number: 1, map_name: "de_inferno" }), "map");
 
 console.log(`2. команда load_match → ${INSTANCE} (matchzy_id ${match.matchzy_id})`);
-must(await db.from("agent_commands").insert({ instance: INSTANCE, type: "load_match", payload: { match_id: match.id } }), "cmd");
+must(await db.from("agent_commands").insert({ instance: INSTANCE, type: "load_match", payload: { match_id: match.id, matchzy_id: match.matchzy_id } }), "cmd");
 
 let ok = false;
 for (let i = 0; i < 30; i++) {

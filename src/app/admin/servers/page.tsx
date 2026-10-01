@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { serverCommand, serverRcon } from "@/app/actions/admin-server";
+import { hostCommand, serverCommand, serverRcon } from "@/app/actions/admin-server";
+import { getAgentBundle } from "@/lib/agent-bundle";
 import { formatShortDateTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
@@ -36,6 +37,9 @@ export default async function ServersPage() {
   type M = { id: string; number: number; server_instance: string; server_state: string; team1: { tag: string } | null; team2: { tag: string } | null };
   const assigned = new Map(((matches ?? []) as unknown as M[]).map((m) => [m.server_instance, m]));
   const info = (host?.info ?? {}) as Record<string, string | number>;
+  const versions = ((host?.info as { versions?: Record<string, string> } | undefined)?.versions ?? {}) as Record<string, string>;
+  const busy = (host?.info as { busy?: string | null } | undefined)?.busy ?? null;
+  const siteBundle = getAgentBundle().version;
 
   return (
     <div className="space-y-8">
@@ -66,6 +70,47 @@ export default async function ServersPage() {
           <div><div className="label">CS2 build</div><div className="mt-1 num">{info.cs2_build ?? "—"}</div></div>
         </Card>
       )}
+
+      <Card className="p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="label mb-3">Обслуживание</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-2 text-sm">
+              <div><span className="text-fg-3">Metamod</span> <span className="num">{versions.metamod ?? "—"}</span></div>
+              <div><span className="text-fg-3">CSSharp</span> <span className="num">{versions.counterstrikesharp ?? "—"}</span></div>
+              <div><span className="text-fg-3">MatchZy</span> <span className="num">{versions.matchzy ?? "—"}</span></div>
+              <div>
+                <span className="text-fg-3">Агент</span>{" "}
+                <span className={`num ${info.agent_version === siteBundle ? "text-ok" : "text-warn"}`}>
+                  {info.agent_version ?? "—"}
+                </span>
+              </div>
+            </div>
+            {info.agent_version && info.agent_version !== siteBundle && (
+              <p className="mt-2 text-xs text-warn">Агент обновится до {siteBundle} автоматически в течение нескольких секунд.</p>
+            )}
+            {busy && <p className="mt-3 text-sm text-warn">Выполняется: {busy}. Серверы могут быть недоступны.</p>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { type: "update_cs2", label: "Обновить CS2", confirm: "Остановить все серверы и обновить CS2 через SteamCMD? Займёт несколько минут." },
+              { type: "update_plugins", label: "Обновить плагины", confirm: "Скачать последние Metamod, CounterStrikeSharp и MatchZy и перезапустить серверы?" },
+              { type: "restart_all", label: "Перезапустить все", confirm: "Перезапустить все активные серверы?" },
+            ].map((c) => (
+              <ActionForm key={c.type} action={hostCommand}>
+                <input type="hidden" name="type" value={c.type} />
+                <SubmitButton size="sm" variant="secondary" confirm={c.confirm}>
+                  {c.label}
+                </SubmitButton>
+              </ActionForm>
+            ))}
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-fg-3">
+          Обновления запускаются, только если нет активных матчей. Код агента, скрипты и конфиги CS2 (MatchZy, инстансы)
+          берутся из репозитория и доезжают до серверного ПК автоматически после деплоя.
+        </p>
+      </Card>
 
       <div className="card overflow-x-auto">
         <table className="tbl min-w-[860px]">

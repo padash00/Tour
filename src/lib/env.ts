@@ -16,12 +16,6 @@ export const env = {
   get sessionSecret() {
     return new TextEncoder().encode(required("SESSION_SECRET"));
   },
-  get steamApiKey() {
-    return process.env.STEAM_API_KEY ?? null;
-  },
-  get faceitApiKey() {
-    return process.env.FACEIT_API_KEY ?? null;
-  },
   /** SteamID64 администраторов через запятую */
   get adminSteamIds() {
     return (process.env.ADMIN_STEAM_IDS ?? "")

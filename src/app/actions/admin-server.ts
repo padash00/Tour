@@ -69,3 +69,34 @@ export async function serverRcon(_prev: ActionResult, formData: FormData): Promi
   revalidatePath("/admin/servers");
   return { success: "Команда отправлена — ответ появится в журнале команд" };
 }
+
+const HOST_TYPES = ["update_cs2", "update_plugins", "restart_all"] as const;
+
+/**
+ * Обновления по сценарию из документа: есть LIVE/назначенные матчи → ждём;
+ * нет → агент останавливает инстансы, обновляет, ставит плагины, запускает и проверяет.
+ */
+export async function hostCommand(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const type = String(formData.get("type")) as (typeof HOST_TYPES)[number];
+  if (!HOST_TYPES.includes(type)) return { error: "Неизвестная команда" };
+
+  const { online, host, instances } = await getServerState();
+  if (!online) return { error: "Server Agent не на связи" };
+  if ((host?.info as { busy?: string } | undefined)?.busy) return { error: "Агент уже выполняет обновление" };
+
+  const busy = instances.filter((i) => i.running && (i.gamestate ?? "none") !== "none");
+  const { count } = await db()
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .not("server_instance", "is", null)
+    .in("status", ["ready", "live"]);
+  if (busy.length || (count ?? 0) > 0) {
+    return { error: `Есть активные матчи (${busy.map((b) => b.name).join(", ") || `${count} назначено`}). Обновление — после их окончания.` };
+  }
+
+  await enqueueCommand(null, type, {}, admin.id);
+  await audit(admin.id, `server.${type}`);
+  revalidatePath("/admin/servers");
+  return { success: "Команда отправлена агенту. Прогресс — в журнале команд." };
+}

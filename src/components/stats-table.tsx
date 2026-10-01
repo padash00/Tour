@@ -14,7 +14,13 @@ export function ratingColor(r: number) {
   return "text-danger";
 }
 
+export function swingColor(s: number | null) {
+  if (s == null) return "text-fg-3";
+  return s >= 1 ? "text-ok" : s <= -1 ? "text-danger" : "text-fg-2";
+}
+
 export const fmt = {
+  swing: (s: number | null) => (s == null ? "—" : `${s > 0 ? "+" : ""}${s.toFixed(1)}%`),
   r: (n: number) => n.toFixed(2),
   d1: (n: number) => n.toFixed(1),
   pct: (n: number) => `${Math.round(n)}%`,
@@ -50,6 +56,7 @@ export function PlayerStatsTable({
             {!compact && <th className="text-right">HS</th>}
             {!compact && <th className="text-right">Entry</th>}
             {!compact && <th className="text-right">Клатчи</th>}
+            <th className="text-right" title="Средний вклад в шанс победы раунда">Swing</th>
             <th className="text-right">Rating</th>
           </tr>
         </thead>
@@ -103,6 +110,7 @@ export function PlayerStatsTable({
                   </td>
                 )}
                 {!compact && <td className="text-right num">{p.clutches}</td>}
+                <td className={cn("text-right num", swingColor(p.swing))}>{fmt.swing(p.swing)}</td>
                 <td className={cn("text-right num font-semibold", ratingColor(p.rating))}>{fmt.r(p.rating)}</td>
               </tr>
             );
@@ -117,7 +125,7 @@ export function RatingExplainer() {
   return (
     <details className="card p-6 group">
       <summary className="list-none cursor-pointer flex items-center justify-between font-semibold">
-        Как считается F16 Rating
+        Как считаются F16 Rating, Swing и MVP
         <span className="text-fg-3 transition group-open:rotate-45 text-xl leading-none">+</span>
       </summary>
       <div className="mt-4 space-y-3 text-sm text-fg-2 leading-relaxed">
@@ -135,9 +143,16 @@ export function RatingExplainer() {
 Rating = 0.0073·KAST% + 0.3591·KPR − 0.5329·DPR
        + 0.2372·Impact + 0.0032·ADR + 0.1587`}
         </pre>
+        <p className="font-semibold text-fg pt-2">Swing</p>
         <p>
-          MVP турнира — лучший рейтинг среди игроков, сыгравших не меньше половины карт своей команды (минимум 2
-          карты). Статистика собирается с игрового сервера после каждого раунда.
+          Swing — средний вклад игрока в шанс команды выиграть раунд, в процентных пунктах за раунд. Каждое событие
+          меняет вероятность победы: убийство (убийце +Δ, при ассисте 75/25), смерть (−Δ), плент, дефьюз. Остаток до
+          исхода раунда делится между выжившими. Шанс победы считается по числу живых с каждой стороны и состоянию
+          бомбы (модель v1; откалибруем на собственных раундах F16).
+        </p>
+        <p>
+          <span className="text-fg">MVP турнира</span> — лучший Swing среди игроков, сыгравших не меньше половины
+          карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.
         </p>
       </div>
     </details>

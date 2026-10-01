@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { a2sInfo, rcon } from "./lib.mjs";
+import { applyBundle, cs2Build, localBundleVersion, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = process.env.F16_SERVER_DIR ?? "D:\\cs2server";
@@ -31,6 +32,8 @@ const INSTANCES = readFileSync(instancesCsv, "utf8")
     return { name, port: Number(port), role };
   });
 const START_PS1 = path.join(F16_DIR, "start.ps1");
+const STEAMCMD_DIR = config.steamcmdDir ?? "D:\\SteamCMD";
+let busy = null; // долгая команда обслуживания, которая сейчас выполняется
 const INTERVAL_MS = 5000;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -76,8 +79,7 @@ function diskFreeGb() {
 
 async function collectHostInfo() {
   if (Date.now() - hostInfoAt < 60_000) return hostInfo;
-  const manifest = path.join(SERVER_DIR, "steamapps", "appmanifest_730.acf");
-  const build = existsSync(manifest) ? /"buildid"\s+"(\d+)"/.exec(readFileSync(manifest, "utf8"))?.[1] : null;
+  const build = cs2Build(SERVER_DIR);
   const load = os.loadavg()[0]; // на Windows всегда 0 — считаем по cpu times
   const cpus = os.cpus();
   const idle = cpus.reduce((a, c) => a + c.times.idle, 0);
@@ -92,10 +94,11 @@ async function collectHostInfo() {
     disk_free_gb: await diskFreeGb(),
     cs2_build: build,
     hostname: os.hostname(),
-    agent_version: "1.0.0",
+    agent_version: localBundleVersion(F16_DIR),
+    versions: readVersions(F16_DIR),
   };
   hostInfoAt = Date.now();
-  return hostInfo;
+  return { ...hostInfo, busy };
 }
 
 async function collectInstances() {
@@ -139,6 +142,26 @@ function runStartScript(name, stop) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const maintenanceCtx = () => ({ f16Dir: F16_DIR, serverDir: SERVER_DIR, steamcmdDir: STEAMCMD_DIR, instances: INSTANCES, startPs1: START_PS1 });
+const HOST_COMMANDS = { update_cs2: updateCs2, update_plugins: updatePlugins, restart_all: restartAll };
+
+/** Долгие команды обслуживания выполняются в фоне, агент продолжает отчитываться сайту */
+function runHostCommand(cmd) {
+  if (busy) return api("/api/agent/ack", { id: cmd.id, ok: false, result: `агент занят: ${busy}` }).catch(() => {});
+  busy = cmd.type;
+  hostInfoAt = 0;
+  log("maintenance start", cmd.type);
+  HOST_COMMANDS[cmd.type](maintenanceCtx())
+    .then((result) => ({ ok: true, result }))
+    .catch((e) => ({ ok: false, result: String(e?.message ?? e) }))
+    .then(async (r) => {
+      busy = null;
+      hostInfoAt = 0;
+      log("maintenance", r.ok ? "ok" : "fail", r.result);
+      await api("/api/agent/ack", { id: cmd.id, ...r }).catch((e) => log("ack failed", e.message));
+    });
+}
+
 async function execute(cmd) {
   const inst = INSTANCES.find((i) => i.name === cmd.instance);
   if (!inst) return { ok: false, result: `unknown instance ${cmd.instance}` };
@@ -155,7 +178,7 @@ async function execute(cmd) {
       return runStartScript(inst.name, false);
     }
     case "load_match": {
-      const { url, header_key, header_value, events_url } = cmd.payload;
+      const { url, header_key, header_value, events_url, log_url } = cmd.payload;
       // на случай, если на сервере остался старый матч
       await rcon(inst.port, secrets.rcon, "get5_endmatch").catch(() => {});
       const out = await rcon(inst.port, secrets.rcon, `matchzy_loadmatch_url ${q(url)} ${q(header_key)} ${q(header_value)}`);
@@ -165,13 +188,18 @@ async function execute(cmd) {
         `matchzy_remote_log_url ${q(events_url)}`,
         `matchzy_remote_log_header_key ${q(header_key)}`,
         `matchzy_remote_log_header_value ${q(header_value)}`,
+        // HTTP-лог CS2 для Swing: каждое убийство, плент, дефьюз и конец раунда
+        "logaddress_delall_http",
+        ...(log_url ? [`logaddress_add_http ${q(log_url)}`] : []),
       ]) {
         await rcon(inst.port, secrets.rcon, c).catch(() => {});
       }
       return { ok: true, result: (out.trim() || "loadmatch sent") + " · events → site" };
     }
-    case "end_match":
+    case "end_match": {
+      await rcon(inst.port, secrets.rcon, "logaddress_delall_http").catch(() => {});
       return { ok: true, result: (await rcon(inst.port, secrets.rcon, "get5_endmatch")).trim() || "ended" };
+    }
     case "rcon":
       return { ok: true, result: (await rcon(inst.port, secrets.rcon, String(cmd.payload.command))).trim() };
     default:
@@ -197,8 +225,20 @@ let failures = 0;
 async function tick() {
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
   const publicInfo = Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu"));
-  const { commands } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances });
+  const { commands, bundle_version } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances });
+
+  // на сайте новая версия агента/скриптов/конфигов → обновляемся и перезапускаемся (F16-agent.bat поднимет снова)
+  if (!busy && bundle_version && bundle_version !== localBundleVersion(F16_DIR)) {
+    const r = await applyBundle({ siteUrl: config.siteUrl, token: config.token, f16Dir: F16_DIR, serverDir: SERVER_DIR });
+    log(`обновление агента ${localBundleVersion(F16_DIR)}: ${r.count} файлов, перезапуск`);
+    process.exit(0);
+  }
+
   for (const cmd of commands ?? []) {
+    if (cmd.type in HOST_COMMANDS) {
+      runHostCommand(cmd);
+      continue;
+    }
     log("cmd", cmd.type, cmd.instance ?? "");
     let r;
     try {

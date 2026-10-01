@@ -3,6 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { notify } from "./audit";
 import { getMatch, getMatchRosters, recomputeSeries, syncBracket } from "./matches";
 import { db } from "./supabase";
+import { getSetting } from "./settings";
+import { startMapLogging, stopMapLogging } from "./swing-ingest";
 import type { Match } from "./types";
 
 // ───────────────────────── авторизация агента и MatchZy
@@ -45,7 +47,7 @@ export type ServerHost = { id: string; lan_ip: string | null; last_seen_at: stri
 export type AgentCommand = {
   id: string;
   instance: string | null;
-  type: "start" | "stop" | "restart" | "load_match" | "end_match" | "rcon";
+  type: "start" | "stop" | "restart" | "load_match" | "end_match" | "rcon" | "update_cs2" | "update_plugins" | "restart_all";
   payload: Record<string, unknown>;
   status: "pending" | "sent" | "done" | "error";
   result: string | null;
@@ -82,7 +84,7 @@ export async function buildMatchzyConfig(matchId: string) {
   const players = (list: typeof rosters.team1) =>
     Object.fromEntries(list.map((r) => [r.player.steam_id, r.player.nickname]));
 
-  const observers = (process.env.OBSERVER_STEAM_IDS ?? "")
+  const observers = ((await getSetting("OBSERVER_STEAM_IDS")) ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter((s) => /^\d{17}$/.test(s));
@@ -126,7 +128,7 @@ export async function assignServer(match: Match, instanceName: string, actorId?:
     .from("matches")
     .update({ server_instance: instanceName, server_state: "loading", server_address: null, server_password: null })
     .eq("id", match.id);
-  await enqueueCommand(instanceName, "load_match", { match_id: match.id }, actorId);
+  await enqueueCommand(instanceName, "load_match", { match_id: match.id, matchzy_id: match.matchzy_id }, actorId);
 }
 
 // ───────────────────────── синхронизация с агентом
@@ -210,6 +212,7 @@ export async function takePendingCommands(siteOrigin: string) {
           header_key: MATCHZY_HEADER,
           header_value: process.env.MATCHZY_TOKEN,
           events_url: `${siteOrigin}/api/matchzy/events`,
+          log_url: `${siteOrigin}/api/cs2/log?m=${c.payload.matchzy_id}&t=${process.env.MATCHZY_TOKEN}`,
         },
       };
     }
@@ -320,7 +323,10 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       if (match.status === "ready") {
         await db().from("matches").update({ status: "live", started_at: new Date().toISOString() }).eq("id", match.id);
       }
-      if (ev.event === "going_live") await setMap({ status: "live" });
+      if (ev.event === "going_live") {
+        await setMap({ status: "live" });
+        await startMapLogging(match.id, mapNumber);
+      }
       break;
     }
     case "round_end": {
@@ -337,6 +343,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
         winner_id: winnerTeam,
       });
       await upsertPlayerStats(match, mapNumber, ev);
+      await stopMapLogging(match.id);
       if (match.status === "ready") await db().from("matches").update({ status: "live" }).eq("id", match.id);
       await recomputeSeries(match.id);
       break;

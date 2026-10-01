@@ -12,6 +12,7 @@ const ITEMS = [
   { href: "/admin/teams", label: "Команды" },
   { href: "/admin/players", label: "Игроки" },
   { href: "/admin/logs", label: "Журнал" },
+  { href: "/admin/settings", label: "Настройки" },
 ];
 
 export function AdminNav() {

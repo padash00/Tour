@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
+  // файлы серверного ПК (агент, скрипты, конфиги CS2) раздаются агенту с сайта
+  outputFileTracingIncludes: {
+    "/api/agent/bundle": ["./server/**/*"],
+    "/api/agent/sync": ["./server/**/*"],
+  },
 };
 
 export default nextConfig;

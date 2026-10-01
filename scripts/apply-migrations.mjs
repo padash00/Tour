@@ -1,11 +1,17 @@
 // Применяет новые миграции из supabase/migrations через Supabase Management API
 // и сохраняет ключи проекта в .env.local (файл в .gitignore).
 // Запуск: SUPABASE_ACCESS_TOKEN=sbp_... node scripts/apply-migrations.mjs
+//         node scripts/apply-migrations.mjs --ci   (в сборке Vercel: только миграции; без токена — пропуск)
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 
-const REF = "dgpxlpjnjthyotjcccfl";
+const REF = process.env.SUPABASE_PROJECT_REF ?? "dgpxlpjnjthyotjcccfl";
+const CI = process.argv.includes("--ci");
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 if (!token) {
+  if (CI) {
+    console.log("migrations: SUPABASE_ACCESS_TOKEN не задан — пропускаю");
+    process.exit(0);
+  }
   console.error("Нет SUPABASE_ACCESS_TOKEN");
   process.exit(1);
 }
@@ -41,6 +47,11 @@ await query("create table if not exists _migrations (name text primary key, appl
 await query(
   `insert into _migrations(name) values ${files.map((f) => `('${esc(f)}')`).join(",")} on conflict do nothing`,
 );
+
+if (CI) {
+  console.log("migrations: ok");
+  process.exit(0);
+}
 
 const tables = await query("select table_name from information_schema.tables where table_schema='public' order by 1");
 console.log("Таблицы:", tables.map((t) => t.table_name).join(", "));

@@ -433,7 +433,7 @@ async function MvpCard({ tournamentId, finished }: { tournamentId: string; finis
       <div className="relative flex flex-wrap items-center gap-5">
         <Avatar src={mvp.player?.avatar_url} name={nick} size={64} />
         <div className="flex-1 min-w-0">
-          <div className="label text-warm">{finished ? "MVP турнира" : "Лидер по рейтингу"}</div>
+          <div className="label text-warm">{finished ? "MVP турнира" : mvp.by === "swing" ? "Лидер по Swing" : "Лидер по рейтингу"}</div>
           <div className="mt-1 text-2xl font-bold tracking-tight truncate">
             {mvp.player ? (
               <Link href={`/players/${mvp.player.steam_id}`} className="hover:text-accent">
@@ -446,7 +446,8 @@ async function MvpCard({ tournamentId, finished }: { tournamentId: string; finis
           <div className="text-sm text-fg-3">{mvp.team?.name ?? ""}</div>
         </div>
         <div className="flex gap-6 text-center">
-          <div><div className="label">Rating</div><div className="mt-1 text-xl font-bold num text-ok">{fmt.r(mvp.rating)}</div></div>
+          <div><div className="label">Swing</div><div className="mt-1 text-xl font-bold num text-ok">{fmt.swing(mvp.swing)}</div></div>
+          <div><div className="label">Rating</div><div className="mt-1 text-xl font-bold num">{fmt.r(mvp.rating)}</div></div>
           <div><div className="label">ADR</div><div className="mt-1 text-xl font-bold num">{fmt.d1(mvp.adr)}</div></div>
           <div><div className="label">K/D</div><div className="mt-1 text-xl font-bold num">{mvp.kd.toFixed(2)}</div></div>
           <div><div className="label">Карты</div><div className="mt-1 text-xl font-bold num">{mvp.maps}</div></div>

@@ -1,5 +1,5 @@
 import "server-only";
-import { env } from "./env";
+import { getSetting } from "./settings";
 
 export type FaceitProfile = {
   id: string;
@@ -10,7 +10,7 @@ export type FaceitProfile = {
 
 /** Ищет FACEIT-профиль по SteamID64. null — профиля нет или ключ не задан. */
 export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfile | null> {
-  const key = env.faceitApiKey;
+  const key = await getSetting("FACEIT_API_KEY");
   if (!key) return null;
   try {
     const res = await fetch(

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { formatDate, mapName } from "@/lib/format";
 import type { PlayerAgg } from "@/lib/stats";
 import type { Player } from "@/lib/types";
-import { fmt, ratingColor } from "./stats-table";
+import { fmt, ratingColor, swingColor } from "./stats-table";
 import { Avatar, Card, Container, EmptyState, FaceitLevel, IconChart, SectionTitle, TeamLogo, cn } from "./ui";
 
 export type MapHistoryItem = {
@@ -36,7 +36,7 @@ export function PlayerProfile({
     { label: "K/D", value: agg ? agg.kd.toFixed(2) : "—" },
     { label: "ADR", value: agg ? fmt.d1(agg.adr) : "—" },
     { label: "KAST", value: agg ? fmt.pct(agg.kast) : "—" },
-    { label: "HS", value: agg ? fmt.pct(agg.hsPct) : "—" },
+    { label: "Swing", value: agg ? fmt.swing(agg.swing) : "—", cls: swingColor(agg?.swing ?? null) },
     { label: "Карты", value: String(agg?.maps ?? 0) },
   ];
 

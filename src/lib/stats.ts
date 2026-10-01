@@ -27,6 +27,8 @@ export type MapStatRow = {
   bomb_plants: number;
   bomb_defuses: number;
   mvp: number;
+  swing_sum?: number;
+  swing_rounds?: number;
 };
 
 export type PlayerAgg = {
@@ -52,6 +54,8 @@ export type PlayerAgg = {
   k4: number;
   k5: number;
   utilityDamage: number;
+  swingSum: number;
+  swingRounds: number;
   // производные
   kd: number;
   adr: number;
@@ -59,6 +63,8 @@ export type PlayerAgg = {
   hsPct: number; // %
   kpr: number;
   rating: number;
+  /** средний вклад в шанс победы раунда, п.п. за раунд; null — нет данных лога */
+  swing: number | null;
 };
 
 /**
@@ -73,7 +79,7 @@ export type PlayerAgg = {
  */
 export const F16_RATING_VERSION = "v1";
 
-function rate(a: Omit<PlayerAgg, "kd" | "adr" | "kast" | "hsPct" | "kpr" | "rating">) {
+function rate(a: Omit<PlayerAgg, "kd" | "adr" | "kast" | "hsPct" | "kpr" | "rating" | "swing">) {
   const r = Math.max(1, a.rounds);
   const kpr = a.kills / r;
   const dpr = a.deaths / r;
@@ -90,6 +96,7 @@ function rate(a: Omit<PlayerAgg, "kd" | "adr" | "kast" | "hsPct" | "kpr" | "rati
     hsPct: a.kills ? (100 * a.hs) / a.kills : 0,
     kpr,
     rating: a.rounds ? rating : 0,
+    swing: a.swingRounds ? (100 * a.swingSum) / a.swingRounds : null,
   };
 }
 
@@ -125,6 +132,8 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
       k4: sum((r) => r.multi_kills?.["4k"] ?? 0),
       k5: sum((r) => r.multi_kills?.["5k"] ?? 0),
       utilityDamage: sum((r) => r.utility_damage),
+      swingSum: sum((r) => r.swing_sum ?? 0),
+      swingRounds: sum((r) => r.swing_rounds ?? 0),
     };
     return { ...base, ...rate(base) };
   });
@@ -143,7 +152,24 @@ export async function getStatRows(filter: { tournamentId?: string; playerId?: st
   if (filter.playerId) q = q.eq("player_id", filter.playerId);
   if (filter.matchId) q = q.eq("match_id", filter.matchId);
   const { data } = await q.limit(5000);
-  return (data ?? []) as MapStatRow[];
+  return attachSwing((data ?? []) as MapStatRow[]);
+}
+
+/** Подмешивает swing из player_map_swing к строкам статистики (по матчу, карте и SteamID) */
+async function attachSwing(rows: MapStatRow[]) {
+  const matchIds = [...new Set(rows.map((r) => r.match_id))];
+  if (matchIds.length === 0) return rows;
+  const { data } = await db().from("player_map_swing").select("*").in("match_id", matchIds);
+  const key = (m: string, n: number, s: string) => `${m}:${n}:${s}`;
+  const swing = new Map((data ?? []).map((r) => [key(r.match_id, r.map_number, r.steam_id), r]));
+  for (const r of rows) {
+    const s = swing.get(key(r.match_id, r.map_number, r.steam_id));
+    if (s) {
+      r.swing_sum = s.swing_sum;
+      r.swing_rounds = s.rounds;
+    }
+  }
+  return rows;
 }
 
 export async function getPlayerLeaderboard(tournamentId?: string) {
@@ -167,8 +193,8 @@ export async function getPlayerLeaderboard(tournamentId?: string) {
 }
 
 /**
- * MVP турнира: лучший F16 Rating среди игроков, сыгравших не меньше половины карт своей команды
- * (минимум 2 карты), чтобы рейтинг по одной карте не побеждал.
+ * MVP турнира: лучший Swing (средний вклад в шанс победы раунда) среди игроков, сыгравших
+ * не меньше половины карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.
  */
 export async function getTournamentMvp(tournamentId: string) {
   const board = await getPlayerLeaderboard(tournamentId);
@@ -176,7 +202,9 @@ export async function getTournamentMvp(tournamentId: string) {
   const teamMaps = new Map<string, number>();
   for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));
   const eligible = board.filter((p) => p.maps >= Math.max(2, Math.ceil((teamMaps.get(p.team_id ?? "") ?? 0) / 2)));
-  return eligible[0] ?? null;
+  const withSwing = eligible.filter((p) => p.swing != null);
+  if (withSwing.length) return { ...withSwing.sort((a, b) => b.swing! - a.swing!)[0], by: "swing" as const };
+  return eligible[0] ? { ...eligible[0], by: "rating" as const } : null;
 }
 
 export type TeamAgg = {
@@ -284,7 +312,8 @@ export async function getPlayerMapHistory(playerId: string) {
       maps: Pick<MatchMap, "map_number" | "map_name" | "team1_score" | "team2_score">[];
     };
   };
-  return ((data ?? []) as unknown as Row[]).map((r) => {
+  const rows = (await attachSwing((data ?? []) as unknown as MapStatRow[])) as unknown as Row[];
+  return rows.map((r) => {
     const agg = aggregatePlayers([r])[0];
     const map = r.match.maps.find((x) => x.map_number === r.map_number);
     const mySide = r.team_id === r.match.team1_id ? 1 : 2;

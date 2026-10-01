@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getAgentBundle } from "@/lib/agent-bundle";
 import { applyAgentReport, checkBearer, takePendingCommands, type AgentReport } from "@/lib/server-control";
 
 /** F16 Server Agent раз в несколько секунд присылает состояние хоста и инстансов, в ответ получает команды. */
@@ -7,5 +8,6 @@ export async function POST(request: NextRequest) {
   const report = (await request.json()) as AgentReport;
   await applyAgentReport(report);
   const commands = await takePendingCommands(request.nextUrl.origin);
-  return NextResponse.json({ commands });
+  // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version });
 }
