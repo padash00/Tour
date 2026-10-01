@@ -1,17 +1,22 @@
-import type { Metadata } from "next";
-import { Inter_Tight, JetBrains_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { JetBrains_Mono, Onest } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { ToastProvider } from "@/components/toast";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
-const interTight = Inter_Tight({
-  variable: "--font-inter-tight",
+// Onest — гротеск с полноценной кириллицей: интерфейс и заголовки
+const onest = Onest({
+  variable: "--font-onest",
   subsets: ["latin", "cyrillic"],
+  display: "swap",
 });
 
+// цифры: счёт, ELO, порты, время — табличные
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin", "cyrillic"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -23,13 +28,20 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image" },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#070b12",
+  colorScheme: "dark",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ru" className={`${interTight.variable} ${jetbrains.variable} h-full`}>
+    <html lang="ru" className={`${onest.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+        <ToastProvider>
+          <SiteHeader />
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
+        </ToastProvider>
       </body>
     </html>
   );

@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useRef, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { ConfirmModal } from "./modal";
-import { buttonClass, cn } from "./ui";
+import { useToast } from "./toast";
+import { Spinner, buttonClass, cn } from "./ui";
 
 export type ActionResult = { error?: string; success?: string } | null;
 export type FormAction = (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
@@ -19,7 +20,7 @@ export function SubmitButton({
   value,
 }: {
   children: ReactNode;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "warm";
+  variant?: "primary" | "secondary" | "outline" | "ghost" | "danger" | "warm";
   size?: "sm" | "md" | "lg";
   className?: string;
   pendingText?: string;
@@ -27,10 +28,12 @@ export function SubmitButton({
   name?: string;
   value?: string;
 }) {
-  const { pending } = useFormStatus();
+  const { pending, data } = useFormStatus();
   const [asking, setAsking] = useState(false);
   const confirmed = useRef(false);
   const button = useRef<HTMLButtonElement>(null);
+  // в форме с несколькими кнопками крутится только та, что отправила
+  const mine = pending && (!name || data?.get(name) === (value ?? ""));
 
   return (
     <>
@@ -40,6 +43,7 @@ export function SubmitButton({
         name={name}
         value={value}
         disabled={pending}
+        aria-busy={mine || undefined}
         className={buttonClass(variant, size, className)}
         onClick={(e) => {
           if (!confirm) return;
@@ -51,7 +55,14 @@ export function SubmitButton({
           setAsking(true);
         }}
       >
-        {pending ? (pendingText ?? "Секунду…") : children}
+        {mine ? (
+          <>
+            <Spinner className="size-4" />
+            {pendingText ?? children}
+          </>
+        ) : (
+          children
+        )}
       </button>
       {confirm && (
         <ConfirmModal
@@ -72,7 +83,10 @@ export function SubmitButton({
   );
 }
 
-/** Форма с серверным действием и выводом ошибки/успеха под ней */
+/**
+ * Форма с серверным действием.
+ * Результат показывается тостом в углу; ошибка дополнительно остаётся под формой, рядом с полями.
+ */
 export function ActionForm({
   action,
   children,
@@ -85,17 +99,29 @@ export function ActionForm({
   inline?: boolean;
 }) {
   const [state, formAction] = useActionState(action, null);
+  const toast = useToast();
+
+  useEffect(() => {
+    if (state?.error) toast.error(state.error);
+    else if (state?.success) toast.success(state.success);
+  }, [state, toast]);
+
   return (
     <form action={formAction} className={cn(inline ? "inline-flex flex-col gap-2" : "", className)}>
       {children}
-      {state?.error && <p className="mt-3 text-sm text-danger">{state.error}</p>}
-      {state?.success && <p className="mt-3 text-sm text-ok">{state.success}</p>}
+      {state?.error && (
+        <p role="alert" className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-danger">
+          <span className="mt-[5px] size-1.5 shrink-0 rounded-full bg-current" />
+          {state.error}
+        </p>
+      )}
     </form>
   );
 }
 
 export function CopyField({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   return (
     <div className="flex gap-2">
       <input readOnly value={value} className="field num text-[13px]" onFocus={(e) => e.currentTarget.select()} />
@@ -105,6 +131,7 @@ export function CopyField({ value }: { value: string }) {
         onClick={async () => {
           await navigator.clipboard.writeText(value);
           setCopied(true);
+          toast.success("Скопировано в буфер обмена");
           setTimeout(() => setCopied(false), 1600);
         }}
       >

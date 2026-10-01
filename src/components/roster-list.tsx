@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Player } from "@/lib/types";
-import { Avatar, FaceitLevel, Pill } from "./ui";
+import { Avatar, FaceitLevel } from "./ui";
 
 export type RosterItem = {
   key: string;
@@ -17,10 +17,10 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
   return (
     <div>
       {items.map((it) => (
-        <div key={it.key} className="flex items-center gap-5 h-[76px] border-b border-white/[0.05] last:border-0">
+        <div key={it.key} className="flex min-h-[76px] items-center gap-4 border-b border-white/[0.05] py-3 last:border-0 sm:gap-5">
           <Avatar src={it.player.avatar_url} name={it.player.nickname} size={48} />
           <div className="min-w-0 flex-1">
-            <Link href={`/players/${it.player.steam_id}`} className="text-[17px] font-semibold hover:text-accent truncate block">
+            <Link href={`/players/${it.player.steam_id}`} className="block truncate rounded-[4px] text-[17px] font-semibold transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
               {it.player.nickname}
             </Link>
             <div className="mt-0.5 text-[12px] uppercase tracking-[0.16em] text-fg-3">
@@ -31,14 +31,19 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
             <FaceitLevel level={it.player.faceit_level} />
             <span className="num w-12 text-right">{it.player.faceit_elo ?? "—"}</span>
           </div>
-          {it.role === "captain" && !it.player.is_banned && <Pill tone="accent">C</Pill>}
+          {it.role === "captain" && !it.player.is_banned && (
+            <span title="Капитан" className="grid size-7 shrink-0 place-items-center rounded-[6px] border border-accent/40 bg-accent/[0.08] text-[12px] font-bold text-accent">
+              C
+            </span>
+          )}
           {it.extra}
         </div>
       ))}
       {Array.from({ length: empty }, (_, i) => (
-        <div key={`empty-${i}`} className="flex items-center gap-5 h-[76px] border-b border-white/[0.05] last:border-0 text-fg-3">
-          <div className="size-12 rounded-full border border-dashed border-white/15" />
+        <div key={`empty-${i}`} className="flex min-h-[76px] items-center gap-4 border-b border-white/[0.05] py-3 text-fg-3 last:border-0 sm:gap-5">
+          <div className="size-12 shrink-0 rounded-full border border-dashed border-white/15" />
           <span className="text-[15px]">Свободный слот</span>
+          <span className="ml-auto text-[12px] uppercase tracking-[0.16em] text-fg-4">ожидает игрока</span>
         </div>
       ))}
     </div>

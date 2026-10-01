@@ -22,9 +22,11 @@ import { prefetchMaps, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
-import { BarCell, CARD, Label, StatusChip } from "@/components/admin/tournament-kit";
+import { BarCell, CARD, Label } from "@/components/admin/tournament-kit";
+import { TournamentStatusChip } from "@/components/primitives";
+import { Lifecycle, type LifeStep } from "@/components/admin/kit";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
-import { Avatar, EmptyState, FaceitLevel, Pill, TeamLogo, cn } from "@/components/ui";
+import { Avatar, EmptyState, FaceitLevel, TeamLogo, cn } from "@/components/ui";
 import { AdminHeader, Dot, Panel, SubTabs, TableBox } from "@/components/admin/control";
 import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
@@ -75,7 +77,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         title={
           <span className="flex flex-wrap items-center gap-3">
             {t.name}
-            <StatusChip status={t.status} />
+            <TournamentStatusChip status={t.status} size="sm" />
           </span>
         }
         description={`${MODES[t.format as ModeKey]?.title ?? t.format} · ${FORMATS[t.bracket_type as FormatKind]?.title ?? t.bracket_type} · старт ${formatDateTime(t.starts_at)}`}
@@ -85,6 +87,8 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
           </Link>
         }
       />
+
+      <LifecyclePanel t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />
 
       <SubTabs
         active={tab}
@@ -166,19 +170,119 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   );
 }
 
+// ───────────────────────── Этапы и следующий шаг
+
+const STEPS: LifeStep[] = [
+  { key: "draft", label: "Черновик" },
+  { key: "registration", label: "Регистрация" },
+  { key: "closed", label: "Закрыта" },
+  { key: "checkin", label: "Check-in" },
+  { key: "bracket", label: "Сетка" },
+  { key: "live", label: "Идёт" },
+  { key: "finished", label: "Завершён" },
+];
+
+function stepIndex(status: TournamentStatus, hasBracket: boolean) {
+  switch (status) {
+    case "draft":
+      return 0;
+    case "registration":
+      return 1;
+    case "registration_closed":
+      return 2;
+    case "checkin":
+      return hasBracket ? 4 : 3;
+    case "live":
+      return 5;
+    case "finished":
+      return 7;
+    default:
+      return -1;
+  }
+}
+
+type T = NonNullable<Awaited<ReturnType<typeof getTournamentById>>>;
+
+/** Шапка управления: где турнир сейчас и одна главная кнопка следующего шага */
+function LifecyclePanel({ t, approved, checkedIn, pending }: { t: T; approved: number; checkedIn: number; pending: number }) {
+  const hasBracket = !!t.bracket_published_at;
+  const status = (to: TournamentStatus, label: string, confirm?: string, variant: "primary" | "danger" = "primary") => (
+    <ActionForm action={setTournamentStatus}>
+      <input type="hidden" name="id" value={t.id} />
+      <input type="hidden" name="status" value={to} />
+      <SubmitButton size="md" variant={variant} confirm={confirm}>
+        {label}
+      </SubmitButton>
+    </ActionForm>
+  );
+
+  let hint = "";
+  let action: React.ReactNode = null;
+  switch (t.status) {
+    case "draft":
+      hint = "Турнир скрыт. Проверьте настройки и откройте регистрацию — страница станет публичной.";
+      action = status("registration", "Открыть регистрацию");
+      break;
+    case "registration":
+      hint = `Одобрено ${approved}/${t.max_teams}${pending ? `, ждут решения ${pending}` : ""}. Закройте регистрацию, когда составы собраны.`;
+      action = status("registration_closed", "Закрыть регистрацию", "Закрыть регистрацию? Составы заблокируются.");
+      break;
+    case "registration_closed":
+      hint = "Составы заблокированы. Откройте check-in — капитаны получат уведомление, Workshop-карты начнут прогреваться.";
+      action = status("checkin", "Открыть check-in");
+      break;
+    case "checkin":
+      if (!hasBracket) {
+        hint = `Check-in прошли ${checkedIn} из ${approved}. Создайте сетку: посев — ручной seed, затем средний ELO; только прошедшие check-in.`;
+        action = (
+          <ActionForm action={generateBracketAction}>
+            <input type="hidden" name="tournamentId" value={t.id} />
+            <input type="hidden" name="seeding" value="elo" />
+            <input type="hidden" name="onlyCheckedIn" value="on" />
+            <SubmitButton size="md" confirm={`Создать и опубликовать сетку для ${checkedIn} участников? Посев зафиксируется.`}>
+              Создать сетку
+            </SubmitButton>
+          </ActionForm>
+        );
+      } else {
+        hint = "Сетка опубликована. Запустите турнир — автопилот начнёт вето и раздачу серверов.";
+        action = status("live", "Запустить турнир");
+      }
+      break;
+    case "live":
+      hint = "Турнир идёт. Когда сыгран финал — завершите: несыгранные матчи отменятся, серверы освободятся.";
+      action = status("finished", "Завершить турнир", "Завершить турнир? Несыгранные матчи будут отменены.", "danger");
+      break;
+    case "finished":
+      hint = "Турнир завершён. Итоги и статистика доступны на публичной странице.";
+      break;
+    case "cancelled":
+      hint = "Турнир отменён.";
+      break;
+  }
+
+  return (
+    <div className={`${CARD} p-5 lg:p-6`}>
+      <Lifecycle steps={STEPS} current={stepIndex(t.status, hasBracket)} cancelled={t.status === "cancelled"} />
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-5">
+        <div className="max-w-2xl">
+          <Label className="text-[10px]">Следующий шаг</Label>
+          <p className="mt-1.5 text-[14px] text-fg-2 leading-relaxed">{hint}</p>
+          {t.status === "checkin" && !hasBracket && (
+            <Link href={`/admin/tournaments/${t.id}?tab=bracket`} className="mt-1 inline-block text-[12px] text-accent hover:underline">
+              Другой посев или все одобренные →
+            </Link>
+          )}
+        </div>
+        {action}
+      </div>
+    </div>
+  );
+}
+
 // ───────────────────────── Обзор
 
-function OverviewTab({
-  t,
-  approved,
-  checkedIn,
-  pending,
-}: {
-  t: NonNullable<Awaited<ReturnType<typeof getTournamentById>>>;
-  approved: number;
-  checkedIn: number;
-  pending: number;
-}) {
+function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: number; checkedIn: number; pending: number }) {
   return (
     <div className="space-y-8">
       <div className={`${CARD} grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]`}>
@@ -188,8 +292,34 @@ function OverviewTab({
         <BarCell label="Сетка" value={t.bracket_published_at ? "Есть" : "Нет"} tone={t.bracket_published_at ? "ok" : undefined} />
       </div>
 
-      <Panel title="Этап турнира">
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-1.5">
+      <Panel title="Автопилот">
+        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-[13px]">
+              <Dot tone={t.autopilot ? "ok" : "muted"} />
+              <span className={t.autopilot ? "text-ok font-medium" : "text-fg-3"}>{t.autopilot ? "Включён" : "Выключен"}</span>
+            </div>
+            <p className="mt-2 text-[13px] text-fg-2 leading-relaxed">
+              Сайт сам запускает вето, как только соперники известны, и отправляет готовые матчи на свободные серверы — по расписанию
+              (за 10 минут до начала) или по порядку номеров. Работает, пока турнир в статусе check-in или «идёт».
+            </p>
+          </div>
+          <ActionForm action={setAutopilot}>
+            <input type="hidden" name="tournamentId" value={t.id} />
+            <input type="hidden" name="on" value={t.autopilot ? "0" : "1"} />
+            <SubmitButton size="sm" variant={t.autopilot ? "secondary" : "primary"}>
+              {t.autopilot ? "Выключить автопилот" : "Включить автопилот"}
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      </Panel>
+
+      <details className="group">
+        <summary className="list-none cursor-pointer text-[12px] text-fg-3 hover:text-fg-2">
+          Сменить этап вручную <span className="group-open:hidden">▾</span>
+          <span className="hidden group-open:inline">▴</span>
+        </summary>
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-1.5">
           {FLOW.map((f) => (
             <ActionForm key={f.status} action={setTournamentStatus}>
               <input type="hidden" name="id" value={t.id} />
@@ -213,29 +343,7 @@ function OverviewTab({
             </ActionForm>
           ))}
         </div>
-      </Panel>
-
-      <Panel title="Автопилот">
-        <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-5 flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[13px]">
-              <Dot tone={t.autopilot ? "ok" : "muted"} />
-              <span className={t.autopilot ? "text-ok font-medium" : "text-fg-3"}>{t.autopilot ? "Включён" : "Выключен"}</span>
-            </div>
-            <p className="mt-2 text-[13px] text-fg-2 leading-relaxed">
-              Сайт сам запускает вето, как только соперники известны, и отправляет готовые матчи на свободные серверы — по расписанию
-              (за 10 минут до начала) или по порядку номеров. Работает, пока турнир в статусе check-in или «идёт».
-            </p>
-          </div>
-          <ActionForm action={setAutopilot}>
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <input type="hidden" name="on" value={t.autopilot ? "0" : "1"} />
-            <SubmitButton size="sm" variant={t.autopilot ? "secondary" : "primary"}>
-              {t.autopilot ? "Выключить автопилот" : "Включить автопилот"}
-            </SubmitButton>
-          </ActionForm>
-        </div>
-      </Panel>
+      </details>
     </div>
   );
 }
@@ -420,12 +528,28 @@ async function RegistrationTab({
         .map((g) => (
           <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
             <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y divide-white/[0.06]">
+              <RegistrationHead />
               {g.items.map((r) => (
                 <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} />
               ))}
             </div>
           </Panel>
         ))}
+    </div>
+  );
+}
+
+const REG_GRID = "grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_70px_80px_110px_120px_minmax(0,auto)] items-center gap-x-4 gap-y-2";
+
+function RegistrationHead() {
+  return (
+    <div className={cn(REG_GRID, "hidden md:grid px-4 h-9 text-[10px] font-medium uppercase tracking-[0.2em] text-[#7f93b0]")}>
+      <span>Команда</span>
+      <span className="text-right">Состав</span>
+      <span className="text-right">Avg ELO</span>
+      <span>Статус</span>
+      <span>Check-in / seed</span>
+      <span className="text-right">Действия</span>
     </div>
   );
 }
@@ -441,58 +565,82 @@ function RegistrationRow({
 }) {
   const mains = r.roster.filter((p) => p.role === "main");
   const elo = averageElo(r.roster);
-  const tone = r.status === "approved" ? "ok" : r.status === "pending" ? "warn" : r.status === "rejected" ? "danger" : "neutral";
+  const tone =
+    r.status === "approved" ? "text-ok" : r.status === "pending" ? "text-warn" : r.status === "rejected" ? "text-danger" : "text-fg-3";
 
   return (
-    <div className="p-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <TeamLogo src={r.team.logo_url} tag={r.team.tag} size={36} />
-        <div className="min-w-0 flex-1">
-          <Link href={`/teams/${r.team.tag}`} className="text-[14px] font-semibold hover:text-accent">
-            {r.team.name}
-          </Link>
-          <div className="text-[12px] text-fg-3 mt-0.5">
-            {r.team.tag} · основа {mains.length} · запас {r.roster.length - mains.length} · avg ELO {elo ?? "—"} · подана{" "}
-            {formatDateTime(r.created_at)}
+    <div className="px-4 py-3">
+      <div className={REG_GRID}>
+        <div className="flex items-center gap-3 min-w-0">
+          <TeamLogo src={r.team.logo_url} tag={r.team.tag} size={32} />
+          <div className="min-w-0">
+            <Link href={`/teams/${r.team.tag}`} className="block truncate text-[14px] font-semibold hover:text-accent">
+              {r.team.name}
+            </Link>
+            <div className="text-[11px] text-fg-3 num">
+              {r.team.tag} · подана {formatShortDateTime(r.created_at)}
+            </div>
           </div>
         </div>
-        <Pill tone={tone}>{registrationStatusLabel[r.status]}</Pill>
-        {r.status === "approved" && (r.checked_in_at ? <Pill tone="ok">Check-in</Pill> : <Pill>Нет check-in</Pill>)}
-      </div>
-
-      {r.note && <p className="mt-2 text-[13px] text-fg-3">Комментарий: {r.note}</p>}
-
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        {r.status !== "approved" && (
-          <ActionForm action={decideRegistration}>
-            <input type="hidden" name="registrationId" value={r.id} />
-            <input type="hidden" name="decision" value="approve" />
-            <SubmitButton size="sm">Одобрить</SubmitButton>
-          </ActionForm>
-        )}
-        {r.status === "approved" && (
-          <>
+        <span className="num text-right text-[13px] text-fg-2 max-md:hidden">
+          {mains.length}
+          <span className="text-fg-3">+{r.roster.length - mains.length}</span>
+        </span>
+        <span className="num text-right text-[13px] text-fg-2 max-md:hidden">{elo ?? "—"}</span>
+        <span className={cn("flex items-center gap-1.5 text-[12px] max-md:hidden", tone)}>
+          <span className="size-1.5 rounded-full bg-current" />
+          {registrationStatusLabel[r.status]}
+        </span>
+        <div className="flex items-center gap-2 max-md:hidden">
+          {r.status === "approved" ? (
+            <>
+              <span className={cn("text-[12px]", r.checked_in_at ? "text-ok" : "text-fg-3")}>{r.checked_in_at ? "✓ check-in" : "нет"}</span>
+              <ActionForm action={setSeed} className="flex gap-1">
+                <input type="hidden" name="registrationId" value={r.id} />
+                <input name="seed" type="number" min={1} max={64} defaultValue={r.seed ?? ""} placeholder="#" aria-label="Seed" className="field !h-8 w-14 !px-2 text-[12px] num" />
+                <SubmitButton size="sm" variant="ghost">
+                  OK
+                </SubmitButton>
+              </ActionForm>
+            </>
+          ) : (
+            <span className="text-[12px] text-fg-3">—</span>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {r.status !== "approved" && r.status !== "withdrawn" && (
+            <ActionForm action={decideRegistration}>
+              <input type="hidden" name="registrationId" value={r.id} />
+              <input type="hidden" name="decision" value="approve" />
+              <SubmitButton size="sm">Одобрить</SubmitButton>
+            </ActionForm>
+          )}
+          {r.status === "approved" && (
             <ActionForm action={adminCheckIn}>
               <input type="hidden" name="registrationId" value={r.id} />
               {r.checked_in_at && <input type="hidden" name="undo" value="1" />}
               <SubmitButton size="sm" variant="secondary">
-                {r.checked_in_at ? "Снять check-in" : "Check-in вручную"}
+                {r.checked_in_at ? "Снять check-in" : "Check-in"}
               </SubmitButton>
             </ActionForm>
-            <ActionForm action={setSeed} className="flex gap-2">
+          )}
+          {r.status === "pending" && (
+            <ActionForm action={decideRegistration}>
               <input type="hidden" name="registrationId" value={r.id} />
-              <input name="seed" type="number" min={1} max={64} defaultValue={r.seed ?? ""} placeholder="Seed" className="field h-8 w-20 text-[13px] num" />
-              <SubmitButton size="sm" variant="ghost">
-                OK
+              <input type="hidden" name="decision" value="reject" />
+              <SubmitButton size="sm" variant="ghost" className="text-danger/80 hover:text-danger" confirm={`Отклонить заявку ${r.team.name} без комментария?`}>
+                Отклонить
               </SubmitButton>
             </ActionForm>
-          </>
-        )}
+          )}
+        </div>
       </div>
 
-      <details className="mt-3 group">
+      {r.note && <p className="mt-2 text-[12px] text-fg-3">Комментарий: {r.note}</p>}
+
+      <details className="mt-2 group">
         <summary className="list-none cursor-pointer text-[12px] text-fg-3 hover:text-fg-2">
-          Состав ({r.roster.length}) <span className="group-open:hidden">▾</span>
+          Состав ({r.roster.length}) и действия <span className="group-open:hidden">▾</span>
           <span className="hidden group-open:inline">▴</span>
         </summary>
         <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
@@ -501,11 +649,13 @@ function RegistrationRow({
             .map((p) => (
               <div key={p.id} className="flex items-center gap-3 py-2">
                 <Avatar src={p.player.avatar_url} name={p.player.nickname} size={24} />
-                <span className="text-[13px] font-medium flex-1 truncate">{p.player.nickname}</span>
+                <Link href={`/players/${p.player.steam_id}`} className="text-[13px] font-medium flex-1 truncate hover:text-accent">
+                  {p.player.nickname}
+                </Link>
                 <span className="num text-[11px] text-fg-3 hidden sm:block">{p.player.steam_id}</span>
                 <FaceitLevel level={p.player.faceit_level} />
                 <span className="text-[12px] text-fg-3 w-14">{p.role === "main" ? "Основа" : "Запас"}</span>
-                {p.player.is_banned && <Pill tone="danger">Бан</Pill>}
+                {p.player.is_banned && <span className="text-[12px] text-danger">бан</span>}
                 <ActionForm action={adminRemoveRosterPlayer}>
                   <input type="hidden" name="rosterId" value={p.id} />
                   <SubmitButton size="sm" variant="ghost" confirm={`Убрать ${p.player.nickname} из состава?`}>
@@ -521,7 +671,7 @@ function RegistrationRow({
             <div className="w-full sm:w-72">
               <PlayerPicker name="steamId" players={players} />
             </div>
-            <select name="role" className="field h-8 text-[13px] w-28">
+            <select name="role" className="field !h-9 text-[13px] w-28">
               <option value="main">Основа</option>
               <option value="sub">Запас</option>
             </select>
@@ -532,24 +682,24 @@ function RegistrationRow({
         ) : (
           <p className="mt-2 text-[12px] text-fg-3">Пока регистрация открыта, состав заявки синхронизируется с составом команды автоматически.</p>
         )}
-      </details>
 
-      {/* отклонение — отдельно, ниже основных действий */}
-      {r.status !== "rejected" && r.status !== "withdrawn" && (
-        <ActionForm action={decideRegistration} className="mt-3 pt-3 border-t border-white/[0.05] flex flex-wrap items-end gap-2">
-          <input type="hidden" name="registrationId" value={r.id} />
-          <input type="hidden" name="decision" value="reject" />
-          <ChipInput
-            name="note"
-            chips={["Неполный состав", "Нарушение правил", "Нет свободных мест", "Повторная заявка"]}
-            placeholder="Причина отклонения (видна капитану)"
-            className="w-full sm:w-[420px]"
-          />
-          <SubmitButton size="sm" variant="danger" confirm={`Отклонить заявку ${r.team.name}?`}>
-            Отклонить
-          </SubmitButton>
-        </ActionForm>
-      )}
+        {/* отклонение с причиной — отдельно, ниже */}
+        {r.status !== "rejected" && r.status !== "withdrawn" && (
+          <ActionForm action={decideRegistration} className="mt-3 pt-3 border-t border-white/[0.05] flex flex-wrap items-end gap-2">
+            <input type="hidden" name="registrationId" value={r.id} />
+            <input type="hidden" name="decision" value="reject" />
+            <ChipInput
+              name="note"
+              chips={["Неполный состав", "Нарушение правил", "Нет свободных мест", "Повторная заявка"]}
+              placeholder="Причина отклонения (видна капитану)"
+              className="w-full sm:w-[420px]"
+            />
+            <SubmitButton size="sm" variant="danger" confirm={`Отклонить заявку ${r.team.name}?`}>
+              Отклонить с причиной
+            </SubmitButton>
+          </ActionForm>
+        )}
+      </details>
     </div>
   );
 }

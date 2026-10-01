@@ -13,9 +13,25 @@ export const metadata: Metadata = { title: "Игроки — F16 Control" };
 export default async function AdminPlayersPage(props: PageProps<"/admin/players">) {
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
+  const role = sp.r === "admin" || sp.r === "banned" ? sp.r : "all";
   const all = await listPlayers();
-  const players = q ? all.filter((p) => p.nickname.toLowerCase().includes(q) || p.steam_id.includes(q)) : all;
   const envAdmins = env.adminSteamIds;
+  const isAdm = (p: (typeof all)[number]) => p.is_admin || envAdmins.includes(p.steam_id);
+  const players = all
+    .filter((p) => !q || p.nickname.toLowerCase().includes(q) || p.steam_id.includes(q))
+    .filter((p) => role === "all" || (role === "admin" ? isAdm(p) : p.is_banned));
+  const ROLES = [
+    { key: "all", label: "Все", n: all.length },
+    { key: "admin", label: "Админы", n: all.filter(isAdm).length },
+    { key: "banned", label: "Бан", n: all.filter((p) => p.is_banned).length },
+  ];
+  const roleHref = (r: string) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (r !== "all") p.set("r", r);
+    const qs = p.toString();
+    return qs ? `/admin/players?${qs}` : "/admin/players";
+  };
 
   return (
     <div className="space-y-6">
@@ -24,11 +40,23 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
         title="Игроки"
         description={`${all.length} зарегистрировано`}
         actions={
-          <form className="w-64">
-            <input name="q" defaultValue={q} placeholder="Ник или SteamID" className="field h-8 text-[13px]" />
+          <form className="w-72" role="search">
+            {role !== "all" && <input type="hidden" name="r" value={role} />}
+            <input name="q" defaultValue={q} placeholder="Ник или SteamID" aria-label="Поиск игрока" className="field !h-10 text-[13px]" />
           </form>
         }
       />
+      <div className="flex gap-1">
+        {ROLES.map((r) => (
+          <Link
+            key={r.key}
+            href={roleHref(r.key)}
+            className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-[7px] text-[12px] transition ${role === r.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]"}`}
+          >
+            {r.label} <span className="num opacity-70">{r.n}</span>
+          </Link>
+        ))}
+      </div>
       {players.length === 0 ? (
         <EmptyState compact title="Игроков не найдено" />
       ) : (

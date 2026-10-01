@@ -34,8 +34,8 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
         title="Команды"
         description={`${all.length} активных`}
         actions={
-          <form className="w-64">
-            <input name="q" defaultValue={q} placeholder="Название или тег" className="field h-8 text-[13px]" />
+          <form className="w-72" role="search">
+            <input name="q" defaultValue={q} placeholder="Название или тег" aria-label="Поиск команды" className="field !h-10 text-[13px]" />
           </form>
         }
       />

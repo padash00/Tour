@@ -2,47 +2,80 @@
 
 /*
  * F16 Arena — дизайн-система.
- * Холодная сине-чёрная палитра, один сдержанный голубой акцент, оранжевый — только как знак бренда.
- * Иерархия строится типографикой и отступами, а не рамками и карточками.
+ * Холодная сине-чёрная палитра, один голубой акцент (#8AB8FF), оранжевый — только знак бренда.
+ * Поверхности поднимаются ступенями 0→4; рамки почти невидимые; тени — только у всплывающих слоёв.
+ * Шрифт — Onest (кириллица, гротеск), цифры — JetBrains Mono с табличными цифрами.
  */
 @theme {
+  /* поверхности: 0 — фон страницы … 4 — всплывающие слои */
   --color-bg: #070b12;
   --color-bg-2: #09111b;
   --color-surface: #0c1622;
   --color-surface-2: #101b28;
   --color-surface-3: #13202e;
+  --color-surface-4: #182739;
+
+  /* рамки */
   --color-line: #ffffff12;
   --color-line-strong: #ffffff1f;
+  --color-line-hover: #ffffff33;
 
+  /* текст */
   --color-fg: #f4f7fb;
   --color-fg-2: #a8b2c2;
   --color-fg-3: #687588;
+  --color-fg-4: #4a5566;
+  --color-eyebrow: #7f93b0;
 
+  /* акцент */
   --color-accent: #8ab8ff;
   --color-accent-strong: #a6cbff;
+  --color-accent-pressed: #79a6ee;
   --color-accent-dim: #8ab8ff14;
+  --color-accent-ink: #07101b;
   --color-steel: #7fc4d8;
   --color-warm: #ff8a43;
+
+  /* смысловые */
   --color-ok: #6fc49a;
   --color-ok-dim: #6fc49a14;
   --color-warn: #d6aa63;
   --color-warn-dim: #d6aa6314;
   --color-danger: #e66f74;
   --color-danger-dim: #e66f7414;
+  --color-live: #ff5d63;
 
-  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
+  /* радиусы 6 / 8 / 12 / 16 */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
   --radius-card: 12px;
   --radius-section: 16px;
+
+  /* тени — только для поднятых слоёв */
+  --shadow-soft: 0 1px 0 0 #ffffff08 inset, 0 8px 24px -16px #000000b3;
+  --shadow-pop: 0 1px 0 0 #ffffff0d inset, 0 18px 48px -18px #000000e6, 0 0 0 1px #00000040;
+
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 :root {
   color-scheme: dark;
+  --header-h: 72px;
+  --focus-ring: #8ab8ffb3;
+}
+@media (min-width: 1024px) {
+  :root {
+    --header-h: 96px;
+  }
 }
 
 html {
   background: var(--color-bg);
+  scroll-padding-top: calc(var(--header-h) + 16px);
 }
 
 body {
@@ -50,11 +83,27 @@ body {
   color: var(--color-fg);
   font-family: var(--font-sans);
   font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 ::selection {
-  background: #8ab8ff40;
+  background: #8ab8ff47;
+  color: #fff;
 }
 
 /* декоративные слои hero не дают горизонтальной прокрутки на телефоне (clip, не hidden — sticky-шапка работает) */
@@ -72,9 +121,32 @@ summary,
 
 /* фокус с клавиатуры — акцентное кольцо; мышью — без него */
 :where(a, button, summary, [role="button"], [tabindex]):focus-visible {
-  outline: 2px solid #8ab8ffb3;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
   border-radius: 6px;
+}
+
+/* полосы прокрутки — тонкие и тёмные */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff1f transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #ffffff1a;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ffffff33;
+  background-clip: padding-box;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,11 +154,53 @@ summary,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
 @layer components {
+  /* ── типографика: одна шкала на весь сайт ── */
+  .t-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(40px, 6.2vw, 76px);
+    line-height: 1.03;
+    letter-spacing: -0.022em;
+  }
+  .t-h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(34px, 4.6vw, 60px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .t-h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(24px, 2.6vw, 34px);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+  .t-h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(18px, 1.6vw, 22px);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+  .t-body {
+    font-size: clamp(15px, 1.2vw, 17px);
+    line-height: 1.65;
+    color: var(--color-fg-2);
+  }
+  .t-meta {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--color-fg-3);
+  }
+
   /* мягкий холодный свет сверху — только для hero-зон */
   .atmos {
     background:
@@ -99,7 +213,7 @@ summary,
     display: none;
   }
 
-  /* отдельный объект: матч, сервер, форма. Не для всего подряд */
+  /* отдельный объект: матч, сервер, форма */
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-line);
@@ -108,8 +222,8 @@ summary,
 
   .card-hover {
     transition:
-      border-color 0.2s,
-      background 0.2s;
+      border-color 0.2s var(--ease-out-soft),
+      background-color 0.2s var(--ease-out-soft);
   }
   .card-hover:hover {
     border-color: var(--color-line-strong);
@@ -124,44 +238,70 @@ summary,
     font-weight: 500;
   }
 
-  /* редкая надпись капсом — над hero-заголовком */
+  /* надпись разрядкой — как на главной */
   .eyebrow {
     font-size: 12px;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.3em;
     text-transform: uppercase;
-    color: var(--color-fg-3);
-    font-weight: 600;
+    color: var(--color-eyebrow);
+    font-weight: 500;
   }
 
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 
+  /* поля ввода: 44px, тёмные, фокус — акцентная рамка без свечения */
   .field {
     width: 100%;
-    height: 40px;
+    height: 44px;
     background: var(--color-bg-2);
-    border: 1px solid var(--color-line);
-    border-radius: 8px;
-    padding: 0 12px;
+    border: 1px solid #ffffff17;
+    border-radius: var(--radius-sm);
+    padding: 0 14px;
     font-size: 14px;
     color: var(--color-fg);
     outline: none;
     transition:
       border-color 0.15s,
+      background-color 0.15s,
       box-shadow 0.15s;
+  }
+  .field:hover {
+    border-color: #ffffff2b;
   }
   textarea.field {
     height: auto;
-    padding: 10px 12px;
+    min-height: 96px;
+    padding: 11px 14px;
+    line-height: 1.55;
+  }
+  select.field {
+    appearance: none;
+    padding-right: 38px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8b2c2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
   }
   .field::placeholder {
     color: var(--color-fg-3);
   }
-  .field:focus {
-    border-color: #8ab8ff99;
-    box-shadow: 0 0 0 3px #8ab8ff14;
+  .field:focus,
+  .field:focus-visible {
+    border-color: var(--color-accent);
+    background-color: #0a1320;
+    box-shadow: 0 0 0 3px #8ab8ff1f;
+    outline: none;
+  }
+  .field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .field[aria-invalid="true"] {
+    border-color: #e66f7499;
   }
 
   .prose-f16 {
@@ -179,10 +319,12 @@ summary,
   }
   .tbl th {
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     color: var(--color-fg-3);
     font-weight: 500;
-    padding: 10px 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--color-line);
     white-space: nowrap;
   }
@@ -196,10 +338,10 @@ summary,
     border-bottom: none;
   }
   .tbl tbody tr {
-    transition: background 0.15s;
+    transition: background-color 0.15s;
   }
   .tbl tbody tr:hover {
-    background: #ffffff05;
+    background: #ffffff06;
   }
   /* плотная таблица F16 Control */
   .tbl-dense td {
@@ -208,7 +350,7 @@ summary,
     font-size: 13px;
   }
   .tbl-dense th {
-    padding: 8px 12px;
+    padding: 9px 12px;
   }
 
   /* строка списка без рамки-карточки */
@@ -218,16 +360,32 @@ summary,
     gap: 16px;
     padding: 14px 4px;
     border-bottom: 1px solid #ffffff0a;
-    transition: background 0.15s;
+    transition: background-color 0.15s;
   }
   .row-link:hover {
-    background: #ffffff04;
+    background: #ffffff05;
+  }
+
+  /* клавиша */
+  .kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 5px;
+    border: 1px solid var(--color-line-strong);
+    border-bottom-width: 2px;
+    background: var(--color-surface-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-fg-2);
   }
 }
 
 /* скелетон загрузки */
 .skeleton {
-  background: linear-gradient(90deg, #ffffff08 0%, #ffffff10 50%, #ffffff08 100%);
+  background: linear-gradient(90deg, #ffffff08 0%, #ffffff12 50%, #ffffff08 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
   border-radius: 8px;
@@ -249,6 +407,29 @@ summary,
 @keyframes pop {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.99);
+    transform: translateY(6px) scale(0.985);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }

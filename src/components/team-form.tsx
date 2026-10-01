@@ -1,43 +1,52 @@
 import type { Team } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "./forms";
-import { Field } from "./ui";
+import { FormField, Input, Textarea } from "./primitives";
+import { LogoInput } from "./public/logo-input";
 
+/** Форма команды: создание и настройки. Подписи над полями, подсказки под ними */
 export function TeamForm({ action, team, submitLabel }: { action: FormAction; team?: Team; submitLabel: string }) {
   return (
     <ActionForm action={action}>
-      <div className="space-y-6 [&_.field]:h-12 [&_.field]:text-[15px] [&_textarea.field]:h-auto [&_label>span:first-child]:uppercase [&_label>span:first-child]:tracking-[0.16em] [&_label>span:first-child]:text-[11px] [&_label>span:first-child]:text-fg-3">
-        <div className="grid sm:grid-cols-[1fr_140px] gap-4">
-          <Field label="Название">
-            <input name="name" required maxLength={32} defaultValue={team?.name} placeholder="Night Raid" className="field" />
-          </Field>
-          <Field label="Тег" hint="2–6 символов">
-            <input name="tag" required maxLength={6} defaultValue={team?.tag} placeholder="NR" className="field uppercase num" />
-          </Field>
+      <div className="space-y-7">
+        <div className="grid gap-5 sm:grid-cols-[1fr_160px]">
+          <FormField label="Название" hint="До 32 символов — так команду увидят в сетке">
+            <Input name="name" required maxLength={32} defaultValue={team?.name} placeholder="Night Raid" autoComplete="off" className="h-12 text-[15px]" />
+          </FormField>
+          <FormField label="Тег" hint="2–6 символов">
+            <Input
+              name="tag"
+              required
+              minLength={2}
+              maxLength={6}
+              defaultValue={team?.tag}
+              placeholder="NR"
+              autoComplete="off"
+              className="num h-12 text-[15px] uppercase tracking-[0.12em]"
+            />
+          </FormField>
         </div>
-        <Field label="Регион">
-          <input name="region" maxLength={48} defaultValue={team?.region ?? ""} placeholder="Алматы" className="field" />
-        </Field>
-        <Field label="Логотип" hint="PNG, JPG или WEBP до 1 МБ, лучше квадратный">
-          <input
-            name="logo"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="field pt-[7px] file:mr-3 file:rounded-md file:border-0 file:bg-surface-3 file:px-3 file:py-1 file:text-xs file:text-fg-2"
-          />
-        </Field>
-        <Field label="Описание">
-          <textarea
+        <FormField label="Регион" hint="Город или регион команды">
+          <Input name="region" maxLength={48} defaultValue={team?.region ?? ""} placeholder="Алматы" className="h-12 text-[15px]" />
+        </FormField>
+        <div>
+          <span className="mb-3 block text-[11px] font-medium uppercase tracking-[0.2em] text-fg-3">Логотип</span>
+          <LogoInput current={team?.logo_url} tag={team?.tag} />
+        </div>
+        <FormField label="Описание" hint="Необязательно, до 400 символов">
+          <Textarea
             name="description"
             rows={3}
             maxLength={400}
             defaultValue={team?.description ?? ""}
-            placeholder="Пару слов о команде — необязательно"
-            className="field resize-none"
+            placeholder="Пару слов о команде"
+            className="text-[15px]"
           />
-        </Field>
+        </FormField>
       </div>
-      <div className="mt-10">
-        <SubmitButton size="lg" className="lg:h-[60px] min-w-[260px] rounded-[8px] text-[16px]">{submitLabel}</SubmitButton>
+      <div className="mt-10 flex flex-wrap items-center gap-4 border-t border-white/[0.06] pt-8">
+        <SubmitButton size="lg" pendingText="Сохраняем…" className="min-w-[240px]">
+          {submitLabel}
+        </SubmitButton>
       </div>
     </ActionForm>
   );

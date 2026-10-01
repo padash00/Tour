@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { PlayerAgg } from "@/lib/stats";
 import { Avatar, cn } from "./ui";
+import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar, SortedHead } from "./public/data-table";
 
 type Row = PlayerAgg & {
   team?: { name: string; tag: string } | null;
@@ -26,38 +27,45 @@ export const fmt = {
   pct: (n: number) => `${Math.round(n)}%`,
 };
 
-/** Таблица игроков: рейтинг, K-D-A, ADR, KAST, HS, entry, клатчи */
+/**
+ * Таблица игроков: рейтинг, K-D-A, ADR, KAST, HS, entry, клатчи.
+ * sticky — своя вертикальная прокрутка с закреплённой шапкой (для длинных рейтингов).
+ */
 export function PlayerStatsTable({
   rows,
   showTeam = true,
   compact,
   rank = true,
+  sticky,
 }: {
   rows: Row[];
   showTeam?: boolean;
   compact?: boolean;
   rank?: boolean;
+  sticky?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className={cn("tbl", compact ? "min-w-[640px] text-[13px]" : "min-w-[900px]")}>
+    <div className={sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto"}>
+      <table className={cn(DATA_TABLE, compact ? "min-w-[640px] text-[13px] [&_td]:h-12" : "min-w-[960px]")}>
         <thead>
           <tr>
-            {rank && <th className="w-10">#</th>}
+            {rank && <th className="w-14">#</th>}
             <th>Игрок</th>
             {showTeam && <th>Команда</th>}
-            {!compact && <th className="text-right">Карты</th>}
-            <th className="text-right">K</th>
-            <th className="text-right">D</th>
-            <th className="text-right">A</th>
-            <th className="text-right">±</th>
-            <th className="text-right">ADR</th>
-            <th className="text-right">KAST</th>
-            {!compact && <th className="text-right">HS</th>}
-            {!compact && <th className="text-right">Entry</th>}
-            {!compact && <th className="text-right">Клатчи</th>}
-            <th className="text-right" title="Средний вклад в шанс победы раунда">Swing</th>
-            <th className="text-right">Rating</th>
+            {!compact && <th className="!text-right">Карты</th>}
+            <th className="!text-right">K</th>
+            <th className="!text-right">D</th>
+            <th className="!text-right">A</th>
+            <th className="!text-right">±</th>
+            <th className="!text-right">ADR</th>
+            <th className="!text-right">KAST</th>
+            {!compact && <th className="!text-right">HS</th>}
+            {!compact && <th className="!text-right">Entry</th>}
+            {!compact && <th className="!text-right">Клатчи</th>}
+            <th className="!text-right" title="Средний вклад в шанс победы раунда">
+              Swing
+            </th>
+            <th className="!text-right">{rank ? <SortedHead title="Отсортировано по рейтингу">Rating</SortedHead> : "Rating"}</th>
           </tr>
         </thead>
         <tbody>
@@ -65,17 +73,21 @@ export function PlayerStatsTable({
             const nick = p.player?.nickname ?? p.name;
             const diff = p.kills - p.deaths;
             const name = (
-              <span className="flex items-center gap-2.5">
-                <Avatar src={p.player?.avatar_url} name={nick} size={compact ? 22 : 28} />
-                <span className="font-medium text-fg truncate max-w-[160px]">{nick}</span>
+              <span className="flex items-center gap-3">
+                <Avatar src={p.player?.avatar_url} name={nick} size={compact ? 24 : 32} />
+                <span className="max-w-[180px] truncate font-semibold text-fg">{nick}</span>
               </span>
             );
             return (
               <tr key={p.steam_id}>
-                {rank && <td className="num text-fg-3">{i + 1}</td>}
+                {rank && (
+                  <td>
+                    <RankBadge n={i + 1} />
+                  </td>
+                )}
                 <td>
                   {p.player ? (
-                    <Link href={`/players/${p.player.steam_id}`} className="hover:text-accent">
+                    <Link href={`/players/${p.player.steam_id}`} className="rounded-[6px] transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       {name}
                     </Link>
                   ) : (
@@ -89,29 +101,30 @@ export function PlayerStatsTable({
                         {p.team.name}
                       </Link>
                     ) : (
-                      "—"
+                      <span className="text-fg-3">—</span>
                     )}
                   </td>
                 )}
-                {!compact && <td className="text-right num">{p.maps}</td>}
-                <td className="text-right num text-fg">{p.kills}</td>
-                <td className="text-right num">{p.deaths}</td>
-                <td className="text-right num">{p.assists}</td>
-                <td className={cn("text-right num", diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "")}>
-                  {diff > 0 ? `+${diff}` : diff}
-                </td>
-                <td className="text-right num">{fmt.d1(p.adr)}</td>
-                <td className="text-right num">{fmt.pct(p.kast)}</td>
-                {!compact && <td className="text-right num">{fmt.pct(p.hsPct)}</td>}
+                {!compact && <td className={NUM_CELL}>{p.maps}</td>}
+                <td className={cn(NUM_CELL, "text-fg")}>{p.kills}</td>
+                <td className={NUM_CELL}>{p.deaths}</td>
+                <td className={NUM_CELL}>{p.assists}</td>
+                <td className={cn(NUM_CELL, diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "")}>{diff > 0 ? `+${diff}` : diff}</td>
+                <td className={NUM_CELL}>{fmt.d1(p.adr)}</td>
+                <td className={NUM_CELL}>{fmt.pct(p.kast)}</td>
+                {!compact && <td className={NUM_CELL}>{fmt.pct(p.hsPct)}</td>}
                 {!compact && (
-                  <td className="text-right num">
+                  <td className={NUM_CELL}>
                     {p.firstKills}
                     <span className="text-fg-3">/{p.firstDeaths}</span>
                   </td>
                 )}
-                {!compact && <td className="text-right num">{p.clutches}</td>}
-                <td className={cn("text-right num", swingColor(p.swing))}>{fmt.swing(p.swing)}</td>
-                <td className={cn("text-right num font-semibold", ratingColor(p.rating))}>{fmt.r(p.rating)}</td>
+                {!compact && <td className={NUM_CELL}>{p.clutches}</td>}
+                <td className={cn(NUM_CELL, swingColor(p.swing))}>{fmt.swing(p.swing)}</td>
+                <td className={cn(NUM_CELL, ratingColor(p.rating))}>
+                  <span className="block text-[15px] font-semibold leading-none">{fmt.r(p.rating)}</span>
+                  {!compact && <RatingBar value={p.rating} className="mt-1.5" />}
+                </td>
               </tr>
             );
           })}
@@ -123,17 +136,19 @@ export function PlayerStatsTable({
 
 export function RatingExplainer() {
   return (
-    <details className="group border-t border-white/[0.06] pt-6">
-      <summary className="list-none cursor-pointer flex items-center justify-between font-semibold text-fg-2 hover:text-fg">
+    <details className="group rounded-[12px] border border-white/[0.08] bg-[#0b1420]/60 px-6 lg:px-8">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[15px] font-semibold text-fg-2 transition-colors hover:text-fg focus-visible:outline-none">
         Как считаются F16 Rating, Swing и MVP
-        <span className="text-fg-3 transition group-open:rotate-45 text-xl leading-none">+</span>
+        <span className="grid size-8 place-items-center rounded-full border border-white/[0.1] text-fg-3 transition-transform duration-200 group-open:rotate-45">
+          +
+        </span>
       </summary>
-      <div className="mt-4 max-w-[760px] space-y-3 text-sm text-fg-2 leading-relaxed">
+      <div className="max-w-[760px] space-y-3 pb-7 text-[14px] leading-relaxed text-fg-2">
         <p>
           F16 Rating v1 зафиксирован до начала турниров. Основа — открытая формула в духе HLTV Rating 2.0, вклад
           в раунды расширен входами, клатчами, мультикиллами и трейдами. Средний игрок — около 1.00.
         </p>
-        <pre className="num text-xs bg-bg-2 rounded-lg p-4 overflow-x-auto text-fg-2">
+        <pre className="num overflow-x-auto rounded-[8px] border border-white/[0.06] bg-bg-2 p-4 text-[12px] text-fg-2">
 {`Impact = 2.13·KPR + 0.42·APR − 0.41
        + (первые убийства − первые смерти) / раунды
        + 1.5 · выигранные клатчи / раунды
@@ -143,7 +158,7 @@ export function RatingExplainer() {
 Rating = 0.0073·KAST% + 0.3591·KPR − 0.5329·DPR
        + 0.2372·Impact + 0.0032·ADR + 0.1587`}
         </pre>
-        <p className="font-semibold text-fg pt-2">Swing</p>
+        <p className="pt-2 font-semibold text-fg">Swing</p>
         <p>
           Swing — средний вклад игрока в шанс команды выиграть раунд, в процентных пунктах за раунд. Каждое событие
           меняет вероятность победы: убийство (убийце +Δ, при ассисте 75/25), смерть (−Δ), плент, дефьюз. Остаток до

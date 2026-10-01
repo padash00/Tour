@@ -40,24 +40,42 @@ function CoverImage({ url, className }: { url: string | null; className?: string
   );
 }
 
-/** Строка турнира в списке — без карточки */
+/** Строка турнира: обложка, статус, название, факты, заполненность мест */
 export function TournamentLine({ t, approved }: { t: Tournament; approved: number }) {
+  const solo = modeOf(t.format).size === 1;
+  const fill = Math.min(100, (approved / Math.max(1, t.max_teams)) * 100);
+  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? t.prize_pool : null;
   return (
     <Link
       href={`/tournaments/${t.slug}`}
-      className="group grid gap-4 lg:gap-7 py-6 lg:py-7 border-b border-white/[0.06] sm:grid-cols-[150px_1fr_auto] sm:items-center hover:bg-white/[0.015] transition-colors"
+      className="group grid gap-4 border-b border-white/[0.06] px-2 py-6 transition-colors last:border-0 hover:bg-white/[0.02] sm:grid-cols-[168px_1fr_auto] sm:items-center lg:gap-8 lg:py-7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded-[10px]"
     >
-      <CoverImage url={t.cover_url} className="hidden sm:block h-[88px] w-[150px] rounded-[10px]" />
+      <CoverImage url={t.cover_url} className="h-[120px] w-full rounded-[10px] sm:h-[96px] sm:w-[168px]" />
       <div className="min-w-0">
-        <TStatus status={t.status} />
-        <div className="mt-1.5 text-xl lg:text-[24px] font-semibold tracking-[-0.015em] truncate group-hover:text-accent transition-colors">
+        <div className="flex flex-wrap items-center gap-3">
+          <TStatus status={t.status} />
+          <span className="text-[13px] text-fg-3">{formatDate(t.starts_at)}</span>
+        </div>
+        <div className="mt-2 truncate text-[20px] font-semibold tracking-[-0.015em] transition-colors group-hover:text-accent-strong lg:text-[24px]">
           {t.name}
         </div>
-        <Meta className="mt-1.5 text-[13px] text-fg-3" items={[formatDate(t.starts_at), ...tournamentFacts(t, approved)]} />
+        <Meta className="mt-1.5 text-[13px] text-fg-3" items={tournamentFacts(t).filter((_, i) => i !== 3)} />
       </div>
-      <div className="flex items-center gap-6">
-        {t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) && <div className="text-right font-semibold">{t.prize_pool}</div>}
-        <IconArrow className="size-4 text-fg-3 group-hover:text-fg transition-colors" />
+      <div className="flex items-center gap-6 sm:min-w-[200px] sm:justify-end">
+        <div className="flex-1 sm:flex-none sm:w-[150px]">
+          <div className="flex items-baseline justify-between text-[13px]">
+            <span className="text-fg-3">{solo ? "Участники" : "Команды"}</span>
+            <span className="num text-fg">
+              {approved}
+              <span className="text-fg-3">/{t.max_teams}</span>
+            </span>
+          </div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]">
+            <div className="h-full rounded-full bg-accent/70" style={{ width: `${fill}%` }} />
+          </div>
+          {prize && <div className="mt-2 text-[13px] font-semibold text-fg">{prize}</div>}
+        </div>
+        <IconArrow className="size-4 shrink-0 text-fg-3 transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-fg" />
       </div>
     </Link>
   );
@@ -67,40 +85,60 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
 
 type ListMatch = MatchWithTeams & { tournament?: Pick<Tournament, "name" | "slug"> | null };
 
-/** Строка матча: команды и счёт, без рамок */
+function TeamCell({ team, lost, align }: { team: MatchWithTeams["team1"]; lost: boolean; align: "left" | "right" }) {
+  return (
+    <div className={cn("flex min-w-0 items-center gap-3", align === "right" && "flex-row-reverse text-right")}>
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={36} /> : <span className="size-9 shrink-0 rounded-[8px] border border-dashed border-white/[0.1]" />}
+      <span className={cn("truncate font-semibold", lost ? "text-fg-3" : "text-fg", !team && "font-normal text-fg-3")}>{team?.name ?? "TBD"}</span>
+    </div>
+  );
+}
+
+/** Строка матча: статус и время, команды с логотипами, счёт по центру, турнир */
 export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTournament?: boolean }) {
   const finished = m.status === "finished";
-  const scored = finished || m.status === "live";
+  const live = m.status === "live";
+  const scored = finished || live;
   const lost = (id: string | null) => finished && m.winner_id !== id;
   return (
     <Link
       href={`/matches/${m.id}`}
-      className="group grid grid-cols-[1fr_auto_1fr] sm:grid-cols-[150px_1fr_auto_1fr_160px] items-center gap-4 py-5 px-2 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors lg:text-[16px]"
+      className={cn(
+        "group block rounded-[10px] border-b border-white/[0.06] px-3 py-4 transition-colors last:border-0 hover:bg-white/[0.025] lg:py-5",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+        live && "bg-live/[0.04]",
+      )}
     >
-      <div className="hidden sm:block min-w-0">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:hidden">
         <MStatus status={m.status} />
+        <span className="truncate text-[12px] text-fg-3">{showTournament && m.tournament ? m.tournament.name : `BO${m.best_of}`}</span>
       </div>
-      <div className="flex items-center justify-end gap-3 min-w-0">
-        <span className={cn("truncate font-medium text-right", lost(m.team1_id) && "text-fg-3")}>{m.team1?.name ?? "TBD"}</span>
-        {m.team1 ? <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={32} /> : <span className="size-8" />}
-      </div>
-      <div className="w-[84px] text-center">
-        {scored ? (
-          <span className="num text-lg lg:text-[20px] font-semibold">
-            {m.team1_score}
-            <span className="text-fg-3 mx-1">:</span>
-            {m.team2_score}
-          </span>
-        ) : (
-          <span className="text-[13px] text-fg-3">{m.scheduled_at ? formatTime(m.scheduled_at) : "vs"}</span>
-        )}
-      </div>
-      <div className="flex items-center gap-3 min-w-0">
-        {m.team2 ? <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={32} /> : <span className="size-8" />}
-        <span className={cn("truncate font-medium", lost(m.team2_id) && "text-fg-3")}>{m.team2?.name ?? "TBD"}</span>
-      </div>
-      <div className="hidden sm:block text-right text-[13px] text-fg-3 truncate">
-        {showTournament && m.tournament ? m.tournament.name : `BO${m.best_of}`}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:grid-cols-[140px_1fr_auto_1fr_180px] sm:gap-5 lg:text-[16px]">
+        <div className="hidden min-w-0 sm:block">
+          <MStatus status={m.status} />
+          <div className="mt-1.5 text-[12px] text-fg-3">
+            {m.scheduled_at ? `${formatDate(m.scheduled_at)}, ${formatTime(m.scheduled_at)}` : `Матч #${m.number}`}
+          </div>
+        </div>
+        <TeamCell team={m.team1} lost={lost(m.team1_id)} align="right" />
+        <div className="w-[92px] text-center">
+          {scored ? (
+            <span className={cn("num text-[20px] font-semibold lg:text-[24px]", live && "text-fg")}>
+              <span className={cn(finished && m.winner_id !== m.team1_id && "text-fg-3")}>{m.team1_score}</span>
+              <span className="mx-1.5 text-fg-4">:</span>
+              <span className={cn(finished && m.winner_id !== m.team2_id && "text-fg-3")}>{m.team2_score}</span>
+            </span>
+          ) : (
+            <span className="num rounded-[6px] border border-white/[0.08] px-2.5 py-1 text-[13px] text-fg-2">
+              {m.scheduled_at ? formatTime(m.scheduled_at) : "vs"}
+            </span>
+          )}
+          <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-fg-4">BO{m.best_of}</div>
+        </div>
+        <TeamCell team={m.team2} lost={lost(m.team2_id)} align="left" />
+        <div className="hidden truncate text-right text-[13px] text-fg-3 sm:block">
+          {showTournament && m.tournament ? m.tournament.name : `Матч #${m.number}`}
+        </div>
       </div>
     </Link>
   );

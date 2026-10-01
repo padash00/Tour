@@ -3,8 +3,8 @@ import { joinTeam } from "@/app/actions/team";
 import { getCurrentPlayer } from "@/lib/auth";
 import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamByInvite, getTeamMembers } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Avatar, ButtonLink, Container, EmptyState, IconSteam, Notice, TeamLogo, buttonClass } from "@/components/ui";
-import { CARD, Eyebrow } from "@/components/primitives";
+import { Avatar, IconSteam, Notice, TeamLogo } from "@/components/ui";
+import { Button, CARD, EmptyCard, Eyebrow, Wrap, btnClass } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Приглашение в команду" };
 
@@ -14,17 +14,18 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
   if (!team) {
     return (
-      <Container size="form" className="py-24">
-        <EmptyState
+      <Wrap className="flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
+        <EmptyCard
+          className="w-full max-w-[560px]"
           title="Ссылка недействительна"
-          description="Возможно, капитан создал новую ссылку или команда распущена. Попросите актуальное приглашение."
+          text="Возможно, капитан создал новую ссылку или команда распущена. Попросите актуальное приглашение."
           action={
-            <ButtonLink href="/" variant="secondary">
+            <Button href="/" variant="secondary" size="md">
               На главную
-            </ButtonLink>
+            </Button>
           }
         />
-      </Container>
+      </Wrap>
     );
   }
 
@@ -34,8 +35,9 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const captain = members.find((m) => m.role === "captain");
 
   return (
-    <Container className="flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
-      <div className={`${CARD} w-full max-w-[520px] px-8 py-12 sm:px-12 text-center`}>
+    <Wrap className="relative flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_440px_at_50%_0%,#16253d80,transparent_70%)]" />
+      <div className={`${CARD} relative w-full max-w-[520px] px-6 py-12 text-center sm:px-12`}>
         <div className="flex justify-center">
           <TeamLogo src={team.logo_url} tag={team.tag} size={104} />
         </div>
@@ -64,14 +66,14 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
         <div className="mt-10 text-left">
           {!player ? (
-            <a href={`/api/auth/steam?next=${encodeURIComponent(`/join/${code}`)}`} className={buttonClass("primary", "lg", "w-full lg:h-[60px] rounded-[8px] text-[16px]")}>
+            <a href={`/api/auth/steam?next=${encodeURIComponent(`/join/${code}`)}`} className={btnClass("primary", "lg", "w-full")}>
               <IconSteam className="size-5" />
               Войти через Steam
             </a>
           ) : membership?.team.id === team.id ? (
-            <ButtonLink href="/team" className="w-full" size="lg">
+            <Button href="/team" className="w-full" size="lg">
               Вы уже в этой команде
-            </ButtonLink>
+            </Button>
           ) : membership ? (
             <Notice tone="warn">Вы уже состоите в команде {membership.team.name}. Чтобы вступить сюда, сначала покиньте её.</Notice>
           ) : full ? (
@@ -79,16 +81,16 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
           ) : (
             <ActionForm action={joinTeam}>
               <input type="hidden" name="code" value={code} />
-              <SubmitButton size="lg" className="w-full lg:h-[60px] rounded-[8px] text-[16px]">
-                Вступить
+              <SubmitButton size="lg" pendingText="Вступаем…" className="w-full lg:h-[60px] lg:text-[17px]">
+                Вступить в {team.name}
               </SubmitButton>
             </ActionForm>
           )}
-          <ButtonLink href="/" variant="ghost" className="mt-3 w-full">
-            Назад
-          </ButtonLink>
+          <Button href="/" variant="ghost" size="md" className="mt-3 w-full">
+            Отказаться
+          </Button>
         </div>
       </div>
-    </Container>
+    </Wrap>
   );
 }

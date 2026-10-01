@@ -10,7 +10,7 @@ import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, type
 import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { AdminHeader, Dot, Panel, SubTabs } from "@/components/admin/control";
+import { ADMIN_CARD, AdminHeader, AdminLabel, Dot, Panel } from "@/components/admin/control";
 
 export const metadata: Metadata = { title: "Настройки — F16 Control" };
 
@@ -107,7 +107,33 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
         title="Настройки"
         description="Ключи хранятся в базе и читаются только сервером сайта. Значения не показываются целиком и не пишутся в журнал."
       />
-      <SubTabs active={tab} items={TABS.map((t) => ({ key: t.key, label: t.label, href: href(t.key) }))} />
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-8 items-start">
+        {/* категории */}
+        <nav aria-label="Разделы настроек" className={`${ADMIN_CARD} p-2 lg:sticky lg:top-6 flex lg:flex-col gap-0.5 overflow-x-auto`}>
+          {TABS.map((t) => {
+            const warn =
+              (t.key === "workshop" && (broken > 0 || unchecked > 0)) ||
+              (TAB_SETTING[t.key] && !byKey.get(TAB_SETTING[t.key]!)?.source);
+            return (
+              <Link
+                key={t.key}
+                href={href(t.key)}
+                aria-current={tab === t.key ? "page" : undefined}
+                className={`relative flex h-10 items-center justify-between gap-3 rounded-[8px] px-3 text-[13px] whitespace-nowrap transition ${tab === t.key ? "bg-accent/[0.08] text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]"}`}
+              >
+                {tab === t.key && <span className="hidden lg:block absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-accent" />}
+                {t.label}
+                {warn && <span className={`size-1.5 rounded-full ${t.key === "workshop" && broken ? "bg-danger" : "bg-warn"}`} />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="min-w-0 space-y-6">
+          <div>
+            <AdminLabel>Раздел</AdminLabel>
+            <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.01em]">{TABS.find((t) => t.key === tab)?.label}</h2>
+          </div>
 
       {tab === "general" && (
         <Panel title="Состояние">
@@ -250,6 +276,8 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
           </p>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
 import { IconArrow, TeamLogo, cn } from "@/components/ui";
-import { CARD, OutlineBtn, PageHero, PrimaryBtn, SearchField, Wrap } from "@/components/primitives";
+import { CARD, EmptyCard, OutlineBtn, PageHero, PrimaryBtn, SearchField, Wrap } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Команды" };
 
@@ -21,25 +21,25 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
         aside={<OutlineBtn href="/team/create">Создать команду</OutlineBtn>}
       />
 
-      <Wrap className="pt-12">
+      <Wrap className="pt-10">
         {all.length > 0 && (
-          <div className="mb-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <SearchField defaultValue={q} placeholder="Поиск по названию или тегу" />
+            {q && (
+              <span className="t-meta">
+                Найдено: <span className="num text-fg-2">{teams.length}</span>
+              </span>
+            )}
           </div>
         )}
 
         {teams.length === 0 ? (
-          <div className={cn(CARD, "px-8 py-12 lg:px-12")}>
-            <div className="text-[20px] lg:text-[24px] font-semibold text-fg">
-              {all.length === 0 ? "Команд пока нет" : "Ничего не найдено"}
-            </div>
-            <p className="mt-2 text-fg-3">{all.length === 0 ? "Станьте первой командой на платформе." : "Попробуйте другой запрос."}</p>
-            {all.length === 0 && (
-              <div className="mt-8">
-                <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn>
-              </div>
-            )}
-          </div>
+          <EmptyCard
+            dashed={all.length === 0}
+            title={all.length === 0 ? "Команд пока нет" : "Ничего не найдено"}
+            text={all.length === 0 ? "Станьте первой командой на платформе." : "Попробуйте другое название или тег."}
+            action={all.length === 0 ? <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn> : undefined}
+          />
         ) : (
           <div className={cn(CARD, "overflow-hidden")}>
             <div className="hidden sm:grid grid-cols-[1fr_180px_110px_110px_24px] gap-6 px-8 py-4 text-[12px] uppercase tracking-[0.2em] text-fg-3 border-b border-white/[0.06]">
@@ -66,7 +66,10 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
                   </div>
                 </div>
                 <span className="hidden sm:block text-[15px] text-fg-2 truncate">{t.region ?? "—"}</span>
-                <span className="num text-[15px] text-right text-fg-2">{t.member_count}</span>
+                <span className="num text-[15px] text-right text-fg-2">
+                  {t.member_count}
+                  <span className="sm:hidden text-fg-3"> игр.</span>
+                </span>
                 <span className="hidden sm:block num text-[15px] text-right text-fg-2">{t.avg_elo ?? "—"}</span>
                 <IconArrow className="hidden sm:block size-4 text-fg-3 group-hover:text-fg transition-colors" />
               </Link>

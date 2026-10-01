@@ -71,7 +71,7 @@ export function ChipInput({
           </button>
         ))}
       </div>
-      <input name={name} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} className="field" />
+      <input name={name} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} className="field mt-2" />
     </div>
   );
 }

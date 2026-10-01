@@ -8,8 +8,9 @@ import { formatDateTime, formatTime } from "@/lib/format";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { TimeLeft } from "@/components/competition/time-left";
-import { Avatar, EmptyState, Notice, TeamLogo, cn } from "@/components/ui";
-import { Flow, FlowHeader } from "@/components/primitives";
+import { Avatar, TeamLogo, cn } from "@/components/ui";
+import { Button, EmptyCard, Flow, FlowHeader } from "@/components/primitives";
+import { Callout } from "@/components/public/callout";
 
 export const metadata: Metadata = { title: "Check-in" };
 
@@ -37,7 +38,15 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
     return (
       <Flow>
         <FlowHeader back={back} title="Check-in" description={window_} />
-        <EmptyState title="Вы не участвуете в турнире" description="Check-in проходят только участники с одобренной заявкой." />
+        <EmptyCard
+          title="Вы не участвуете в турнире"
+          text="Check-in проходят только участники с одобренной заявкой."
+          action={
+            <Button href={`/tournaments/${t.slug}`} variant="secondary" size="md">
+              К турниру
+            </Button>
+          }
+        />
       </Flow>
     );
   }
@@ -63,8 +72,13 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
         <TeamLogo src={team.logo_url} tag={team.tag} size={56} />
         <div className="flex-1 min-w-0">
           <div className="text-[22px] lg:text-[26px] font-semibold truncate">{team.name}</div>
-          <div className="text-[14px] lg:text-[15px] text-fg-3">
-            Готово {checked} из {approved.length}
+          <div className="mt-1 flex items-center gap-3 text-[14px] lg:text-[15px] text-fg-3">
+            <span>
+              Готово {checked} из {approved.length}
+            </span>
+            <span className="h-1 w-24 overflow-hidden rounded-full bg-white/[0.08]" aria-hidden>
+              <span className="block h-full bg-ok/80" style={{ width: `${(checked / Math.max(1, approved.length)) * 100}%` }} />
+            </span>
           </div>
         </div>
       </div>
@@ -74,7 +88,15 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
           const bad = r.player.is_banned || !/^\d{17}$/.test(r.player.steam_id);
           return (
             <li key={r.id} className="flex items-center gap-4 h-14 lg:text-[17px] border-b border-white/[0.05] last:border-0">
-              <span className={cn("w-4 text-center", bad ? "text-danger" : "text-ok")}>{bad ? "✕" : "✓"}</span>
+              <span
+                className={cn(
+                  "grid size-6 shrink-0 place-items-center rounded-full text-[12px]",
+                  bad ? "bg-danger/15 text-danger" : "bg-ok/15 text-ok",
+                )}
+                aria-label={bad ? "Проблема" : "Готов"}
+              >
+                {bad ? "✕" : "✓"}
+              </span>
               <Avatar src={r.player.avatar_url} name={r.player.nickname} size={32} />
               <span className="flex-1 truncate">{r.player.nickname}</span>
               <span className="text-[13px] text-fg-3">
@@ -90,11 +112,13 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
           {ready ? "Команда готова" : problems.length ? "Нужно исправить состав" : "Состав в порядке"}
         </div>
         {problems.length > 0 && !ready && (
-          <ul className="mt-3 space-y-1 text-sm text-fg-2">
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
+          <Callout tone="danger" className="mt-4">
+            <ul className="space-y-1">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </Callout>
         )}
         {ready ? (
           <p className="mt-3 text-fg-2">
@@ -102,13 +126,13 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
           </p>
         ) : t.status !== "checkin" ? (
           <div className="mt-5">
-            <Notice>Check-in ещё не открыт. Мы пришлём уведомление, когда он начнётся.</Notice>
+            <Callout>Check-in ещё не открыт. Мы пришлём уведомление, когда он начнётся.</Callout>
           </div>
         ) : isCaptain ? (
-          <div className="mt-8 flex flex-wrap items-center gap-x-10 gap-y-5">
-            <ActionForm action={checkIn}>
+          <div className="mt-8 flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-10">
+            <ActionForm action={checkIn} className="w-full sm:w-auto">
               <input type="hidden" name="tournamentId" value={t.id} />
-              <SubmitButton size="lg" className="h-[60px] px-14 text-[17px] tracking-[0.08em]" pendingText="Проверяем…">
+              <SubmitButton size="lg" className="h-[60px] w-full px-14 text-[17px] tracking-[0.08em] sm:w-auto" pendingText="Проверяем…">
                 CHECK-IN
               </SubmitButton>
             </ActionForm>
@@ -123,7 +147,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
           </div>
         ) : (
           <div className="mt-5">
-            <Notice>Check-in проходит капитан команды.</Notice>
+            <Callout>Check-in проходит капитан команды — вам ничего делать не нужно.</Callout>
           </div>
         )}
       </div>

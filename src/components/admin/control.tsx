@@ -39,7 +39,7 @@ export function AdminHeader({
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-7 border-b border-white/[0.06]">
       <div className="min-w-0">
         {back && (
-          <Link href={back.href} className="text-[12px] text-fg-3 hover:text-fg">
+          <Link href={back.href} className="rounded-sm text-[12px] text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
             ← {back.label}
           </Link>
         )}
@@ -148,7 +148,7 @@ export function AlertRow({
         <Link
           href={action.href}
           className={cn(
-            "ml-auto inline-flex h-8 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors",
+            "ml-auto inline-flex h-9 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             tone === "danger"
               ? "border-danger/40 text-danger hover:bg-danger/[0.1]"
               : tone === "warn"
@@ -190,13 +190,14 @@ export function SubTabs({ items, active }: { items: { key: string; label: ReactN
           key={t.key}
           href={t.href}
           scroll={false}
+          aria-current={t.key === active ? "page" : undefined}
           className={cn(
-            "relative h-11 inline-flex items-center text-[13px] font-medium whitespace-nowrap transition-colors",
+            "relative h-11 inline-flex items-center rounded-sm text-[13px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
             t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
           )}
         >
           {t.label}
-          {t.key === active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
+          {t.key === active && <span className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent" />}
         </Link>
       ))}
     </div>

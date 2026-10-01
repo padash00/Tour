@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { buttonClass } from "./ui";
+import { btnClass } from "./primitives";
 
 /** Twitch / YouTube → адрес для встраивания; null — ссылку встроить нельзя */
 export function streamEmbed(url: string, host: string): string | null {
@@ -28,7 +28,7 @@ export function StreamEmbed({ url }: { url: string }) {
   const src = streamEmbed(url, host);
   if (!src) {
     return (
-      <a href={url} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
+      <a href={url} target="_blank" rel="noreferrer" className={btnClass("secondary", "md")}>
         Смотреть трансляцию ↗
       </a>
     );
@@ -47,7 +47,7 @@ export function ShareButton({ title }: { title: string }) {
   return (
     <button
       type="button"
-      className={buttonClass("ghost", "sm", "-ml-3")}
+      className={btnClass("ghost", "sm", "-ml-3")}
       onClick={async () => {
         const url = window.location.href.split("?")[0];
         if (navigator.share) {

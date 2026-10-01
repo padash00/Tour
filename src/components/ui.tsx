@@ -7,31 +7,49 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 
 // ───────────────────────── buttons
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "warm";
+/*
+ * Кнопки F16 Control и служебных мест. Та же система, что в primitives (btnClass):
+ * primary — акцент, secondary/outline — рамка, ghost — без фона, danger — опасное действие.
+ * Размеры: sm 36 · md 44 · lg 52.
+ */
+type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "warm";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-[#06101f] hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent/40",
-  secondary:
-    "bg-transparent text-fg border border-line-strong hover:bg-white/[0.04] hover:border-white/20 focus-visible:ring-2 focus-visible:ring-accent/30",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.04]",
-  danger: "bg-danger-dim text-danger border border-[#e66f7433] hover:bg-[#e66f7424]",
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed",
+  secondary: "bg-white/[0.03] text-fg border border-white/[0.14] hover:bg-white/[0.06] hover:border-white/[0.26]",
+  outline: "bg-transparent text-fg border border-white/25 hover:border-white/45 hover:bg-white/[0.03]",
+  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
+  danger: "bg-danger/[0.1] text-danger border border-danger/35 hover:bg-danger/[0.16] hover:border-danger/55",
   // знак бренда — использовать крайне редко
   warm: "bg-warm text-[#1a0d03] hover:brightness-110",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-8 px-3 text-[13px] rounded-lg gap-1.5",
-  md: "h-10 px-4 text-sm rounded-[9px] gap-2",
-  lg: "h-12 px-5 text-[15px] rounded-[10px] gap-2",
+  sm: "h-9 px-3.5 text-[13px] rounded-[7px] gap-1.5",
+  md: "h-11 px-4.5 text-[14px] rounded-[8px] gap-2",
+  lg: "h-[52px] px-6 text-[15px] rounded-[9px] gap-2.5",
 };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
   return cn(
-    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent/60 transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none",
+    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] whitespace-nowrap select-none",
+    "transition-[background-color,border-color,color,transform,opacity] duration-150 ease-out active:scale-[0.98]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+    "disabled:opacity-50 disabled:pointer-events-none aria-disabled:opacity-50 aria-disabled:pointer-events-none",
     variants[variant],
     sizes[size],
     extra,
+  );
+}
+
+/** Индикатор загрузки внутри кнопки */
+export function Spinner({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={cn("animate-[spin_.7s_linear_infinite]", className)} fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -208,19 +226,29 @@ export function FaceitLevel({ level }: { level: number | null }) {
 
 export function Tabs({ items, active }: { items: { key: string; label: string; href: string }[]; active: string }) {
   return (
-    <div className="flex gap-6 border-b border-line overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+    <div
+      role="tablist"
+      className="flex gap-7 border-b border-line overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {items.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           scroll={false}
+          role="tab"
+          aria-selected={t.key === active}
           className={cn(
-            "relative h-12 inline-flex items-center text-[15px] font-medium transition-colors whitespace-nowrap",
+            "relative h-12 inline-flex items-center text-[15px] font-medium transition-colors duration-150 whitespace-nowrap",
             t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
           )}
         >
           {t.label}
-          {t.key === active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-fg" />}
+          <span
+            className={cn(
+              "absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent transition-[opacity,transform] duration-200",
+              t.key === active ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50",
+            )}
+          />
         </Link>
       ))}
     </div>

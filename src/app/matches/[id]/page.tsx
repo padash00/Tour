@@ -15,10 +15,12 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
-import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
+import { ServerPreparing, ServerReady, connectHref } from "@/components/competition/server-block";
 import { VetoBoard } from "@/components/competition/veto-board";
-import { ButtonLink, EmptyState, Pill, cn } from "@/components/ui";
-import { Eyebrow, WRAP } from "@/components/primitives";
+import { MatchProgress } from "@/components/competition/match-progress";
+import { cn } from "@/components/ui";
+import { Button, EmptyCard, Eyebrow, FormField, StatusChip, Textarea, WRAP, btnClass } from "@/components/primitives";
+import { MobileStickyCta } from "@/components/public/callout";
 
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
@@ -122,7 +124,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
       <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
 
-      <div className={cn(WRAP, "pt-12 md:pt-16 space-y-16 lg:space-y-20")}>
+      <div className={cn(WRAP, "pt-10 md:pt-14 space-y-16 lg:space-y-20")}>
+        <MatchProgress status={m.status} singleMap={m.tournament.map_pool.length <= 1} />
         {/* ── главный блок по состоянию матча */}
         {m.status === "pending" || m.status === "upcoming" ? (
           <section className="grid sm:grid-cols-3 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
@@ -145,7 +148,9 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             </div>
           </section>
         ) : m.status === "veto" ? (
-          <VetoBoard m={m} state={state} myTurn={myTurn} images={mapImages} />
+          <section className={cn("relative -mx-2 rounded-[18px] p-2 sm:-mx-4 sm:p-4", myTurn && "bg-accent/[0.04] ring-1 ring-accent/25")}>
+            <VetoBoard m={m} state={state} myTurn={myTurn} images={mapImages} />
+          </section>
         ) : serverPhase && (inRoster || admin) ? (
           m.server_address ? (
             <ServerReady
@@ -204,16 +209,16 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                     }))}
                 />
               ) : (
-                <EmptyState compact title="Состав появится" description="Когда команда определится." />
+                <EmptyCard dashed title="Состав появится" text="Когда команда определится по итогам предыдущих матчей." />
               )}
             </div>
           ))}
         </section>
 
         {!player && m.status === "veto" && (
-          <ButtonLink href={`/login?next=/matches/${m.id}`} variant="secondary">
+          <Button href={`/login?next=/matches/${m.id}`} variant="secondary" size="md">
             Войти — для капитанов
-          </ButtonLink>
+          </Button>
         )}
 
         {/* ── спор */}
@@ -221,17 +226,17 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           <section className="max-w-2xl">
             <Eyebrow className="mb-4">Спор по матчу</Eyebrow>
             {disputes.length > 0 && (
-              <div className="mb-6">
+              <div className="mb-6 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 px-6">
                 {disputes.map((d) => (
-                  <div key={d.id} className="py-4 border-b border-white/[0.05] last:border-0 text-sm">
+                  <div key={d.id} className="py-5 border-b border-white/[0.05] last:border-0 text-sm">
                     <div className="flex justify-between gap-2 text-[13px] text-fg-3">
                       <span>
                         {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} ·{" "}
                         {formatDateTime(d.created_at)}
                       </span>
-                      <Pill tone={d.status === "open" ? "warn" : d.status === "resolved" ? "ok" : "neutral"}>
+                      <StatusChip tone={d.status === "open" ? "warn" : d.status === "resolved" ? "ok" : "muted"} size="sm">
                         {d.status === "open" ? "рассматривается" : d.status === "resolved" ? "принят" : "отклонён"}
-                      </Pill>
+                      </StatusChip>
                     </div>
                     <p className="mt-2 text-fg whitespace-pre-line">{d.reason}</p>
                     {d.decision && <p className="mt-2 text-fg-2">Решение: {d.decision}</p>}
@@ -242,13 +247,10 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
               <ActionForm action={openDispute}>
                 <input type="hidden" name="matchId" value={m.id} />
-                <textarea
-                  name="reason"
-                  rows={3}
-                  placeholder="Что произошло: раунд, время, игроки. Результат не изменится без решения администратора."
-                  className="field resize-y text-sm"
-                />
-                <div className="mt-3">
+                <FormField label="Что произошло" hint="Раунд, время, игроки. Результат не изменится без решения администратора.">
+                  <Textarea name="reason" rows={4} required minLength={10} placeholder="Например: 14-й раунд, у игрока X пропал звук…" />
+                </FormField>
+                <div className="mt-4">
                   <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
                     Открыть спор
                   </SubmitButton>
@@ -258,6 +260,13 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           </section>
         )}
       </div>
+      {serverPhase && (inRoster || admin) && m.server_address && m.status === "ready" && (
+        <MobileStickyCta note="Сервер готов">
+          <a href={connectHref(m.server_address, m.server_password)} className={btnClass("primary", "lg", "w-full")}>
+            Подключиться
+          </a>
+        </MobileStickyCta>
+      )}
     </>
   );
 }

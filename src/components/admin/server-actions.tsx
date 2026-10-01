@@ -1,26 +1,32 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect } from "react";
 import { serverCommand } from "@/app/actions/admin-server";
 import { SubmitButton } from "@/components/forms";
+import { useToast } from "@/components/toast";
 import { cn } from "@/components/ui";
 
 const LABEL = { start: "Запустить", stop: "Стоп", restart: "Рестарт", end_match: "Снять матч" } as const;
 
-/** Кнопки инстанса в таблице серверов: одна форма, результат — короткой строкой, гаснет сам */
-export function ServerActions({ instance, running }: { instance: string; running: boolean }) {
+/** Кнопки инстанса: одна форма, результат — уведомлением в углу (строка/карточка не прыгает) */
+export function ServerActions({
+  instance,
+  running,
+  align = "end",
+  className,
+}: {
+  instance: string;
+  running: boolean;
+  align?: "start" | "end";
+  className?: string;
+}) {
   const [state, action] = useActionState(serverCommand, null);
-  const [shown, setShown] = useState<typeof state>(null);
+  const toast = useToast();
 
   useEffect(() => {
-    if (!state) return;
-    const show = setTimeout(() => setShown(state), 0);
-    const hide = setTimeout(() => setShown(null), 5000);
-    return () => {
-      clearTimeout(show);
-      clearTimeout(hide);
-    };
-  }, [state]);
+    if (state?.error) toast.error(state.error);
+    else if (state?.success) toast.success(state.success);
+  }, [state, toast]);
 
   const types = running ? (["end_match", "restart", "stop"] as const) : (["start"] as const);
   const confirm: Record<string, string | undefined> = {
@@ -30,7 +36,7 @@ export function ServerActions({ instance, running }: { instance: string; running
   };
 
   return (
-    <form action={action} className="relative flex justify-end gap-1">
+    <form action={action} className={cn("flex flex-wrap gap-1", align === "end" ? "justify-end" : "justify-start", className)}>
       <input type="hidden" name="instance" value={instance} />
       {types.map((type) => (
         <SubmitButton
@@ -45,17 +51,6 @@ export function ServerActions({ instance, running }: { instance: string; running
           {LABEL[type]}
         </SubmitButton>
       ))}
-      {shown && (
-        <span
-          className={cn(
-            "absolute right-0 top-full mt-0.5 max-w-[260px] truncate text-[11px] leading-4",
-            shown.error ? "text-danger" : "text-ok",
-          )}
-          title={shown.error ?? shown.success}
-        >
-          {shown.error ?? "Команда отправлена агенту"}
-        </span>
-      )}
     </form>
   );
 }

@@ -9,10 +9,21 @@ import type { Notification } from "@/lib/types";
 import { getTeamMatches } from "@/lib/matches";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { MatchRow, MatchStatusBadge } from "@/components/match-bits";
-import { TournamentStatusPill } from "@/components/tournament-bits";
-import { NotificationRow } from "@/components/competition/notification-row";
-import { Avatar, ButtonLink, EmptyState, FaceitLevel, Pill, TeamLogo, buttonClass, cn } from "@/components/ui";
-import { CARD, PageHero, SectionHead, Wrap } from "@/components/primitives";
+import { NotificationItem } from "@/components/public/notification-feed";
+import { Avatar, FaceitLevel, TeamLogo, cn } from "@/components/ui";
+import {
+  Button,
+  CARD,
+  Eyebrow,
+  PageHero,
+  PrimaryBtn,
+  SectionHead,
+  SectionLink,
+  StatusChip,
+  TournamentStatusChip,
+  Wrap,
+  btnClass,
+} from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Профиль" };
 
@@ -37,6 +48,60 @@ export default async function MePage() {
   const unread = notifications.filter((n) => !n.read_at).length;
   const activeRegs = regs.filter((r) => isActiveRegistration(r) && !["finished", "cancelled"].includes(r.tournament.status));
   const isCaptain = membership?.team.captain_id === player.id;
+  const needsCheckin = activeRegs.find((r) => r.tournament.status === "checkin" && r.status === "approved" && !r.checked_in_at);
+
+  // главное следующее действие — одно, по приоритету
+  const action: { eyebrow: string; title: string; text: string; href: string; cta: string; tone?: "live" } | null =
+    next && (next.status === "live" || next.status === "ready")
+      ? {
+          eyebrow: next.status === "live" ? "Матч идёт" : "Сервер готов",
+          title: `${next.team1?.name ?? "TBD"} vs ${next.team2?.name ?? "TBD"}`,
+          text: next.status === "live" ? "Матч уже на сервере — следите за счётом." : "Адрес сервера на странице матча. На подключение — 15 минут.",
+          href: `/matches/${next.id}`,
+          cta: next.status === "live" ? "Открыть матч" : "Подключиться",
+          tone: "live",
+        }
+      : next && next.status === "veto"
+        ? {
+            eyebrow: "Вето карт",
+            title: "Идёт выбор карт",
+            text: isCaptain ? "Ваш ход может быть сейчас — на ход 60 секунд." : "Капитаны выбирают карты. Следите за матчем.",
+            href: `/matches/${next.id}`,
+            cta: "Открыть вето",
+          }
+        : needsCheckin && isCaptain
+          ? {
+              eyebrow: "Check-in открыт",
+              title: needsCheckin.tournament.name,
+              text: "Подтвердите участие команды, иначе место займёт другая.",
+              href: `/tournaments/${needsCheckin.tournament.slug}/checkin`,
+              cta: "Пройти check-in",
+            }
+          : !membership && !solo
+            ? {
+                eyebrow: "Первый шаг",
+                title: "Создайте команду",
+                text: "Вы станете капитаном и получите ссылку-приглашение для игроков.",
+                href: "/team/create",
+                cta: "Создать команду",
+              }
+            : membership && isCaptain && members.length < 5
+              ? {
+                  eyebrow: "Состав",
+                  title: `В команде ${members.length} из 5`,
+                  text: "Отправьте ссылку-приглашение игрокам — она в штабе команды.",
+                  href: "/team",
+                  cta: "Пригласить игроков",
+                }
+              : activeRegs.length === 0
+                ? {
+                    eyebrow: "Турниры",
+                    title: "Найдите турнир",
+                    text: isCaptain || solo ? "Подайте заявку, пока открыта регистрация." : "Заявку на турнир подаёт капитан.",
+                    href: "/tournaments",
+                    cta: "Смотреть турниры",
+                  }
+                : null;
 
   return (
     <>
@@ -71,16 +136,16 @@ export default async function MePage() {
               Обновить Steam и FACEIT
             </SubmitButton>
           </ActionForm>
-          <ButtonLink href={`/players/${player.steam_id}`} variant="ghost" size="sm">
+          <Button href={`/players/${player.steam_id}`} variant="ghost" size="sm">
             Публичный профиль
-          </ButtonLink>
+          </Button>
           {isAdmin(player) && (
-            <ButtonLink href="/admin" variant="ghost" size="sm">
+            <Button href="/admin" variant="ghost" size="sm">
               F16 Control
-            </ButtonLink>
+            </Button>
           )}
           <form action="/api/auth/logout" method="post">
-            <button className={buttonClass("ghost", "sm")}>Выйти</button>
+            <button className={btnClass("ghost", "sm")}>Выйти</button>
           </form>
         </div>
         }
@@ -88,13 +153,41 @@ export default async function MePage() {
 
       <Wrap>
 
-      {/* ── следующий матч — главное */}
+      {/* ── следующее действие — главное */}
+      {action && (
+        <section className="pt-12">
+          <div
+            className={cn(
+              CARD,
+              "relative overflow-hidden p-7 sm:p-10",
+              action.tone === "live" && "border-danger/30",
+            )}
+          >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_260px_at_100%_0%,#1a2c4880,transparent_70%)]" />
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <Eyebrow className={action.tone === "live" ? "!text-danger" : undefined}>
+                  {action.tone === "live" && <span className="mr-2 inline-block size-1.5 animate-pulse rounded-full bg-current align-middle" />}
+                  Следующий шаг · {action.eyebrow}
+                </Eyebrow>
+                <div className="t-h2 mt-4 break-words">{action.title}</div>
+                <p className="t-body mt-2 max-w-[620px]">{action.text}</p>
+              </div>
+              <PrimaryBtn href={action.href} className="shrink-0">
+                {action.cta} →
+              </PrimaryBtn>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── следующий матч */}
       {next && (
         <section className="pt-12">
-          <SectionHead title="Следующий матч" action={<MatchStatusBadge status={next.status} />} />
+          <SectionHead title="Ближайший матч" action={<MatchStatusBadge status={next.status} />} />
           <Link
             href={`/matches/${next.id}`}
-            className={cn(CARD, "grid grid-cols-[1fr_auto_1fr] items-center gap-6 hover:border-white/20 transition-colors p-6 sm:p-10")}
+            className={cn(CARD, "grid grid-cols-[1fr_auto_1fr] items-center gap-4 p-6 transition-colors hover:border-white/[0.18] hover:bg-[#0d1726] sm:gap-6 sm:p-10")}
           >
             <div className="flex items-center gap-4 min-w-0">
               {next.team1 && <TeamLogo src={next.team1.logo_url} tag={next.team1.tag} size={48} />}
@@ -139,26 +232,26 @@ export default async function MePage() {
                       </Link>
                       <div className="text-[13px] text-fg-3 mt-0.5">Старт {formatDateTime(r.tournament.starts_at)}</div>
                     </div>
-                    <TournamentStatusPill status={r.tournament.status} />
-                    <Pill tone={r.status === "approved" ? "ok" : "warn"}>{registrationStatusLabel[r.status]}</Pill>
+                    <TournamentStatusChip status={r.tournament.status} size="sm" />
+                    <StatusChip tone={r.status === "approved" ? "ok" : "warn"} size="sm">
+                      {registrationStatusLabel[r.status]}
+                    </StatusChip>
                     {r.tournament.status === "checkin" && r.status === "approved" && !r.checked_in_at && isCaptain && (
-                      <ButtonLink href={`/tournaments/${r.tournament.slug}/checkin`} size="sm">
+                      <Button href={`/tournaments/${r.tournament.slug}/checkin`} size="sm">
                         Check-in
-                      </ButtonLink>
+                      </Button>
                     )}
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState
-                compact
-                title="Нет активных заявок"
-                action={
-                  <ButtonLink href="/tournaments" variant="secondary" size="sm">
-                    Смотреть турниры
-                  </ButtonLink>
-                }
-              />
+              <div className="py-2">
+                <div className="text-[16px] font-semibold text-fg">Нет активных заявок</div>
+                <p className="mt-1 text-[14px] text-fg-3">Здесь появится турнир, в котором вы участвуете.</p>
+                <Button href="/tournaments" variant="secondary" size="sm" className="mt-4">
+                  Смотреть турниры
+                </Button>
+              </div>
             )}
           </section>
 
@@ -182,16 +275,13 @@ export default async function MePage() {
                 </div>
               </Link>
             ) : (
-              <EmptyState
-                compact
-                title="Вы пока не в команде"
-                description="Создайте свою или попросите капитана прислать приглашение."
-                action={
-                  <ButtonLink href="/team/create" size="sm">
-                    Создать команду
-                  </ButtonLink>
-                }
-              />
+              <div className="py-2">
+                <div className="text-[16px] font-semibold text-fg">Вы пока не в команде</div>
+                <p className="mt-1 text-[14px] text-fg-3">Создайте свою или попросите капитана прислать приглашение.</p>
+                <Button href="/team/create" size="sm" className="mt-4">
+                  Создать команду
+                </Button>
+              </div>
             )}
           </section>
 
@@ -204,33 +294,34 @@ export default async function MePage() {
                 ))}
               </div>
             ) : (
-              <EmptyState compact title="Матчей пока нет" description="Ваши матчи появятся здесь после публикации сетки." />
+              <div className="py-2">
+                <div className="text-[16px] font-semibold text-fg">Матчей пока нет</div>
+                <p className="mt-1 text-[14px] text-fg-3">Ваши матчи появятся здесь после публикации сетки.</p>
+              </div>
             )}
           </section>
         </div>
 
         <aside id="notifications" className={cn(CARD, "scroll-mt-28 p-6 lg:p-8 lg:sticky lg:top-28")}>
-          <div className="flex items-baseline justify-between mb-2">
-            <SectionHead title="Уведомления" className="mb-0" />
-            <div className="flex items-center gap-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <SectionHead title={unread ? `Уведомления · ${unread}` : "Уведомления"} className="!mb-0" />
+            <div className="flex items-center gap-2">
               {unread > 0 && (
                 <ActionForm action={markNotificationsRead}>
                   <SubmitButton variant="ghost" size="sm">
-                    Прочитать все
+                    Прочитать
                   </SubmitButton>
                 </ActionForm>
               )}
-              <Link href="/notifications" className="text-sm text-fg-3 hover:text-fg">
-                Все →
-              </Link>
+              <SectionLink href="/notifications">Все</SectionLink>
             </div>
           </div>
           {notifications.length === 0 ? (
-            <EmptyState compact title="Уведомлений нет" />
+            <p className="py-4 text-[14px] text-fg-3">Уведомлений нет.</p>
           ) : (
             <div>
               {notifications.map((n) => (
-                <NotificationRow key={n.id} n={n} />
+                <NotificationItem key={n.id} n={n} compact />
               ))}
             </div>
           )}

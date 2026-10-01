@@ -5,6 +5,8 @@ import type { Player } from "@/lib/types";
 import { fmt, ratingColor, swingColor } from "./stats-table";
 import { Avatar, FaceitLevel, TeamLogo, cn } from "./ui";
 import { CARD, PageHero, SectionHead, Wrap } from "./primitives";
+import { DATA_TABLE, NUM_CELL } from "./public/data-table";
+import { FormStrip } from "./public/form-strip";
 
 export type MapHistoryItem = {
   key: string;
@@ -57,13 +59,20 @@ export function PlayerProfile({
     { label: "Карты", value: String(agg?.maps ?? 0) },
   ];
   const maps = bestMaps(history);
+  const form = history.slice(0, 5).map((h) => (h.scoreFor > h.scoreAgainst ? "W" : "L") as "W" | "L");
+  const won = history.filter((h) => h.scoreFor > h.scoreAgainst).length;
 
   return (
     <>
       <PageHero
         media={
-          <div className="shrink-0 rounded-full border border-white/[0.1] p-1.5">
-            <Avatar src={player.avatar_url} name={player.nickname} size={136} />
+          <div className="relative shrink-0 rounded-full border border-white/[0.12] p-1.5 shadow-[var(--shadow-soft)]">
+            <Avatar src={player.avatar_url} name={player.nickname} size={152} />
+            {player.faceit_level ? (
+              <span className="absolute -bottom-1 -right-1 rounded-full bg-bg p-1">
+                <FaceitLevel level={player.faceit_level} />
+              </span>
+            ) : null}
           </div>
         }
         eyebrow="Игрок F16 Arena"
@@ -113,10 +122,28 @@ export function PlayerProfile({
             </div>
           </>
         }
-        aside={actions}
+        aside={
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            {actions}
+            <div className={cn(CARD, "w-full p-6 lg:min-w-[300px]")}>
+              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-fg-3">Форма · последние карты</div>
+              {form.length ? (
+                <>
+                  <FormStrip results={form} className="mt-4" />
+                  <div className="num mt-4 text-[14px] text-fg-2">
+                    <span className="text-ok">{won}W</span> · <span className="text-danger">{history.length - won}L</span>
+                    <span className="text-fg-3"> · {history.length} карт</span>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-3 text-[14px] text-fg-3">Первая карта на F16 Arena впереди.</p>
+              )}
+            </div>
+          </div>
+        }
       >
         {/* КЛЮЧЕВЫЕ ЦИФРЫ — открытая типографика */}
-        <div className="mt-12 grid grid-cols-3 md:grid-cols-6 gap-y-8 gap-x-6 border-t border-white/[0.06] pt-10">
+        <div className="mt-12 grid grid-cols-3 gap-x-6 gap-y-8 border-t border-white/[0.06] pt-10 md:grid-cols-6">
           {main.map((s, i) => (
             <div key={s.label} className={cn(i > 0 && "md:border-l md:border-white/[0.06] md:pl-6")}>
               <div
@@ -138,7 +165,7 @@ export function PlayerProfile({
       <Wrap className="pt-14">
         {/* ДЕТАЛИ */}
         {agg && (
-          <dl className={cn(CARD, "flex flex-wrap gap-x-10 gap-y-4 px-8 py-6 text-[15px]")}>
+          <dl className={cn(CARD, "grid grid-cols-2 gap-x-8 gap-y-4 px-6 py-6 text-[15px] sm:grid-cols-4 lg:grid-cols-6 lg:px-8")}>
             {[
               ["Убийства", agg.kills],
               ["Смерти", agg.deaths],
@@ -152,9 +179,9 @@ export function PlayerProfile({
               ["Матчей", agg.matches],
               ["Раундов", agg.rounds],
             ].map(([label, value]) => (
-              <div key={String(label)} className="flex items-baseline gap-2">
-                <dt className="text-fg-3">{label}</dt>
-                <dd className="num font-semibold">{value}</dd>
+              <div key={String(label)}>
+                <dt className="text-[11px] uppercase tracking-[0.18em] text-fg-3">{label}</dt>
+                <dd className="num mt-1 text-[18px] font-semibold text-fg">{value}</dd>
               </div>
             ))}
           </dl>
@@ -164,41 +191,41 @@ export function PlayerProfile({
           <section className={cn(CARD, "p-6 lg:p-8 min-w-0")}>
             <SectionHead title="Последние матчи" />
             {history.length === 0 ? (
-              <div>
-                <div className="text-[17px] font-semibold text-fg">Матчей пока нет</div>
-                <div className="mt-1 text-[15px] text-fg-3">История появится после первого участия в турнире.</div>
+              <div className="rounded-[10px] border border-dashed border-white/[0.12] px-6 py-8">
+                <div className="text-[16px] font-semibold text-fg">Матчей пока нет</div>
+                <div className="mt-1 text-[14px] text-fg-3">История появится после первого участия в турнире.</div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="tbl min-w-[560px]">
+              <div className="-mx-6 overflow-x-auto lg:-mx-8">
+                <table className={cn(DATA_TABLE, "min-w-[600px] [&_th]:first:pl-6 [&_td]:first:pl-6 lg:[&_th]:first:pl-8 lg:[&_td]:first:pl-8")}>
                   <thead>
                     <tr>
                       <th>Соперник</th>
                       <th>Карта</th>
-                      <th className="text-right">Счёт</th>
-                      <th className="text-right">K–D</th>
-                      <th className="text-right">ADR</th>
-                      <th className="text-right">Rating</th>
+                      <th className="!text-right">Счёт</th>
+                      <th className="!text-right">K–D</th>
+                      <th className="!text-right">ADR</th>
+                      <th className="!text-right">Rating</th>
                     </tr>
                   </thead>
                   <tbody>
                     {history.map((h) => (
                       <tr key={h.key}>
                         <td>
-                          <Link href={`/matches/${h.matchId}`} className="text-fg hover:text-accent">
+                          <Link href={`/matches/${h.matchId}`} className="font-semibold text-fg transition-colors hover:text-accent">
                             {h.opponent?.name ?? "—"}
                           </Link>
                           <div className="text-[12px] text-fg-3">{h.tournament.name}</div>
                         </td>
                         <td>{mapName(h.mapName)}</td>
-                        <td className={cn("text-right num", h.scoreFor > h.scoreAgainst ? "text-ok" : "text-danger")}>
+                        <td className={cn(NUM_CELL, h.scoreFor > h.scoreAgainst ? "text-ok" : "text-danger")}>
                           {h.scoreFor}:{h.scoreAgainst}
                         </td>
-                        <td className="text-right num">
+                        <td className={NUM_CELL}>
                           {h.stats.kills}–{h.stats.deaths}
                         </td>
-                        <td className="text-right num">{fmt.d1(h.stats.adr)}</td>
-                        <td className={cn("text-right num font-semibold", ratingColor(h.stats.rating))}>{fmt.r(h.stats.rating)}</td>
+                        <td className={NUM_CELL}>{fmt.d1(h.stats.adr)}</td>
+                        <td className={cn(NUM_CELL, "font-semibold", ratingColor(h.stats.rating))}>{fmt.r(h.stats.rating)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -211,16 +238,21 @@ export function PlayerProfile({
             <section className={cn(CARD, "p-6 lg:p-8")}>
               <SectionHead title="Лучшие карты" />
               {maps.length === 0 ? (
-                <p className="text-fg-3">Пока нет сыгранных карт.</p>
+                <p className="text-[14px] text-fg-3">Появятся после первых сыгранных карт.</p>
               ) : (
                 <div>
                   {maps.map((m) => (
-                    <div key={m.map} className="flex items-center gap-4 py-3 border-b border-white/[0.06]">
-                      <span className="flex-1 font-medium">{mapName(m.map)}</span>
-                      <span className="text-[13px] text-fg-3">
-                        {m.wins}/{m.played}
-                      </span>
-                      <span className={cn("num w-12 text-right font-semibold", ratingColor(m.rating))}>{fmt.r(m.rating)}</span>
+                    <div key={m.map} className="border-b border-white/[0.06] py-3.5 last:border-0">
+                      <div className="flex items-center gap-4">
+                        <span className="flex-1 font-semibold text-fg">{mapName(m.map)}</span>
+                        <span className="num text-[13px] text-fg-3">
+                          {m.wins}/{m.played} побед
+                        </span>
+                        <span className={cn("num w-12 text-right font-semibold", ratingColor(m.rating))}>{fmt.r(m.rating)}</span>
+                      </div>
+                      <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className={cn("h-full rounded-full bg-current opacity-70", ratingColor(m.rating))} style={{ width: `${Math.min(100, (m.rating / 1.6) * 100)}%` }} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -228,7 +260,7 @@ export function PlayerProfile({
             </section>
             <section className={cn(CARD, "p-6 lg:p-8")}>
               <SectionHead title="Достижения" />
-              <p className="text-fg-3">Первые трофеи впереди.</p>
+              <p className="text-[14px] text-fg-3">Первые трофеи впереди.</p>
             </section>
           </div>
         </div>

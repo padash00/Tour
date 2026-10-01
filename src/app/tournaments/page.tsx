@@ -39,7 +39,7 @@ export default async function TournamentsPage() {
         <section className="mt-16 lg:mt-20">
           <SectionHead>Следующие турниры</SectionHead>
           {upcoming.length > 0 ? (
-            <div className="border-t border-white/[0.06]">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-1.5">
               {upcoming.map((t) => (
                 <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
               ))}
@@ -57,7 +57,7 @@ export default async function TournamentsPage() {
             <SectionHead action={<Link href="/stats" className="text-[14px] text-fg-3 hover:text-fg">Статистика →</Link>}>
               Архив
             </SectionHead>
-            <div className="border-t border-white/[0.06]">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-1.5">
               {archive.map((t) => (
                 <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
               ))}

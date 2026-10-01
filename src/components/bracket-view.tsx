@@ -5,26 +5,37 @@ import type { Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
 import { Eyebrow } from "./primitives";
 import { TeamLogo, cn } from "./ui";
+import { BracketHover } from "./competition/bracket-hover";
 
 // размеры сетки
-const W = 248; // ширина карточки матча
-const H = 74; // высота карточки
+const W = 256; // ширина карточки матча
+const H = 78; // высота карточки
 const GAP_Y = 18; // зазор между матчами первого раунда
 const GAP_X = 72; // расстояние между колонками (место под линии)
-const HEAD = 34; // заголовок колонки
+const HEAD = 46; // заголовок колонки
 
 function Slot({ team, score, winner, loser, showScore }: { team: Team | null; score: number; winner: boolean; loser: boolean; showScore: boolean }) {
   return (
     <div
+      data-team={team?.id}
       className={cn(
-        "relative flex items-center gap-2 h-[29px] px-3",
-        winner ? "text-fg" : loser ? "text-fg-3" : team ? "text-fg-2" : "text-fg-3",
+        "relative flex items-center gap-2.5 h-[31px] px-3 rounded-[6px] transition-[opacity,background-color] duration-150",
+        winner ? "text-fg" : loser ? "text-fg-3" : team ? "text-fg-2" : "text-fg-4",
       )}
     >
-      {winner && <span className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full bg-accent" />}
-      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={18} /> : <span className="size-[18px] rounded-[5px] bg-white/[0.04]" />}
+      {winner && <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-accent" />}
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={20} /> : <span className="size-5 rounded-[5px] border border-dashed border-white/[0.1]" />}
       <span className={cn("flex-1 truncate text-[14px]", winner && "font-semibold")}>{team?.name ?? "TBD"}</span>
-      {showScore && <span className={cn("num text-[13px] w-4 text-right", winner ? "text-fg font-semibold" : "text-fg-3")}>{score}</span>}
+      {showScore && (
+        <span
+          className={cn(
+            "num grid h-6 min-w-6 place-items-center rounded-[5px] px-1 text-[13px]",
+            winner ? "bg-accent/15 text-accent font-semibold" : "text-fg-3",
+          )}
+        >
+          {score}
+        </span>
+      )}
     </div>
   );
 }
@@ -34,7 +45,7 @@ function Node({ m }: { m: MatchWithTeams }) {
   const bye = m.is_walkover && (!m.team1_id || !m.team2_id);
   if (m.status === "cancelled" || bye) {
     return (
-      <div className="h-full rounded-[8px] border border-dashed border-white/[0.08] px-3 flex items-center text-[11px] text-fg-3">
+      <div className="h-full rounded-[10px] border border-dashed border-white/[0.08] px-3 flex items-center text-[11px] text-fg-3">
         #{m.number} · {bye ? `${(m.team1 ?? m.team2)?.name ?? "—"} проходит дальше` : "пустой матч"}
       </div>
     );
@@ -44,13 +55,17 @@ function Node({ m }: { m: MatchWithTeams }) {
   return (
     <Link
       href={`/matches/${m.id}`}
+      data-node=""
       className={cn(
-        "block h-full rounded-[8px] border bg-[#0b1420] transition-colors hover:bg-[#0f1a28]",
-        live ? "border-danger/50" : "border-white/[0.08] hover:border-white/[0.18]",
+        "block h-full rounded-[10px] border bg-[#0b1420] px-1 transition-[border-color,background-color] duration-150 hover:bg-[#0f1a28]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+        live ? "border-live/50 shadow-[0_0_0_1px_#ff5d6322]" : "border-white/[0.08] hover:border-white/[0.2]",
       )}
     >
-      <div className="flex items-center justify-between px-3 h-[16px] pt-1 text-[10px] text-fg-3">
-        <span>BO{m.best_of}</span>
+      <div className="flex items-center justify-between px-2 h-[14px] pt-1 text-[10px] text-fg-3">
+        <span className="num">
+          #{m.number} · BO{m.best_of}
+        </span>
         <MatchStatusBadge status={m.status} compact />
       </div>
       <Slot team={m.team1} score={m.team1_score} winner={finished && m.winner_id === m.team1_id} loser={finished && m.winner_id !== m.team1_id} showScore={showScore} />
@@ -120,22 +135,34 @@ function Section({
   return (
     <section>
       <Eyebrow className="mb-5">{title}</Eyebrow>
-      <div className="overflow-x-auto pb-4 -mx-4 px-4">
+      <div className="overflow-x-auto pb-4 -mx-5 px-5 sm:-mx-8 sm:px-8 [mask-image:linear-gradient(90deg,transparent,#000_20px,#000_calc(100%-32px),transparent)] lg:[mask-image:none]">
         <div className="relative" style={{ width, height }}>
           <svg className="absolute inset-0 pointer-events-none" width={width} height={height} aria-hidden>
             {lines.map((l) => (
-              <path key={l.key} d={l.d} fill="none" stroke={l.done ? "#8ab8ff66" : "#ffffff1a"} strokeWidth="1" />
+              <path key={l.key} d={l.d} fill="none" stroke={l.done ? "#8ab8ff73" : "#ffffff1f"} strokeWidth="1.25" strokeLinejoin="round" />
             ))}
           </svg>
-          {rounds.map((r, col) => (
-            <div
-              key={r}
-              className="absolute text-[11px] uppercase tracking-[0.2em] text-fg-3 whitespace-nowrap"
-              style={{ left: col * (W + GAP_X), top: 0, width: W }}
-            >
-              {roundTitle(matches.find((m) => m.round === r)?.bracket ?? side, r, totalUpper, totalLower)}
-            </div>
-          ))}
+          {rounds.map((r, col) => {
+            const inRound = matches.filter((m) => m.round === r);
+            const done = inRound.every((m) => m.status === "finished" || m.status === "cancelled");
+            const live = inRound.some((m) => m.status === "live" || m.status === "veto" || m.status === "ready");
+            return (
+              <div
+                key={r}
+                className={cn(
+                  "absolute flex h-8 items-center justify-between rounded-[8px] border px-3 text-[11px] uppercase tracking-[0.2em] whitespace-nowrap",
+                  live ? "border-live/40 text-fg" : done ? "border-white/[0.06] text-fg-3" : "border-white/[0.1] text-fg-2",
+                )}
+                style={{ left: col * (W + GAP_X), top: 0, width: W }}
+              >
+                <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower)}</span>
+                <span className="num normal-case tracking-normal text-fg-3">
+                  {live && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" />}
+                  {inRound.length}
+                </span>
+              </div>
+            );
+          })}
           {all.map((p) => (
             <div key={p.m.id} className="absolute" style={{ left: p.x, top: p.y, width: W, height: H }}>
               <Node m={p.m} />
@@ -161,7 +188,9 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const upperWithFinal = gf.length ? [...upper, ...gf.map((m) => ({ ...m, round: totalUpper + 1 }))] : upper;
 
   return (
+    <BracketHover>
     <div className="space-y-14">
+      <p className="-mb-8 text-[13px] text-fg-3">Наведите на команду, чтобы увидеть её путь по сетке.</p>
       <Section
         title={lower.length ? "Верхняя сетка" : "Плей-офф"}
         matches={upperWithFinal}
@@ -170,5 +199,6 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
       />
       {lower.length > 0 && <Section title="Нижняя сетка" matches={lower} totalUpper={totalUpper} totalLower={totalLower} />}
     </div>
+    </BracketHover>
   );
 }

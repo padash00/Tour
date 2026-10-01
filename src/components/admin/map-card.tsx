@@ -1,9 +1,20 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { removeMapImage, toggleMapEnabled, uploadMapImage } from "@/app/actions/admin-settings";
 import { MapTile } from "@/components/competition/map-tile";
+import type { ActionResult } from "@/components/forms";
+import { useToast } from "@/components/toast";
 import { cn } from "@/components/ui";
+
+/** Результат действия — уведомлением в углу */
+function useResultToast(state: ActionResult) {
+  const toast = useToast();
+  useEffect(() => {
+    if (state?.error) toast.error(state.error);
+    else if (state?.success) toast.success(state.success);
+  }, [state, toast]);
+}
 
 /** Карта в «Настройки → Карты»: превью, загрузка картинки по клику, доступна/скрыта */
 export function MapCard({
@@ -18,14 +29,23 @@ export function MapCard({
   toggleable?: boolean;
 }) {
   const [upState, upload, uploading] = useActionState(uploadMapImage, null);
-  const [, remove] = useActionState(removeMapImage, null);
-  const [, toggle, toggling] = useActionState(toggleMapEnabled, null);
+  const [rmState, remove, removing] = useActionState(removeMapImage, null);
+  const [tgState, toggle, toggling] = useActionState(toggleMapEnabled, null);
+  useResultToast(upState);
+  useResultToast(rmState);
+  useResultToast(tgState);
   const fileRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <div className={cn("space-y-2", !enabled && "opacity-55")}>
-      <button type="button" onClick={() => fileRef.current?.click()} className="block w-full text-left" title="Загрузить картинку">
+    <div className={cn("space-y-2 transition-opacity", !enabled && "opacity-55")}>
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+        title="Загрузить картинку"
+        aria-label={`${image ? "Сменить" : "Загрузить"} картинку карты`}
+      >
         <MapTile map={map} image={image} caption={uploading ? "загрузка…" : image ? "сменить картинку" : "загрузить картинку"} interactive />
       </button>
       <form ref={formRef} action={upload} className="hidden">
@@ -45,8 +65,9 @@ export function MapCard({
             <button
               type="submit"
               disabled={toggling}
+              aria-pressed={enabled}
               className={cn(
-                "inline-flex items-center gap-1.5 h-7 px-2 rounded-md transition",
+                "inline-flex h-8 items-center gap-1.5 rounded-md px-2 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
                 enabled ? "text-ok hover:bg-white/[0.04]" : "text-fg-3 hover:bg-white/[0.04]",
               )}
             >
@@ -60,13 +81,16 @@ export function MapCard({
         {image && (
           <form action={remove}>
             <input type="hidden" name="map" value={map} />
-            <button type="submit" className="h-7 px-2 rounded-md text-fg-3 hover:text-danger hover:bg-white/[0.04]">
+            <button
+              type="submit"
+              disabled={removing}
+              className="h-8 rounded-md px-2 text-fg-3 transition-colors hover:bg-white/[0.04] hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
               убрать картинку
             </button>
           </form>
         )}
       </div>
-      {upState?.error && <p className="text-[12px] text-danger">{upState.error}</p>}
     </div>
   );
 }

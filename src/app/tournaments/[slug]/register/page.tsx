@@ -9,8 +9,12 @@ import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
-import { Avatar, ButtonLink, FaceitLevel, Notice, Pill, TeamLogo } from "@/components/ui";
-import { Flow, FlowHeader, Step } from "@/components/primitives";
+import { Avatar, FaceitLevel, IconArrow, TeamLogo } from "@/components/ui";
+import { Button, Flow, FlowHeader, StatusChip, Step } from "@/components/primitives";
+import { Callout } from "@/components/public/callout";
+import type { RegistrationStatus } from "@/lib/types";
+
+const regTone = (s: RegistrationStatus) => (s === "approved" ? "ok" : s === "pending" ? "warn" : s === "rejected" ? "danger" : "muted");
 
 export const metadata: Metadata = { title: "Регистрация на турнир" };
 
@@ -45,23 +49,27 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
               </div>
             </div>
             {soloReg && (
-              <Pill tone={soloReg.status === "approved" ? "ok" : soloReg.status === "pending" ? "warn" : "neutral"}>
+              <StatusChip tone={regTone(soloReg.status)} size="sm">
                 {registrationStatusLabel[soloReg.status]}
-              </Pill>
+              </StatusChip>
             )}
           </div>
         </Step>
         <Step n={2} title="Подтверждение" done={!!soloActive}>
           {soloReg?.status === "rejected" && soloReg.note && (
             <div className="mb-4">
-              <Notice tone="danger">Причина отказа: {soloReg.note}</Notice>
+              <Callout tone="danger" title="Заявка отклонена">
+                {soloReg.note}
+              </Callout>
             </div>
           )}
           {t.status !== "registration" ? (
-            <Notice>Регистрация закрыта.</Notice>
+            <Callout>Регистрация закрыта.</Callout>
           ) : soloActive ? (
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="text-sm text-fg-2">Заявка подана.</span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <Callout tone="ok" className="flex-1">
+                {soloReg.status === "approved" ? "Вы в турнире. Ждём вас на check-in." : "Заявка подана — администратор скоро её рассмотрит."}
+              </Callout>
               <ActionForm action={withdrawRegistration}>
                 <input type="hidden" name="tournamentId" value={t.id} />
                 <SubmitButton variant="ghost" size="sm" confirm="Отменить участие в турнире?">
@@ -72,7 +80,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           ) : (
             <ActionForm action={registerTeam}>
               <input type="hidden" name="tournamentId" value={t.id} />
-              <SubmitButton size="lg" className="w-full" pendingText="Отправляем…">
+              <SubmitButton size="lg" className="h-[56px] w-full text-[16px]" pendingText="Отправляем…">
                 Подать заявку
               </SubmitButton>
             </ActionForm>
@@ -91,7 +99,9 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         <FlowHeader back={back} title={`Регистрация на ${t.name}`} description={description} />
         <Step n={1} title="Команда">
           <p className="text-sm text-fg-2 mb-5">Создайте команду и пригласите игроков по ссылке — затем капитан подаёт заявку.</p>
-          <ButtonLink href="/team/create">Создать команду</ButtonLink>
+          <Button href="/team/create" size="lg" iconRight={<IconArrow />}>
+            Создать команду
+          </Button>
         </Step>
         <Step n={2} title="Состав" muted />
         <Step n={3} title="Подтверждение" muted />
@@ -132,16 +142,16 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             </div>
           </div>
           {reg && (
-            <Pill tone={reg.status === "approved" ? "ok" : reg.status === "pending" ? "warn" : "neutral"}>
+            <StatusChip tone={regTone(reg.status)} size="sm">
               {registrationStatusLabel[reg.status]}
-            </Pill>
+            </StatusChip>
           )}
         </div>
       </Step>
 
       {!isCaptain ? (
         <Step n={2} title="Состав">
-          <Notice>Заявку подаёт капитан команды.</Notice>
+          <Callout>Заявку подаёт капитан команды — вам ничего делать не нужно.</Callout>
           {reg?.roster.length ? (
             <div className="mt-4">
               <RosterList
@@ -154,9 +164,9 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         <>
           <Step n={2} title={`Нужно минимум ${mainPlayersLabel(mode.size)}`}>
             <p className="text-sm text-fg-2 mb-5">Сейчас в команде {members.length}. Пригласите игроков по ссылке со страницы команды.</p>
-            <ButtonLink href="/team" variant="secondary">
+            <Button href="/team" variant="secondary" size="md" iconRight={<IconArrow />}>
               Пригласить игроков
-            </ButtonLink>
+            </Button>
           </Step>
           <Step n={3} title="Подтверждение" muted />
         </>
@@ -165,7 +175,9 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           <input type="hidden" name="tournamentId" value={t.id} />
           {reg?.status === "rejected" && reg.note && (
             <div className="py-4">
-              <Notice tone="danger">Причина отказа: {reg.note}</Notice>
+              <Callout tone="danger" title="Заявка отклонена">
+                {reg.note}
+              </Callout>
             </div>
           )}
           <Step n={2} title="Состав">
@@ -188,12 +200,12 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           </Step>
           <Step n={3} title="Подтверждение" done={!!active}>
             {active && (
-              <p className="mb-4 text-sm text-fg-3">
+              <Callout tone={reg.status === "approved" ? "ok" : "neutral"} className="mb-5">
                 {reg.status === "approved" ? "Заявка одобрена." : "Заявка ждёт решения администратора."} Состав можно менять, пока открыта
                 регистрация.
-              </p>
+              </Callout>
             )}
-            <SubmitButton size="lg" className="w-full" pendingText="Сохраняем…">
+            <SubmitButton size="lg" className="h-[56px] w-full text-[16px]" pendingText="Сохраняем…">
               {active ? "Сохранить состав" : "Подать заявку"}
             </SubmitButton>
           </Step>
@@ -211,7 +223,8 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       )}
 
       {active && canEdit && (
-        <div className="pt-8 mt-8 border-t border-line">
+        <div className="mt-6 flex items-center justify-between gap-4 rounded-[12px] border border-white/[0.06] px-6 py-4">
+          <span className="text-[13px] text-fg-3">Передумали участвовать?</span>
           <ActionForm action={withdrawRegistration}>
             <input type="hidden" name="tournamentId" value={t.id} />
             <SubmitButton variant="ghost" size="sm" confirm="Отозвать заявку команды?">

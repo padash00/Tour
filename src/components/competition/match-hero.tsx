@@ -32,6 +32,7 @@ export function MatchHero({
       <div className="pointer-events-none absolute inset-0">
         <Image src="/home/tournament.jpg" alt="" fill priority sizes="100vw" className="object-cover object-[60%_35%] opacity-45" />
         <div className="absolute inset-0 bg-gradient-to-b from-bg/70 via-bg/80 to-bg" />
+        {live && <div className="absolute inset-0 bg-[radial-gradient(600px_280px_at_50%_55%,#ff5d6314,transparent_70%)]" />}
       </div>
       <div className={cn(WRAP, "relative pt-10 pb-14 lg:pb-20")}>
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -54,8 +55,14 @@ export function MatchHero({
         <div className="mt-10 lg:mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-10 lg:gap-16">
           <TeamSide team={m.team1} align="left" winner={finished && m.winner_id === m.team1_id} dim={finished && m.winner_id !== m.team1_id} />
           <div className="text-center">
+            {live && (
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-live/40 bg-live/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-live">
+                <span className="size-1.5 rounded-full bg-live animate-pulse" />
+                Live
+              </div>
+            )}
             {finished || live ? (
-              <div className="num text-[48px] sm:text-[80px] lg:text-[112px] font-semibold tracking-[-0.04em] leading-none">
+              <div className={cn("num font-semibold tracking-[-0.04em] leading-none", live ? "text-[56px] sm:text-[96px] lg:text-[136px]" : "text-[48px] sm:text-[80px] lg:text-[112px]")}>
                 <span className={cn(finished && m.winner_id !== m.team1_id && "text-fg-3")}>{m.team1_score}</span>
                 <span className="text-fg-3/50 mx-2 sm:mx-5">:</span>
                 <span className={cn(finished && m.winner_id !== m.team2_id && "text-fg-3")}>{m.team2_score}</span>
@@ -65,7 +72,7 @@ export function MatchHero({
             )}
             {current && live && (
               <div className="mt-4 inline-flex items-center gap-2 text-[14px] lg:text-[16px] text-fg-2">
-                <span className="size-1.5 rounded-full bg-danger animate-pulse" />
+                <span className="size-1.5 rounded-full bg-live animate-pulse" />
                 {mapName(current.map_name)} · <span className="num">{current.team1_score}:{current.team2_score}</span>
               </div>
             )}

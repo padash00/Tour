@@ -16,24 +16,21 @@ import { GroupStageView, SwissView } from "@/components/stage-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 
 import { MapTile } from "@/components/competition/map-tile";
+import { TournamentLifecycle, nextStepText } from "@/components/competition/tournament-lifecycle";
 import Image from "next/image";
-import { tournamentStatusLabel } from "@/lib/format";
-import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "@/components/primitives";
 import {
-  Avatar,
-  ButtonLink,
-
-  EmptyState,
-  FaceitLevel,
-  IconArrow,
-  KV,
-
-  Notice,
-  Pill,
-  Tabs,
-  TeamLogo,
-  buttonClass,
-} from "@/components/ui";
+  Button,
+  EmptyCard,
+  Eyebrow,
+  OutlineBtn,
+  PrimaryBtn,
+  StatusChip,
+  TournamentStatusChip,
+  WRAP,
+  btnClass,
+} from "@/components/primitives";
+import { Callout, MobileStickyCta } from "@/components/public/callout";
+import { Avatar, FaceitLevel, IconArrow, KV, Tabs, TeamLogo } from "@/components/ui";
 
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
@@ -99,7 +96,9 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           </div>
           {t.status === "draft" && (
             <div className="mt-6 max-w-2xl">
-              <Notice tone="warn">Черновик — страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать.</Notice>
+              <Callout tone="warn" title="Черновик">
+                Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.
+              </Callout>
             </div>
           )}
           <div className="mt-16 lg:mt-24 max-w-[900px]">
@@ -119,23 +118,16 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
                 </span>
               ))}
             </div>
-            <div className="mt-10 flex flex-wrap items-center gap-5">
-              <HeroCta t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} />
-              <span
-                className={`inline-flex h-10 items-center gap-2 rounded-[6px] border px-4 text-[14px] ${
-                  t.status === "registration"
-                    ? "text-ok border-ok/40 bg-ok/[0.08]"
-                    : t.status === "live"
-                      ? "text-danger border-danger/40 bg-danger/[0.08]"
-                      : t.status === "checkin"
-                        ? "text-warn border-warn/40 bg-warn/[0.08]"
-                        : "text-fg-2 border-white/15 bg-white/[0.03]"
-                }`}
-              >
-                <span className="size-1.5 rounded-full bg-current" />
-                {tournamentStatusLabel[t.status]}
+            <p className="mt-6 max-w-[640px] text-[16px] lg:text-[18px] text-fg-2">{nextStepText(t)}</p>
+            <div className="mt-8 flex flex-wrap items-center gap-5">
+              <span className="hidden sm:contents">
+                <HeroCta t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} />
               </span>
+              <TournamentStatusChip status={t.status} />
             </div>
+          </div>
+          <div className="mt-12 lg:mt-16 max-w-[1000px]">
+            <TournamentLifecycle t={t} />
           </div>
         </div>
         <div className={`${WRAP} relative`}>
@@ -167,9 +159,10 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
               (matches.length ? (
                 <StagesTab t={t} matches={matches} />
               ) : (
-                <EmptyState
+                <EmptyCard
+                  dashed
                   title="Сетка появится после check-in"
-                  description={`${bracketLabel[t.bracket_type] ?? t.bracket_type} на ${t.max_teams} ${solo ? "участников" : "команд"}. Посев будет опубликован после check-in.`}
+                  text={`${bracketLabel[t.bracket_type] ?? t.bracket_type} на ${t.max_teams} ${solo ? "участников" : "команд"}. Посев будет опубликован после check-in.`}
                 />
               ))}
             {tab === "matches" && <MatchesTab matches={matches} />}
@@ -179,12 +172,14 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
                 {t.rules ? (
                   <div className="prose-f16">{t.rules}</div>
                 ) : (
-                  <EmptyState
+                  <EmptyCard
+                    dashed
                     title="Регламент будет опубликован до начала регистрации"
+                    text="Пока действуют общие правила платформы."
                     action={
-                      <Link href="/rules" className="text-accent hover:text-accent-strong text-sm">
-                        Общие правила платформы →
-                      </Link>
+                      <Button href="/rules" variant="secondary" size="md" iconRight={<IconArrow />}>
+                        Общие правила
+                      </Button>
                     }
                   />
                 )}
@@ -229,7 +224,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
                   {t.entry_fee && <KV label="Взнос">{t.entry_fee}</KV>}
                   {t.contact && <KV label="Организатор">{t.contact}</KV>}
                   {t.discord_url && (
-                    <a href={t.discord_url} target="_blank" rel="noreferrer" className={buttonClass("secondary", "md", "mt-4 w-full")}>
+                    <a href={t.discord_url} target="_blank" rel="noreferrer" className={btnClass("secondary", "md", "mt-4 w-full")}>
                       Discord турнира ↗
                     </a>
                   )}
@@ -240,8 +235,20 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           )}
         </div>
       </div>
+      <MobileCta t={t} loggedIn={!!player} team={myTeam} isCaptain={isCaptain} reg={myReg} />
     </>
   );
+}
+
+/** На телефоне главная кнопка всегда под рукой — внизу экрана */
+function MobileCta(props: { t: Tournament; loggedIn: boolean; team: Team | null; isCaptain: boolean; reg: Registration | null }) {
+  const cta = <HeroCta {...props} full />;
+  const { t, reg } = props;
+  const shows =
+    (t.status === "checkin" && reg?.status === "approved" && !reg.checked_in_at) ||
+    (t.status === "registration" && !(reg && (reg.status === "pending" || reg.status === "approved")));
+  if (!shows) return null;
+  return <MobileStickyCta note={t.name}>{cta}</MobileStickyCta>;
 }
 
 /** Одна главная кнопка в шапке турнира — по состоянию участия */
@@ -251,23 +258,39 @@ function HeroCta({
   team,
   isCaptain,
   reg,
+  full,
 }: {
   t: Tournament;
   loggedIn: boolean;
   team: Team | null;
   isCaptain: boolean;
   reg: Registration | null;
+  /** растянуть на всю ширину (липкая панель на телефоне) */
+  full?: boolean;
 }) {
   const base = `/tournaments/${t.slug}`;
+  const wide = full ? "w-full min-w-0 lg:min-w-0" : undefined;
   const active = reg && (reg.status === "pending" || reg.status === "approved");
   if (t.status === "checkin" && reg?.status === "approved" && !reg.checked_in_at) {
-    return <PrimaryBtn href={`${base}/checkin`}>Пройти check-in</PrimaryBtn>;
+    return (
+      <PrimaryBtn href={`${base}/checkin`} className={wide}>
+        Пройти check-in
+      </PrimaryBtn>
+    );
   }
   if (t.status !== "registration" || active) return null;
   const solo = t.format === "1v1";
   const label = solo ? "Участвовать" : !team && loggedIn ? "Создать команду" : isCaptain || !loggedIn ? "Зарегистрировать команду" : "Заявку подаёт капитан";
   const href = !loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`;
-  return !team && loggedIn && !solo ? <OutlineBtn href={href}>{label}</OutlineBtn> : <PrimaryBtn href={href}>{label}</PrimaryBtn>;
+  return !team && loggedIn && !solo ? (
+    <OutlineBtn href={href} className={wide}>
+      {label}
+    </OutlineBtn>
+  ) : (
+    <PrimaryBtn href={href} className={wide}>
+      {label}
+    </PrimaryBtn>
+  );
 }
 
 function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, string> }) {
@@ -373,9 +396,10 @@ function TeamsTab({
 }) {
   if (approved.length === 0) {
     return (
-      <EmptyState
+      <EmptyCard
+        dashed
         title={solo ? "Пока нет участников" : "Пока нет одобренных команд"}
-        description={
+        text={
           pendingCount > 0
             ? `${pendingCount} ${pendingCount === 1 ? "заявка ожидает" : "заявки ожидают"} подтверждения.`
             : "Станьте первыми, кто подаст заявку."
@@ -391,6 +415,7 @@ function TeamsTab({
           {pendingCount > 0 && ` · ещё на рассмотрении: ${pendingCount}`}
         </div>
       </div>
+      <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 px-5 sm:px-7">
       {approved.map((r) => (
         <div key={r.id} className="py-6 border-b border-white/[0.06] last:border-0">
           <div className="flex items-center gap-4">
@@ -405,7 +430,11 @@ function TeamsTab({
                 {r.team.region ? ` · ${r.team.region}` : ""}
               </div>
             </div>
-            {r.checked_in_at && <Pill tone="ok">Check-in</Pill>}
+            {r.checked_in_at && (
+              <StatusChip tone="ok" size="sm">
+                Check-in
+              </StatusChip>
+            )}
           </div>
           {!solo && (
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 sm:pl-[64px]">
@@ -423,6 +452,7 @@ function TeamsTab({
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -451,21 +481,27 @@ function RegistrationBox({
     body = (
       <>
         <div className="flex items-center gap-4">
-          <Pill tone={reg.status === "approved" ? "ok" : "warn"}>{registrationStatusLabel[reg.status]}</Pill>
-          {reg.checked_in_at && <Pill tone="ok">Check-in пройден</Pill>}
+          <StatusChip tone={reg.status === "approved" ? "ok" : "warn"} size="sm">
+            {registrationStatusLabel[reg.status]}
+          </StatusChip>
+          {reg.checked_in_at && (
+            <StatusChip tone="ok" size="sm">
+              Check-in пройден
+            </StatusChip>
+          )}
         </div>
         <p className="mt-3 text-sm text-fg-2">
           {team?.name} {reg.status === "approved" ? "участвует в турнире." : "ждёт решения администратора."}
         </p>
         {t.status === "checkin" && reg.status === "approved" && !reg.checked_in_at && (
-          <ButtonLink href={`${base}/checkin`} className="mt-5 w-full">
+          <Button href={`${base}/checkin`} size="md" className="mt-5 w-full">
             Пройти check-in
-          </ButtonLink>
+          </Button>
         )}
         {isCaptain && t.status === "registration" && (
-          <ButtonLink href={`${base}/register`} variant="secondary" className="mt-5 w-full">
+          <Button href={`${base}/register`} variant="secondary" size="md" className="mt-5 w-full">
             Управлять заявкой
-          </ButtonLink>
+          </Button>
         )}
       </>
     );
@@ -482,12 +518,14 @@ function RegistrationBox({
         {t.registration_closes_at && <div className="mt-3 text-[13px] text-fg-3">до {formatDateTime(t.registration_closes_at)}</div>}
         {reg?.status === "rejected" && (
           <div className="mt-4">
-            <Notice tone="danger">Предыдущая заявка отклонена{reg.note ? `: ${reg.note}` : "."}</Notice>
+            <Callout tone="danger">Предыдущая заявка отклонена{reg.note ? `: ${reg.note}` : "."}</Callout>
           </div>
         )}
-        <ButtonLink
+        <Button
           href={!loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`}
+          size="md"
           className="mt-5 w-full"
+          iconRight={<IconArrow />}
         >
           {solo
             ? loggedIn
@@ -500,8 +538,7 @@ function RegistrationBox({
                 : isCaptain
                   ? "Зарегистрировать команду"
                   : "Заявку подаёт капитан"}
-          <IconArrow />
-        </ButtonLink>
+        </Button>
       </>
     );
   } else {
@@ -523,7 +560,7 @@ function RegistrationBox({
 function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
   const list = visibleMatches(matches);
   if (list.length === 0) {
-    return <EmptyState title="Матчей пока нет" description="Расписание появится вместе с сеткой турнира." />;
+    return <EmptyCard dashed title="Матчей пока нет" text="Расписание появится вместе с сеткой турнира." />;
   }
   // предстоящие — по дням расписания, без времени — отдельной группой
   const upcoming = list
@@ -547,7 +584,7 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
         .map((g) => (
           <section key={g.title}>
             <Eyebrow className="mb-4">{g.title}</Eyebrow>
-            <div className="-mx-4">
+            <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 px-1 py-1">
               {g.items.map((m) => (
                 <MatchRow key={m.id} m={m} stage={matchStage(m, matches)} />
               ))}
@@ -562,7 +599,11 @@ async function StatsTab({ tournamentId }: { tournamentId: string }) {
   const rows = await getPlayerLeaderboard(tournamentId);
   return (
     <div className="space-y-10">
-      {rows.length ? <PlayerStatsTable rows={rows} /> : <EmptyState title="Статистика появится после первого матча" />}
+      {rows.length ? (
+        <PlayerStatsTable rows={rows} />
+      ) : (
+        <EmptyCard dashed title="Статистика появится после первого матча" text="Убийства, ADR, KAST и F16 Rating считаются с наших серверов автоматически." />
+      )}
       <RatingExplainer />
     </div>
   );
@@ -639,7 +680,7 @@ async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<Retur
       ) : (
         hasStage &&
         (t.bracket_type === "groups_playoff" || t.bracket_type === "swiss_playoff") && (
-          <EmptyState compact title="Плей-офф" description="Сетка плей-офф появится автоматически после групповой стадии." />
+          <EmptyCard dashed title="Плей-офф" text="Сетка плей-офф появится автоматически после групповой стадии." />
         )
       )}
     </div>

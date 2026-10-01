@@ -26,7 +26,7 @@ export function RosterPicker({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-6 text-[13px] uppercase tracking-[0.16em]">
+      <div className="mb-4 flex flex-wrap gap-6 text-[12px] font-medium uppercase tracking-[0.18em]" aria-live="polite">
         <span className={mains === size ? "text-ok" : "text-warn"}>
           Основа {mains}/{size}
         </span>
@@ -52,16 +52,19 @@ export function RosterPicker({
               {m.banned ? (
                 <span className="text-xs text-danger">заблокирован</span>
               ) : (
-                <div className="inline-flex rounded-[8px] border border-white/[0.08] bg-[#09111b] p-1">
+                <div role="radiogroup" aria-label={`Роль: ${m.nickname}`} className="inline-flex rounded-[9px] border border-white/[0.08] bg-[#09111b] p-1">
                   {options.map((o) => (
                     <button
                       key={o.v}
                       type="button"
+                      role="radio"
+                      aria-checked={s === o.v}
                       disabled={o.disabled}
                       onClick={() => set(m.player_id, o.v)}
                       className={cn(
-                        "h-9 px-4 rounded-[6px] text-[13px] font-medium transition disabled:opacity-30",
-                        s === o.v ? (o.v === "main" ? "bg-accent text-[#07101b]" : "bg-white/[0.08] text-fg") : "text-fg-3 hover:text-fg-2",
+                        "h-10 rounded-[7px] px-4 text-[13px] font-medium transition-colors duration-150 disabled:opacity-30",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+                        s === o.v ? (o.v === "main" ? "bg-accent text-accent-ink" : "bg-white/[0.1] text-fg") : "text-fg-3 hover:text-fg-2",
                       )}
                     >
                       {o.label}

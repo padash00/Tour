@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { tournamentStatusLabel } from "@/lib/format";
 import type { MatchStatus, TournamentStatus } from "@/lib/types";
 import { cn } from "../ui";
@@ -69,28 +69,93 @@ export function SectionLink({ href, children }: { href: string; children: ReactN
 
 // ───────────────────────── кнопки
 
-type BtnVariant = "primary" | "outline" | "ghost" | "danger";
-type BtnSize = "md" | "lg";
+/*
+ * Система кнопок: варианты primary / secondary / outline / ghost / danger,
+ * размеры sm 36 · md 44 · lg 52 (60 на десктопе — как на главной) · xl 60.
+ */
+export type BtnVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+export type BtnSize = "sm" | "md" | "lg" | "xl";
 
 const BTN_BASE =
-  "inline-flex items-center justify-center gap-3 rounded-[8px] font-semibold whitespace-nowrap select-none transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50";
+  "relative inline-flex items-center justify-center font-semibold whitespace-nowrap select-none " +
+  "transition-[background-color,border-color,color,transform,box-shadow] duration-150 ease-out active:scale-[0.985] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg " +
+  "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const BTN_VARIANT: Record<BtnVariant, string> = {
-  primary: "bg-accent text-[#07101b] hover:bg-accent-strong",
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed shadow-[0_1px_0_0_#ffffff40_inset]",
+  secondary: "border border-white/[0.14] bg-white/[0.03] text-fg hover:border-white/[0.26] hover:bg-white/[0.06]",
   outline: "border border-white/25 text-fg hover:border-white/45 hover:bg-white/[0.03]",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.04]",
-  danger: "border border-danger/40 bg-danger/[0.08] text-danger hover:bg-danger/[0.14]",
+  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
+  danger: "border border-danger/40 bg-danger/[0.08] text-danger hover:border-danger/60 hover:bg-danger/[0.14]",
 };
 
 const BTN_SIZE: Record<BtnSize, string> = {
+  sm: "h-9 gap-1.5 rounded-[7px] px-3.5 text-[13px]",
+  md: "h-11 gap-2 rounded-[8px] px-5 text-[14px]",
   // крупная — как на главной
-  lg: "h-[52px] lg:h-[60px] px-8 text-[15px] lg:text-[17px]",
-  md: "h-11 px-5 text-[14px]",
+  lg: "h-[52px] gap-3 rounded-[8px] px-8 text-[15px] lg:h-[60px] lg:text-[17px]",
+  xl: "h-[60px] gap-3 rounded-[9px] px-9 text-[17px]",
 };
 
 /** Классы кнопки — для <button>, <a> и форм */
 export function btnClass(variant: BtnVariant = "primary", size: BtnSize = "lg", extra?: string) {
   return cn(BTN_BASE, BTN_VARIANT[variant], BTN_SIZE[size], extra);
+}
+
+function BtnSpinner() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 animate-[spin_.7s_linear_infinite]" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Универсальная кнопка: с href — ссылка, без — <button>.
+ * iconLeft / iconRight — иконки по краям, loading — индикатор вместо левой иконки.
+ */
+export function Button({
+  href,
+  variant = "primary",
+  size = "md",
+  iconLeft,
+  iconRight,
+  loading,
+  className,
+  children,
+  ...rest
+}: {
+  href?: string;
+  variant?: BtnVariant;
+  size?: BtnSize;
+  iconLeft?: ReactNode;
+  iconRight?: ReactNode;
+  loading?: boolean;
+  className?: string;
+  children?: ReactNode;
+} & Omit<ComponentProps<"button">, "className" | "children">) {
+  const inner = (
+    <>
+      {loading ? <BtnSpinner /> : iconLeft}
+      {children}
+      {iconRight}
+    </>
+  );
+  const cls = btnClass(variant, size, className);
+  if (href) {
+    return (
+      <Link href={href} className={cls} aria-disabled={rest.disabled || loading || undefined}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" {...rest} disabled={rest.disabled || loading} aria-busy={loading || undefined} className={cls}>
+      {inner}
+    </button>
+  );
 }
 
 export function PrimaryBtn({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
@@ -339,6 +404,87 @@ export function MatchStatusChip({ status, size = "sm" }: { status: MatchStatus; 
     </StatusChip>
   );
 }
+
+// ───────────────────────── поля ввода
+
+/** Классы поля: .field из globals.css (44px, фокус — акцентная рамка) */
+export function fieldClass(extra?: string) {
+  return cn("field", extra);
+}
+
+/** Подпись над полем, подсказка и ошибка под ним */
+export function FormField({
+  label,
+  hint,
+  error,
+  children,
+  className,
+}: {
+  label: ReactNode;
+  hint?: ReactNode;
+  error?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-2 block text-[11px] font-medium uppercase tracking-[0.2em] text-fg-3">{label}</span>
+      {children}
+      {error ? (
+        <span className="mt-1.5 block text-[12px] text-danger">{error}</span>
+      ) : hint ? (
+        <span className="mt-1.5 block text-[12px] leading-snug text-fg-3">{hint}</span>
+      ) : null}
+    </label>
+  );
+}
+
+export function Input({ className, ...props }: ComponentProps<"input">) {
+  return <input {...props} className={fieldClass(className)} />;
+}
+
+export function Select({ className, ...props }: ComponentProps<"select">) {
+  return <select {...props} className={fieldClass(className)} />;
+}
+
+export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
+  return <textarea {...props} className={fieldClass(cn("resize-y", className))} />;
+}
+
+// ───────────────────────── мелочи
+
+/** Клавиша: <Kbd>Esc</Kbd> */
+export function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="kbd">{children}</kbd>;
+}
+
+/** Подсказка при наведении/фокусе — без JS */
+export function Tooltip({ text, children, side = "top" }: { text: ReactNode; children: ReactNode; side?: "top" | "bottom" }) {
+  return (
+    <span className="group/tip relative inline-flex">
+      {children}
+      <span
+        role="tooltip"
+        className={cn(
+          "pointer-events-none absolute left-1/2 z-50 w-max max-w-[260px] -translate-x-1/2 rounded-[7px] border border-white/[0.1] bg-surface-4 px-2.5 py-1.5",
+          "text-[12px] leading-snug text-fg opacity-0 shadow-[var(--shadow-pop)] transition-opacity duration-150",
+          "group-hover/tip:opacity-100 group-focus-within/tip:opacity-100",
+          side === "top" ? "bottom-full mb-2" : "top-full mt-2",
+        )}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
+/** Скелетон загрузки */
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("skeleton", className)} />;
+}
+
+/** Размеры аватаров и логотипов — единая шкала */
+export const AVATAR_SIZE = { xs: 24, sm: 32, md: 40, lg: 56, xl: 96, hero: 128 } as const;
 
 // ───────────────────────── сфокусированный сценарий (регистрация, check-in)
 

@@ -74,8 +74,18 @@ export function VetoBoard({
               <ActionForm key={map} action={vetoAct}>
                 <input type="hidden" name="matchId" value={m.id} />
                 <input type="hidden" name="map" value={map} />
-                <button type="submit" className="w-full block">
-                  <MapTile map={map} state={state_} caption={caption} interactive image={images[map]} />
+                <button
+                  type="submit"
+                  aria-label={`${state.current?.action === "pick" ? "Пик" : "Бан"}: ${map}`}
+                  className="group/map block w-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                >
+                  <MapTile
+                    map={map}
+                    state={state_}
+                    caption={state.current?.action === "pick" ? "Нажмите — пик" : "Нажмите — бан"}
+                    interactive
+                    image={images[map]}
+                  />
                 </button>
               </ActionForm>
             ) : (

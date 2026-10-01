@@ -4,7 +4,7 @@ import { getCurrentPlayer } from "@/lib/auth";
 import { safeNext } from "@/lib/redirect";
 import { BrandLogo } from "@/components/brand";
 import { IconSteam, Notice } from "@/components/ui";
-import { Eyebrow } from "@/components/primitives";
+import { Eyebrow, btnClass } from "@/components/primitives";
 
 export const metadata: Metadata = { title: "Вход" };
 
@@ -36,7 +36,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
           </div>
         )}
 
-        <a href={`/api/auth/steam?next=${encodeURIComponent(next)}`} className="mt-10 inline-flex h-[60px] w-full items-center justify-center gap-3 rounded-[8px] bg-accent text-[17px] font-semibold text-[#07101b] transition-colors hover:bg-accent-strong">
+        <a href={`/api/auth/steam?next=${encodeURIComponent(next)}`} className={btnClass("primary", "xl", "mt-10 w-full")}>
           <IconSteam className="size-5" />
           Войти через Steam
         </a>
