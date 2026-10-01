@@ -15,6 +15,7 @@ import { averageElo, getTournamentById, getTournamentRegistrations, type Registr
 import { formatDateTime, registrationStatusLabel, tournamentStatusLabel } from "@/lib/format";
 import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
+import { prefetchMaps, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
@@ -102,6 +103,41 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             </ActionForm>
           ))}
         </div>
+      </Card>
+
+      <Card className={cn("p-6", t.autopilot && "border-[#6cc59a44]")}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-2">
+              <div className="label">Автопилот</div>
+              {t.autopilot ? <Pill tone="ok" dot>включён</Pill> : <Pill>выключен</Pill>}
+            </div>
+            <p className="mt-2 text-sm text-fg-2">
+              Сайт сам запускает вето, как только соперники известны, и отправляет готовые матчи на свободные серверы — по
+              расписанию (за 10 минут до начала) или по порядку номеров. Работает, пока турнир в статусе check-in или «идёт».
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionForm action={setAutopilot}>
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <input type="hidden" name="on" value={t.autopilot ? "0" : "1"} />
+              <SubmitButton variant={t.autopilot ? "secondary" : "primary"}>
+                {t.autopilot ? "Выключить автопилот" : "Включить автопилот"}
+              </SubmitButton>
+            </ActionForm>
+            {t.map_pool.some((m) => m.includes("@")) && (
+              <ActionForm action={prefetchMaps}>
+                <input type="hidden" name="tournamentId" value={t.id} />
+                <SubmitButton variant="ghost">Прогреть карты</SubmitButton>
+              </ActionForm>
+            )}
+          </div>
+        </div>
+        {t.map_pool.some((m) => m.includes("@")) && (
+          <p className="mt-3 text-xs text-fg-3">
+            Карты из Workshop скачиваются на сервер автоматически при открытии check-in. Кнопка «Прогреть карты» — сделать это сейчас.
+          </p>
+        )}
       </Card>
 
       <Card className="p-6">

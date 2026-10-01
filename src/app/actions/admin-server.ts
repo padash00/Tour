@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { getMatch } from "@/lib/matches";
-import { assignServer, enqueueCommand, getServerState, pickFreeInstance } from "@/lib/server-control";
+import { assignServer, enqueueCommand, enqueuePrefetch, getServerState, pickFreeInstance } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -71,6 +71,28 @@ export async function serverRcon(_prev: ActionResult, formData: FormData): Promi
 }
 
 const HOST_TYPES = ["update_cs2", "update_plugins", "restart_all"] as const;
+
+export async function setAutopilot(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("tournamentId"));
+  const on = formData.get("on") === "1";
+  await db().from("tournaments").update({ autopilot: on }).eq("id", id);
+  await audit(admin.id, on ? "tournament.autopilot_on" : "tournament.autopilot_off", { type: "tournament", id });
+  revalidatePath(`/admin/tournaments/${id}`);
+  return { success: on ? "Автопилот включён" : "Автопилот выключен" };
+}
+
+export async function prefetchMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("tournamentId"));
+  const { online } = await getServerState();
+  if (!online) return { error: "Server Agent не на связи" };
+  const n = await enqueuePrefetch(id, admin.id);
+  if (!n) return { error: "В маппуле турнира нет карт из Workshop — прогревать нечего" };
+  await audit(admin.id, "server.prefetch_maps", { type: "tournament", id }, { maps: n });
+  revalidatePath("/admin/servers");
+  return { success: `Агент скачивает ${n} карт(ы) на свободном сервере. Прогресс — в журнале команд на странице «Серверы».` };
+}
 
 /**
  * Обновления по сценарию из документа: есть LIVE/назначенные матчи → ждём;

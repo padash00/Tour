@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { countApproved, getPlayerBySteamId, getTournamentById } from "@/lib/data";
 import { fromLocalInput } from "@/lib/format";
+import { enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
 import { db } from "@/lib/supabase";
 import type { PrizeRow, TournamentStatus } from "@/lib/types";
@@ -201,6 +202,7 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
   await audit(admin.id, "tournament.status", { type: "tournament", id }, { from: before.status, to: status });
 
   if (status === "checkin") {
+    await enqueuePrefetch(id, admin.id);
     const { data } = await db()
       .from("tournament_registrations")
       .select("team:teams(captain_id)")

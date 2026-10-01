@@ -99,6 +99,7 @@ export type Tournament = {
   swiss_wins: number;
   playoff_type: "single_elimination" | "double_elimination";
   playoff_created_at: string | null;
+  autopilot: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { a2sInfo, rcon } from "./lib.mjs";
-import { applyBundle, cs2Build, localBundleVersion, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
+import { applyBundle, cs2Build, localBundleVersion, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = process.env.F16_SERVER_DIR ?? "D:\\cs2server";
@@ -142,8 +142,17 @@ function runStartScript(name, stop) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const maintenanceCtx = () => ({ f16Dir: F16_DIR, serverDir: SERVER_DIR, steamcmdDir: STEAMCMD_DIR, instances: INSTANCES, startPs1: START_PS1 });
-const HOST_COMMANDS = { update_cs2: updateCs2, update_plugins: updatePlugins, restart_all: restartAll };
+const maintenanceCtx = () => ({
+  f16Dir: F16_DIR,
+  serverDir: SERVER_DIR,
+  steamcmdDir: STEAMCMD_DIR,
+  instances: INSTANCES,
+  startPs1: START_PS1,
+  rcon,
+  a2sInfo,
+  rconPassword: secrets.rcon,
+});
+const HOST_COMMANDS = { update_cs2: updateCs2, update_plugins: updatePlugins, restart_all: restartAll, prefetch_maps: prefetchMaps };
 
 /** Долгие команды обслуживания выполняются в фоне, агент продолжает отчитываться сайту */
 function runHostCommand(cmd) {
@@ -151,7 +160,7 @@ function runHostCommand(cmd) {
   busy = cmd.type;
   hostInfoAt = 0;
   log("maintenance start", cmd.type);
-  HOST_COMMANDS[cmd.type](maintenanceCtx())
+  HOST_COMMANDS[cmd.type](maintenanceCtx(), cmd.payload)
     .then((result) => ({ ok: true, result }))
     .catch((e) => ({ ok: false, result: String(e?.message ?? e) }))
     .then(async (r) => {

@@ -48,7 +48,17 @@ export type ServerHost = { id: string; lan_ip: string | null; last_seen_at: stri
 export type AgentCommand = {
   id: string;
   instance: string | null;
-  type: "start" | "stop" | "restart" | "load_match" | "end_match" | "rcon" | "update_cs2" | "update_plugins" | "restart_all";
+  type:
+    | "start"
+    | "stop"
+    | "restart"
+    | "load_match"
+    | "end_match"
+    | "rcon"
+    | "update_cs2"
+    | "update_plugins"
+    | "restart_all"
+    | "prefetch_maps";
   payload: Record<string, unknown>;
   status: "pending" | "sent" | "done" | "error";
   result: string | null;
@@ -123,8 +133,10 @@ export async function buildMatchzyConfig(matchId: string) {
 
 /** Свободный инстанс: агент его видит запущенным, MatchZy без матча, и он не закреплён за другим матчем */
 export async function pickFreeInstance(preferRole: "active" | "reserve" = "active") {
-  const { online, instances } = await getServerState();
+  const { online, instances, host } = await getServerState();
   if (!online) return null;
+  // агент занят обслуживанием (прогрев карт, обновление) — серверы могут менять карту, не назначаем
+  if ((host?.info as { busy?: string | null } | undefined)?.busy) return null;
   const { data: busy } = await db()
     .from("matches")
     .select("server_instance")
@@ -381,4 +393,75 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       break;
     }
   }
+}
+
+// ───────────────────────── автопилот
+
+const AUTOPILOT_LEAD_MS = 10 * 60_000; // матч с расписанием уходит на сервер за 10 минут до начала
+
+/**
+ * Автопилот: для турниров с включённым автопилотом запускает вето у матчей с известными соперниками
+ * и отправляет готовые матчи на свободные серверы. Вызывается на каждой синхронизации агента.
+ */
+export async function autopilotTick() {
+  const { data: ts } = await db()
+    .from("tournaments")
+    .select("id, map_pool")
+    .eq("autopilot", true)
+    .in("status", ["checkin", "live"]);
+  if (!ts?.length) return;
+
+  const now = Date.now();
+  const due = (m: { scheduled_at: string | null }) => !m.scheduled_at || new Date(m.scheduled_at).getTime() - now <= AUTOPILOT_LEAD_MS;
+
+  for (const t of ts) {
+    const { data: list } = await db()
+      .from("matches")
+      .select("id, number, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
+      .eq("tournament_id", t.id)
+      .in("status", ["upcoming", "ready"])
+      .order("number");
+    const matches = (list ?? []).sort(
+      (a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.number - b.number,
+    );
+
+    // 1. вето — как только соперники известны
+    for (const m of matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x))) {
+      const { data: updated } = await db()
+        .from("matches")
+        .update({ status: "veto", veto_deadline: new Date(now + 60_000).toISOString() })
+        .eq("id", m.id)
+        .eq("status", "upcoming")
+        .select("id");
+      if (!updated?.length) continue;
+      const { data: teams } = await db().from("teams").select("captain_id").in("id", [m.team1_id, m.team2_id]);
+      await notify(
+        (teams ?? []).map((x) => x.captain_id),
+        `Вето матча #${m.number} началось`,
+        "Автопилот: на каждый шаг — 60 секунд.",
+        `/matches/${m.id}`,
+      );
+    }
+
+    // 2. готовые матчи — на свободные серверы
+    for (const m of matches.filter((x) => x.status === "ready" && (!x.server_instance || x.server_state === "error") && due(x))) {
+      const inst = await pickFreeInstance();
+      if (!inst) return; // свободных серверов нет — ждём следующей синхронизации
+      const { data: full } = await db().from("matches").select("*").eq("id", m.id).single();
+      if (!full) continue;
+      await assignServer(full as Match, inst.name);
+      await db()
+        .from("audit_logs")
+        .insert({ action: "autopilot.assign", entity_type: "match", entity_id: m.id, payload: { instance: inst.name } });
+    }
+  }
+}
+
+/** Workshop-карты турнира (формат «name@id») → прогрев на сервере, чтобы к матчу карта уже была в кэше */
+export async function enqueuePrefetch(tournamentId: string, actorId?: string) {
+  const { data: t } = await db().from("tournaments").select("map_pool").eq("id", tournamentId).single();
+  const ids = ((t?.map_pool ?? []) as string[]).filter((m) => m.includes("@")).map((m) => m.split("@")[1]);
+  if (!ids.length) return 0;
+  await enqueueCommand(null, "prefetch_maps", { workshop_ids: ids }, actorId);
+  return ids.length;
 }

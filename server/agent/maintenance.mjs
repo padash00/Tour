@@ -183,3 +183,49 @@ export async function restartAll({ instances, startPs1 }) {
   await startActive(startPs1);
   return "активные инстансы перезапущены";
 }
+
+// ───────────────────────── прогрев workshop-карт
+
+/**
+ * Скачивает workshop-карты в кэш: на свободном сервере по очереди грузит каждую карту
+ * (host_workshop_map), ждёт, пока она реально загрузится, затем возвращает сервер на de_mirage.
+ * Установка CS2 общая для всех инстансов — карта скачивается один раз для всех.
+ */
+export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, payload) {
+  const ids = (payload?.workshop_ids ?? []).filter((x) => /^\d+$/.test(String(x)));
+  if (!ids.length) return "нет карт для прогрева";
+  // свободный запущенный сервер: MatchZy без матча
+  let target = null;
+  for (const i of instances) {
+    const status = await rcon(i.port, rconPassword, "get5_status").catch(() => null);
+    if (!status) continue;
+    try {
+      if (JSON.parse(status.slice(status.indexOf("{"))).gamestate === "none") {
+        target = i;
+        break;
+      }
+    } catch {}
+  }
+  if (!target) throw new Error("нет свободного запущенного сервера для прогрева");
+
+  const results = [];
+  for (const id of ids) {
+    const before = (await a2sInfo(target.port))?.map ?? "";
+    await rcon(target.port, rconPassword, `host_workshop_map ${id}`);
+    const started = Date.now();
+    let map = before;
+    // ждём смены карты: скачивание + загрузка, до 10 минут
+    while (Date.now() - started < 10 * 60_000) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const info = await a2sInfo(target.port);
+      if (info?.map && info.map !== before) {
+        map = info.map;
+        break;
+      }
+    }
+    const sec = Math.round((Date.now() - started) / 1000);
+    results.push(map !== before ? `${id} → ${map} (${sec} с)` : `${id}: не загрузилась за ${sec} с`);
+  }
+  await rcon(target.port, rconPassword, "changelevel de_mirage").catch(() => {});
+  return `${target.name}: ${results.join(" · ")}`;
+}
