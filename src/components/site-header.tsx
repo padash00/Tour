@@ -75,8 +75,8 @@ export async function SiteHeader() {
 export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-line">
-      <Container className="py-12 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div>
+      <Container className="py-12 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="col-span-2 md:col-span-1">
           <Logo />
           <p className="mt-4 max-w-xs text-sm text-fg-3 leading-relaxed">
             Турнирная платформа F16 Arena для соревнований по CS2. Реальные серверы, честная статистика.

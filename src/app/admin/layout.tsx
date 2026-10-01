@@ -6,8 +6,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const admin = await requireAdmin();
   return (
     <Container className="pt-10">
-      <div className="grid lg:grid-cols-[220px_1fr] gap-8 items-start">
-        <aside className="lg:sticky lg:top-24">
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-8 items-start">
+        <aside className="min-w-0 lg:sticky lg:top-24">
           <div className="label mb-3 px-3">Control · {admin.nickname}</div>
           <AdminNav />
         </aside>

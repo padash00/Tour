@@ -95,7 +95,7 @@ export default async function HomePage() {
                 </div>
               </div>
             </div>
-            <div className="absolute -bottom-6 -left-6 card px-4 py-3 flex items-center gap-3">
+            <div className="absolute -top-6 -left-6 card px-4 py-3 flex items-center gap-3 shadow-[0_16px_40px_-16px_#000]">
               <span className="grid place-items-center size-9 rounded-lg bg-accent-dim text-accent">
                 <IconShield className="size-[18px]" />
               </span>
