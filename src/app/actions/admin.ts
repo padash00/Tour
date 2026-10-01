@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { countApproved, getPlayerBySteamId, getTournamentById } from "@/lib/data";
 import { fromLocalInput } from "@/lib/format";
-import { enqueuePrefetch } from "@/lib/server-control";
+import { closeMatchesOfEndedTournaments, enqueueCommand, enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
 import { db } from "@/lib/supabase";
 import type { PrizeRow, TournamentStatus } from "@/lib/types";
@@ -201,6 +201,14 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
   await db().from("tournaments").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
   await audit(admin.id, "tournament.status", { type: "tournament", id }, { from: before.status, to: status });
 
+  if (status === "finished" || status === "cancelled") {
+    const closed = await closeMatchesOfEndedTournaments(id, admin.id);
+    if (closed) {
+      revalidatePath("/", "layout");
+      return { success: `Статус обновлён. Несыгранные матчи отменены: ${closed}, серверы освобождены.` };
+    }
+  }
+
   if (status === "checkin") {
     await enqueuePrefetch(id, admin.id);
     const { data } = await db()
@@ -221,9 +229,26 @@ export async function deleteTournament(_prev: ActionResult, formData: FormData):
   const id = String(formData.get("id"));
   const t = await getTournamentById(id);
   if (!t) return { error: "Турнир не найден" };
-  if (t.status !== "draft") return { error: "Удалить можно только черновик" };
-  await db().from("tournaments").delete().eq("id", id);
-  await audit(admin.id, "tournament.delete", { type: "tournament", id }, { name: t.name });
+  if (t.status !== "draft" && String(formData.get("confirm") ?? "").trim() !== t.name.trim()) {
+    return { error: "Введите точное название турнира, чтобы подтвердить удаление" };
+  }
+
+  // матчи турнира, которые сейчас на серверах, — снимаем с серверов, чтобы освободить инстансы
+  const { data: onServers } = await db()
+    .from("matches")
+    .select("id, server_instance")
+    .eq("tournament_id", id)
+    .not("server_instance", "is", null)
+    .in("status", ["ready", "live", "veto", "upcoming"]);
+  for (const m of onServers ?? []) {
+    await enqueueCommand(m.server_instance, "end_match", {}, admin.id);
+  }
+
+  // матчи, сетка, заявки, вето, статистика и споры удаляются каскадом
+  const { error } = await db().from("tournaments").delete().eq("id", id);
+  if (error) return { error: `Не удалось удалить: ${error.message}` };
+  await audit(admin.id, "tournament.delete", { type: "tournament", id }, { name: t.name, status: t.status });
+  revalidatePath("/", "layout");
   redirect("/admin/tournaments");
 }
 

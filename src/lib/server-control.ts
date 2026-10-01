@@ -617,3 +617,39 @@ export async function verifyWorkshopLibrary() {
   if (count) return;
   await enqueueCommand(null, "prefetch_maps", { workshop_ids: unchecked });
 }
+
+// ───────────────────────── закрытие матчей завершённого турнира
+
+/**
+ * Турнир завершён или отменён → его несыгранные матчи отменяются, серверы освобождаются.
+ * Вызывается при смене статуса и на каждом тике агента (подчищает старые данные).
+ */
+export async function closeMatchesOfEndedTournaments(tournamentId?: string, actorId?: string) {
+  let q = db().from("tournaments").select("id").in("status", ["finished", "cancelled"]);
+  if (tournamentId) q = q.eq("id", tournamentId);
+  const { data: ts } = await q;
+  const ids = (ts ?? []).map((t) => t.id);
+  if (!ids.length) return 0;
+
+  const { data: open } = await db()
+    .from("matches")
+    .select("id, server_instance")
+    .in("tournament_id", ids)
+    .in("status", ["pending", "upcoming", "veto", "ready", "live"]);
+  if (!open?.length) return 0;
+
+  for (const m of open) {
+    if (m.server_instance) await enqueueCommand(m.server_instance, "end_match", {}, actorId);
+  }
+  await db()
+    .from("matches")
+    .update({ status: "cancelled", server_instance: null, server_state: null, server_address: null, server_password: null })
+    .in(
+      "id",
+      open.map((m) => m.id),
+    );
+  await db()
+    .from("audit_logs")
+    .insert({ action: "tournament.close_matches", entity_type: "tournament", entity_id: ids[0], payload: { matches: open.length } });
+  return open.length;
+}

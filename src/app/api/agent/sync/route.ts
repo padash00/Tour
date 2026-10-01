@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAgentBundle } from "@/lib/agent-bundle";
-import { applyAgentReport, autopilotTick, checkBearer, takePendingCommands, verifyWorkshopLibrary, type AgentReport } from "@/lib/server-control";
+import { applyAgentReport, autopilotTick, checkBearer, takePendingCommands, verifyWorkshopLibrary, closeMatchesOfEndedTournaments, type AgentReport } from "@/lib/server-control";
 
 /** F16 Server Agent раз в несколько секунд присылает состояние хоста и инстансов, в ответ получает команды. */
 export async function POST(request: NextRequest) {
@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     await autopilotTick();
     await verifyWorkshopLibrary();
+    await closeMatchesOfEndedTournaments();
   } catch (e) {
     console.error("autopilot failed", e);
   }
