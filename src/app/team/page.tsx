@@ -25,7 +25,9 @@ import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
 import { TeamForm } from "@/components/team-form";
 import { TournamentStatusPill } from "@/components/tournament-bits";
-import { ButtonLink, Container, EmptyState, Notice, Pill, TeamLogo } from "@/components/ui";
+import { EmptyState, Notice, Pill, TeamLogo, cn } from "@/components/ui";
+import { OutlineBtn, PrimaryBtn } from "@/components/public/home";
+import { CARD, HeroNumber, PageHero, SectionHead, Wrap } from "@/components/public/page-kit";
 
 export const metadata: Metadata = { title: "Моя команда" };
 
@@ -35,17 +37,16 @@ export default async function MyTeamPage() {
 
   if (!membership) {
     return (
-      <Container size="narrow">
-        <div className="pt-16 md:pt-24">
-          <h1 className="text-[36px] md:text-[48px] font-bold tracking-[-0.035em] leading-[1.02]">У вас пока нет команды</h1>
-          <p className="mt-4 text-fg-2 max-w-lg">Создайте команду или попросите капитана прислать ссылку-приглашение.</p>
-          <div className="mt-8">
-            <ButtonLink href="/team/create" size="lg">
-              Создать команду
-            </ButtonLink>
-          </div>
+      <PageHero
+        eyebrow="Штаб команды"
+        title="У вас пока нет команды"
+        lead="Создайте команду или попросите капитана прислать ссылку-приглашение."
+      >
+        <div className="mt-10 flex flex-wrap gap-4">
+          <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn>
+          <OutlineBtn href="/teams">Найти команду</OutlineBtn>
         </div>
-      </Container>
+      </PageHero>
     );
   }
 
@@ -63,54 +64,63 @@ export default async function MyTeamPage() {
   const full = mains >= MAX_MAIN;
 
   return (
-    <Container size="competition">
-      {/* ── идентичность команды */}
-      <section className="pt-12 md:pt-16 pb-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between border-b border-line">
-        <div className="flex items-center gap-6 min-w-0">
-          <TeamLogo src={team.logo_url} tag={team.tag} size={88} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 text-sm text-fg-3">
-              <span>{team.tag}</span>
-              <Pill tone={full ? "ok" : "warn"}>{full ? "Состав собран" : "Состав неполный"}</Pill>
-            </div>
-            <h1 className="mt-2 text-[36px] md:text-[48px] font-bold tracking-[-0.04em] leading-[1] truncate">{team.name}</h1>
-            <div className="mt-2 text-sm text-fg-3">
-              {team.region ?? "Регион не указан"} · с {formatDate(team.created_at)}
-            </div>
+    <>
+      {/* ── штаб команды */}
+      <PageHero
+        media={
+          <div className="shrink-0 rounded-[16px] border border-white/[0.08] bg-[#0b1420]/80 p-4">
+            <TeamLogo src={team.logo_url} tag={team.tag} size={112} />
           </div>
+        }
+        eyebrow={`Штаб команды · ${team.tag}`}
+        title={team.name}
+        lead={
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] lg:text-[17px] text-fg">
+            <Pill tone={full ? "ok" : "warn"}>{full ? "Состав собран" : "Состав неполный"}</Pill>
+            <span className="h-4 w-px bg-white/20" />
+            {team.region ?? "Регион не указан"}
+            <span className="h-4 w-px bg-white/20" />
+            {isCaptain ? "Вы капитан" : "Вы игрок"}
+            <span className="h-4 w-px bg-white/20" />с {formatDate(team.created_at)}
+          </div>
+        }
+      >
+        <div className="mt-12 flex flex-wrap gap-x-16 gap-y-8 border-t border-white/[0.06] pt-10">
+          <HeroNumber
+            label="Основа"
+            value={
+              <>
+                {mains}
+                <span className="text-fg-3">/{MAX_MAIN}</span>
+              </>
+            }
+            tone={full ? "text-ok" : undefined}
+          />
+          <HeroNumber
+            label="Запас"
+            value={
+              <>
+                {subs}
+                <span className="text-fg-3">/{MAX_SUBS}</span>
+              </>
+            }
+          />
+          <HeroNumber label="Avg FACEIT ELO" value={elo ?? "—"} />
+          <HeroNumber label="Заявок" value={regs.length} />
         </div>
-        <div className="flex gap-10">
-          <div>
-            <div className="num text-[28px] font-semibold leading-none">
-              {mains}
-              <span className="text-fg-3">/{MAX_MAIN}</span>
-            </div>
-            <div className="mt-2 text-[13px] text-fg-3">Основа</div>
-          </div>
-          <div>
-            <div className="num text-[28px] font-semibold leading-none">
-              {subs}
-              <span className="text-fg-3">/{MAX_SUBS}</span>
-            </div>
-            <div className="mt-2 text-[13px] text-fg-3">Запас</div>
-          </div>
-          <div>
-            <div className="num text-[28px] font-semibold leading-none">{elo ?? "—"}</div>
-            <div className="mt-2 text-[13px] text-fg-3">Avg FACEIT ELO</div>
-          </div>
-        </div>
-      </section>
+      </PageHero>
 
+      <Wrap>
       {locked && (
-        <div className="mt-8">
+        <div className="mt-10">
           <Notice tone="warn">Состав заблокирован турниром «{locked.name}». Изменить его может только администратор.</Notice>
         </div>
       )}
 
-      <div className="pt-12 grid lg:grid-cols-[minmax(0,1fr)_340px] gap-x-16 gap-y-12 items-start">
-        <div className="space-y-16 min-w-0">
-          <section>
-            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Состав</h2>
+      <div className="pt-14 grid lg:grid-cols-[minmax(0,1fr)_400px] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+          <section className={cn(CARD, "p-6 lg:p-8")}>
+            <SectionHead title="Состав" />
             <RosterList
               slots={MAX_MAIN + MAX_SUBS}
               items={members.map((m) => ({
@@ -160,8 +170,8 @@ export default async function MyTeamPage() {
             />
           </section>
 
-          <section>
-            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Турниры</h2>
+          <section className={cn(CARD, "p-6 lg:p-8")}>
+            <SectionHead title="Турниры" />
             {regs.length === 0 ? (
               <EmptyState
                 compact
@@ -175,8 +185,8 @@ export default async function MyTeamPage() {
             ) : (
               <div>
                 {regs.map((r) => (
-                  <div key={r.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 min-h-14 py-2 border-b border-white/[0.05] last:border-0">
-                    <Link href={`/tournaments/${r.tournament.slug}`} className="font-medium hover:text-accent-strong flex-1">
+                  <div key={r.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 min-h-[64px] py-2 border-b border-white/[0.05] last:border-0">
+                    <Link href={`/tournaments/${r.tournament.slug}`} className="text-[17px] font-semibold hover:text-accent flex-1">
                       {r.tournament.name}
                     </Link>
                     <TournamentStatusPill status={r.tournament.status} />
@@ -191,23 +201,23 @@ export default async function MyTeamPage() {
           </section>
 
           {isCaptain && (
-            <details className="group">
-              <summary className="list-none cursor-pointer flex items-center justify-between py-4 border-y border-line text-[15px] font-semibold">
+            <details className={cn(CARD, "group px-6 lg:px-8")}>
+              <summary className="list-none cursor-pointer flex items-center justify-between py-6 text-[13px] font-medium uppercase tracking-[0.2em] text-fg-2">
                 Настройки команды
                 <span className="text-fg-3 transition-transform group-open:rotate-45">+</span>
               </summary>
-              <div className="pt-6">
+              <div className="pb-8 pt-2">
                 <TeamForm action={updateTeam} team={team} submitLabel="Сохранить" />
               </div>
             </details>
           )}
         </div>
 
-        <aside className="space-y-10 lg:sticky lg:top-24">
+        <aside className="space-y-4 lg:sticky lg:top-28">
           {isCaptain && (
-            <div className="rounded-2xl bg-surface p-6">
-              <h3 className="text-[15px] font-semibold">Пригласить игрока</h3>
-              <p className="mt-1 text-sm text-fg-3 mb-4">Игрок войдёт через Steam и подтвердит вступление.</p>
+            <div className={cn(CARD, "p-6 lg:p-8")}>
+              <SectionHead title="Пригласить игрока" className="mb-3" />
+              <p className="text-[15px] text-fg-3 mb-5">Игрок войдёт через Steam и подтвердит вступление.</p>
               <CopyField value={`${origin}/join/${team.invite_code}`} />
               <ActionForm action={regenerateInvite} className="mt-3">
                 <SubmitButton variant="ghost" size="sm" confirm="Старая ссылка перестанет работать. Продолжить?">
@@ -216,15 +226,15 @@ export default async function MyTeamPage() {
               </ActionForm>
             </div>
           )}
-          <Link href={`/teams/${team.tag}`} className="block text-sm text-fg-2 hover:text-fg">
-            Публичная страница команды →
+          <Link href={`/teams/${team.tag}`} className={cn(CARD, "flex items-center justify-between px-6 py-5 text-[15px] text-fg-2 hover:text-fg lg:px-8")}>
+            Публичная страница команды <span>→</span>
           </Link>
         </aside>
       </div>
 
       {/* ── опасные действия — внизу, отдельно */}
-      <section className="mt-24 pt-8 border-t border-line max-w-xl">
-        <h3 className="text-[13px] text-fg-3 mb-3">Опасная зона</h3>
+      <section className="mt-24 pt-8 border-t border-white/[0.06] max-w-xl">
+        <SectionHead title="Опасная зона" className="mb-4" />
         {isCaptain ? (
           <ActionForm action={disbandTeam}>
             <SubmitButton variant="danger" size="sm" confirm="Распустить команду? Все игроки будут исключены. Это действие необратимо.">
@@ -240,6 +250,7 @@ export default async function MyTeamPage() {
           </ActionForm>
         )}
       </section>
-    </Container>
+      </Wrap>
+    </>
   );
 }

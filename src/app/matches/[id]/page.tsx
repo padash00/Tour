@@ -17,7 +17,8 @@ import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
 import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
 import { VetoBoard } from "@/components/competition/veto-board";
-import { ButtonLink, Container, EmptyState, Pill, cn } from "@/components/ui";
+import { ButtonLink, EmptyState, Pill, cn } from "@/components/ui";
+import { Eyebrow, WRAP } from "@/components/public/home";
 
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
@@ -53,22 +54,22 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   const seriesMaps = m.maps.length > 0 && (
     <section>
-      <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-5">{m.status === "finished" ? "Итоги серии" : "Карты серии"}</h2>
-      <div>
+      <Eyebrow className="mb-6">{m.status === "finished" ? "Итоги серии" : "Карты серии"}</Eyebrow>
+      <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 px-6 lg:px-8">
         {m.maps.map((map) => {
           const w1 = map.status === "finished" && map.team1_score > map.team2_score;
           const w2 = map.status === "finished" && map.team2_score > map.team1_score;
           return (
-            <div key={map.id} className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[72px_1fr_auto_120px] items-center gap-4 h-14 border-b border-white/[0.05] last:border-0">
+            <div key={map.id} className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[90px_1fr_auto_140px] items-center gap-4 h-16 lg:h-[72px] border-b border-white/[0.06] last:border-0">
               <span className="text-[13px] text-fg-3">Карта {map.map_number}</span>
-              <span className="font-semibold text-[16px]">{mapName(map.map_name)}</span>
+              <span className="font-semibold text-[16px] lg:text-[20px]">{mapName(map.map_name)}</span>
               <span className="hidden sm:block text-[13px] text-fg-3">
                 {map.picked_by ? `пик ${map.picked_by === m.team1_id ? m.team1?.tag : m.team2?.tag}` : "decider"}
               </span>
               {map.status === "pending" ? (
                 <span className="text-[13px] text-fg-3 text-right">—</span>
               ) : (
-                <span className="num text-right text-lg font-semibold">
+                <span className="num text-right text-lg lg:text-[24px] font-semibold">
                   {map.status === "live" && <span className="mr-2 inline-block size-1.5 rounded-full bg-danger animate-pulse align-middle" />}
                   <span className={cn(w2 && "text-fg-3")}>{map.team1_score}</span>
                   <span className="text-fg-3 mx-1">:</span>
@@ -84,7 +85,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   const scoreboard = statRows.length > 0 && (
     <section className="space-y-10">
-      <h2 className="text-[22px] font-bold tracking-[-0.025em]">Статистика</h2>
+      <Eyebrow>Статистика</Eyebrow>
       {[...new Set(statRows.map((r) => r.map_number))]
         .sort((a, b) => a - b)
         .map((n) => {
@@ -93,7 +94,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
           return (
             <div key={n} className="space-y-6">
-              <div className="text-sm text-fg-3">
+              <div className="text-[15px] text-fg-2">
                 Карта {n}
                 {map ? ` · ${mapName(map.map_name)} · ${map.team1_score}:${map.team2_score}` : ""}
               </div>
@@ -104,7 +105,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                 if (!teamRows.length) return null;
                 return (
                   <div key={i}>
-                    <div className="mb-2 font-semibold">{team?.name}</div>
+                    <div className="mb-3 text-[18px] lg:text-[20px] font-semibold">{team?.name}</div>
                     <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} />
                   </div>
                 );
@@ -121,24 +122,24 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
       <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
 
-      <Container size="competition" className="pt-12 md:pt-16 space-y-16">
+      <div className={cn(WRAP, "pt-12 md:pt-16 space-y-16 lg:space-y-20")}>
         {/* ── главный блок по состоянию матча */}
         {m.status === "pending" || m.status === "upcoming" ? (
-          <section className="grid sm:grid-cols-3 gap-8">
-            <div>
-              <div className="label">Начало</div>
-              <div className="mt-1.5 text-lg font-semibold">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Будет объявлено"}</div>
+          <section className="grid sm:grid-cols-3 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08]">
+            <div className="p-7 lg:p-9">
+              <Eyebrow>Начало</Eyebrow>
+              <div className="mt-3 text-[20px] lg:text-[24px] font-semibold">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Будет объявлено"}</div>
             </div>
-            <div>
-              <div className="label">Формат</div>
-              <div className="mt-1.5 text-lg font-semibold">BO{m.best_of}</div>
+            <div className="p-7 lg:p-9">
+              <Eyebrow>Формат</Eyebrow>
+              <div className="mt-3 text-[20px] lg:text-[24px] font-semibold">BO{m.best_of}</div>
             </div>
-            <div>
-              <div className="label">Вето</div>
-              <div className="mt-1.5 text-lg font-semibold">
+            <div className="p-7 lg:p-9">
+              <Eyebrow>Вето</Eyebrow>
+              <div className="mt-3 text-[20px] lg:text-[24px] font-semibold">
                 {m.status === "pending" ? "Ожидаем соперников" : "Ещё не началось"}
               </div>
-              <div className="mt-1 text-[13px] text-fg-3">
+              <div className="mt-2 text-[14px] text-fg-3">
                 {m.status === "pending" ? "Команды определятся по итогам предыдущих матчей." : "Капитанам придёт уведомление."}
               </div>
             </div>
@@ -158,9 +159,9 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             <ServerPreparing loading={m.server_state === "loading"} />
           )
         ) : m.status === "ready" ? (
-          <section className="flex items-center gap-3">
-            <Pill tone="accent">Подготовка к матчу</Pill>
-            <span className="text-sm text-fg-3">Игроки подключаются к серверу.</span>
+          <section className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-7 lg:p-10">
+            <Eyebrow className="text-accent">Подготовка к матчу</Eyebrow>
+            <div className="mt-3 text-[20px] lg:text-[26px] font-semibold">Игроки подключаются к серверу</div>
           </section>
         ) : null}
 
@@ -178,7 +179,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
         {m.status !== "veto" && m.veto.length > 0 && (
           <section>
-            <h2 className="text-[15px] font-semibold mb-3 text-fg-2">Вето</h2>
+            <Eyebrow className="mb-4">Вето</Eyebrow>
             <VetoBoard m={m} state={state} myTurn={false} compact images={mapImages} />
           </section>
         )}
@@ -190,7 +191,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             { team: m.team2, roster: rosters.team2 },
           ].map(({ team, roster }, i) => (
             <div key={i}>
-              <h3 className="text-lg font-semibold tracking-[-0.015em] mb-3">{team?.name ?? "TBD"}</h3>
+              <Eyebrow className="mb-2">Состав</Eyebrow>
+              <h3 className="text-[22px] lg:text-[28px] font-semibold tracking-[-0.015em] mb-4">{team?.name ?? "TBD"}</h3>
               {roster.length ? (
                 <RosterList
                   items={roster
@@ -217,7 +219,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         {/* ── спор */}
         {(disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status))) && (
           <section className="max-w-2xl">
-            <h2 className="text-[15px] font-semibold text-fg-2 mb-4">Спор по матчу</h2>
+            <Eyebrow className="mb-4">Спор по матчу</Eyebrow>
             {disputes.length > 0 && (
               <div className="mb-6">
                 {disputes.map((d) => (
@@ -255,7 +257,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             )}
           </section>
         )}
-      </Container>
+      </div>
     </>
   );
 }

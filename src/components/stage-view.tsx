@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Eyebrow } from "./public/home";
 import type { StandingRow } from "@/lib/formats";
 import type { Match, Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
@@ -27,7 +28,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
   return (
     <Link
       href={`/matches/${m.id}`}
-      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg bg-surface px-3 h-11 text-[13px] hover:bg-surface-2 transition-colors"
+      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-[8px] border border-white/[0.08] bg-[#0b1420] px-4 h-12 text-[14px] hover:border-white/[0.18] transition-colors"
     >
       <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? "TBD"}</span>
       <span className="text-center">
@@ -131,14 +132,14 @@ export function GroupStageView({
         return (
           <section key={g.label ?? "A"} className="space-y-4">
             <div className="flex items-baseline justify-between">
-              <h3 className="text-lg font-semibold tracking-[-0.015em]">{single ? "Таблица" : `Группа ${g.label}`}</h3>
+              <Eyebrow>{single ? "Таблица" : `Группа ${g.label}`}</Eyebrow>
               {advance != null && <span className="text-xs text-fg-3">выходят {advance} лучших</span>}
             </div>
             <StandingsTable rows={g.table} teams={teams} advance={advance} solo={solo} />
             <div className={cn("grid gap-4", single && "md:grid-cols-2 lg:grid-cols-3")}>
               {rounds.map((r) => (
                 <div key={r}>
-                  <div className="text-[12px] text-fg-3 mb-2">Тур {r}</div>
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-fg-3 mb-2">Тур {r}</div>
                   <div className="space-y-1.5">
                     {g.matches
                       .filter((m) => m.round === r)

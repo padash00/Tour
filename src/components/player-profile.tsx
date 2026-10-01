@@ -3,7 +3,8 @@ import { formatDate, mapName } from "@/lib/format";
 import type { PlayerAgg } from "@/lib/stats";
 import type { Player } from "@/lib/types";
 import { fmt, ratingColor, swingColor } from "./stats-table";
-import { Avatar, Container, EmptyState, FaceitLevel, Meta, TeamLogo, cn } from "./ui";
+import { Avatar, FaceitLevel, TeamLogo, cn } from "./ui";
+import { CARD, PageHero, SectionHead, Wrap } from "./public/page-kit";
 
 export type MapHistoryItem = {
   key: string;
@@ -59,32 +60,43 @@ export function PlayerProfile({
 
   return (
     <>
-      <section className="atmos">
-        <Container className="pt-16 pb-14 md:pt-24 md:pb-16 flex flex-col md:flex-row md:items-end gap-8 md:gap-10">
-          <Avatar src={player.avatar_url} name={player.nickname} size={128} />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[44px] md:text-[64px] font-bold tracking-[-0.045em] leading-[0.95] truncate">{player.nickname}</h1>
-            <Meta
-              className="mt-5"
-              items={[
+      <PageHero
+        media={
+          <div className="shrink-0 rounded-full border border-white/[0.1] p-1.5">
+            <Avatar src={player.avatar_url} name={player.nickname} size={136} />
+          </div>
+        }
+        eyebrow="Игрок F16 Arena"
+        title={player.nickname}
+        lead={
+          <>
+            <div className="flex flex-wrap items-center gap-y-2 text-[15px] lg:text-[17px] text-fg">
+              {[
                 team ? (
-                  <Link key="t" href={`/teams/${team.tag}`} className="inline-flex items-center gap-2 text-fg hover:text-accent">
-                    <TeamLogo src={team.logo_url} tag={team.tag} size={20} />
+                  <Link key="t" href={`/teams/${team.tag}`} className="inline-flex items-center gap-2 hover:text-accent">
+                    <TeamLogo src={team.logo_url} tag={team.tag} size={22} />
                     {team.name}
                   </Link>
                 ) : (
                   "Без команды"
                 ),
                 player.country,
-                `На платформе с ${formatDate(player.created_at)}`,
+                `С ${formatDate(player.created_at)}`,
                 player.profile_url ? (
-                  <a key="s" href={player.profile_url} target="_blank" rel="noreferrer" className="hover:text-fg">
+                  <a key="s" href={player.profile_url} target="_blank" rel="noreferrer" className="hover:text-accent">
                     Steam ↗
                   </a>
                 ) : null,
-              ]}
-            />
-            <div className="mt-6 flex items-center gap-3 text-sm">
+              ]
+                .filter(Boolean)
+                .map((x, i) => (
+                  <span key={i} className="flex items-center">
+                    {i > 0 && <span className="mx-4 h-4 w-px bg-white/20" />}
+                    {x}
+                  </span>
+                ))}
+            </div>
+            <div className="mt-5 flex items-center gap-3 text-[15px]">
               <FaceitLevel level={player.faceit_level} />
               {player.faceit_nickname ? (
                 <a
@@ -99,31 +111,34 @@ export function PlayerProfile({
                 <span className="text-fg-3">FACEIT-профиль не найден</span>
               )}
             </div>
-          </div>
-          {actions}
-        </Container>
-      </section>
-
-      <Container className="pt-14">
-        {/* КЛЮЧЕВЫЕ ЦИФРЫ — крупная типографика без коробок */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-y-8 gap-x-6">
-          {main.map((s) => (
-            <div key={s.label}>
+          </>
+        }
+        aside={actions}
+      >
+        {/* КЛЮЧЕВЫЕ ЦИФРЫ — открытая типографика */}
+        <div className="mt-12 grid grid-cols-3 md:grid-cols-6 gap-y-8 gap-x-6 border-t border-white/[0.06] pt-10">
+          {main.map((s, i) => (
+            <div key={s.label} className={cn(i > 0 && "md:border-l md:border-white/[0.06] md:pl-6")}>
               <div
                 className={cn(
-                  "num text-[32px] md:text-[44px] font-semibold tracking-[-0.03em] leading-none",
+                  "num font-semibold tracking-[-0.03em] leading-none",
+                  i === 0 ? "text-[40px] md:text-[56px]" : "text-[30px] md:text-[42px]",
                   agg ? (s.cls ?? "text-fg") : "text-fg-3",
                 )}
               >
                 {s.value}
               </div>
-              <div className="mt-2 text-[13px] text-fg-3">{s.label}</div>
+              <div className="mt-3 text-[12px] uppercase tracking-[0.2em] text-fg-3">{s.label}</div>
             </div>
           ))}
         </div>
         {!agg && <p className="mt-6 text-fg-3">Статистика появится после первого матча на F16 Arena.</p>}
+      </PageHero>
+
+      <Wrap className="pt-14">
+        {/* ДЕТАЛИ */}
         {agg && (
-          <dl className="mt-10 pt-6 border-t border-white/[0.06] flex flex-wrap gap-x-10 gap-y-4 text-sm">
+          <dl className={cn(CARD, "flex flex-wrap gap-x-10 gap-y-4 px-8 py-6 text-[15px]")}>
             {[
               ["Убийства", agg.kills],
               ["Смерти", agg.deaths],
@@ -145,13 +160,16 @@ export function PlayerProfile({
           </dl>
         )}
 
-        <div className="mt-20 grid lg:grid-cols-[1.7fr_1fr] gap-14 items-start">
-          <section>
-            <h2 className="text-[26px] md:text-[30px] font-bold tracking-[-0.03em]">Последние матчи</h2>
+        <div className="mt-14 grid lg:grid-cols-[1.7fr_1fr] gap-4 items-start">
+          <section className={cn(CARD, "p-6 lg:p-8 min-w-0")}>
+            <SectionHead title="Последние матчи" />
             {history.length === 0 ? (
-              <EmptyState compact title="Матчей пока нет" description="История появится после первого участия в турнире." />
+              <div>
+                <div className="text-[17px] font-semibold text-fg">Матчей пока нет</div>
+                <div className="mt-1 text-[15px] text-fg-3">История появится после первого участия в турнире.</div>
+              </div>
             ) : (
-              <div className="mt-4 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="tbl min-w-[560px]">
                   <thead>
                     <tr>
@@ -189,13 +207,13 @@ export function PlayerProfile({
             )}
           </section>
 
-          <div className="space-y-14">
-            <section>
-              <h2 className="text-[22px] font-bold tracking-[-0.025em]">Лучшие карты</h2>
+          <div className="space-y-4">
+            <section className={cn(CARD, "p-6 lg:p-8")}>
+              <SectionHead title="Лучшие карты" />
               {maps.length === 0 ? (
-                <p className="mt-3 text-fg-3">Пока нет сыгранных карт.</p>
+                <p className="text-fg-3">Пока нет сыгранных карт.</p>
               ) : (
-                <div className="mt-3">
+                <div>
                   {maps.map((m) => (
                     <div key={m.map} className="flex items-center gap-4 py-3 border-b border-white/[0.06]">
                       <span className="flex-1 font-medium">{mapName(m.map)}</span>
@@ -208,13 +226,13 @@ export function PlayerProfile({
                 </div>
               )}
             </section>
-            <section>
-              <h2 className="text-[22px] font-bold tracking-[-0.025em]">Достижения</h2>
-              <p className="mt-3 text-fg-3">Первые трофеи впереди.</p>
+            <section className={cn(CARD, "p-6 lg:p-8")}>
+              <SectionHead title="Достижения" />
+              <p className="text-fg-3">Первые трофеи впереди.</p>
             </section>
           </div>
         </div>
-      </Container>
+      </Wrap>
     </>
   );
 }

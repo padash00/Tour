@@ -4,8 +4,7 @@ import { createTeam } from "@/app/actions/team";
 import { requirePlayer } from "@/lib/auth";
 import { getActiveMembership } from "@/lib/data";
 import { TeamForm } from "@/components/team-form";
-import { FlowHeader } from "@/components/competition/step";
-import { Container } from "@/components/ui";
+import { CARD, PageHero, Wrap } from "@/components/public/page-kit";
 
 export const metadata: Metadata = { title: "Создать команду" };
 
@@ -14,14 +13,18 @@ export default async function CreateTeamPage() {
   if (await getActiveMembership(player.id)) redirect("/team");
 
   return (
-    <Container size="form">
-      <FlowHeader
+    <>
+      <PageHero
+        compact
+        eyebrow="Шаг 1 · Команда"
         title="Создать команду"
-        description="Вы станете капитаном. После создания получите ссылку-приглашение для игроков."
+        lead="Вы станете капитаном. После создания получите ссылку-приглашение для игроков."
       />
-      <div className="pt-4">
-        <TeamForm action={createTeam} submitLabel="Создать команду" />
-      </div>
-    </Container>
+      <Wrap className="pt-12">
+        <div className={`${CARD} max-w-[760px] p-8 lg:p-12`}>
+          <TeamForm action={createTeam} submitLabel="Создать команду" />
+        </div>
+      </Wrap>
+    </>
   );
 }

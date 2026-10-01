@@ -4,6 +4,7 @@ import { mapName } from "@/lib/format";
 import type { vetoState } from "@/lib/veto";
 import { ActionForm } from "../forms";
 import { Countdown } from "../live-refresh";
+import { Eyebrow } from "../public/home";
 import { cn } from "../ui";
 import { MapTile, type MapTileState } from "./map-tile";
 
@@ -30,36 +31,36 @@ export function VetoBoard({
   return (
     <section>
       {active && state.current ? (
-        <div className="flex flex-wrap items-end justify-between gap-6 mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-8 mb-10 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-7 sm:p-10">
           <div>
-            <div className="text-sm text-fg-3">{myTurn ? "Ваш ход" : "Ход"}</div>
-            <div className="mt-1 text-[26px] md:text-[34px] font-bold tracking-[-0.03em] leading-tight">
+            <Eyebrow className={myTurn ? "text-accent" : undefined}>{myTurn ? "Ваш ход" : "Ход"} · вето · BO{m.best_of}</Eyebrow>
+            <div className="mt-4 text-[28px] md:text-[44px] lg:text-[56px] font-semibold uppercase tracking-[-0.01em] leading-[1.05]">
               {turnTeam?.name ?? "—"}
-              <span className={cn("ml-3", state.current.action === "ban" ? "text-danger" : "text-accent")}>
-                — {state.current.action === "ban" ? "бан карты" : "пик карты"}
+              <span className={cn("block mt-1", state.current.action === "ban" ? "text-danger" : "text-accent")}>
+                {state.current.action === "ban" ? "Бан карты" : "Пик карты"}
               </span>
             </div>
             {myTurn && (
-              <div className="mt-2 text-sm text-fg-2">
+              <div className="mt-4 text-[15px] lg:text-[17px] text-fg-2">
                 Нажмите на карту. Если время выйдет — карта выберется случайно.
               </div>
             )}
           </div>
           {m.veto_deadline && (
             <div className="text-right">
-              <div className="text-sm text-fg-3">Осталось</div>
-              <div className="num text-[34px] font-semibold leading-none mt-1">
+              <Eyebrow>Осталось</Eyebrow>
+              <div className="num text-[44px] lg:text-[72px] font-semibold leading-none mt-3">
                 <Countdown deadline={m.veto_deadline} />
               </div>
             </div>
           )}
         </div>
       ) : (
-        !compact && <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-6">Вето карт</h2>
+        !compact && <Eyebrow className="mb-6">Вето карт</Eyebrow>
       )}
 
       {!compact && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           {m.tournament.map_pool.map((map) => {
             const act = m.veto.find((a) => a.map_name === map);
             const state_: MapTileState = act ? (act.action === "ban" ? "banned" : act.action === "pick" ? "picked" : "decider") : "available";
@@ -84,7 +85,7 @@ export function VetoBoard({
         </div>
       )}
 
-      <ol className={cn("flex flex-wrap gap-x-5 gap-y-2 text-[13px]", compact ? "" : "mt-6")}>
+      <ol className={cn("flex flex-wrap gap-x-6 gap-y-2 text-[14px]", compact ? "" : "mt-8")}>
         {state.plan.map((s) => {
           const done = m.veto.find((a) => a.step === s.step);
           const t = s.team === 1 ? m.team1?.tag : s.team === 2 ? m.team2?.tag : null;

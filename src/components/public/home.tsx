@@ -163,7 +163,7 @@ const statusTone: Partial<Record<TournamentStatus, string>> = {
   live: "text-danger border-danger/40 bg-danger/[0.08]",
 };
 
-function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
+export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
   const mode = modeOf(t.format);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? t.prize_pool : null;
   const second =

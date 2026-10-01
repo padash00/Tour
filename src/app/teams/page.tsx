@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
-import { ButtonLink, Container, EmptyState, PageHeader, TeamLogo } from "@/components/ui";
+import { OutlineBtn, PrimaryBtn } from "@/components/public/home";
+import { CARD, PageHero, SearchField, Wrap } from "@/components/public/page-kit";
+import { IconArrow, TeamLogo, cn } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Команды" };
 
@@ -12,49 +14,67 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
   const teams = q ? all.filter((t) => t.name.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q)) : all;
 
   return (
-    <Container>
-      <PageHeader title="Команды" actions={<ButtonLink href="/team/create" variant="secondary">Создать команду</ButtonLink>} />
+    <>
+      <PageHero
+        eyebrow="Команды F16 Arena"
+        title="Команды"
+        lead={all.length ? `${all.length} ${all.length === 1 ? "команда" : all.length < 5 ? "команды" : "команд"} на платформе.` : undefined}
+        aside={<OutlineBtn href="/team/create">Создать команду</OutlineBtn>}
+      />
 
-      {all.length > 0 && (
-        <form className="mb-4 sm:w-80">
-          <input name="q" defaultValue={q} placeholder="Поиск по названию или тегу" className="field" />
-        </form>
-      )}
-
-      {teams.length === 0 ? (
-        <EmptyState
-          title={all.length === 0 ? "Команд пока нет" : "Ничего не найдено"}
-          description={all.length === 0 ? "Станьте первой командой на платформе." : "Попробуйте другой запрос."}
-          action={all.length === 0 ? <ButtonLink href="/team/create">Создать команду</ButtonLink> : undefined}
-        />
-      ) : (
-        <div>
-          <div className="hidden sm:grid grid-cols-[1fr_140px_100px_100px] gap-4 px-1 pb-3 text-[12px] text-fg-3 border-b border-line">
-            <span>Команда</span>
-            <span>Регион</span>
-            <span className="text-right">Игроки</span>
-            <span className="text-right">Avg ELO</span>
+      <Wrap className="pt-12">
+        {all.length > 0 && (
+          <div className="mb-8">
+            <SearchField defaultValue={q} placeholder="Поиск по названию или тегу" />
           </div>
-          {teams.map((t) => (
-            <Link
-              key={t.id}
-              href={`/teams/${t.tag}`}
-              className="group grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_140px_100px_100px] items-center gap-4 px-1 py-4 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
-            >
-              <div className="flex items-center gap-4 min-w-0">
-                <TeamLogo src={t.logo_url} tag={t.tag} size={40} />
-                <div className="min-w-0">
-                  <div className="font-semibold truncate group-hover:text-accent transition-colors">{t.name}</div>
-                  <div className="text-[13px] text-fg-3">{t.tag}</div>
-                </div>
+        )}
+
+        {teams.length === 0 ? (
+          <div className={cn(CARD, "px-8 py-12 lg:px-12")}>
+            <div className="text-[20px] lg:text-[24px] font-semibold text-fg">
+              {all.length === 0 ? "Команд пока нет" : "Ничего не найдено"}
+            </div>
+            <p className="mt-2 text-fg-3">{all.length === 0 ? "Станьте первой командой на платформе." : "Попробуйте другой запрос."}</p>
+            {all.length === 0 && (
+              <div className="mt-8">
+                <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn>
               </div>
-              <span className="hidden sm:block text-sm text-fg-2 truncate">{t.region ?? "—"}</span>
-              <span className="num text-sm text-right text-fg-2">{t.member_count}</span>
-              <span className="hidden sm:block num text-sm text-right text-fg-2">{t.avg_elo ?? "—"}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </Container>
+            )}
+          </div>
+        ) : (
+          <div className={cn(CARD, "overflow-hidden")}>
+            <div className="hidden sm:grid grid-cols-[1fr_180px_110px_110px_24px] gap-6 px-8 py-4 text-[12px] uppercase tracking-[0.2em] text-fg-3 border-b border-white/[0.06]">
+              <span>Команда</span>
+              <span>Регион</span>
+              <span className="text-right">Игроки</span>
+              <span className="text-right">Avg ELO</span>
+              <span />
+            </div>
+            {teams.map((t, i) => (
+              <Link
+                key={t.id}
+                href={`/teams/${t.tag}`}
+                className={cn(
+                  "group grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_110px_110px_24px] items-center gap-6 px-6 sm:px-8 py-5 transition-colors hover:bg-white/[0.025]",
+                  i > 0 && "border-t border-white/[0.05]",
+                )}
+              >
+                <div className="flex items-center gap-5 min-w-0">
+                  <TeamLogo src={t.logo_url} tag={t.tag} size={48} />
+                  <div className="min-w-0">
+                    <div className="text-[17px] lg:text-[18px] font-semibold truncate group-hover:text-accent transition-colors">{t.name}</div>
+                    <div className="mt-0.5 text-[13px] uppercase tracking-[0.18em] text-fg-3">{t.tag}</div>
+                  </div>
+                </div>
+                <span className="hidden sm:block text-[15px] text-fg-2 truncate">{t.region ?? "—"}</span>
+                <span className="num text-[15px] text-right text-fg-2">{t.member_count}</span>
+                <span className="hidden sm:block num text-[15px] text-right text-fg-2">{t.avg_elo ?? "—"}</span>
+                <IconArrow className="hidden sm:block size-4 text-fg-3 group-hover:text-fg transition-colors" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </Wrap>
+    </>
   );
 }

@@ -22,21 +22,10 @@ export function TournamentStatusPill({ status }: { status: TournamentStatus }) {
 }
 
 /** Сдержанная графика вместо стоковых картинок: план карты тонкими линиями */
-export function MapGraphic({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 400 300" className={className} fill="none" aria-hidden>
-      <g stroke="#ffffff" strokeOpacity="0.07" strokeWidth="1">
-        <path d="M40 60h110v60H90v70H40z" />
-        <path d="M180 40h90v40h40v90h-60v-40h-70z" />
-        <path d="M210 200h120v60H210z" />
-        <path d="M60 220h100v40H60z" />
-        <path d="M300 60h60v60h-60z" />
-      </g>
-      <g stroke="#8ab8ff" strokeOpacity="0.18" strokeWidth="1.2" strokeDasharray="3 6">
-        <path d="M95 150 C 140 150, 160 120, 210 120 S 280 150, 320 220" />
-      </g>
-    </svg>
-  );
+/** Устарело: декоративная «схема карты» убрана из дизайна; экспорт оставлен для совместимости */
+export function MapGraphic(props: { className?: string }) {
+  void props;
+  return null;
 }
 
 export function tournamentFacts(t: Tournament, approved?: number) {

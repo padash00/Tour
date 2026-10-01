@@ -58,23 +58,13 @@ export function tournamentFacts(t: Tournament, approved?: number) {
   ];
 }
 
-/** Сдержанная фирменная композиция — вместо стоковых картинок, когда у турнира нет обложки */
-export function BrandVisual({ className }: { className?: string }) {
-  return (
-    <div className={cn("relative overflow-hidden bg-bg-2", className)} aria-hidden>
-      <div className="absolute inset-0 bg-[radial-gradient(600px_380px_at_70%_30%,#14233b,transparent_70%)]" />
-      <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-gradient-to-t from-bg/80 to-transparent" />
-    </div>
-  );
-}
-
+/** Фото турнира: обложка из базы или кадр из утверждённого макета главной, затемнённый снизу */
 export function CoverImage({ url, className }: { url: string | null; className?: string }) {
-  if (!url) return <BrandVisual className={className} />;
   return (
     <div className={cn("relative overflow-hidden bg-bg-2", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.8]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-bg/70 via-bg/10 to-transparent" />
+      <img src={url ?? "/home/tournament.jpg"} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.8]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-bg/80 via-bg/20 to-transparent" />
     </div>
   );
 }
@@ -159,12 +149,12 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
   return (
     <Link
       href={`/tournaments/${t.slug}`}
-      className="group grid gap-4 py-6 border-b border-white/[0.06] sm:grid-cols-[120px_1fr_auto] sm:items-center"
+      className="group grid gap-4 lg:gap-7 py-6 lg:py-7 border-b border-white/[0.06] sm:grid-cols-[150px_1fr_auto] sm:items-center hover:bg-white/[0.015] transition-colors"
     >
-      <CoverImage url={t.cover_url} className="hidden sm:block h-[76px] w-[120px] rounded-lg" />
+      <CoverImage url={t.cover_url} className="hidden sm:block h-[88px] w-[150px] rounded-[10px]" />
       <div className="min-w-0">
         <TStatus status={t.status} />
-        <div className="mt-1.5 text-xl font-semibold tracking-[-0.02em] truncate group-hover:text-accent transition-colors">
+        <div className="mt-1.5 text-xl lg:text-[24px] font-semibold tracking-[-0.015em] truncate group-hover:text-accent transition-colors">
           {t.name}
         </div>
         <Meta className="mt-1.5 text-[13px] text-fg-3" items={[formatDate(t.starts_at), ...tournamentFacts(t, approved)]} />
@@ -189,18 +179,18 @@ export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTour
   return (
     <Link
       href={`/matches/${m.id}`}
-      className="group grid grid-cols-[1fr_auto_1fr] sm:grid-cols-[140px_1fr_auto_1fr_120px] items-center gap-4 py-4 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+      className="group grid grid-cols-[1fr_auto_1fr] sm:grid-cols-[150px_1fr_auto_1fr_160px] items-center gap-4 py-5 px-2 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors lg:text-[16px]"
     >
       <div className="hidden sm:block min-w-0">
         <MStatus status={m.status} />
       </div>
       <div className="flex items-center justify-end gap-3 min-w-0">
         <span className={cn("truncate font-medium text-right", lost(m.team1_id) && "text-fg-3")}>{m.team1?.name ?? "TBD"}</span>
-        {m.team1 ? <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={28} /> : <span className="size-7" />}
+        {m.team1 ? <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={32} /> : <span className="size-8" />}
       </div>
-      <div className="w-[72px] text-center">
+      <div className="w-[84px] text-center">
         {scored ? (
-          <span className="num text-lg font-semibold">
+          <span className="num text-lg lg:text-[20px] font-semibold">
             {m.team1_score}
             <span className="text-fg-3 mx-1">:</span>
             {m.team2_score}
@@ -210,10 +200,10 @@ export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTour
         )}
       </div>
       <div className="flex items-center gap-3 min-w-0">
-        {m.team2 ? <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={28} /> : <span className="size-7" />}
+        {m.team2 ? <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={32} /> : <span className="size-8" />}
         <span className={cn("truncate font-medium", lost(m.team2_id) && "text-fg-3")}>{m.team2?.name ?? "TBD"}</span>
       </div>
-      <div className="hidden sm:block text-right text-[12px] text-fg-3 truncate">
+      <div className="hidden sm:block text-right text-[13px] text-fg-3 truncate">
         {showTournament && m.tournament ? m.tournament.name : `BO${m.best_of}`}
       </div>
     </Link>

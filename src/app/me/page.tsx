@@ -11,7 +11,8 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { MatchRow, MatchStatusBadge } from "@/components/match-bits";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { NotificationRow } from "@/components/competition/notification-row";
-import { Avatar, ButtonLink, Container, EmptyState, FaceitLevel, Pill, TeamLogo, buttonClass, cn } from "@/components/ui";
+import { Avatar, ButtonLink, EmptyState, FaceitLevel, Pill, TeamLogo, buttonClass, cn } from "@/components/ui";
+import { CARD, PageHero, SectionHead, Wrap } from "@/components/public/page-kit";
 
 export const metadata: Metadata = { title: "Профиль" };
 
@@ -38,14 +39,19 @@ export default async function MePage() {
   const isCaptain = membership?.team.captain_id === player.id;
 
   return (
-    <Container size="competition">
+    <>
       {/* ── профиль */}
-      <section className="pt-12 md:pt-16 pb-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between border-b border-line">
-        <div className="flex items-center gap-6 min-w-0">
-          <Avatar src={player.avatar_url} name={player.nickname} size={80} />
-          <div className="min-w-0">
-            <h1 className="text-[36px] md:text-[44px] font-bold tracking-[-0.04em] leading-[1] truncate">{player.nickname}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-fg-3">
+      <PageHero
+        compact
+        media={
+          <div className="shrink-0 rounded-full border border-white/[0.1] p-1.5">
+            <Avatar src={player.avatar_url} name={player.nickname} size={104} />
+          </div>
+        }
+        eyebrow="Личный кабинет"
+        title={player.nickname}
+        lead={
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] text-fg-2">
               <span className="inline-flex items-center gap-2">
                 <FaceitLevel level={player.faceit_level} />
                 {player.faceit_elo ? <span className="num text-fg-2">{player.faceit_elo} ELO</span> : "FACEIT не найден"}
@@ -57,8 +63,8 @@ export default async function MePage() {
                 </Link>
               )}
             </div>
-          </div>
-        </div>
+        }
+        aside={
         <div className="flex flex-wrap gap-1">
           <ActionForm action={refreshProfile}>
             <SubmitButton variant="ghost" size="sm" pendingText="Обновляем…">
@@ -77,22 +83,22 @@ export default async function MePage() {
             <button className={buttonClass("ghost", "sm")}>Выйти</button>
           </form>
         </div>
-      </section>
+        }
+      />
+
+      <Wrap>
 
       {/* ── следующий матч — главное */}
       {next && (
         <section className="pt-12">
-          <div className="flex items-center gap-3 text-sm text-fg-3 mb-4">
-            Следующий матч
-            <MatchStatusBadge status={next.status} />
-          </div>
+          <SectionHead title="Следующий матч" action={<MatchStatusBadge status={next.status} />} />
           <Link
             href={`/matches/${next.id}`}
-            className="grid grid-cols-[1fr_auto_1fr] items-center gap-6 rounded-2xl bg-surface hover:bg-surface-2 transition-colors p-6 sm:p-8"
+            className={cn(CARD, "grid grid-cols-[1fr_auto_1fr] items-center gap-6 hover:border-white/20 transition-colors p-6 sm:p-10")}
           >
             <div className="flex items-center gap-4 min-w-0">
               {next.team1 && <TeamLogo src={next.team1.logo_url} tag={next.team1.tag} size={48} />}
-              <span className="truncate text-lg sm:text-2xl font-bold tracking-[-0.02em]">{next.team1?.name ?? "TBD"}</span>
+              <span className="truncate text-lg sm:text-[30px] font-semibold tracking-[-0.015em]">{next.team1?.name ?? "TBD"}</span>
             </div>
             <div className="text-center">
               <div className="text-fg-3 font-semibold tracking-[0.1em]">VS</div>
@@ -102,7 +108,7 @@ export default async function MePage() {
               </div>
             </div>
             <div className="flex items-center justify-end gap-4 min-w-0">
-              <span className="truncate text-lg sm:text-2xl font-bold tracking-[-0.02em] text-right">{next.team2?.name ?? "TBD"}</span>
+              <span className="truncate text-lg sm:text-[30px] font-semibold tracking-[-0.015em] text-right">{next.team2?.name ?? "TBD"}</span>
               {next.team2 && <TeamLogo src={next.team2.logo_url} tag={next.team2.tag} size={48} />}
             </div>
           </Link>
@@ -119,10 +125,10 @@ export default async function MePage() {
         ]}
       />
 
-      <div className="pt-12 grid lg:grid-cols-[minmax(0,1fr)_360px] gap-x-16 gap-y-14 items-start">
-        <div className="space-y-14 min-w-0">
-          <section>
-            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Мой турнир</h2>
+      <div className="pt-12 grid lg:grid-cols-[minmax(0,1fr)_400px] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+          <section className={cn(CARD, "p-6 lg:p-8")}>
+            <SectionHead title="Мой турнир" />
             {activeRegs.length > 0 ? (
               <div>
                 {activeRegs.map((r) => (
@@ -156,8 +162,8 @@ export default async function MePage() {
             )}
           </section>
 
-          <section>
-            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Моя команда</h2>
+          <section className={cn(CARD, "p-6 lg:p-8")}>
+            <SectionHead title="Моя команда" />
             {membership ? (
               <Link href="/team" className="flex items-center gap-5 py-3 group">
                 <TeamLogo src={membership.team.logo_url} tag={membership.team.tag} size={48} />
@@ -189,8 +195,8 @@ export default async function MePage() {
             )}
           </section>
 
-          <section>
-            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Матчи</h2>
+          <section className={cn(CARD, "p-6 lg:p-8")}>
+            <SectionHead title="Матчи" />
             {upcoming.length + recent.length ? (
               <div className="-mx-4">
                 {[...upcoming.slice(next ? 1 : 0), ...recent].map((m) => (
@@ -203,9 +209,9 @@ export default async function MePage() {
           </section>
         </div>
 
-        <aside id="notifications" className="scroll-mt-24 lg:sticky lg:top-24">
+        <aside id="notifications" className={cn(CARD, "scroll-mt-28 p-6 lg:p-8 lg:sticky lg:top-28")}>
           <div className="flex items-baseline justify-between mb-2">
-            <h2 className="text-[15px] font-semibold">Уведомления</h2>
+            <SectionHead title="Уведомления" className="mb-0" />
             <div className="flex items-center gap-3">
               {unread > 0 && (
                 <ActionForm action={markNotificationsRead}>
@@ -230,7 +236,8 @@ export default async function MePage() {
           )}
         </aside>
       </div>
-    </Container>
+      </Wrap>
+    </>
   );
 }
 
@@ -240,7 +247,7 @@ function Onboarding({ steps }: { steps: { done: boolean; title: string; hint?: s
   const current = steps.find((s) => !s.done);
   return (
     <section className="pt-12">
-      <div className="text-sm text-fg-3 mb-5">Что дальше</div>
+      <SectionHead title="Что дальше" />
       <ol className="grid sm:grid-cols-4 gap-6">
         {steps.map((s, i) => {
           const active = s === current;
@@ -249,7 +256,7 @@ function Onboarding({ steps }: { steps: { done: boolean; title: string; hint?: s
               <div className={cn("num text-[12px]", s.done ? "text-ok" : active ? "text-accent" : "text-fg-3")}>
                 {s.done ? "✓" : String(i + 1).padStart(2, "0")}
               </div>
-              <div className={cn("mt-1 font-medium", s.done ? "text-fg-3" : active ? "text-fg" : "text-fg-3")}>{s.title}</div>
+              <div className={cn("mt-1 text-[17px] font-semibold", s.done ? "text-fg-3" : active ? "text-fg" : "text-fg-3")}>{s.title}</div>
               {active && s.hint && <div className="mt-1 text-[13px] text-fg-3">{s.hint}</div>}
             </div>
           );

@@ -6,7 +6,8 @@ import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { NotificationRow } from "@/components/competition/notification-row";
-import { Container, EmptyState, PageHeader, Tabs, cn } from "@/components/ui";
+import { EmptyState, Tabs, cn } from "@/components/ui";
+import { CARD, PageHero, Wrap } from "@/components/public/page-kit";
 
 export const metadata: Metadata = { title: "Уведомления" };
 
@@ -35,10 +36,12 @@ export default async function NotificationsPage(props: PageProps<"/notifications
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
 
   return (
-    <Container size="narrow">
-      <PageHeader
+    <>
+      <PageHero
+        compact
+        eyebrow={unread ? `Непрочитанных: ${unread}` : "Всё прочитано"}
         title="Уведомления"
-        actions={
+        aside={
           (unread ?? 0) > 0 ? (
             <ActionForm action={markNotificationsRead}>
               <SubmitButton variant="ghost" size="sm">
@@ -48,6 +51,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
           ) : null
         }
       />
+      <Wrap className="pt-10">
       <Tabs
         active={filter}
         items={[
@@ -56,7 +60,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
         ]}
       />
 
-      <div className="pt-4">
+      <div className={cn(CARD, "mt-8 px-6 lg:px-8")}>
         {items.length === 0 ? (
           <EmptyState
             title={filter === "unread" ? "Всё прочитано" : "Уведомлений пока нет"}
@@ -80,6 +84,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
           ))}
         </div>
       )}
-    </Container>
+      </Wrap>
+    </>
   );
 }

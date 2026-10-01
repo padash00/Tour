@@ -5,7 +5,7 @@ import { Field } from "./ui";
 export function TeamForm({ action, team, submitLabel }: { action: FormAction; team?: Team; submitLabel: string }) {
   return (
     <ActionForm action={action}>
-      <div className="space-y-6">
+      <div className="space-y-6 [&_.field]:h-12 [&_.field]:text-[15px] [&_textarea.field]:h-auto [&_label>span:first-child]:uppercase [&_label>span:first-child]:tracking-[0.16em] [&_label>span:first-child]:text-[11px] [&_label>span:first-child]:text-fg-3">
         <div className="grid sm:grid-cols-[1fr_140px] gap-4">
           <Field label="Название">
             <input name="name" required maxLength={32} defaultValue={team?.name} placeholder="Night Raid" className="field" />
@@ -36,8 +36,8 @@ export function TeamForm({ action, team, submitLabel }: { action: FormAction; te
           />
         </Field>
       </div>
-      <div className="mt-8">
-        <SubmitButton size="lg">{submitLabel}</SubmitButton>
+      <div className="mt-10">
+        <SubmitButton size="lg" className="lg:h-[60px] min-w-[260px] rounded-[8px] text-[16px]">{submitLabel}</SubmitButton>
       </div>
     </ActionForm>
   );

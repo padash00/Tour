@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container, PageHeader } from "@/components/ui";
+import { WRAP } from "@/components/public/home";
+import { PageHero } from "@/components/public/page-hero";
 
 export const metadata: Metadata = { title: "Правила" };
 
@@ -83,14 +84,15 @@ const FAQ = [
 
 export default function RulesPage() {
   return (
-    <Container>
-      <PageHeader
-        title="Правила"
+    <>
+      <PageHero
+        eyebrow="Регламент F16 Arena"
+        title="Правила и FAQ"
         description="Общие правила платформы. У турнира могут быть свои дополнения — смотрите вкладку «Правила» на его странице."
       />
-      <div className="lg:grid lg:grid-cols-[220px_minmax(0,800px)] lg:gap-16">
+      <div className={`${WRAP} pt-14 lg:grid lg:grid-cols-[260px_minmax(0,780px)] lg:gap-20`}>
         <nav className="hidden lg:block">
-          <ol className="sticky top-24 space-y-2.5 text-sm">
+          <ol className="sticky top-32 space-y-3 text-[14px] border-l border-white/[0.08] pl-5">
             {RULES.map((r, i) => (
               <li key={r.title}>
                 <a href={`#r${i + 1}`} className="flex gap-3 text-fg-3 hover:text-fg transition-colors">
@@ -110,14 +112,14 @@ export default function RulesPage() {
 
         <article>
           {RULES.map((r, i) => (
-            <section key={r.title} id={`r${i + 1}`} className="scroll-mt-24 pb-14">
+            <section key={r.title} id={`r${i + 1}`} className="scroll-mt-32 pb-14">
               <div className="flex items-baseline gap-4">
                 <span className="num text-sm text-fg-3">{String(i + 1).padStart(2, "0")}</span>
-                <h2 className="text-[24px] md:text-[28px] font-bold tracking-[-0.025em]">{r.title}</h2>
+                <h2 className="text-[24px] md:text-[30px] font-semibold tracking-[-0.015em]">{r.title}</h2>
               </div>
               <ol className="mt-6 space-y-4 pl-9">
                 {r.items.map((it, j) => (
-                  <li key={it} className="relative text-[16px] text-fg-2 leading-[1.7]">
+                  <li key={it} className="relative text-[16px] lg:text-[17px] text-fg-2 leading-[1.75]">
                     <span className="absolute -left-9 top-[3px] num text-[12px] text-fg-3">
                       {i + 1}.{j + 1}
                     </span>
@@ -128,8 +130,8 @@ export default function RulesPage() {
             </section>
           ))}
 
-          <section id="faq" className="scroll-mt-24 pt-6">
-            <h2 className="text-[24px] md:text-[28px] font-bold tracking-[-0.025em]">Частые вопросы</h2>
+          <section id="faq" className="scroll-mt-32 pt-6">
+            <h2 className="text-[24px] md:text-[30px] font-semibold tracking-[-0.015em]">Частые вопросы</h2>
             <div className="mt-6 border-t border-white/[0.06]">
               {FAQ.map((f) => (
                 <details key={f.q} className="group border-b border-white/[0.06] py-5">
@@ -151,6 +153,6 @@ export default function RulesPage() {
           </section>
         </article>
       </div>
-    </Container>
+    </>
   );
 }

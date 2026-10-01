@@ -5,7 +5,9 @@ import type { Tournament } from "@/lib/types";
 import { MatchLine } from "@/components/public/bits";
 import { visibleMatches } from "@/components/match-bits";
 import { LiveRefresh } from "@/components/live-refresh";
-import { Container, EmptyState, PageHeader } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
+import { WRAP } from "@/components/public/home";
+import { PageHero, SectionLabel } from "@/components/public/page-hero";
 
 export const metadata: Metadata = { title: "Матчи" };
 
@@ -30,33 +32,36 @@ export default async function MatchesPage() {
   const next = active.filter((m) => m.status !== "live");
 
   return (
-    <Container>
+    <>
       {live.length > 0 && <LiveRefresh intervalMs={10000} />}
-      <PageHeader title="Матчи" />
+      <PageHero eyebrow="Матчи F16 Arena" title="Матчи" description="Live, ближайшие и сыгранные матчи всех турниров." />
+      <div className={`${WRAP} pt-14`}>
 
       {active.length === 0 && finished.length === 0 ? (
         <EmptyState title="Матчей пока нет" description="Матчи появятся, когда будет опубликована сетка турнира." />
       ) : (
-        <div className="space-y-20">
+        <div className="space-y-16">
           {live.length > 0 && (
             <section>
-              <h2 className="text-sm text-fg-3 mb-2">Сейчас в игре</h2>
+              <SectionLabel>Сейчас в игре</SectionLabel>
               {live.map((m) => (
                 <MatchLine key={m.id} m={m} />
               ))}
             </section>
           )}
           <section>
-            <h2 className="text-sm text-fg-3 mb-2">Ближайшие</h2>
+            <SectionLabel>Ближайшие</SectionLabel>
             {next.length > 0 ? (
               next.map((m) => <MatchLine key={m.id} m={m} />)
             ) : (
-              <p className="py-4 text-fg-2">Запланированных матчей нет.</p>
+              <p className="rounded-[12px] border border-dashed border-white/[0.12] px-8 py-7 text-[15px] lg:text-[17px] text-fg-3">
+                Запланированных матчей нет.
+              </p>
             )}
           </section>
           {finished.length > 0 && (
             <section>
-              <h2 className="text-sm text-fg-3 mb-2">Завершённые</h2>
+              <SectionLabel>Завершённые</SectionLabel>
               {finished.map((m) => (
                 <MatchLine key={m.id} m={m} />
               ))}
@@ -64,6 +69,7 @@ export default async function MatchesPage() {
           )}
         </div>
       )}
-    </Container>
+      </div>
+    </>
   );
 }

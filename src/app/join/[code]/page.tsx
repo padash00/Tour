@@ -4,6 +4,8 @@ import { getCurrentPlayer } from "@/lib/auth";
 import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamByInvite, getTeamMembers } from "@/lib/data";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Avatar, ButtonLink, Container, EmptyState, IconSteam, Notice, TeamLogo, buttonClass } from "@/components/ui";
+import { CARD } from "@/components/public/page-kit";
+import { Eyebrow } from "@/components/public/home";
 
 export const metadata: Metadata = { title: "Приглашение в команду" };
 
@@ -33,13 +35,13 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const captain = members.find((m) => m.role === "captain");
 
   return (
-    <Container className="flex min-h-[calc(100vh-68px)] items-center justify-center py-16">
-      <div className="w-full max-w-[420px] text-center">
+    <Container className="flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
+      <div className={`${CARD} w-full max-w-[520px] px-8 py-12 sm:px-12 text-center`}>
         <div className="flex justify-center">
-          <TeamLogo src={team.logo_url} tag={team.tag} size={88} />
+          <TeamLogo src={team.logo_url} tag={team.tag} size={104} />
         </div>
-        <div className="mt-8 text-sm text-fg-3">Вас пригласили в команду</div>
-        <h1 className="mt-2 text-[36px] font-bold tracking-[-0.035em] leading-tight">{team.name}</h1>
+        <Eyebrow className="mt-8">Вас пригласили в команду</Eyebrow>
+        <h1 className="mt-4 text-[38px] lg:text-[46px] font-semibold tracking-[-0.015em] leading-tight">{team.name}</h1>
         {captain && (
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-fg-3">
             <Avatar src={captain.player.avatar_url} name={captain.player.nickname} size={20} />
@@ -63,7 +65,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
         <div className="mt-10 text-left">
           {!player ? (
-            <a href={`/api/auth/steam?next=${encodeURIComponent(`/join/${code}`)}`} className={buttonClass("primary", "lg", "w-full")}>
+            <a href={`/api/auth/steam?next=${encodeURIComponent(`/join/${code}`)}`} className={buttonClass("primary", "lg", "w-full lg:h-[60px] rounded-[8px] text-[16px]")}>
               <IconSteam className="size-5" />
               Войти через Steam
             </a>
@@ -78,7 +80,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
           ) : (
             <ActionForm action={joinTeam}>
               <input type="hidden" name="code" value={code} />
-              <SubmitButton size="lg" className="w-full">
+              <SubmitButton size="lg" className="w-full lg:h-[60px] rounded-[8px] text-[16px]">
                 Вступить
               </SubmitButton>
             </ActionForm>

@@ -45,10 +45,10 @@ export function MapTile({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl h-24 sm:h-28 p-4 flex flex-col justify-end text-left transition-all duration-200 w-full",
+        "relative overflow-hidden rounded-[10px] border border-white/[0.08] h-28 sm:h-36 xl:h-44 p-4 lg:p-5 flex flex-col justify-end text-left transition-all duration-200 w-full",
         state === "banned" && "opacity-35 grayscale",
-        state === "picked" && "ring-1 ring-accent/70",
-        state === "decider" && "ring-1 ring-ok/70",
+        state === "picked" && "ring-2 ring-accent/80 border-transparent",
+        state === "decider" && "ring-2 ring-ok/70 border-transparent",
         interactive && "cursor-pointer hover:ring-1 hover:ring-white/40 hover:-translate-y-px",
         className,
       )}
@@ -63,7 +63,7 @@ export function MapTile({
       ) : (
         <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff0d,transparent_60%)]" />
       )}
-      <span className={cn("relative text-[17px] font-semibold tracking-[-0.01em]", state === "banned" && "line-through decoration-1")}>
+      <span className={cn("relative text-[17px] lg:text-[20px] font-semibold tracking-[-0.01em]", state === "banned" && "line-through decoration-1")}>
         {mapName(map)}
       </span>
       <span

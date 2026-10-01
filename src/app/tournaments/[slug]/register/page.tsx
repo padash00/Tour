@@ -9,8 +9,8 @@ import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
-import { FlowHeader, Step } from "@/components/competition/step";
-import { Avatar, ButtonLink, Container, FaceitLevel, Notice, Pill, TeamLogo } from "@/components/ui";
+import { Flow, FlowHeader, Step } from "@/components/public/flow";
+import { Avatar, ButtonLink, FaceitLevel, Notice, Pill, TeamLogo } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Регистрация на турнир" };
 
@@ -30,7 +30,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
     const soloReg = solo ? await getRegistration(t.id, solo.id) : null;
     const soloActive = soloReg && (soloReg.status === "pending" || soloReg.status === "approved");
     return (
-      <Container size="form">
+      <Flow>
         <FlowHeader back={back} title={`Регистрация на ${t.name}`} description="Турнир 1×1 — команда не нужна, вы участвуете сами." />
         <Step n={1} title="Участник" done>
           <div className="flex items-center gap-4">
@@ -78,7 +78,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             </ActionForm>
           )}
         </Step>
-      </Container>
+      </Flow>
     );
   }
 
@@ -87,7 +87,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
 
   if (!membership) {
     return (
-      <Container size="form">
+      <Flow>
         <FlowHeader back={back} title={`Регистрация на ${t.name}`} description={description} />
         <Step n={1} title="Команда">
           <p className="text-sm text-fg-2 mb-5">Создайте команду и пригласите игроков по ссылке — затем капитан подаёт заявку.</p>
@@ -95,7 +95,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         </Step>
         <Step n={2} title="Состав" muted />
         <Step n={3} title="Подтверждение" muted />
-      </Container>
+      </Flow>
     );
   }
 
@@ -118,7 +118,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   const captain = members.find((m) => m.player_id === team.captain_id)?.player;
 
   return (
-    <Container size="form">
+    <Flow>
       <FlowHeader back={back} title={`Регистрация на ${t.name}`} description={description} />
 
       <Step n={1} title="Команда" done>
@@ -220,6 +220,6 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           </ActionForm>
         </div>
       )}
-    </Container>
+    </Flow>
   );
 }

@@ -344,7 +344,7 @@ function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, s
 
       {t.sponsors?.length > 0 && (
         <section>
-          <h2 className="text-[15px] font-semibold text-fg-2 mb-4">Партнёры</h2>
+          <Eyebrow className="mb-5">Партнёры</Eyebrow>
           <div className="flex flex-wrap gap-x-10 gap-y-3 text-lg font-semibold text-fg-2">
             {t.sponsors.map((sp) =>
               sp.url ? (
@@ -386,18 +386,18 @@ function TeamsTab({
   return (
     <div>
       <div className="flex items-baseline justify-between mb-4">
-        <div className="text-sm text-fg-3">
+        <div className="text-[14px] lg:text-[15px] text-fg-3">
           {approved.length} {solo ? "участников" : "команд"}
           {pendingCount > 0 && ` · ещё на рассмотрении: ${pendingCount}`}
         </div>
       </div>
       {approved.map((r) => (
-        <div key={r.id} className="py-5 border-b border-white/[0.05] last:border-0">
+        <div key={r.id} className="py-6 border-b border-white/[0.06] last:border-0">
           <div className="flex items-center gap-4">
             {r.seed && <span className="num text-sm text-fg-3 w-6">{r.seed}</span>}
-            <TeamLogo src={r.team.logo_url} tag={r.team.tag} size={40} />
+            <TeamLogo src={r.team.logo_url} tag={r.team.tag} size={48} />
             <div className="min-w-0 flex-1">
-              <Link href={`/teams/${r.team.tag}`} className="text-[17px] font-semibold hover:text-accent-strong">
+              <Link href={`/teams/${r.team.tag}`} className="text-[18px] lg:text-[21px] font-semibold hover:text-accent-strong">
                 {r.team.name}
               </Link>
               <div className="text-[13px] text-fg-3">
@@ -408,7 +408,7 @@ function TeamsTab({
             {r.checked_in_at && <Pill tone="ok">Check-in</Pill>}
           </div>
           {!solo && (
-            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 sm:pl-[56px]">
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 sm:pl-[64px]">
               {r.roster
                 .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
                 .map((rp) => (
@@ -513,9 +513,9 @@ function RegistrationBox({
   }
 
   return (
-    <div className="rounded-2xl bg-surface p-6">
-      <h3 className="text-[15px] font-semibold mb-4">Регистрация</h3>
-      {body}
+    <div>
+      <Eyebrow className="mb-4">Регистрация</Eyebrow>
+      <div className="text-[15px]">{body}</div>
     </div>
   );
 }
@@ -541,12 +541,12 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
     { title: "Сыгранные", items: list.filter((m) => m.status === "finished").reverse() },
   ];
   return (
-    <div className="space-y-12 max-w-[960px]">
+    <div className="space-y-14 max-w-[1100px]">
       {groups
         .filter((g) => g.items.length)
         .map((g) => (
           <section key={g.title}>
-            <h3 className="text-[15px] font-semibold text-fg-2 mb-3">{g.title}</h3>
+            <Eyebrow className="mb-4">{g.title}</Eyebrow>
             <div className="-mx-4">
               {g.items.map((m) => (
                 <MatchRow key={m.id} m={m} stage={matchStage(m, matches)} />
@@ -573,13 +573,13 @@ async function MvpBlock({ tournamentId, finished }: { tournamentId: string; fini
   if (!mvp) return null;
   const nick = mvp.player?.nickname ?? mvp.name;
   return (
-    <section className="mb-16 pb-12 border-b border-line">
-      <div className="text-sm text-fg-3">{finished ? "MVP турнира" : mvp.by === "swing" ? "Лидер по Swing" : "Лидер по рейтингу"}</div>
+    <section className="mb-14 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-8 lg:p-10">
+      <Eyebrow>{finished ? "MVP турнира" : mvp.by === "swing" ? "Лидер по Swing" : "Лидер по рейтингу"}</Eyebrow>
       <div className="mt-4 flex flex-wrap items-center gap-x-10 gap-y-6">
         <div className="flex items-center gap-4 min-w-0">
           <Avatar src={mvp.player?.avatar_url} name={nick} size={56} />
           <div className="min-w-0">
-            <div className="text-[28px] font-bold tracking-[-0.03em] truncate">
+            <div className="text-[30px] lg:text-[36px] font-semibold tracking-[-0.015em] truncate">
               {mvp.player ? (
                 <Link href={`/players/${mvp.player.steam_id}`} className="hover:text-accent-strong">
                   {nick}
@@ -633,7 +633,7 @@ async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<Retur
         ))}
       {playoff.length > 0 ? (
         <div>
-          {hasStage && <h2 className="mb-8 text-[26px] font-bold tracking-[-0.025em]">Плей-офф</h2>}
+          {hasStage && <Eyebrow className="mb-8">Плей-офф</Eyebrow>}
           <BracketView matches={playoff} />
         </div>
       ) : (

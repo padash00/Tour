@@ -17,17 +17,17 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
   return (
     <div>
       {items.map((it) => (
-        <div key={it.key} className="flex items-center gap-4 h-16 border-b border-white/[0.05] last:border-0">
-          <Avatar src={it.player.avatar_url} name={it.player.nickname} size={36} />
+        <div key={it.key} className="flex items-center gap-5 h-[76px] border-b border-white/[0.05] last:border-0">
+          <Avatar src={it.player.avatar_url} name={it.player.nickname} size={48} />
           <div className="min-w-0 flex-1">
-            <Link href={`/players/${it.player.steam_id}`} className="font-medium hover:text-accent-strong truncate block">
+            <Link href={`/players/${it.player.steam_id}`} className="text-[17px] font-semibold hover:text-accent truncate block">
               {it.player.nickname}
             </Link>
-            <div className="text-[12px] text-fg-3">
+            <div className="mt-0.5 text-[12px] uppercase tracking-[0.16em] text-fg-3">
               {it.player.is_banned ? <span className="text-danger">Заблокирован</span> : roleLabel[it.role]}
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-3 text-sm text-fg-3">
+          <div className="hidden sm:flex items-center gap-3 text-[15px] text-fg-3">
             <FaceitLevel level={it.player.faceit_level} />
             <span className="num w-12 text-right">{it.player.faceit_elo ?? "—"}</span>
           </div>
@@ -36,9 +36,9 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
         </div>
       ))}
       {Array.from({ length: empty }, (_, i) => (
-        <div key={`empty-${i}`} className="flex items-center gap-4 h-16 border-b border-white/[0.05] last:border-0 text-fg-3">
-          <div className="size-9 rounded-full border border-dashed border-white/15" />
-          <span className="text-sm">Свободный слот</span>
+        <div key={`empty-${i}`} className="flex items-center gap-5 h-[76px] border-b border-white/[0.05] last:border-0 text-fg-3">
+          <div className="size-12 rounded-full border border-dashed border-white/15" />
+          <span className="text-[15px]">Свободный слот</span>
         </div>
       ))}
     </div>

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
-import { CurrentTournament, TournamentLine } from "@/components/public/bits";
-import { Container, EmptyState, PageHeader } from "@/components/ui";
+import { TournamentLine } from "@/components/public/bits";
+import { OutlineBtn, TournamentCard, WRAP } from "@/components/public/home";
+import { PageHero, SectionLabel } from "@/components/public/page-hero";
+import { cn } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Турниры" };
 
@@ -11,46 +14,57 @@ export default async function TournamentsPage() {
   const current = featured && !["finished", "cancelled"].includes(featured.status) ? featured : null;
   const upcoming = all.filter((t) => t.id !== current?.id && !["finished", "cancelled"].includes(t.status));
   const archive = all.filter((t) => ["finished", "cancelled"].includes(t.status));
+  const isFirst = !archive.some((t) => t.status === "finished");
 
   return (
-    <Container>
-      <PageHeader title="Турниры" />
+    <>
+      <PageHero eyebrow="Соревнования F16 Arena" title="Турниры" description="Турниры по CS2 на реальных серверах F16 Arena." />
 
-      <section>
-        <h2 className="text-sm text-fg-3 mb-8">Текущий</h2>
-        {current ? (
-          <CurrentTournament t={current} approved={counts[current.id] ?? 0} />
-        ) : (
-          <EmptyState
-            title="Сейчас турниров нет"
-            description="Следующий турнир F16 Arena будет объявлен здесь."
-          />
-        )}
-      </section>
-
-      <section className="mt-24">
-        <h2 className="text-sm text-fg-3">Предстоящие</h2>
-        {upcoming.length > 0 ? (
-          <div className="mt-2">
-            {upcoming.map((t) => (
-              <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 text-fg-2">Следующие турниры будут объявлены позже.</p>
-        )}
-      </section>
-
-      {archive.length > 0 && (
-        <section className="mt-24">
-          <h2 className="text-sm text-fg-3">Архив</h2>
-          <div className="mt-2">
-            {archive.map((t) => (
-              <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
-            ))}
-          </div>
+      <div className={cn(WRAP, "pt-14")}>
+        <section>
+          <SectionLabel>Текущий турнир</SectionLabel>
+          {current ? (
+            <TournamentCard t={current} approved={counts[current.id] ?? 0} isFirst={isFirst} />
+          ) : (
+            <div className="rounded-[12px] border border-dashed border-white/[0.12] bg-white/[0.012] px-8 py-10 lg:px-11">
+              <div className="text-[18px] lg:text-[22px] font-semibold text-fg">Сейчас турниров нет</div>
+              <p className="mt-2 text-[15px] lg:text-[17px] text-fg-3">Следующий турнир F16 Arena будет объявлен здесь.</p>
+              <div className="mt-7">
+                <OutlineBtn href="/team/create">Собрать команду</OutlineBtn>
+              </div>
+            </div>
+          )}
         </section>
-      )}
-    </Container>
+
+        <section className="mt-16 lg:mt-20">
+          <SectionLabel>Следующие турниры</SectionLabel>
+          {upcoming.length > 0 ? (
+            <div className="border-t border-white/[0.06]">
+              {upcoming.map((t) => (
+                <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-dashed border-white/[0.12] bg-white/[0.012] px-8 py-7 lg:px-11 lg:py-8">
+              <div className="text-[15px] lg:text-[18px] font-semibold text-fg">Скоро</div>
+              <div className="mt-1 text-[14px] lg:text-[16px] text-fg-3">Впереди ещё больше соревнований. Следите за обновлениями!</div>
+            </div>
+          )}
+        </section>
+
+        {archive.length > 0 && (
+          <section className="mt-16 lg:mt-20">
+            <SectionLabel action={<Link href="/stats" className="text-[14px] text-fg-3 hover:text-fg">Статистика →</Link>}>
+              Архив
+            </SectionLabel>
+            <div className="border-t border-white/[0.06]">
+              {archive.map((t) => (
+                <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </>
   );
 }

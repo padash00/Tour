@@ -26,7 +26,7 @@ export function RosterPicker({
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-4 text-sm">
+      <div className="mb-4 flex flex-wrap gap-6 text-[13px] uppercase tracking-[0.16em]">
         <span className={mains === size ? "text-ok" : "text-warn"}>
           Основа {mains}/{size}
         </span>
@@ -45,14 +45,14 @@ export function RosterPicker({
             { v: "out", label: "Не играет", disabled: false },
           ];
           return (
-            <div key={m.player_id} className="flex flex-wrap items-center gap-3 min-h-14 py-2 border-b border-white/[0.05] last:border-0">
-              <Avatar src={m.avatar_url} name={m.nickname} size={34} />
-              <span className={cn("flex-1 min-w-[120px] font-medium truncate", s === "out" && "text-fg-3")}>{m.nickname}</span>
+            <div key={m.player_id} className="flex flex-wrap items-center gap-4 min-h-[68px] py-2 border-b border-white/[0.05] last:border-0">
+              <Avatar src={m.avatar_url} name={m.nickname} size={42} />
+              <span className={cn("flex-1 min-w-[120px] text-[16px] font-semibold truncate", s === "out" && "text-fg-3")}>{m.nickname}</span>
               <FaceitLevel level={m.faceit_level} />
               {m.banned ? (
                 <span className="text-xs text-danger">заблокирован</span>
               ) : (
-                <div className="inline-flex rounded-lg bg-white/[0.04] p-0.5">
+                <div className="inline-flex rounded-[8px] border border-white/[0.08] bg-[#09111b] p-1">
                   {options.map((o) => (
                     <button
                       key={o.v}
@@ -60,8 +60,8 @@ export function RosterPicker({
                       disabled={o.disabled}
                       onClick={() => set(m.player_id, o.v)}
                       className={cn(
-                        "h-8 px-3 rounded-md text-xs font-medium transition disabled:opacity-30",
-                        s === o.v ? "bg-surface-3 text-fg" : "text-fg-3 hover:text-fg-2",
+                        "h-9 px-4 rounded-[6px] text-[13px] font-medium transition disabled:opacity-30",
+                        s === o.v ? (o.v === "main" ? "bg-accent text-[#07101b]" : "bg-white/[0.08] text-fg") : "text-fg-3 hover:text-fg-2",
                       )}
                     >
                       {o.label}
