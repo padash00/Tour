@@ -428,7 +428,7 @@ export async function autopilotTick() {
   for (const t of ts) {
     const { data: list } = await db()
       .from("matches")
-      .select("id, number, round, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
+      .select("id, number, round, stage, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
       .eq("tournament_id", t.id)
       .in("status", ["upcoming", "veto", "ready", "live"])
       .order("number");
@@ -436,6 +436,7 @@ export async function autopilotTick() {
       (a, b) =>
         (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.round - b.round || a.number - b.number,
     );
+    const stageIds = new Set(matches.filter((m) => m.stage === "group" || m.stage === "swiss").map((m) => m.id));
     // участник не может играть два матча одновременно: занят, если его матч уже на сервере или идёт
     const busy = new Set<string>();
     for (const m of matches) {
@@ -444,11 +445,23 @@ export async function autopilotTick() {
         if (m.team2_id) busy.add(m.team2_id);
       }
     }
-    const free = (m: { team1_id: string | null; team2_id: string | null }) =>
-      !!m.team1_id && !!m.team2_id && !busy.has(m.team1_id) && !busy.has(m.team2_id);
+    // группы / круговая / швейцарка — строго по турам: следующий тур, когда весь текущий сыгран
+    const { data: openStage } = await db()
+      .from("matches")
+      .select("round, stage")
+      .eq("tournament_id", t.id)
+      .in("stage", ["group", "swiss"])
+      .not("status", "in", "(finished,cancelled)");
+    const currentRound = openStage?.length ? Math.min(...openStage.map((x) => x.round)) : null;
+    const free = (m: { team1_id: string | null; team2_id: string | null; round: number; id: string }) =>
+      !!m.team1_id &&
+      !!m.team2_id &&
+      !busy.has(m.team1_id) &&
+      !busy.has(m.team2_id) &&
+      (currentRound == null || !stageIds.has(m.id) || m.round === currentRound);
 
     // 1. вето — как только соперники известны
-    for (const m of matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x))) {
+    for (const m of matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x) && free(x))) {
       const { data: updated } = await db()
         .from("matches")
         .update({ status: "veto", veto_deadline: new Date(now + 60_000).toISOString() })
