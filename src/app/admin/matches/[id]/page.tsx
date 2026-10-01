@@ -11,7 +11,9 @@ import {
   setServerInfo,
   startVeto,
 } from "@/app/actions/admin-match";
+import { sendMatchToServer } from "@/app/actions/admin-server";
 import { mapName } from "@/lib/format";
+import { getServerState } from "@/lib/server-control";
 import { applyVetoTimeouts, getMatch } from "@/lib/matches";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -25,12 +27,13 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   await applyVetoTimeouts(id);
   const m = await getMatch(id);
   if (!m) notFound();
+  const servers = await getServerState();
   const t1 = m.team1?.name ?? "TBD";
   const t2 = m.team2?.name ?? "TBD";
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {["veto", "live"].includes(m.status) && <LiveRefresh intervalMs={4000} />}
+      {(["veto", "live"].includes(m.status) || m.server_state === "loading") && <LiveRefresh intervalMs={4000} />}
       <div>
         <Link href="/admin/matches" className="text-sm text-fg-3 hover:text-fg-2">
           ← Матчи
@@ -95,23 +98,63 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
       </Card>
 
       {/* 2. Сервер */}
-      <Card className="p-6">
-        <div className="label mb-4">2 · Сервер</div>
-        <ActionForm action={setServerInfo}>
-          <input type="hidden" name="matchId" value={m.id} />
-          <div className="grid sm:grid-cols-[1.4fr_1fr_auto] gap-3 items-end">
-            <Field label="Адрес (ip:port)">
-              <input name="address" defaultValue={m.server_address ?? ""} placeholder="192.168.0.100:27015" className="field num" />
-            </Field>
-            <Field label="Пароль">
-              <input name="password" defaultValue={m.server_password ?? ""} className="field num" />
-            </Field>
-            <SubmitButton variant="secondary">Сохранить</SubmitButton>
-          </div>
-        </ActionForm>
-        <p className="mt-3 text-xs text-fg-3">
-          Видно только игрокам этого матча. На этапе 3 сервер будет назначаться автоматически через Server Agent.
-        </p>
+      <Card className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="label">2 · Сервер</div>
+          <span className={cn("text-xs", servers.online ? "text-ok" : "text-danger")}>
+            Agent {servers.online ? "online" : "offline"}
+          </span>
+        </div>
+        {m.server_instance && (
+          <p className="text-sm text-fg-2">
+            {m.server_instance} ·{" "}
+            {m.server_state === "ready"
+              ? `готов, игроки видят ${m.server_address}`
+              : m.server_state === "error"
+                ? "ошибка загрузки матча — смотрите журнал команд на странице «Серверы»"
+                : "загружаем матч в MatchZy…"}
+          </p>
+        )}
+        {["ready", "live"].includes(m.status) ? (
+          <ActionForm action={sendMatchToServer}>
+            <input type="hidden" name="matchId" value={m.id} />
+            <div className="flex flex-wrap items-center gap-2">
+              <select name="instance" className="field w-56" defaultValue="">
+                <option value="">Свободный сервер автоматически</option>
+                {servers.instances.map((i) => (
+                  <option key={i.name} value={i.name}>
+                    {i.name} · {!i.running ? "выключен" : (i.gamestate ?? "none") === "none" ? "свободен" : i.gamestate}
+                    {i.role === "reserve" ? " · резерв" : ""}
+                  </option>
+                ))}
+              </select>
+              <SubmitButton variant={m.server_instance ? "secondary" : "primary"}>
+                {m.server_instance ? "Перенести на другой сервер" : "Отправить на сервер"}
+              </SubmitButton>
+            </div>
+            <p className="mt-2 text-xs text-fg-3">
+              Агент загрузит матч в MatchZy (составы по SteamID, карты после вето). Адрес появится у игроков после проверки сервера.
+              Счёт и результат придут автоматически.
+            </p>
+          </ActionForm>
+        ) : (
+          <p className="text-sm text-fg-3">Сервер назначается после вето.</p>
+        )}
+        <details>
+          <summary className="cursor-pointer text-xs text-fg-3 hover:text-fg-2">Указать адрес вручную (если агент недоступен)</summary>
+          <ActionForm action={setServerInfo} className="mt-3">
+            <input type="hidden" name="matchId" value={m.id} />
+            <div className="grid sm:grid-cols-[1.4fr_1fr_auto] gap-3 items-end">
+              <Field label="Адрес (ip:port)">
+                <input name="address" defaultValue={m.server_address ?? ""} placeholder="192.168.0.159:27015" className="field num" />
+              </Field>
+              <Field label="Пароль">
+                <input name="password" defaultValue={m.server_password ?? ""} className="field num" />
+              </Field>
+              <SubmitButton variant="secondary">Сохранить</SubmitButton>
+            </div>
+          </ActionForm>
+        </details>
       </Card>
 
       {/* 3. Игра */}

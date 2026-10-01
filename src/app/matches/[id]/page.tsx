@@ -228,7 +228,11 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                   </p>
                 </div>
               ) : (
-                <p className="text-sm text-fg-3">Сервер готовится. Адрес появится здесь — страница обновится сама.</p>
+                <p className="text-sm text-fg-3">
+                  {m.server_state === "loading"
+                    ? "Сервер загружает матч и проверяет составы. Адрес появится здесь через несколько секунд."
+                    : "Сервер готовится. Адрес появится здесь — страница обновится сама."}
+                </p>
               )}
             </Card>
           )}

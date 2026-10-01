@@ -5,7 +5,7 @@ import { formatShortDateTime, tournamentStatusLabel } from "@/lib/format";
 import type { AuditLog, Player, Tournament } from "@/lib/types";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { ButtonLink, Card, EmptyState, Pill, SectionTitle } from "@/components/ui";
-import { SERVER_PLAN } from "./servers/plan";
+import { getServerState } from "@/lib/server-control";
 
 export const metadata: Metadata = { title: "Админ-панель" };
 
@@ -20,6 +20,7 @@ export default async function AdminOverview() {
     db().from("tournaments").select("*").not("status", "in", "(finished,cancelled)").order("starts_at"),
     db().from("audit_logs").select("*, actor:players(nickname)").order("created_at", { ascending: false }).limit(8),
   ]);
+  const servers = await getServerState();
   const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
   const logs = (logsRes.data ?? []) as (AuditLog & { actor: Pick<Player, "nickname"> | null })[];
@@ -89,17 +90,18 @@ export default async function AdminOverview() {
       <section>
         <SectionTitle title="Серверы" action={<Link href="/admin/servers" className="text-sm text-fg-3 hover:text-fg">Подробнее →</Link>} />
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {SERVER_PLAN.map((s) => (
+          {servers.instances.map((s) => (
             <Card key={s.name} className="p-4">
               <div className="flex items-center justify-between">
                 <span className="font-semibold num text-sm">{s.name}</span>
-                <span className="size-2 rounded-full bg-fg-3" />
+                <span className={`size-2 rounded-full ${!servers.online || !s.running ? "bg-fg-3" : (s.gamestate ?? "none") === "none" ? "bg-ok" : "bg-danger"}`} />
               </div>
-              <div className="mt-3 text-xs text-fg-3">{s.reserve ? "STANDBY" : "OFFLINE"}</div>
+              <div className="mt-3 text-xs text-fg-3 uppercase">
+                {!servers.online ? "agent offline" : !s.running ? (s.role === "reserve" ? "standby" : "offline") : (s.gamestate ?? "none") === "none" ? "free" : s.gamestate}
+              </div>
             </Card>
           ))}
         </div>
-        <p className="mt-3 text-xs text-fg-3">Server Agent ещё не подключён — статусы появятся на этапе 3.</p>
       </section>
 
       <section>

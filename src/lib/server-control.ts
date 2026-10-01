@@ -1,0 +1,364 @@
+import "server-only";
+import { timingSafeEqual } from "node:crypto";
+import { notify } from "./audit";
+import { getMatch, getMatchRosters, recomputeSeries, syncBracket } from "./matches";
+import { db } from "./supabase";
+import type { Match } from "./types";
+
+// ───────────────────────── авторизация агента и MatchZy
+
+function safeEqual(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+export function checkBearer(request: Request, envName: "AGENT_TOKEN" | "MATCHZY_TOKEN") {
+  const expected = process.env[envName];
+  if (!expected) return false;
+  const header = request.headers.get("authorization") ?? "";
+  return safeEqual(header, `Bearer ${expected}`);
+}
+
+// ───────────────────────── типы
+
+export type ServerInstance = {
+  name: string;
+  port: number;
+  role: "active" | "reserve";
+  running: boolean;
+  gamestate: string | null;
+  map: string | null;
+  players: number | null;
+  matchzy_match_id: number | null;
+  match_id: string | null;
+  last_seen_at: string | null;
+  info: Record<string, unknown>;
+};
+
+export type ServerHost = { id: string; lan_ip: string | null; last_seen_at: string | null; info: Record<string, unknown> };
+
+export type AgentCommand = {
+  id: string;
+  instance: string | null;
+  type: "start" | "stop" | "restart" | "load_match" | "end_match" | "rcon";
+  payload: Record<string, unknown>;
+  status: "pending" | "sent" | "done" | "error";
+  result: string | null;
+  created_at: string;
+};
+
+export const AGENT_OFFLINE_AFTER_MS = 30_000;
+
+export async function getServerState() {
+  const [{ data: host }, { data: instances }] = await Promise.all([
+    db().from("server_host").select("*").eq("id", "main").maybeSingle(),
+    db().from("server_instances").select("*").order("name"),
+  ]);
+  const h = host as ServerHost | null;
+  const online = !!h?.last_seen_at && Date.now() - new Date(h.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
+  return { host: h, online, instances: (instances ?? []) as ServerInstance[] };
+}
+
+export async function enqueueCommand(
+  instance: string | null,
+  type: AgentCommand["type"],
+  payload: Record<string, unknown> = {},
+  createdBy?: string,
+) {
+  await db().from("agent_commands").insert({ instance, type, payload, created_by: createdBy ?? null });
+}
+
+// ───────────────────────── конфиг матча для MatchZy
+
+export async function buildMatchzyConfig(matchId: string, siteOrigin: string) {
+  const m = await getMatch(matchId);
+  if (!m || !m.team1 || !m.team2 || m.maps.length === 0 || m.matchzy_id == null) return null;
+  const rosters = await getMatchRosters(m);
+  const players = (list: typeof rosters.team1) =>
+    Object.fromEntries(list.map((r) => [r.player.steam_id, r.player.nickname]));
+
+  const observers = (process.env.OBSERVER_STEAM_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^\d{17}$/.test(s));
+
+  return {
+    matchid: m.matchzy_id,
+    team1: { id: m.team1.id, name: m.team1.name, tag: m.team1.tag, players: players(rosters.team1) },
+    team2: { id: m.team2.id, name: m.team2.name, tag: m.team2.tag, players: players(rosters.team2) },
+    num_maps: m.best_of,
+    maplist: m.maps.map((x) => x.map_name),
+    map_sides: m.maps.map(() => "knife"),
+    skip_veto: true, // вето уже прошло на сайте
+    clinch_series: true,
+    players_per_team: 5,
+    min_players_to_ready: 10,
+    min_spectators_to_ready: 0,
+    spectators: { players: Object.fromEntries(observers.map((id, i) => [id, `F16 Observer ${i + 1}`])) },
+    cvars: {
+      matchzy_remote_log_url: `${siteOrigin}/api/matchzy/events`,
+      matchzy_remote_log_header_key: "Authorization",
+      matchzy_remote_log_header_value: `Bearer ${process.env.MATCHZY_TOKEN}`,
+      hostname: `F16 Arena | ${m.team1.tag} vs ${m.team2.tag}`,
+    },
+  };
+}
+
+// ───────────────────────── назначение сервера
+
+/** Свободный инстанс: агент его видит запущенным, MatchZy без матча, и он не закреплён за другим матчем */
+export async function pickFreeInstance(preferRole: "active" | "reserve" = "active") {
+  const { online, instances } = await getServerState();
+  if (!online) return null;
+  const { data: busy } = await db()
+    .from("matches")
+    .select("server_instance")
+    .not("server_instance", "is", null)
+    .in("status", ["ready", "live"]);
+  const taken = new Set((busy ?? []).map((b) => b.server_instance));
+  const free = instances.filter((i) => i.running && (i.gamestate ?? "none") === "none" && !taken.has(i.name));
+  return free.find((i) => i.role === preferRole) ?? free[0] ?? null;
+}
+
+export async function assignServer(match: Match, instanceName: string, actorId?: string) {
+  await db()
+    .from("matches")
+    .update({ server_instance: instanceName, server_state: "loading", server_address: null, server_password: null })
+    .eq("id", match.id);
+  await enqueueCommand(instanceName, "load_match", { match_id: match.id }, actorId);
+}
+
+// ───────────────────────── синхронизация с агентом
+
+export type AgentReport = {
+  lan_ip?: string;
+  info?: Record<string, unknown>;
+  instances?: {
+    name: string;
+    running: boolean;
+    map?: string | null;
+    players?: number | null;
+    get5?: { gamestate?: string; matchid?: number | null; map_number?: number | null } | null;
+  }[];
+};
+
+export async function applyAgentReport(report: AgentReport) {
+  const now = new Date().toISOString();
+  await db()
+    .from("server_host")
+    .upsert({ id: "main", lan_ip: report.lan_ip ?? null, last_seen_at: now, info: report.info ?? {} });
+
+  const lanIp = report.lan_ip;
+  for (const inst of report.instances ?? []) {
+    const gamestate = inst.running ? (inst.get5?.gamestate ?? null) : null;
+    const matchzyId = inst.running ? (inst.get5?.matchid ?? null) : null;
+    const { data: match } = matchzyId
+      ? await db().from("matches").select("*").eq("matchzy_id", matchzyId).maybeSingle()
+      : { data: null };
+
+    await db()
+      .from("server_instances")
+      .update({
+        running: inst.running,
+        gamestate,
+        map: inst.map ?? null,
+        players: inst.players ?? null,
+        matchzy_match_id: matchzyId,
+        match_id: match?.id ?? null,
+        last_seen_at: now,
+      })
+      .eq("name", inst.name);
+
+    // health check: матч загрузился на назначенный сервер → выдаём адрес игрокам
+    const m = match as Match | null;
+    if (m && m.server_instance === inst.name && m.server_state === "loading" && gamestate && gamestate !== "none" && lanIp) {
+      const { data: row } = await db().from("server_instances").select("port").eq("name", inst.name).single();
+      await db()
+        .from("matches")
+        .update({ server_state: "ready", server_address: `${lanIp}:${row?.port}` })
+        .eq("id", m.id);
+      const full = await getMatch(m.id);
+      const captains = [full?.team1?.captain_id, full?.team2?.captain_id].filter(Boolean) as string[];
+      await notify(captains, `Сервер для матча #${m.number} готов`, "Откройте страницу матча и нажмите «Подключиться».", `/matches/${m.id}`);
+    }
+  }
+}
+
+/** Отдаёт агенту ожидающие команды, подставляя абсолютные URL и токены */
+export async function takePendingCommands(siteOrigin: string) {
+  const { data } = await db()
+    .from("agent_commands")
+    .select("*")
+    .eq("status", "pending")
+    .order("created_at")
+    .limit(20);
+  const commands = (data ?? []) as AgentCommand[];
+  if (commands.length === 0) return [];
+  await db()
+    .from("agent_commands")
+    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .in("id", commands.map((c) => c.id));
+
+  return commands.map((c) => {
+    if (c.type === "load_match") {
+      return {
+        ...c,
+        payload: {
+          ...c.payload,
+          url: `${siteOrigin}/api/matchzy/config/${c.payload.match_id}`,
+          header_key: "Authorization",
+          header_value: `Bearer ${process.env.MATCHZY_TOKEN}`,
+        },
+      };
+    }
+    return c;
+  });
+}
+
+export async function ackCommand(id: string, ok: boolean, result: string) {
+  const { data } = await db()
+    .from("agent_commands")
+    .update({ status: ok ? "done" : "error", result: result.slice(0, 4000), done_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  const cmd = data as AgentCommand | null;
+  if (cmd?.type === "load_match" && !ok) {
+    await db().from("matches").update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
+  }
+}
+
+// ───────────────────────── события MatchZy
+
+type StatsPlayer = { steamid: string; name: string; stats: Record<string, number> };
+type StatsTeam = { id?: string; name?: string; score?: number; series_score?: number; players?: StatsPlayer[] };
+type MatchzyEvent = {
+  event: string;
+  matchid?: number;
+  map_number?: number;
+  round_number?: number;
+  winner?: { side?: string; team?: string };
+  team1?: StatsTeam;
+  team2?: StatsTeam;
+  team1_series_score?: number;
+  team2_series_score?: number;
+};
+
+async function upsertPlayerStats(match: Match, mapNumber: number, ev: MatchzyEvent) {
+  const sides: [StatsTeam | undefined, string | null][] = [
+    [ev.team1, match.team1_id],
+    [ev.team2, match.team2_id],
+  ];
+  const all = sides.flatMap(([t]) => t?.players ?? []);
+  if (all.length === 0) return;
+  const { data: known } = await db().from("players").select("id, steam_id").in("steam_id", all.map((p) => String(p.steamid)));
+  const byStem = new Map((known ?? []).map((p) => [p.steam_id, p.id]));
+
+  const rows = sides.flatMap(([t, teamId]) =>
+    (t?.players ?? []).map((p) => {
+      const s = p.stats ?? {};
+      const n = (k: string) => Number(s[k] ?? 0) || 0;
+      return {
+        match_id: match.id,
+        map_number: mapNumber,
+        steam_id: String(p.steamid),
+        player_id: byStem.get(String(p.steamid)) ?? null,
+        team_id: teamId,
+        name: p.name,
+        kills: n("kills"),
+        deaths: n("deaths"),
+        assists: n("assists"),
+        damage: n("damage"),
+        headshot_kills: n("headshot_kills"),
+        rounds_played: n("rounds_played"),
+        kast: n("kast"),
+        first_kills: n("first_kills_t") + n("first_kills_ct"),
+        first_deaths: n("first_deaths_t") + n("first_deaths_ct"),
+        trade_kills: n("trade_kills"),
+        clutch_wins: n("1v1") + n("1v2") + n("1v3") + n("1v4") + n("1v5"),
+        multi_kills: { "2k": n("2k"), "3k": n("3k"), "4k": n("4k"), "5k": n("5k") },
+        utility_damage: n("utility_damage"),
+        enemies_flashed: n("enemies_flashed"),
+        flash_assists: n("flash_assists"),
+        bomb_plants: n("bomb_plants"),
+        bomb_defuses: n("bomb_defuses"),
+        mvp: n("mvp"),
+        raw: s,
+        updated_at: new Date().toISOString(),
+      };
+    }),
+  );
+  await db().from("player_map_stats").upsert(rows, { onConflict: "match_id,map_number,steam_id" });
+}
+
+export async function handleMatchzyEvent(ev: MatchzyEvent) {
+  const { data } = ev.matchid != null
+    ? await db().from("matches").select("*").eq("matchzy_id", ev.matchid).maybeSingle()
+    : { data: null };
+  const match = data as Match | null;
+
+  await db().from("match_events").insert({
+    match_id: match?.id ?? null,
+    matchzy_id: ev.matchid ?? null,
+    event: ev.event,
+    map_number: ev.map_number ?? null,
+    round_number: ev.round_number ?? null,
+    payload: ev,
+  });
+  if (!match) return;
+
+  // MatchZy нумерует карты с 0, у нас — с 1
+  const mapNumber = (ev.map_number ?? 0) + 1;
+  const setMap = (patch: Record<string, unknown>) =>
+    db().from("match_maps").update(patch).eq("match_id", match.id).eq("map_number", mapNumber);
+
+  switch (ev.event) {
+    case "series_start":
+    case "going_live": {
+      if (match.status === "ready") {
+        await db().from("matches").update({ status: "live", started_at: new Date().toISOString() }).eq("id", match.id);
+      }
+      if (ev.event === "going_live") await setMap({ status: "live" });
+      break;
+    }
+    case "round_end": {
+      await setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "live" });
+      await upsertPlayerStats(match, mapNumber, ev);
+      break;
+    }
+    case "map_result": {
+      const winnerTeam = ev.winner?.team === "team1" ? match.team1_id : ev.winner?.team === "team2" ? match.team2_id : null;
+      await setMap({
+        team1_score: ev.team1?.score ?? 0,
+        team2_score: ev.team2?.score ?? 0,
+        status: "finished",
+        winner_id: winnerTeam,
+      });
+      await upsertPlayerStats(match, mapNumber, ev);
+      if (match.status === "ready") await db().from("matches").update({ status: "live" }).eq("id", match.id);
+      await recomputeSeries(match.id);
+      break;
+    }
+    case "series_end": {
+      const fresh = await getMatch(match.id);
+      if (fresh && fresh.status !== "finished") {
+        const winner = ev.winner?.team === "team1" ? match.team1_id : ev.winner?.team === "team2" ? match.team2_id : null;
+        if (winner) {
+          await db()
+            .from("matches")
+            .update({
+              status: "finished",
+              winner_id: winner,
+              team1_score: ev.team1_series_score ?? fresh.team1_score,
+              team2_score: ev.team2_series_score ?? fresh.team2_score,
+              finished_at: new Date().toISOString(),
+            })
+            .eq("id", match.id);
+          await syncBracket(match.tournament_id);
+        }
+      }
+      break;
+    }
+  }
+}

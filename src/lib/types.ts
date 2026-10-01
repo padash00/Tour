@@ -150,6 +150,9 @@ export type Match = {
   veto_deadline: string | null;
   server_address: string | null;
   server_password: string | null;
+  matchzy_id: number | null;
+  server_instance: string | null;
+  server_state: "assigned" | "loading" | "ready" | "error" | null;
   scheduled_at: string | null;
   started_at: string | null;
   finished_at: string | null;

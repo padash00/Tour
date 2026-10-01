@@ -65,7 +65,7 @@ const tqa = teamId ? `&teamId=${teamId}` : "";
 console.log(`✓ проект: ${project.name}${teamId ? ` (команда ${teams.find((t) => t.id === teamId)?.slug})` : ""}`);
 
 // ── переменные окружения
-const keys = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SESSION_SECRET", "STEAM_API_KEY", "FACEIT_API_KEY", "ADMIN_STEAM_IDS"];
+const keys = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SESSION_SECRET", "STEAM_API_KEY", "FACEIT_API_KEY", "ADMIN_STEAM_IDS", "AGENT_TOKEN", "MATCHZY_TOKEN", "OBSERVER_STEAM_IDS"];
 const payload = keys
   .filter((k) => env[k])
   .map((k) => ({ key: k, value: env[k], type: "encrypted", target: ["production", "preview", "development"] }));

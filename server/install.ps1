@@ -67,6 +67,12 @@ Write-Host "OK  конфиги инстансов: $($instances.name -join ', ')
 $f16 = Join-Path $ServerDir "f16"
 New-Item -ItemType Directory -Force $f16 | Out-Null
 Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
+# F16 Server Agent
+New-Item -ItemType Directory -Force (Join-Path $f16 "agent") | Out-Null
+Copy-Item (Join-Path $repo "agent\*.mjs") (Join-Path $f16 "agent") -Force
+if (-not (Test-Path (Join-Path $f16 "agent.json"))) {
+  Write-Host "!!  Нет $f16gent.json — создайте: { siteUrl, token (AGENT_TOKEN), lanIp }"
+}
 Write-Host "OK  $f16\start.ps1"
 Write-Host ""
 Write-Host "Готово. Запуск: powershell -ExecutionPolicy Bypass -File server\start.ps1 -Name CS2-01"
