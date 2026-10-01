@@ -54,7 +54,11 @@ start / stop / restart / load_match / end_match / rcon. Сайт к сервер
 
 - Конфиг: `D:\cs2server\f16\agent.json` — `siteUrl`, `token` (= `AGENT_TOKEN` в Vercel), `lanIp`. В git не хранится.
 - Ручной запуск: `D:\cs2server\F16-agent.bat` (перезапускается сам при падении).
-- Автозапуск при входе в Windows: `shell:startup\F16-Arena.bat` → `D:\cs2server\F16-autostart.bat` (CS2-01..03 + агент).
+- Автозапуск: задача Планировщика Windows «F16 Server Agent» (при входе) → `D:\cs2server\F16-autostart.bat` (CS2-01..03 + агент).
+- Самообновление: сайт отдаёт `server/agent`, `start.ps1`, `install.ps1`, `instances.csv`, `cfg/**` по версии (хэш).
+  После деплоя агент сам скачивает новую версию и перезапускается. Ручное копирование не нужно.
+- Обслуживание из админки «Серверы»: обновить CS2 (SteamCMD под кешированным логином), обновить плагины
+  (последние Metamod / CounterStrikeSharp / MatchZy), перезапустить все — только когда нет активных матчей.
 
 Поток матча: вето на сайте → админ «Отправить на сервер» → агент `matchzy_loadmatch_url` →
 MatchZy забирает конфиг (составы по SteamID, карты) → агент ставит адрес событий → сайт видит
