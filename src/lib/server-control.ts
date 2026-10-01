@@ -531,6 +531,7 @@ export async function autopilotTick() {
     // 2. готовые матчи — на свободные серверы
     for (const m of matches.filter((x) => x.status === "ready" && (!x.server_instance || x.server_state === "error") && due(x))) {
       if (!free(m)) continue; // кто-то из участников ещё доигрывает другой матч
+      if (await workshopLoadBusy(m.id)) continue; // другой сервер сейчас качает/грузит карту — по одному
       const inst = await pickFreeInstance();
       if (!inst) return; // свободных серверов нет — ждём следующей синхронизации
       busy.add(m.team1_id!);
@@ -606,7 +607,11 @@ async function saveWorkshopResults(result: string) {
  */
 export async function verifyWorkshopLibrary() {
   const [library, info] = await Promise.all([getWorkshopMaps(), workshopInfo()]);
-  const unchecked = library.map((w) => w.split("@")[1]).filter((id) => !info[id]);
+  // непроверенные + те, что не загрузились больше часа назад (сбой мог быть разовым — сервер упал, Steam тормозил)
+  const hourAgo = Date.now() - 60 * 60_000;
+  const unchecked = library
+    .map((w) => w.split("@")[1])
+    .filter((id) => !info[id] || (!info[id].ok && new Date(info[id].checked_at).getTime() < hourAgo));
   if (!unchecked.length) return;
   // прогрев идёт до 4 минут; команда старше 10 минут считается зависшей (агент перезапускался) и не блокирует
   const since = new Date(Date.now() - 10 * 60_000).toISOString();
@@ -617,6 +622,86 @@ export async function verifyWorkshopLibrary() {
     .gte("created_at", since);
   if (count) return;
   await enqueueCommand(null, "prefetch_maps", { workshop_ids: unchecked });
+}
+
+// ───────────────────────── сторож: зависшие команды и загрузки
+
+/** Команды агента, которые выполняются быстро (агент обрывает их через 60 с) */
+const QUICK_COMMANDS = ["start", "stop", "restart", "load_match", "end_match", "rcon"];
+const STALE_COMMAND_MS = 3 * 60_000;
+const LOAD_WATCHDOG_MS = MAP_LOAD_TIMEOUT_MS + 60_000;
+
+/**
+ * Агент перезапустился посреди команды или упал — команда навсегда «отправлено», а матч навсегда «loading».
+ * Такие команды закрываем ошибкой, а матч переводим в «error», чтобы автопилот/админ перенёс его.
+ * Вызывается на каждой синхронизации агента.
+ */
+export async function expireStaleWork() {
+  const staleBefore = new Date(Date.now() - STALE_COMMAND_MS).toISOString();
+  const { data: stale } = await db()
+    .from("agent_commands")
+    .update({ status: "error", result: "нет ответа агента (перезапуск или сбой) — команда снята", done_at: new Date().toISOString() })
+    .eq("status", "sent")
+    .in("type", QUICK_COMMANDS)
+    .lt("sent_at", staleBefore)
+    .select("id, type, instance, payload");
+  for (const c of stale ?? []) {
+    if (c.type === "load_match" && c.payload?.match_id) {
+      await db().from("matches").update({ server_state: "error" }).eq("id", String(c.payload.match_id)).eq("server_state", "loading");
+    }
+  }
+
+  // матч «загружается», но MatchZy так и не взял его (конфиг не скачался, команда потерялась)
+  const loadBefore = new Date(Date.now() - LOAD_WATCHDOG_MS).toISOString();
+  const { data: loading } = await db()
+    .from("matches")
+    .select("id, number, matchzy_id, server_instance")
+    .eq("server_state", "loading")
+    .lt("server_assigned_at", loadBefore);
+  if (!loading?.length) return;
+  const { data: insts } = await db().from("server_instances").select("name, matchzy_match_id");
+  const onServer = new Map((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
+  for (const m of loading) {
+    if (onServer.get(m.server_instance) === m.matchzy_id) continue; // загружен — ждёт карту, это проверяет health check
+    await db().from("matches").update({ server_state: "error" }).eq("id", m.id).eq("server_state", "loading");
+    await notify(
+      await adminIds(),
+      `Матч #${m.number}: сервер ${m.server_instance} не принял матч`,
+      "MatchZy не загрузил конфиг за 3 минуты. Автопилот перенесёт матч на свободный сервер; проверьте журнал команд агента.",
+      `/admin/matches/${m.id}`,
+    );
+  }
+}
+
+/**
+ * Матч с Workshop-картой ждёт, если:
+ *  - карта ещё не прогрета/не подтверждена прогревом (загрузка через матч без кэша роняет сервер) —
+ *    прогрев запустит verifyWorkshopLibrary / enqueuePrefetch, матч уйдёт после подтверждения;
+ *  - другой матч сейчас грузится: все инстансы делят одну папку steamapps, загружаем по одному.
+ */
+async function workshopLoadBusy(matchId: string) {
+  const { data: maps } = await db().from("match_maps").select("map_name").eq("match_id", matchId).order("map_number");
+  const ws = (maps ?? []).map((m) => m.map_name).filter((n) => n.includes("@"));
+  if (!ws.length) return false;
+  const info = await workshopInfo();
+  const unverified = ws.map((n) => n.split("@")[1]).filter((id) => !info[id]?.ok);
+  if (unverified.length) {
+    // карт турнира может не быть в библиотеке — прогреваем их напрямую (не чаще раза в 10 минут)
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { count } = await db()
+      .from("agent_commands")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "prefetch_maps")
+      .gte("created_at", since);
+    if (!count) await enqueueCommand(null, "prefetch_maps", { workshop_ids: [...new Set(unverified)] });
+    return true;
+  }
+  const { count } = await db()
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("server_state", "loading")
+    .neq("id", matchId);
+  return !!count;
 }
 
 // ───────────────────────── закрытие матчей завершённого турнира

@@ -11,6 +11,7 @@ import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ADMIN_CARD, AdminHeader, AdminLabel, Dot, Panel } from "@/components/admin/control";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Настройки — F16 Control" };
 
@@ -85,6 +86,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export default async function SettingsPage(props: PageProps<"/admin/settings">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
   const [settings, workshop, info, mapImages, disabledMaps] = await Promise.all([

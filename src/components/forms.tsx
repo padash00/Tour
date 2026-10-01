@@ -124,7 +124,7 @@ export function CopyField({ value }: { value: string }) {
   const toast = useToast();
   return (
     <div className="flex gap-2">
-      <input readOnly value={value} className="field num text-[13px]" onFocus={(e) => e.currentTarget.select()} />
+      <input readOnly value={value} aria-label="Ссылка для копирования" className="field num text-[13px]" onFocus={(e) => e.currentTarget.select()} />
       <button
         type="button"
         className={buttonClass("secondary", "md", "shrink-0 w-32")}

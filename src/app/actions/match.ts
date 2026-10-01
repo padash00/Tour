@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { BANNED_ERROR } from "@/lib/data";
 import { applyVetoTimeouts, getMatch, insertVetoAction } from "@/lib/matches";
 import { VETO_STEP_SECONDS, vetoState } from "@/lib/veto";
 import type { ActionResult } from "@/components/forms";
@@ -11,6 +12,7 @@ export async function vetoAct(_prev: ActionResult, formData: FormData): Promise<
   const matchId = String(formData.get("matchId"));
   const map = String(formData.get("map"));
   const player = await requirePlayer(`/matches/${matchId}`);
+  if (player.is_banned) return { error: BANNED_ERROR };
 
   await applyVetoTimeouts(matchId);
   const m = await getMatch(matchId);

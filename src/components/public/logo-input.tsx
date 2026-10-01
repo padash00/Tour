@@ -45,6 +45,7 @@ export function LogoInput({ name = "logo", current, tag }: { name?: string; curr
         ref={input}
         name={name}
         type="file"
+        aria-label="Логотип команды"
         accept="image/png,image/jpeg,image/webp"
         className="sr-only"
         onChange={(e) => {

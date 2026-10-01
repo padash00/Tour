@@ -96,11 +96,12 @@ export default async function MyTeamPage() {
             <StatusChip tone={full ? "ok" : "warn"} size="sm">
               {full ? "Состав собран" : `Нужно ещё ${MAX_MAIN - mains}`}
             </StatusChip>
-            <span className="h-4 w-px bg-white/20" />
-            {team.region ?? "Регион не указан"}
-            <span className="h-4 w-px bg-white/20" />
-            {isCaptain ? "Вы капитан" : "Вы игрок"}
-            <span className="h-4 w-px bg-white/20" />с {formatDate(team.created_at)}
+            <span className="hidden h-4 w-px bg-white/20 sm:block" />
+            <span>{team.region ?? "Регион не указан"}</span>
+            <span className="hidden h-4 w-px bg-white/20 sm:block" />
+            <span>{isCaptain ? "Вы капитан" : "Вы игрок"}</span>
+            <span className="hidden h-4 w-px bg-white/20 sm:block" />
+            <span>с {formatDate(team.created_at)}</span>
           </div>
         }
       >
@@ -164,16 +165,16 @@ export default async function MyTeamPage() {
                 <MatchStatusBadge status={next.status} />
               </div>
               <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                   {next.team1 && <TeamLogo src={next.team1.logo_url} tag={next.team1.tag} size={44} />}
-                  <span className="truncate text-[18px] font-semibold lg:text-[22px]">{next.team1?.name ?? "TBD"}</span>
+                  <span className="line-clamp-2 break-words text-[15px] font-semibold leading-tight sm:text-[18px] lg:text-[22px]">{next.team1?.name ?? "TBD"}</span>
                 </div>
                 <div className="text-center">
                   <div className="text-[13px] font-semibold tracking-[0.14em] text-fg-3">VS</div>
                   <div className="num mt-1 text-[12px] text-fg-3">BO{next.best_of}</div>
                 </div>
-                <div className="flex min-w-0 items-center justify-end gap-3">
-                  <span className="truncate text-right text-[18px] font-semibold lg:text-[22px]">{next.team2?.name ?? "TBD"}</span>
+                <div className="flex min-w-0 flex-col-reverse items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                  <span className="line-clamp-2 break-words text-right text-[15px] font-semibold leading-tight sm:text-[18px] lg:text-[22px]">{next.team2?.name ?? "TBD"}</span>
                   {next.team2 && <TeamLogo src={next.team2.logo_url} tag={next.team2.tag} size={44} />}
                 </div>
               </div>

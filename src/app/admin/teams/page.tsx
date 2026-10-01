@@ -6,10 +6,12 @@ import { db } from "@/lib/supabase";
 import type { RegistrationStatus } from "@/lib/types";
 import { EmptyState, TeamLogo } from "@/components/ui";
 import { AdminHeader, TableBox } from "@/components/admin/control";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Команды — F16 Control" };
 
 export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const all = await listTeams();

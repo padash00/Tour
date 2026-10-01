@@ -14,7 +14,8 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
   if (!team) {
     return (
-      <Wrap className="flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
+      <Wrap className="flex min-h-[calc(100vh-96px)] items-start justify-center py-10 sm:items-center sm:py-16">
+        <h1 className="sr-only">Приглашение в команду</h1>
         <EmptyCard
           className="w-full max-w-[560px]"
           title="Ссылка недействительна"
@@ -35,7 +36,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const captain = members.find((m) => m.role === "captain");
 
   return (
-    <Wrap className="relative flex min-h-[calc(100vh-96px)] items-center justify-center py-16">
+    <Wrap className="relative flex min-h-[calc(100vh-96px)] items-start justify-center py-10 sm:items-center sm:py-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_440px_at_50%_0%,#16253d80,transparent_70%)]" />
       <div className={`${CARD} relative w-full max-w-[520px] px-6 py-12 text-center sm:px-12`}>
         <div className="flex justify-center">
@@ -44,9 +45,9 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
         <Eyebrow className="mt-8">Вас пригласили в команду</Eyebrow>
         <h1 className="mt-4 text-[38px] lg:text-[46px] font-semibold tracking-[-0.015em] leading-tight">{team.name}</h1>
         {captain && (
-          <div className="mt-3 inline-flex items-center gap-2 text-sm text-fg-3">
+          <div className="mt-3 flex max-w-full flex-wrap items-center justify-center gap-2 text-sm text-fg-3">
             <Avatar src={captain.player.avatar_url} name={captain.player.nickname} size={20} />
-            Капитан <span className="text-fg-2">{captain.player.nickname}</span>
+            Капитан <span className="min-w-0 break-all text-fg-2">{captain.player.nickname}</span>
           </div>
         )}
         <div className="mt-8 flex justify-center -space-x-1.5">

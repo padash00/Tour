@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import {
+  BANNED_ERROR,
   MAX_MAIN,
   MAX_SUBS,
   getActiveMembership,
@@ -15,6 +16,8 @@ import {
   getTeamMembers,
   getTeamRegistrations,
   isActiveRegistration,
+  isRateLimited,
+  sniffImage,
   syncOpenRosters,
 } from "@/lib/data";
 import { db } from "@/lib/supabase";
@@ -43,13 +46,14 @@ const teamSchema = z.object({
 
 async function uploadLogo(teamId: string, file: File | null): Promise<string | null | { error: string }> {
   if (!file || file.size === 0) return null;
-  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return { error: "Логотип — PNG, JPG или WEBP" };
   if (file.size > 1024 * 1024) return { error: "Логотип — не больше 1 МБ" };
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  // тип определяем по содержимому файла, а не по заявленному браузером
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const type = sniffImage(bytes);
+  if (!type) return { error: "Логотип — PNG, JPG или WEBP" };
+  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
   const path = `${teamId}/${Date.now()}.${ext}`;
-  const { error } = await db()
-    .storage.from("team-logos")
-    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: true });
+  const { error } = await db().storage.from("team-logos").upload(path, bytes, { contentType: type, upsert: true });
   if (error) return { error: "Не удалось загрузить логотип" };
   return db().storage.from("team-logos").getPublicUrl(path).data.publicUrl;
 }
@@ -63,7 +67,7 @@ function uniqueViolation(error: { code?: string; message?: string } | null) {
 
 export async function createTeam(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const player = await requirePlayer("/team/create");
-  if (player.is_banned) return { error: "Ваш аккаунт заблокирован" };
+  if (player.is_banned) return { error: BANNED_ERROR };
   if (await getActiveMembership(player.id)) return { error: "Вы уже состоите в команде" };
 
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
@@ -94,6 +98,7 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
 
   const logo = await uploadLogo(team.id, formData.get("logo") as File | null);
   if (typeof logo === "string") await db().from("teams").update({ logo_url: logo }).eq("id", team.id);
+  // если логотип не подошёл — команда всё равно создана, логотип можно загрузить в настройках
 
   await audit(player.id, "team.create", { type: "team", id: team.id }, { name, tag });
   redirect("/team");
@@ -103,6 +108,7 @@ const NOT_CAPTAIN = "Только капитан может это сделат�
 
 async function requireCaptain() {
   const player = await requirePlayer("/team");
+  if (player.is_banned) return null; // заблокированный капитан не управляет командой
   const membership = await getActiveMembership(player.id);
   if (!membership || membership.team.captain_id !== player.id) return null;
   return { player, team: membership.team };
@@ -156,7 +162,8 @@ export async function regenerateInvite(): Promise<ActionResult> {
 export async function joinTeam(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const code = String(formData.get("code") ?? "");
   const player = await requirePlayer(`/join/${code}`);
-  if (player.is_banned) return { error: "Ваш аккаунт заблокирован" };
+  if (player.is_banned) return { error: BANNED_ERROR };
+  if (await isRateLimited(player.id, "team.join", 5)) return { error: "Слишком часто — попробуйте через пару секунд" };
 
   const team = await getTeamByInvite(code);
   if (!team) return { error: "Ссылка недействительна" };

@@ -229,6 +229,11 @@ export async function forceResult(_prev: ActionResult, formData: FormData): Prom
       veto_deadline: null,
     })
     .eq("id", m.id);
+  // матч, загруженный на сервер, снимаем — инстанс освобождается для следующих матчей
+  if (m.server_instance) {
+    await enqueueCommand(m.server_instance, "end_match", {}, admin.id);
+    await db().from("matches").update({ server_instance: null, server_state: null, server_address: null }).eq("id", m.id);
+  }
   await syncBracket(m.tournament_id);
   await audit(admin.id, "match.force_result", { type: "match", id: m.id }, { winner, reason });
   revalidateMatch(m.id, m.tournament.slug);
@@ -332,7 +337,8 @@ export async function replaceRosterPlayer(_prev: ActionResult, formData: FormDat
   let onServer = "";
   if (m.server_instance && ["ready", "live"].includes(m.status)) {
     const side = teamId === m.team1_id ? "team1" : "team2";
-    const nick = inPlayer.nickname.replace(/"/g, "");
+    // ник приходит из Steam — убираем всё, что консоль CS2 трактует как разделитель команд
+    const nick = inPlayer.nickname.replace(/["\\;\u0000-\u001f\u007f]/g, "").slice(0, 32) || "player";
     await enqueueCommand(m.server_instance, "rcon", { command: `matchzy_removeplayer ${outRow.player.steam_id}` }, admin.id);
     await enqueueCommand(m.server_instance, "rcon", { command: `matchzy_addplayer ${inSteam} ${side} "${nick}"` }, admin.id);
     onServer = ` и на сервере ${m.server_instance}`;

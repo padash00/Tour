@@ -30,7 +30,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
       href={`/matches/${m.id}`}
       className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-[8px] border border-white/[0.08] bg-[#0b1420] px-4 h-12 text-[14px] hover:border-white/[0.18] transition-colors"
     >
-      <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? "TBD"}</span>
+      <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? (finished ? "Бай" : "TBD")}</span>
       <span className="text-center">
         {finished || m.status === "live" ? (
           <span className="num font-semibold">
@@ -40,7 +40,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
           <MatchStatusBadge status={m.status} compact />
         )}
       </span>
-      <span className={cn("truncate text-right", finished && m.winner_id !== m.team2_id ? "text-fg-3" : "text-fg")}>{t2?.name ?? "TBD"}</span>
+      <span className={cn("truncate text-right", finished && m.winner_id !== m.team2_id ? "text-fg-3" : "text-fg")}>{t2?.name ?? (finished ? "Бай" : "TBD")}</span>
     </Link>
   );
 }

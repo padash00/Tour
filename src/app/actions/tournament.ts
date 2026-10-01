@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import {
+  BANNED_ERROR,
+  checkinWindowError,
   getActiveMembership,
   getRegistration,
   getSoloTeam,
   getTeamMembers,
   getTournamentById,
+  isRateLimited,
   writeRoster,
 } from "@/lib/data";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
@@ -18,6 +21,7 @@ import type { ActionResult } from "@/components/forms";
 
 async function captainContext(next: string, tournament?: Tournament, createSolo = false) {
   const player = await requirePlayer(next);
+  if (player.is_banned) return { error: BANNED_ERROR } as const;
   if (tournament && modeOf(tournament.format).size === 1) {
     const solo = await getSoloTeam(player, createSolo);
     if (!solo) return { error: "Вы ещё не участвуете в этом турнире" } as const;
@@ -33,12 +37,15 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const tournamentId = String(formData.get("tournamentId"));
   const tournament = await getTournamentById(tournamentId);
   if (!tournament || tournament.status === "draft") return { error: "Турнир не найден" };
+  if (tournament.status !== "registration") return { error: "Регистрация на турнир закрыта" };
+  if (tournament.registration_closes_at && Date.now() > new Date(tournament.registration_closes_at).getTime()) {
+    return { error: "Регистрация на турнир закрыта" };
+  }
 
   const ctx = await captainContext(`/tournaments/${tournament.slug}/register`, tournament, true);
   if ("error" in ctx) return { error: ctx.error };
   const { player, team } = ctx;
-
-  if (tournament.status !== "registration") return { error: "Регистрация на турнир закрыта" };
+  if (await isRateLimited(player.id, "registration.create", 5)) return { error: "Слишком часто — попробуйте через пару секунд" };
 
   // состав на турнир выбирает капитан: основа ровно под режим, запасные — до лимита режима
   const mode = modeOf(tournament.format);
@@ -147,6 +154,8 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   const { player, team } = ctx;
 
   if (tournament.status !== "checkin") return { error: "Check-in сейчас не проводится" };
+  const windowError = checkinWindowError(tournament);
+  if (windowError) return { error: windowError };
   const reg = await getRegistration(tournament.id, team.id);
   if (!reg || reg.status !== "approved") return { error: "Заявка команды не одобрена" };
   if (reg.checked_in_at) return { success: "Команда уже прошла check-in" };

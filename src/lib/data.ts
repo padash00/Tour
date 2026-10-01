@@ -302,3 +302,45 @@ export async function getEntrantTeam(player: Player, tournament: Pick<Tournament
   if (tournament.format === "1v1") return getSoloTeam(player, false);
   return (await getActiveMembership(player.id))?.team ?? null;
 }
+
+// ───────────────────────── защита действий игроков
+
+export const BANNED_ERROR = "Ваш аккаунт заблокирован";
+
+/**
+ * Простое ограничение частоты: было ли такое же действие этого игрока за последние `seconds` секунд
+ * (по журналу audit_logs — действие должно записываться через audit()).
+ */
+export async function isRateLimited(playerId: string, action: string, seconds: number) {
+  const since = new Date(Date.now() - seconds * 1000).toISOString();
+  const { count } = await db()
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("actor_id", playerId)
+    .eq("action", action)
+    .gte("created_at", since);
+  return (count ?? 0) > 0;
+}
+
+/** Тип картинки по первым байтам файла (не по заявленному браузером типу) */
+export function sniffImage(buf: Uint8Array): "image/png" | "image/jpeg" | "image/webp" | null {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 && buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a) {
+    return "image/png";
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (
+    buf.length >= 12 &&
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && // RIFF
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50 // WEBP
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
+
+/** Окно check-in: null — можно, иначе текст ошибки */
+export function checkinWindowError(t: Pick<Tournament, "checkin_opens_at" | "checkin_closes_at">, now = Date.now()) {
+  if (t.checkin_opens_at && now < new Date(t.checkin_opens_at).getTime()) return "Check-in ещё не открылся";
+  if (t.checkin_closes_at && now > new Date(t.checkin_closes_at).getTime()) return "Check-in закрыт — обратитесь к администратору";
+  return null;
+}

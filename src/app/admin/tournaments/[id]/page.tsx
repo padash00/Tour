@@ -31,6 +31,7 @@ import { AdminHeader, Dot, Panel, SubTabs, TableBox } from "@/components/admin/c
 import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
 
@@ -56,6 +57,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default async function AdminTournamentPage(props: PageProps<"/admin/tournaments/[id]">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const { id } = await props.params;
   const sp = await props.searchParams;
   // старые ссылки ?tab=registrations ведут на регистрацию

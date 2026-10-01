@@ -7,6 +7,7 @@ import { formatShortDateTime, mapName } from "@/lib/format";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
 import { EmptyState, cn } from "@/components/ui";
 import { AdminHeader, TableBox } from "@/components/admin/control";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Матчи — F16 Control" };
 
@@ -22,6 +23,7 @@ type Row = MatchWithTeams & {
 };
 
 export default async function AdminMatchesPage(props: PageProps<"/admin/matches">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const filter = FILTERS.find((f) => f.key === sp.f) ?? FILTERS[0];
   const { data } = await db()

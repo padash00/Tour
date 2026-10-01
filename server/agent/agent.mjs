@@ -48,7 +48,9 @@ async function enforceCvars(inst, get5) {
   if (!rule) return;
   const active = get5 && get5.matchid === rule.matchid && ["warmup", "knife", "waiting_for_knife_decision", "going_live", "live"].includes(get5.gamestate);
   if (!active) {
-    if (!get5 || get5.gamestate === "none" || get5.matchid !== rule.matchid) {
+    // снимаем правило только по явному ответу «матча нет / другой матч». Пустой ответ (get5 = null) бывает,
+    // пока сервер меняет карту между картами серии — правило нужно сохранить для следующей карты.
+    if (get5 && (get5.gamestate === "none" || get5.matchid !== rule.matchid)) {
       delete enforce[inst.name];
       saveEnforce();
     }
@@ -273,13 +275,7 @@ async function tick() {
   const publicInfo = Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu"));
   const { commands, bundle_version } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances });
 
-  // на сайте новая версия агента/скриптов/конфигов → обновляемся и перезапускаемся (F16-agent.bat поднимет снова)
-  if (!busy && bundle_version && bundle_version !== localBundleVersion(F16_DIR)) {
-    const r = await applyBundle({ siteUrl: config.siteUrl, token: config.token, f16Dir: F16_DIR, serverDir: SERVER_DIR });
-    log(`обновление агента ${localBundleVersion(F16_DIR)}: ${r.count} файлов, перезапуск`);
-    process.exit(0);
-  }
-
+  // сайт уже пометил эти команды «отправлено» — выполняем их ДО самообновления, иначе они потеряются
   for (const cmd of commands ?? []) {
     if (cmd.type in HOST_COMMANDS) {
       runHostCommand(cmd);
@@ -297,6 +293,13 @@ async function tick() {
     }
     log(r.ok ? "  ok" : "  fail", r.result.slice(0, 200));
     await api("/api/agent/ack", { id: cmd.id, ...r }).catch((e) => log("ack failed", e.message));
+  }
+
+  // на сайте новая версия агента/скриптов/конфигов → обновляемся и перезапускаемся (F16-agent.bat поднимет снова)
+  if (!busy && bundle_version && bundle_version !== localBundleVersion(F16_DIR)) {
+    const r = await applyBundle({ siteUrl: config.siteUrl, token: config.token, f16Dir: F16_DIR, serverDir: SERVER_DIR });
+    log(`обновление агента ${localBundleVersion(F16_DIR)}: ${r.count} файлов, перезапуск`);
+    process.exit(0);
   }
 }
 

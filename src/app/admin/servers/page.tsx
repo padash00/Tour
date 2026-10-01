@@ -12,6 +12,7 @@ import { cn } from "@/components/ui";
 import { ADMIN_CARD, AdminHeader, AlertRow, Dot } from "@/components/admin/control";
 import { humanPlayers } from "@/components/admin/instance-card";
 import { Section, Strip, StripCell, instanceState, minutesSince, serverNow, toneBar, toneText } from "@/components/admin/kit";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Серверы — F16 Control" };
 
@@ -23,6 +24,7 @@ const CMD_STATUS: Record<AgentCommand["status"], string> = {
 };
 
 export default async function ServersPage() {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
   const [{ data: matches }, { data: commands }] = await Promise.all([
     db()

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
+import { audit } from "@/lib/audit";
+import { isRateLimited } from "@/lib/data";
 import { fetchFaceitBySteamId } from "@/lib/faceit";
 import { fetchSteamProfile } from "@/lib/steam";
 import { db } from "@/lib/supabase";
@@ -9,6 +11,9 @@ import type { ActionResult } from "@/components/forms";
 
 export async function refreshProfile(): Promise<ActionResult> {
   const player = await requirePlayer();
+  // каждый вызов ходит во внешние Steam/FACEIT API — не чаще раза в 15 секунд
+  if (await isRateLimited(player.id, "profile.refresh", 15)) return { error: "Профиль только что обновлялся — подождите немного" };
+  await audit(player.id, "profile.refresh");
   const [profile, faceit] = await Promise.all([
     fetchSteamProfile(player.steam_id),
     fetchFaceitBySteamId(player.steam_id),

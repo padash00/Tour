@@ -100,6 +100,15 @@ export function standings(teamIds: string[], matches: StageMatch[], opts: { swis
   );
   const opponents = new Map<string, string[]>(teamIds.map((id) => [id, []]));
   for (const m of matches) {
+    // бай (швейцарка, нечётное число команд): матч без соперника — свободная победа
+    if (m.status === "finished" && m.winner_id && (!m.team1_id || !m.team2_id)) {
+      const r = rows.get(m.winner_id);
+      if (r) {
+        r.played++;
+        r.wins++;
+      }
+      continue;
+    }
     if (m.status !== "finished" || !m.team1_id || !m.team2_id || !m.winner_id) continue;
     for (const [me, other, side] of [
       [m.team1_id, m.team2_id, 1],
@@ -158,9 +167,11 @@ export const swissMaxRounds = (wins: number) => 2 * wins - 1;
 /**
  * Пары следующего раунда: внутри каждого «пула» с одинаковым счётом (W–L) — сильный против слабого
  * (по посеву/Бухгольцу), без повторных встреч, если это возможно.
- * Возвращает пары и, при нечётном пуле, команду «вниз» в следующий пул.
+ * Нечётный пул отдаёт команду «вниз» в следующий пул. Если в конце остаётся одна команда —
+ * она получает бай (свободную победу): возвращается как пара [команда, null].
+ * Бай достаётся самой слабой команде без бая (ключ `${id}:BYE` в played), иначе — самой слабой.
  */
-export function swissPairings(table: StandingRow[], played: Set<string>, swissWins: number): [string, string][] {
+export function swissPairings(table: StandingRow[], played: Set<string>, swissWins: number): [string, string | null][] {
   const active = table.filter((r) => r.status === "active");
   const pools = new Map<string, StandingRow[]>();
   for (const r of active) {
@@ -174,8 +185,15 @@ export function swissPairings(table: StandingRow[], played: Set<string>, swissWi
     return bw - aw || al - bl;
   });
   const key = (a: string, b: string) => [a, b].sort().join(":");
-  const pairs: [string, string][] = [];
+  const pairs: [string, string | null][] = [];
   let carry: StandingRow[] = [];
+  // нечётное число активных — бай заранее: самый слабый (последний пул, последний по таблице) без бая
+  if (active.length % 2) {
+    const ranked = keys.flatMap((k) => [...pools.get(k)!].sort((a, b) => b.buchholz - a.buchholz || a.seed - b.seed));
+    const pick = [...ranked].reverse().find((r) => !played.has(`${r.teamId}:BYE`)) ?? ranked[ranked.length - 1];
+    pairs.push([pick.teamId, null]);
+    for (const k of keys) pools.set(k, pools.get(k)!.filter((r) => r.teamId !== pick.teamId));
+  }
   for (const k of keys) {
     const pool = [...carry, ...pools.get(k)!].sort((a, b) => b.buchholz - a.buchholz || a.seed - b.seed);
     carry = [];
@@ -194,8 +212,14 @@ export function swissPairings(table: StandingRow[], played: Set<string>, swissWi
   return pairs;
 }
 
-/** Первый раунд швейцарки: верхняя половина посева против нижней (1–9, 2–10 … для 16) */
-export function swissFirstRound(seeded: string[]): [string, string][] {
-  const half = Math.floor(seeded.length / 2);
-  return Array.from({ length: half }, (_, i) => [seeded[i], seeded[i + half]] as [string, string]);
+/**
+ * Первый раунд швейцарки: верхняя половина посева против нижней (1–9, 2–10 … для 16).
+ * При нечётном числе последний посев получает бай — пара [команда, null].
+ */
+export function swissFirstRound(seeded: string[]): [string, string | null][] {
+  const list = seeded.length % 2 ? seeded.slice(0, -1) : seeded;
+  const half = list.length / 2;
+  const pairs: [string, string | null][] = Array.from({ length: half }, (_, i) => [list[i], list[i + half]] as [string, string]);
+  if (seeded.length % 2) pairs.push([seeded[seeded.length - 1], null]);
+  return pairs;
 }

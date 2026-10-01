@@ -22,7 +22,7 @@ export default async function CreateTeamPage() {
     <>
       <PageHero compact eyebrow="Новая команда" title="Создать команду" lead="Название и тег — обязательно, остальное можно заполнить позже." />
       <Wrap className="pt-10">
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,760px)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,760px)_minmax(0,1fr)]">
           <div className={`${CARD} p-7 sm:p-10 lg:p-12`}>
             <TeamForm action={createTeam} submitLabel="Создать команду" />
           </div>

@@ -24,7 +24,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   if (!t) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/register`);
   const back = (
-    <Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">
+    <Link href={`/tournaments/${t.slug}`} className="inline-flex min-h-11 items-center lg:min-h-0 hover:text-fg-2">
       ← {t.name}
     </Link>
   );

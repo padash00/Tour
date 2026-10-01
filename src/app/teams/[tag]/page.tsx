@@ -61,7 +61,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           <div className="absolute inset-x-0 bottom-0 h-px bg-white/[0.06]" />
         </div>
         <div className={cn(WRAP, "relative pt-14 pb-12 lg:pt-20 lg:pb-14")}>
-          <Link href="/teams" className="text-[14px] text-fg-2 transition-colors hover:text-fg">
+          <Link href="/teams" className="inline-flex min-h-11 items-center lg:min-h-0 text-[14px] text-fg-2 transition-colors hover:text-fg">
             ← Команды
           </Link>
           <div className="mt-10 flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
@@ -72,13 +72,13 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
               <div className="min-w-0">
                 <Eyebrow>Команда F16 Arena · {team.tag}</Eyebrow>
                 <h1 className="t-display mt-5 break-words">{team.name}</h1>
-                <div className="mt-6 flex flex-wrap items-center gap-y-2 text-[15px] text-fg lg:text-[17px]">
+                <div className="mt-6 flex flex-col items-start gap-y-2 text-[15px] text-fg sm:flex-row sm:flex-wrap sm:items-center lg:text-[17px]">
                   {[team.region, captain ? `Капитан — ${captain.player.nickname}` : null, `С ${formatDate(team.created_at)}`]
                     .filter(Boolean)
                     .map((x, i) => (
-                      <span key={i} className="flex items-center">
-                        {i > 0 && <span className="mx-4 h-4 w-px bg-white/20" />}
-                        {x}
+                      <span key={i} className="flex min-w-0 max-w-full items-center">
+                        {i > 0 && <span className="mx-4 hidden h-4 w-px shrink-0 bg-white/20 sm:block" />}
+                        <span className="min-w-0 break-all sm:break-normal">{x}</span>
                       </span>
                     ))}
                 </div>

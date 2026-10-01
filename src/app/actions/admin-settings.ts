@@ -11,7 +11,8 @@ import type { ActionResult } from "@/components/forms";
 export async function saveSetting(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const key = String(formData.get("key")) as SettingKey;
-  if (!(key in SETTINGS)) return { error: "Неизвестная настройка" };
+  // Object.hasOwn: «constructor»/«__proto__» не должны проходить как ключи настроек
+  if (!Object.hasOwn(SETTINGS, key)) return { error: "Неизвестная настройка" };
   const clear = formData.get("clear") === "1";
   const value = String(formData.get("value") ?? "").trim();
 
@@ -46,10 +47,15 @@ export async function editWorkshopMaps(_prev: ActionResult, formData: FormData):
   if (remove) {
     list = list.filter((x) => x !== remove);
   } else {
-    const name = String(formData.get("name") ?? "").trim().replace(/[@,\s]+/g, "_");
+    // имя уходит в маппул турнира и конфиг MatchZy: латиница, цифры, «_», «.», «-»
+    const name = String(formData.get("name") ?? "")
+      .trim()
+      .replace(/[^\w.-]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40);
     const link = String(formData.get("link") ?? "").trim();
-    const id = link.match(/id=(\d+)/)?.[1] ?? link.match(/^\d+$/)?.[0];
-    if (!name) return { error: "Введите название карты" };
+    const id = link.match(/id=(\d{1,20})/)?.[1] ?? link.match(/^\d{1,20}$/)?.[0];
+    if (!name) return { error: "Введите название карты латиницей (например aim_map)" };
     if (!id) return { error: "Нужна ссылка на карту в Workshop (…filedetails/?id=123) или её ID" };
     list = [...list.filter((x) => !x.endsWith(`@${id}`)), `${name}@${id}`];
     // сразу проверяем на сервере, грузится ли карта в CS2, и узнаём её внутреннее имя

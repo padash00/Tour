@@ -14,12 +14,14 @@ import { MatchStatusChip, TournamentStatusChip } from "@/components/primitives";
 import { ADMIN_CARD, AdminHeader, AlertRow } from "@/components/admin/control";
 import { InstanceCard, type InstanceMatch } from "@/components/admin/instance-card";
 import { Quiet, Section, SectionLink, Strip, StripCell, minutesSince, serverNow } from "@/components/admin/kit";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "F16 Control" };
 
 type QueueMatch = MatchWithTeams & { tournament: Pick<Tournament, "name" | "status"> | null };
 
 export default async function AdminOverview() {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const [players, teams, pendingRes, tournamentsRes, logsRes, activeRes, queueRes, disputesRes] = await Promise.all([
     db().from("players").select("id", { count: "exact", head: true }),
     db().from("teams").select("id", { count: "exact", head: true }).is("disbanded_at", null),

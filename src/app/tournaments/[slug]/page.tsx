@@ -85,7 +85,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
         </div>
         <div className={`${WRAP} relative pt-10 pb-12 lg:pt-12 lg:pb-16`}>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <Link href="/tournaments" className="text-fg-2 hover:text-fg">
+            <Link href="/tournaments" className="inline-flex min-h-11 items-center lg:min-h-0 text-fg-2 hover:text-fg">
               ← Турниры
             </Link>
             {isAdmin(player) && (
@@ -106,14 +106,16 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             <h1 className="mt-6 text-[44px] sm:text-[60px] lg:text-[76px] font-semibold leading-[1.02] tracking-[-0.015em]">{t.name}</h1>
             <div className="mt-8 flex flex-wrap items-center gap-y-3 text-[15px] lg:text-[18px] text-fg">
               {[
-                formatDate(t.starts_at),
+                t.starts_at ? formatDate(t.starts_at) : null,
                 t.game,
                 modeOf(t.format).size === 5 ? "5v5" : modeOf(t.format).size === 2 ? "2v2" : "1v1",
                 bracketLabel[t.bracket_type] ?? t.bracket_type,
                 t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн"),
-              ].map((x, i) => (
+              ]
+                .filter(Boolean)
+                .map((x, i) => (
                 <span key={i} className="flex items-center">
-                  {i > 0 && <span className="mx-5 h-4 w-px bg-white/20" />}
+                  {i > 0 && <span className="mx-3 h-4 w-px bg-white/20 sm:mx-5" />}
                   {x}
                 </span>
               ))}

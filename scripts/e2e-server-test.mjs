@@ -139,7 +139,21 @@ if (ok) {
     const { data } = await db.from("match_events").select("event").eq("matchzy_id", match.matchzy_id);
     if (data?.length) got = data.map((e) => e.event);
   }
+  // с ножевым раундом MatchZy шлёт going_live только после ножа — тогда старт подтверждаем по ответу сервера
+  let knife = false;
+  if (!got) {
+    const { data: r } = await db
+      .from("agent_commands")
+      .select("result")
+      .eq("instance", INSTANCE)
+      .eq("type", "rcon")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    knife = /knife\.cfg/i.test(r?.result ?? "");
+  }
   if (got) console.log(`   ✓ события дошли до сайта: ${got.join(", ")}`);
+  else if (knife) console.log("   ✓ матч стартовал с ножевого раунда (going_live придёт после ножа)");
   else {
     console.log("   ✕ событий от MatchZy нет");
     ok = false;

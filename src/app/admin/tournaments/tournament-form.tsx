@@ -283,7 +283,7 @@ export function TournamentForm({
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-fg-3">
                 <span>Адрес:</span>
                 {slugEdited ? (
-                  <input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} className="field h-8 w-64 num text-[13px]" />
+                  <input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} aria-label="Адрес страницы турнира" className="field h-8 w-64 num text-[13px]" />
                 ) : (
                   <span className="num text-fg-2">/tournaments/{effectiveSlug || "…"}</span>
                 )}
@@ -317,6 +317,7 @@ export function TournamentForm({
               <input
                 name="cover"
                 type="file"
+                aria-label="Обложка турнира"
                 accept="image/png,image/jpeg,image/webp"
                 className="sr-only"
                 onChange={(e) => {
@@ -674,12 +675,14 @@ export function TournamentForm({
                   <input
                     value={p.place}
                     onChange={(e) => setPrizes((list) => list.map((x, j) => (j === i ? { ...x, place: e.target.value } : x)))}
+                    aria-label={`Место ${i + 1}`}
                     className="field w-36"
                   />
                   <input
                     value={p.prize}
                     onChange={(e) => setPrizes((list) => list.map((x, j) => (j === i ? { ...x, prize: e.target.value } : x)))}
                     placeholder="Сумма или приз"
+                    aria-label={`Приз за ${p.place || `место ${i + 1}`}`}
                     className="field flex-1"
                   />
                   <button

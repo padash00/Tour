@@ -60,7 +60,7 @@ export function SectionLink({ href, children }: { href: string; children: ReactN
   return (
     <Link
       href={href}
-      className="rounded-[6px] text-[13px] lg:text-[14px] text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      className="inline-flex min-h-11 items-center rounded-[6px] text-[13px] text-fg-3 transition-colors duration-150 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 lg:min-h-0 lg:text-[14px]"
     >
       {children} →
     </Link>

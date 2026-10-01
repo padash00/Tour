@@ -57,7 +57,7 @@ export default async function PlayersPage(props: PageProps<"/players">) {
                   return (
                     <tr key={p.id}>
                       <td>
-                        <Link href={`/players/${p.steam_id}`} className="group flex items-center gap-4 text-fg">
+                        <Link href={`/players/${p.steam_id}`} className="group flex min-h-11 items-center gap-4 text-fg">
                           <Avatar src={p.avatar_url} name={p.nickname} size={40} />
                           <span className="text-[16px] font-semibold transition-colors group-hover:text-accent">{p.nickname}</span>
                           {p.is_banned && <span className="text-[11px] uppercase tracking-[0.16em] text-danger">бан</span>}
@@ -65,7 +65,7 @@ export default async function PlayersPage(props: PageProps<"/players">) {
                       </td>
                       <td>
                         {p.team ? (
-                          <Link href={`/teams/${p.team.tag}`} className="transition-colors hover:text-fg">
+                          <Link href={`/teams/${p.team.tag}`} className="inline-flex min-h-11 items-center transition-colors hover:text-fg lg:min-h-0">
                             {p.team.name}
                           </Link>
                         ) : (

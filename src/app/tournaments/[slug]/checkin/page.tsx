@@ -26,7 +26,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
   const checked = approved.filter((r) => r.checked_in_at).length;
 
   const back = (
-    <Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">
+    <Link href={`/tournaments/${t.slug}`} className="inline-flex min-h-11 items-center lg:min-h-0 hover:text-fg-2">
       ← {t.name}
     </Link>
   );

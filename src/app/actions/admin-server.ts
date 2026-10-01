@@ -64,6 +64,9 @@ export async function serverRcon(_prev: ActionResult, formData: FormData): Promi
   const command = String(formData.get("command") ?? "").trim();
   if (!command) return { error: "Введите команду" };
   if (command.length > 200) return { error: "Слишком длинная команда" };
+  if (/[\u0000-\u001f\u007f]/.test(command)) return { error: "Команда — одной строкой, без переносов" };
+  const { data: inst } = await db().from("server_instances").select("name").eq("name", instance).maybeSingle();
+  if (!inst) return { error: "Инстанс не найден" };
   await enqueueCommand(instance, "rcon", { command }, admin.id);
   await audit(admin.id, "server.rcon", undefined, { instance, command });
   revalidatePath("/admin/servers");

@@ -89,9 +89,9 @@ export function SiteFooter() {
               <Logo height={46} />
               <span className="text-[13px] text-fg-3 lg:text-[14px]">© {new Date().getFullYear()} F16 Arena. Все права защищены.</span>
             </div>
-            <nav className="flex flex-wrap gap-x-9 gap-y-3 text-[13px] text-fg-2 md:ml-auto lg:gap-x-12 lg:text-[14px]" aria-label="Подвал">
+            <nav className="flex flex-wrap gap-x-9 gap-y-0 text-[13px] text-fg-2 md:ml-auto md:gap-y-3 lg:gap-x-12 lg:text-[14px]" aria-label="Подвал">
               {[...NAV, ...NAV_MORE].map((i) => (
-                <Link key={i.href} href={i.href} className="transition-colors duration-150 hover:text-fg">
+                <Link key={i.href} href={i.href} className="inline-flex min-h-11 items-center transition-colors duration-150 hover:text-fg md:min-h-0">
                   {i.label}
                 </Link>
               ))}

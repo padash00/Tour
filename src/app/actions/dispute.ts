@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isAdmin, requireAdmin, requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
+import { BANNED_ERROR, isRateLimited } from "@/lib/data";
 import { env } from "@/lib/env";
 import { getMatch } from "@/lib/matches";
 import { db } from "@/lib/supabase";
@@ -25,6 +26,8 @@ async function adminIds() {
 export async function openDispute(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const matchId = String(formData.get("matchId"));
   const player = await requirePlayer(`/matches/${matchId}`);
+  if (player.is_banned && !isAdmin(player)) return { error: BANNED_ERROR };
+  if (await isRateLimited(player.id, "dispute.open", 30)) return { error: "Спор уже отправлен — подождите немного" };
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason.length < 10) return { error: "Опишите проблему подробнее (минимум 10 символов)" };
   if (reason.length > 1000) return { error: "Слишком длинное описание" };

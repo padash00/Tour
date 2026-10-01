@@ -7,10 +7,12 @@ import { formatDate } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Avatar, EmptyState, FaceitLevel } from "@/components/ui";
 import { AdminHeader, TableBox } from "@/components/admin/control";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Игроки — F16 Control" };
 
 export default async function AdminPlayersPage(props: PageProps<"/admin/players">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const role = sp.r === "admin" || sp.r === "banned" ? sp.r : "all";

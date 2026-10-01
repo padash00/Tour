@@ -198,6 +198,32 @@ async function summary(t: Tournament) {
   await printStandings(t);
 }
 
+// ───────────── 4–6. Нечётные и «неровные» количества: баи швейцарки и сетки
+for (const [label, n, offset, patch] of [
+  ["swiss7", 7, 50, { bracket_type: "swiss_playoff", swiss_wins: 3, playoff_type: "double_elimination" }],
+  ["se6", 6, 60, { bracket_type: "single_elimination" }],
+  ["de5", 5, 70, { bracket_type: "double_elimination" }],
+] as const) {
+  const ps = await makePlayers(n, offset);
+  const teams = must(
+    await db()
+      .from("teams")
+      .insert(ps.map((p, i) => ({ name: `${label} Team ${i + 1}`, tag: `X${offset / 10}${i}`, captain_id: p.id, invite_code: `E2EF-${label}${i}` })))
+      .select("id"),
+    "teams",
+  ) as { id: string }[];
+  const ids = teams.map((x) => x.id);
+  const t = await makeTournament(label, { max_teams: n, map_pool: ["de_mirage"], ...patch }, ids);
+  await createBracket(t, ids);
+  await playToEnd(t, ids);
+  const s = await summary(t);
+  console.log(`\n${label}: ${n} команд, ${patch.bracket_type}:`, s);
+  if ((s as { unfinished?: number }).unfinished || !(s as { champion?: string }).champion) {
+    console.log(`  ✕ ${label}: турнир не доигран`);
+    process.exitCode = 1;
+  }
+}
+
 if (!KEEP) {
   await cleanup();
   console.log("\nтестовые данные удалены");

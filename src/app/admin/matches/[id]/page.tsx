@@ -28,6 +28,7 @@ import { Avatar, Field, FaceitLevel, TeamLogo, cn } from "@/components/ui";
 import { MatchStatusChip } from "@/components/primitives";
 import { ADMIN_CARD, AdminHeader, Dot } from "@/components/admin/control";
 import { FactRow, Quiet, RailGroup, Section, SectionLink, Timeline, serverNow, type TimelineItem } from "@/components/admin/kit";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Матч — F16 Control" };
 
@@ -156,6 +157,7 @@ function NextStep({
 }
 
 export default async function AdminMatchPage(props: PageProps<"/admin/matches/[id]">) {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const { id } = await props.params;
   await applyVetoTimeouts(id);
   const m = await getMatch(id);
@@ -254,10 +256,10 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
       <div className={cn(ADMIN_CARD, "relative overflow-hidden", m.status === "live" && "border-danger/25")}>
         {m.status === "live" && <span className="absolute inset-x-0 top-0 h-[3px] bg-danger animate-pulse" />}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-8 px-5 sm:px-8 py-7 sm:py-9">
-          <div className="flex items-center gap-4 min-w-0">
+          <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
             {m.team1 && <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={72} />}
             <div className="min-w-0">
-              <div className={cn("truncate text-[18px] sm:text-[24px] font-semibold tracking-[-0.01em]", m.winner_id && m.winner_id === m.team1_id && "text-ok")}>
+              <div className={cn("line-clamp-2 break-words text-[15px] leading-tight sm:text-[24px] font-semibold tracking-[-0.01em]", m.winner_id && m.winner_id === m.team1_id && "text-ok")}>
                 {t1}
               </div>
               <div className="text-[12px] text-fg-3">{m.team1?.tag ?? "—"}</div>
@@ -281,9 +283,9 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               {m.scheduled_at ? ` · ${formatDateTime(m.scheduled_at)}` : ""}
             </div>
           </div>
-          <div className="flex items-center justify-end gap-4 min-w-0">
+          <div className="flex min-w-0 flex-col-reverse items-end gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             <div className="min-w-0 text-right">
-              <div className={cn("truncate text-[18px] sm:text-[24px] font-semibold tracking-[-0.01em]", m.winner_id && m.winner_id === m.team2_id && "text-ok")}>
+              <div className={cn("line-clamp-2 break-words text-[15px] leading-tight sm:text-[24px] font-semibold tracking-[-0.01em]", m.winner_id && m.winner_id === m.team2_id && "text-ok")}>
                 {t2}
               </div>
               <div className="text-[12px] text-fg-3">{m.team2?.tag ?? "—"}</div>
@@ -557,7 +559,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               <input type="hidden" name="matchId" value={m.id} />
               <div className="text-[11px] text-fg-3 mb-1">Время матча (Алматы)</div>
               <div className="flex gap-2">
-                <input type="datetime-local" name="scheduledAt" defaultValue={toLocalInput(m.scheduled_at)} className="field !h-9 text-[13px]" />
+                <input type="datetime-local" name="scheduledAt" defaultValue={toLocalInput(m.scheduled_at)} aria-label="Время матча" className="field !h-9 text-[13px]" />
                 <SubmitButton size="sm" variant="secondary">
                   OK
                 </SubmitButton>

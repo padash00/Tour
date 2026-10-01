@@ -44,8 +44,15 @@ const tournamentSchema = z.object({
   timeout_seconds: z.coerce.number().int().min(15).max(120).default(30),
   tech_pauses: z.coerce.number().int().min(0).max(10).default(2),
   tech_pause_seconds: z.coerce.number().int().min(60).max(900).default(300),
-  stream_url: z.union([z.literal(""), z.string().trim().url("Трансляция — полная ссылка https://…")]).optional().default(""),
-  discord_url: z.union([z.literal(""), z.string().trim().url("Discord — полная ссылка https://…")]).optional().default(""),
+  // только http(s): ссылка попадает в href, javascript:/data: недопустимы
+  stream_url: z
+    .union([z.literal(""), z.string().trim().regex(/^https?:\/\/[^\s]+$/i, "Трансляция — полная ссылка https://…").max(300)])
+    .optional()
+    .default(""),
+  discord_url: z
+    .union([z.literal(""), z.string().trim().regex(/^https?:\/\/[^\s]+$/i, "Discord — полная ссылка https://…").max(300)])
+    .optional()
+    .default(""),
   contact: z.string().trim().max(120).optional().default(""),
   entry_fee: z.string().trim().max(80).optional().default(""),
   sponsors: z.string().optional().default("[]"),
@@ -125,7 +132,9 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
       .split(/[\s,]+/)
       .map((m) => (m.includes("@") ? m.trim() : m.trim().toLowerCase()))
       .filter(Boolean)
-      .map((m) => (m.includes("@") || /^(de|aim|cs|ar|fy|awp)_/.test(m) ? m : `de_${m}`)),
+      .map((m) => (m.includes("@") || /^(de|aim|cs|ar|fy|awp)_/.test(m) ? m : `de_${m}`))
+      // имя карты уходит в конфиг MatchZy и в host_workshop_map — только безопасные символы
+      .filter((m) => /^[a-z0-9_]{1,64}$/.test(m) || /^[\w.-]{1,40}@\d{1,20}$/.test(m)),
     description: data.description || null,
     requirements: data.requirements || null,
     rules: data.rules || null,
@@ -165,7 +174,9 @@ export async function createTournament(_prev: ActionResult, formData: FormData):
   const parsed = tournamentSchema.safeParse(withSlug(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { data, error } = await db().from("tournaments").insert(tournamentRow(parsed.data)).select("id").single();
+  const row = tournamentRow(parsed.data);
+  if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
+  const { data, error } = await db().from("tournaments").insert(row).select("id").single();
   if (error || !data) {
     return { error: error?.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось создать турнир" };
   }
@@ -180,7 +191,9 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
   const parsed = tournamentSchema.safeParse(withSlug(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { error } = await db().from("tournaments").update(tournamentRow(parsed.data)).eq("id", id);
+  const row = tournamentRow(parsed.data);
+  if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
+  const { error } = await db().from("tournaments").update(row).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось сохранить" };
   if (formData.get("removeCover") === "on") await db().from("tournaments").update({ cover_url: null }).eq("id", id);
   const cover = await uploadCover(id, formData);
@@ -359,6 +372,7 @@ export async function adminAddRosterPlayer(_prev: ActionResult, formData: FormDa
 
   const player = await getPlayerBySteamId(steamId);
   if (!player) return { error: "Игрок с таким SteamID ещё не входил на платформу" };
+  if (player.is_banned) return { error: "Игрок заблокирован на платформе" };
 
   const { data: reg } = await db().from("tournament_registrations").select("tournament_id").eq("id", registrationId).single();
   if (!reg) return { error: "Заявка не найдена" };

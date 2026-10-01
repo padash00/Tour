@@ -179,13 +179,21 @@ async function insertStageMatches(tournament: Tournament, list: NewMatch[]) {
     .order("number", { ascending: false })
     .limit(1);
   let n = last?.[0]?.number ?? 0;
-  const rows = list.map((m) => ({
-    id: randomUUID(),
-    tournament_id: tournament.id,
-    number: ++n,
-    status: m.team1_id && m.team2_id ? "upcoming" : "pending",
-    ...m,
-  }));
+  const rows = list.map((m) => {
+    // бай швейцарки: соперника нет — сразу техническая победа
+    const bye = m.stage === "swiss" && !!m.team1_id && !m.team2_id;
+    return {
+      id: randomUUID(),
+      tournament_id: tournament.id,
+      number: ++n,
+      status: m.team1_id && m.team2_id ? "upcoming" : bye ? "finished" : "pending",
+      // одинаковый набор колонок у всех строк: при пакетной вставке недостающие поля стали бы NULL
+      winner_id: bye ? m.team1_id : null,
+      is_walkover: bye,
+      finished_at: bye ? new Date().toISOString() : null,
+      ...m,
+    };
+  });
   const { error } = await db().from("matches").insert(rows);
   if (error) throw new Error(error.message);
   await afterMatchesUpcoming(
@@ -320,7 +328,10 @@ export async function progressStages(tournamentId: string) {
   if (swiss) {
     const table = standings(seeded, matches, { swiss: true, swissWins: tournament.swiss_wins });
     if (table.some((r) => r.status === "active")) {
-      const played = new Set(matches.map((m) => [m.team1_id, m.team2_id].sort().join(":")));
+      // сыгранные пары + полученные баи (`${id}:BYE`), чтобы бай не доставался одной команде дважды
+      const played = new Set(
+        matches.map((m) => (m.team1_id && m.team2_id ? [m.team1_id, m.team2_id].sort().join(":") : `${m.team1_id ?? m.team2_id}:BYE`)),
+      );
       const round = Math.max(...matches.map((m) => m.round)) + 1;
       const pairs = swissPairings(table, played, tournament.swiss_wins);
       if (pairs.length) {
@@ -336,6 +347,8 @@ export async function progressStages(tournamentId: string) {
             best_of: tournament.default_best_of ?? 1,
           })),
         );
+        // раунд из одного бая играть некому — сразу двигаем стадию дальше
+        if (pairs.every(([, b]) => !b)) await progressStages(tournamentId);
       }
       return;
     }

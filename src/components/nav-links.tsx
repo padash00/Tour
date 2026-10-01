@@ -296,7 +296,7 @@ export function MobileMenu({ items, user }: { items: Item[]; user?: UserInfo | n
                 </Link>
               ))}
               <form action="/api/auth/logout" method="post" className="border-t border-white/[0.06]">
-                <button type="submit" className="flex h-12 w-full items-center px-4 text-left text-[16px] text-fg-3">
+                <button type="submit" className="flex h-12 w-full items-center px-4 text-left text-[16px] text-fg-2 transition-colors hover:text-danger">
                   Выйти
                 </button>
               </form>

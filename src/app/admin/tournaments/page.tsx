@@ -8,6 +8,7 @@ import { ButtonLink, EmptyState } from "@/components/ui";
 import { TournamentStatusChip } from "@/components/primitives";
 import { AdminHeader, TableBox } from "@/components/admin/control";
 import { MiniLifecycle } from "@/components/admin/kit";
+import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Турниры — F16 Control" };
 
@@ -42,6 +43,7 @@ function nextAction(t: Tournament, pending: number): { text: string; tab?: strin
 }
 
 export default async function AdminTournamentsPage() {
+  await requireAdmin(); // права проверяются в каждой странице, не только в layout
   const [{ data }, { data: pendingRows }] = await Promise.all([
     db().from("tournaments").select("*").order("created_at", { ascending: false }),
     db().from("tournament_registrations").select("tournament_id").eq("status", "pending"),

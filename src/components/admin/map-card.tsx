@@ -54,6 +54,7 @@ export function MapCard({
           ref={fileRef}
           type="file"
           name="image"
+          aria-label={`Картинка карты ${map}`}
           accept="image/png,image/jpeg,image/webp"
           onChange={() => formRef.current?.requestSubmit()}
         />
