@@ -208,6 +208,14 @@ export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, p
   }
   if (!target) throw new Error("нет свободного запущенного сервера для прогрева");
 
+  // исходная точка — de_mirage: если на сервере уже стоит та же workshop-карта, смену не увидим
+  if ((await a2sInfo(target.port))?.map !== "de_mirage") {
+    await rcon(target.port, rconPassword, "changelevel de_mirage").catch(() => {});
+    for (let k = 0; k < 12 && (await a2sInfo(target.port))?.map !== "de_mirage"; k++) {
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+
   const results = [];
   for (const id of ids) {
     const before = (await a2sInfo(target.port))?.map ?? "";
@@ -225,6 +233,12 @@ export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, p
     }
     const sec = Math.round((Date.now() - started) / 1000);
     results.push(map !== before ? `${id} → ${map} (${sec} с)` : `${id}: не загрузилась за ${sec} с`);
+    if (map !== before && ids.length > 1) {
+      await rcon(target.port, rconPassword, "changelevel de_mirage").catch(() => {});
+      for (let k = 0; k < 12 && (await a2sInfo(target.port))?.map !== "de_mirage"; k++) {
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
   }
   await rcon(target.port, rconPassword, "changelevel de_mirage").catch(() => {});
   return `${target.name}: ${results.join(" · ")}`;

@@ -4,7 +4,7 @@ import { notify } from "./audit";
 import { getMatch, getMatchRosters, recomputeSeries, syncBracket } from "./matches";
 import { db } from "./supabase";
 import { modeOf } from "./modes";
-import { getSetting } from "./settings";
+import { getSetting, getWorkshopMaps } from "./settings";
 import { startMapLogging, stopMapLogging } from "./swing-ingest";
 import type { Match } from "./types";
 
@@ -598,4 +598,22 @@ async function saveWorkshopResults(result: string) {
     info[m[1]] = { map: null, ok: false, checked_at: now, note: "не загружается в CS2 — возможно, карта из CS:GO" };
   }
   await db().from("app_settings").upsert({ key: "WORKSHOP_MAP_INFO", value: JSON.stringify(info), updated_at: now });
+}
+
+/**
+ * Карты библиотеки, которые ещё ни разу не проверялись на сервере, → прогрев.
+ * Не чаще раза в 10 минут, чтобы не держать сервер занятым.
+ */
+export async function verifyWorkshopLibrary() {
+  const [library, info] = await Promise.all([getWorkshopMaps(), workshopInfo()]);
+  const unchecked = library.map((w) => w.split("@")[1]).filter((id) => !info[id]);
+  if (!unchecked.length) return;
+  const since = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { count } = await db()
+    .from("agent_commands")
+    .select("id", { count: "exact", head: true })
+    .eq("type", "prefetch_maps")
+    .or(`status.in.(pending,sent),created_at.gte.${since}`);
+  if (count) return;
+  await enqueueCommand(null, "prefetch_maps", { workshop_ids: unchecked });
 }
