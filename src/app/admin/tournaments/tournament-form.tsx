@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ACTIVE_POOL, CS2_MAPS, slugify } from "@/lib/maps";
+import { MODES, type ModeKey } from "@/lib/modes";
 import type { PrizeRow, Tournament } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
 import { Card, Field, cn } from "@/components/ui";
@@ -225,7 +226,25 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       </Section>
 
       {/* 2 */}
-      <Section step={2} title="Формат">
+      <Section step={2} title="Режим и формат">
+        <div>
+          <div className="mb-2 text-[13px] font-medium text-fg-2">Режим игры</div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {(Object.keys(MODES) as ModeKey[]).map((k) => (
+              <OptionCard
+                key={k}
+                active={format === k}
+                onClick={() => {
+                  setFormat(k);
+                  setMaps([...MODES[k].maps]);
+                }}
+                title={MODES[k].title}
+                text={MODES[k].text}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="-mb-2 text-[13px] font-medium text-fg-2">Формат турнира</div>
         <div className="grid sm:grid-cols-2 gap-3">
           <OptionCard
             active={bracket === "double_elimination"}
@@ -245,10 +264,7 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
             <div className="mb-2 text-[13px] font-medium text-fg-2">Команд</div>
             <Segmented value={maxTeams} onChange={setMaxTeams} options={[4, 8, 16, 32].map((n) => ({ value: n, label: String(n) }))} />
           </div>
-          <div>
-            <div className="mb-2 text-[13px] font-medium text-fg-2">Режим</div>
-            <Segmented value={format} onChange={setFormat} options={[{ value: "5v5", label: "5 на 5" }, { value: "2v2", label: "2 на 2" }]} />
-          </div>
+
           <div>
             <div className="mb-2 text-[13px] font-medium text-fg-2">Обычные матчи</div>
             <Segmented value={bo} onChange={setBo} options={[1, 3].map((n) => ({ value: n, label: `BO${n}` }))} />
@@ -283,17 +299,24 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
                 <span className={cn("absolute bottom-2.5 right-2.5 size-5 rounded-md grid place-items-center text-[11px]", on ? "bg-accent text-[#06101f]" : "border border-line-strong")}>
                   {on ? "✓" : ""}
                 </span>
-                {!m.active && <span className="absolute bottom-2.5 left-3 text-[10px] uppercase tracking-wider text-fg-3">резерв</span>}
+                {(MODES[format as ModeKey]?.maps as readonly string[] | undefined)?.includes(m.id) && (
+                  <span className="absolute bottom-2.5 left-3 text-[10px] uppercase tracking-wider text-fg-3">пул режима</span>
+                )}
               </button>
             );
           })}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className={mapWarning ? "text-warn" : "text-fg-3"}>
-            Выбрано {maps.length} {mapWarning ? `· ${mapWarning}` : "· вето 7 карт"}
+            Выбрано {maps.length}
+            {mapWarning ? ` · ${mapWarning}` : ""}
           </span>
-          <button type="button" onClick={() => setMaps([...ACTIVE_POOL])} className="text-accent hover:underline">
-            Активный пул
+          <button
+            type="button"
+            onClick={() => setMaps([...(MODES[format as ModeKey]?.maps ?? ACTIVE_POOL)])}
+            className="text-accent hover:underline"
+          >
+            Стандартный пул режима
           </button>
         </div>
       </Section>

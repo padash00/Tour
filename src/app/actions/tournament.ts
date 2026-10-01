@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import {
-  MAX_MAIN,
   getActiveMembership,
   getRegistration,
   getTeamMembers,
   getTournamentById,
   writeRoster,
 } from "@/lib/data";
+import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -33,21 +33,34 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
 
   if (tournament.status !== "registration") return { error: "Регистрация на турнир закрыта" };
 
+  // состав на турнир выбирает капитан: основа ровно под режим, запасные — до лимита режима
+  const mode = modeOf(tournament.format);
   const members = await getTeamMembers(team.id);
-  const mains = members.filter((m) => m.role !== "substitute");
-  if (mains.length < MAX_MAIN) {
-    return { error: `Нужно минимум ${MAX_MAIN} основных игроков. Сейчас: ${mains.length}.` };
+  let mainIds = formData.getAll("main").map(String);
+  let subIds = formData.getAll("sub").map(String);
+  if (mainIds.length === 0) {
+    const ordered = [...members.filter((m) => m.role !== "substitute"), ...members.filter((m) => m.role === "substitute")];
+    mainIds = ordered.slice(0, mode.size).map((m) => m.player_id);
+    subIds = ordered.slice(mode.size, mode.size + mode.subs).map((m) => m.player_id);
   }
-  const banned = members.find((m) => m.player.is_banned);
+  const memberIds = new Set(members.map((m) => m.player_id));
+  if ([...mainIds, ...subIds].some((id) => !memberIds.has(id))) return { error: "В составе есть игрок не из вашей команды" };
+  if (new Set([...mainIds, ...subIds]).size !== mainIds.length + subIds.length) return { error: "Игрок выбран дважды" };
+  if (mainIds.length !== mode.size) {
+    return { error: `${mode.title}: в основе должно быть ${mainPlayersLabel(mode.size)}. Выбрано: ${mainIds.length}.` };
+  }
+  if (subIds.length > mode.subs) return { error: `Запасных можно не больше ${mode.subs}` };
+  const chosen = [...mainIds, ...subIds].map((id) => members.find((m) => m.player_id === id)!);
+  const banned = chosen.find((m) => m.player.is_banned);
   if (banned) return { error: `Игрок ${banned.player.nickname} заблокирован на платформе` };
 
   const existing = await getRegistration(tournament.id, team.id);
-  if (existing && (existing.status === "pending" || existing.status === "approved")) {
-    return { error: "Команда уже подала заявку" };
-  }
+  const isUpdate = !!existing && (existing.status === "pending" || existing.status === "approved");
 
   let registrationId: string;
-  if (existing) {
+  if (isUpdate) {
+    registrationId = existing!.id;
+  } else if (existing) {
     await db()
       .from("tournament_registrations")
       .update({ status: "pending", note: null, decided_by: null, decided_at: null, checked_in_at: null, seed: null })
@@ -63,15 +76,27 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     registrationId = data.id;
   }
 
-  const rosterError = await writeRoster(registrationId, tournament.id, members);
+  const rosterError = await writeRoster(
+    registrationId,
+    tournament.id,
+    chosen.map((m) => ({ ...m, role: subIds.includes(m.player_id) ? ("substitute" as const) : ("player" as const) })),
+  );
   if (rosterError) {
-    await db().from("tournament_registrations").update({ status: "withdrawn" }).eq("id", registrationId);
-    await db().from("tournament_roster_players").delete().eq("registration_id", registrationId);
+    if (!isUpdate) {
+      await db().from("tournament_registrations").update({ status: "withdrawn" }).eq("id", registrationId);
+      await db().from("tournament_roster_players").delete().eq("registration_id", registrationId);
+    }
     return { error: "Кто-то из игроков уже заявлен на этот турнир в составе другой команды" };
   }
 
+  if (isUpdate) {
+    await audit(player.id, "registration.roster", { type: "tournament", id: tournament.id }, { team: team.tag });
+    revalidatePath(`/tournaments/${tournament.slug}`, "layout");
+    return { success: "Состав заявки обновлён" };
+  }
+
   await notify(
-    members.filter((m) => m.player_id !== player.id).map((m) => m.player_id),
+    chosen.filter((m) => m.player_id !== player.id).map((m) => m.player_id),
     `${team.name} подала заявку на «${tournament.name}»`,
     "Заявка ожидает подтверждения администратора.",
     `/tournaments/${tournament.slug}`,
@@ -119,8 +144,9 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   if (!reg || reg.status !== "approved") return { error: "Заявка команды не одобрена" };
   if (reg.checked_in_at) return { success: "Команда уже прошла check-in" };
 
+  const mode = modeOf(tournament.format);
   const mains = reg.roster.filter((r) => r.role === "main");
-  if (mains.length < MAX_MAIN) return { error: `В составе меньше ${MAX_MAIN} основных игроков` };
+  if (mains.length !== mode.size) return { error: `В основе должно быть ${mainPlayersLabel(mode.size)}, сейчас ${mains.length}` };
   const banned = reg.roster.find((r) => r.player.is_banned);
   if (banned) return { error: `Игрок ${banned.player.nickname} заблокирован` };
 

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { notify } from "./audit";
 import { getMatch, getMatchRosters, recomputeSeries, syncBracket } from "./matches";
 import { db } from "./supabase";
+import { modeOf } from "./modes";
 import { getSetting } from "./settings";
 import { startMapLogging, stopMapLogging } from "./swing-ingest";
 import type { Match } from "./types";
@@ -99,8 +100,9 @@ export async function buildMatchzyConfig(matchId: string) {
     map_sides: m.maps.map((_, i) => (m.tournament.knife_round ? "knife" : i % 2 === 0 ? "team1_ct" : "team2_ct")),
     skip_veto: true, // вето уже прошло на сайте
     clinch_series: true,
-    players_per_team: 5,
-    min_players_to_ready: 10,
+    players_per_team: modeOf(m.tournament.format).size,
+    min_players_to_ready: modeOf(m.tournament.format).size * 2,
+    wingman: modeOf(m.tournament.format).wingman,
     min_spectators_to_ready: 0,
     spectators: { players: Object.fromEntries(observers.map((id, i) => [id, `F16 Observer ${i + 1}`])) },
     // только числовые cvars: MatchZy выполняет их без кавычек.

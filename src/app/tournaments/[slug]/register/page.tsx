@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { registerTeam, withdrawRegistration } from "@/app/actions/tournament";
 import { requirePlayer } from "@/lib/auth";
-import { MAX_MAIN, getActiveMembership, getRegistration, getTeamMembers, getTournamentBySlug } from "@/lib/data";
+import { getActiveMembership, getRegistration, getTeamMembers, getTournamentBySlug } from "@/lib/data";
+import { mainPlayersLabel, modeOf } from "@/lib/modes";
+import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
@@ -43,14 +45,19 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   const { team } = membership;
   const isCaptain = team.captain_id === player.id;
   const [members, reg] = await Promise.all([getTeamMembers(team.id), getRegistration(t.id, team.id)]);
-  const mains = members.filter((m) => m.role !== "substitute");
+  const mode = modeOf(t.format);
   const active = reg && (reg.status === "pending" || reg.status === "approved");
-  const checks = [
-    { ok: mains.length >= MAX_MAIN, text: `${MAX_MAIN} основных игроков (сейчас ${mains.length})` },
-    { ok: !members.some((m) => m.player.is_banned), text: "Нет заблокированных игроков" },
-    { ok: t.status === "registration", text: "Регистрация открыта" },
-  ];
-  const ready = checks.every((c) => c.ok);
+  const canEdit = isCaptain && t.status === "registration";
+
+  // предвыбор: текущий состав заявки, иначе основа по ролям в команде
+  const initial: Record<string, "main" | "sub" | "out"> = {};
+  if (active && reg.roster.length) {
+    for (const r of reg.roster) initial[r.player_id] = r.role === "sub" ? "sub" : "main";
+  } else {
+    const ordered = [...members.filter((m) => m.role !== "substitute"), ...members.filter((m) => m.role === "substitute")];
+    ordered.forEach((m, i) => (initial[m.player_id] = i < mode.size ? "main" : i < mode.size + mode.subs ? "sub" : "out"));
+  }
+  const enough = members.filter((m) => !m.player.is_banned).length >= mode.size;
 
   return (
     <Container className="max-w-3xl">
@@ -61,7 +68,10 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             <TeamLogo src={team.logo_url} tag={team.tag} size={52} />
             <div className="flex-1">
               <div className="text-lg font-semibold">{team.name}</div>
-              <div className="text-sm text-fg-3">{team.tag}</div>
+              <div className="text-sm text-fg-3">
+                {mode.title} · в основе {mainPlayersLabel(mode.size)}
+                {mode.subs ? `, до ${mode.subs} запасн.` : ""}
+              </div>
             </div>
             {reg && (
               <Pill tone={reg.status === "approved" ? "ok" : reg.status === "pending" ? "warn" : "neutral"} dot>
@@ -69,62 +79,67 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
               </Pill>
             )}
           </div>
-          <div className="mt-5 border-t border-line pt-2">
-            <RosterList
-              slots={7}
-              items={members.map((m) => ({
-                key: m.id,
-                player: m.player,
-                role: m.role === "captain" ? "captain" : m.role === "substitute" ? "sub" : "main",
-              }))}
-            />
-          </div>
-          <div className="mt-4">
-            <Link href="/team" className="text-sm text-accent hover:underline">
-              Изменить состав команды →
-            </Link>
-          </div>
         </Card>
-
-        {!active && (
-          <Card className="p-6">
-            <div className="label mb-4">Проверка</div>
-            <ul className="space-y-2.5">
-              {checks.map((c) => (
-                <li key={c.text} className="flex items-center gap-3 text-sm">
-                  <span className={c.ok ? "text-ok" : "text-danger"}>{c.ok ? "✓" : "✕"}</span>
-                  <span className={c.ok ? "text-fg-2" : "text-fg"}>{c.text}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
 
         {reg?.status === "rejected" && reg.note && <Notice tone="danger">Причина отказа: {reg.note}</Notice>}
 
         {!isCaptain ? (
           <Notice>Заявку подаёт капитан команды.</Notice>
-        ) : active ? (
-          <Card className="p-6 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-            <p className="text-sm text-fg-2">
-              {reg.status === "approved"
-                ? "Заявка одобрена. Пока регистрация открыта, изменения состава команды автоматически попадают в заявку."
-                : "Заявка подана и ждёт решения администратора. Изменения состава автоматически попадают в заявку."}
-            </p>
-            {t.status === "registration" && (
-              <ActionForm action={withdrawRegistration}>
-                <input type="hidden" name="tournamentId" value={t.id} />
-                <SubmitButton variant="danger" confirm="Отозвать заявку команды?">
-                  Отозвать заявку
-                </SubmitButton>
-              </ActionForm>
-            )}
-          </Card>
-        ) : (
+        ) : !enough ? (
+          <EmptyState
+            icon={<IconUsers />}
+            title={`Нужно минимум ${mainPlayersLabel(mode.size)}`}
+            description={`Сейчас в команде ${members.length}. Пригласите игроков по ссылке со страницы команды.`}
+            action={<ButtonLink href="/team">Моя команда</ButtonLink>}
+          />
+        ) : canEdit ? (
           <ActionForm action={registerTeam}>
             <input type="hidden" name="tournamentId" value={t.id} />
-            <SubmitButton size="lg" className="w-full" pendingText="Отправляем заявку…">
-              {ready ? "Подать заявку на турнир" : "Подать заявку (проверьте требования)"}
+            <Card className="p-6">
+              <div className="label mb-3">Состав на турнир</div>
+              <RosterPicker
+                size={mode.size}
+                subs={mode.subs}
+                initial={initial}
+                members={members.map((m) => ({
+                  player_id: m.player_id,
+                  nickname: m.player.nickname,
+                  avatar_url: m.player.avatar_url,
+                  faceit_level: m.player.faceit_level,
+                  banned: m.player.is_banned,
+                }))}
+              />
+            </Card>
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <SubmitButton size="lg" className="flex-1" pendingText="Сохраняем…">
+                {active ? "Сохранить состав заявки" : "Подать заявку на турнир"}
+              </SubmitButton>
+            </div>
+            {active && (
+              <p className="mt-3 text-sm text-fg-3">
+                {reg.status === "approved" ? "Заявка одобрена." : "Заявка ждёт решения администратора."} Состав можно менять, пока
+                открыта регистрация.
+              </p>
+            )}
+          </ActionForm>
+        ) : (
+          <Card className="p-6">
+            <div className="label mb-2">Состав заявки</div>
+            {reg?.roster.length ? (
+              <RosterList
+                items={reg.roster.map((r) => ({ key: r.id, player: r.player, role: r.player_id === team.captain_id ? "captain" : r.role }))}
+              />
+            ) : (
+              <p className="text-sm text-fg-3">Регистрация закрыта.</p>
+            )}
+          </Card>
+        )}
+
+        {active && canEdit && (
+          <ActionForm action={withdrawRegistration}>
+            <input type="hidden" name="tournamentId" value={t.id} />
+            <SubmitButton variant="ghost" confirm="Отозвать заявку команды?">
+              Отозвать заявку
             </SubmitButton>
           </ActionForm>
         )}

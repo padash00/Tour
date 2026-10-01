@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { checkIn } from "@/app/actions/tournament";
 import { requirePlayer } from "@/lib/auth";
-import { MAX_MAIN, getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
+import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, formatTime, tournamentStatusLabel } from "@/lib/format";
+import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
 import { Card, Container, EmptyState, Notice, PageHeader, Pill, TeamLogo } from "@/components/ui";
@@ -51,7 +52,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
   const mains = reg.roster.filter((r) => r.role === "main");
   const checks = [
     { ok: true, text: "Команда зарегистрирована" },
-    { ok: mains.length >= MAX_MAIN, text: `Минимум ${MAX_MAIN} основных игроков (${mains.length})` },
+    { ok: mains.length === modeOf(t.format).size, text: `В основе ${mainPlayersLabel(modeOf(t.format).size)} (${mains.length})` },
     { ok: reg.roster.every((r) => /^\d{17}$/.test(r.player.steam_id)), text: "SteamID всех игроков валидны" },
     { ok: !reg.roster.some((r) => r.player.is_banned), text: "Нет блокировок" },
     { ok: true, text: "Состав подтверждён" },

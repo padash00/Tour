@@ -6,6 +6,7 @@ import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamen
 import { bracketLabel, formatDate, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
 import { getTournamentMatches } from "@/lib/matches";
+import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
 import { ShareButton, StreamEmbed } from "@/components/stream";
@@ -85,7 +86,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <TournamentStatusPill status={t.status} />
             <Pill>{t.game}</Pill>
-            <Pill>{t.format}</Pill>
+            <Pill>{modeOf(t.format).title}</Pill>
             <Pill>{t.is_lan ? "LAN" : "Онлайн"}</Pill>
           </div>
           <h1 className="mt-5 text-4xl md:text-[56px] font-bold tracking-[-0.04em] leading-[1]">{t.name}</h1>
@@ -225,7 +226,7 @@ function Overview({ t }: { t: Tournament }) {
         <Card className="p-6">
           <div className="label mb-2">Формат</div>
           <KV label="Игра">{t.game}</KV>
-          <KV label="Режим">{t.format}</KV>
+          <KV label="Режим">{modeOf(t.format).title}</KV>
           <KV label="Сетка">{bracketLabel[t.bracket_type] ?? t.bracket_type}</KV>
           <KV label="Матчи">{t.match_format ?? "—"}</KV>
           <KV label="Площадка">{t.is_lan ? `LAN${t.location ? ` · ${t.location}` : ""}` : (t.location ?? "Онлайн")}</KV>
@@ -314,7 +315,10 @@ function Overview({ t }: { t: Tournament }) {
           ) : (
             <ul className="space-y-2.5 text-sm text-fg-2">
               <li>— Вход на платформу через Steam у каждого игрока</li>
-              <li>— 5 основных игроков, до 2 запасных</li>
+              <li>
+                — {modeOf(t.format).title}: в основе {mainPlayersLabel(modeOf(t.format).size)}
+                {modeOf(t.format).subs ? `, до ${modeOf(t.format).subs} запасн.` : ""}
+              </li>
               <li>— Один игрок — одна команда в рамках турнира</li>
               <li>— Check-in капитаном в отведённое время</li>
             </ul>

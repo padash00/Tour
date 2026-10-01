@@ -220,20 +220,26 @@ export async function getLockingTournament(teamId: string): Promise<Tournament |
 }
 
 /**
- * Пересобирает турнирные составы команды из текущего состава —
- * только для турниров, где регистрация ещё открыта.
+ * Состав заявки выбирает капитан. Пока регистрация открыта, из заявки
+ * автоматически убираются игроки, покинувшие команду.
  */
 export async function syncOpenRosters(teamId: string) {
   const regs = await getTeamRegistrations(teamId);
   const open = regs.filter((r) => isActiveRegistration(r) && r.tournament.status === "registration");
   if (open.length === 0) return;
-  const members = await getTeamMembers(teamId);
+  const members = new Set((await getTeamMembers(teamId)).map((m) => m.player_id));
   for (const reg of open) {
-    await writeRoster(reg.id, reg.tournament_id, members);
+    const { data } = await db().from("tournament_roster_players").select("id, player_id").eq("registration_id", reg.id);
+    const gone = (data ?? []).filter((r) => !members.has(r.player_id)).map((r) => r.id);
+    if (gone.length) await db().from("tournament_roster_players").delete().in("id", gone);
   }
 }
 
-export async function writeRoster(registrationId: string, tournamentId: string, members: TeamMemberWithPlayer[]) {
+export async function writeRoster(
+  registrationId: string,
+  tournamentId: string,
+  members: Pick<TeamMemberWithPlayer, "player_id" | "role">[],
+) {
   await db().from("tournament_roster_players").delete().eq("registration_id", registrationId);
   if (members.length === 0) return null;
   const { error } = await db()
