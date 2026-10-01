@@ -12,10 +12,11 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-accent text-[#06101f] hover:bg-accent-strong shadow-[inset_0_1px_0_#ffffff55,0_6px_20px_-8px_#8bb8ff80]",
-  secondary: "bg-surface-2 text-fg border border-line-strong hover:border-[#3a4c6a] hover:bg-surface-3",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.04]",
-  danger: "bg-danger-dim text-danger border border-[#ef7a7a33] hover:bg-[#ef7a7a26]",
+    "bg-accent text-[#06101f] hover:bg-accent-strong shadow-[inset_0_1px_0_#ffffff40,0_1px_2px_#0006] focus-visible:ring-2 focus-visible:ring-accent/40",
+  secondary:
+    "bg-white/[0.04] text-fg border border-line-strong hover:bg-white/[0.07] hover:border-[#3a4c6a] focus-visible:ring-2 focus-visible:ring-accent/30",
+  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
+  danger: "bg-danger-dim text-danger border border-[#ef7a7a33] hover:bg-[#ef7a7a26] hover:border-[#ef7a7a55]",
   warm: "bg-warm text-[#1a0d03] hover:brightness-110 shadow-[inset_0_1px_0_#ffffff55]",
 };
 
@@ -27,7 +28,7 @@ const sizes: Record<Size, string> = {
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
   return cn(
-    "inline-flex items-center justify-center font-semibold whitespace-nowrap transition-all duration-150 active:translate-y-px disabled:opacity-50 disabled:pointer-events-none select-none",
+    "inline-flex items-center justify-center font-semibold tracking-[-0.005em] whitespace-nowrap outline-none transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none",
     variants[variant],
     sizes[size],
     extra,

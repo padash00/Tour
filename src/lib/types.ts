@@ -80,6 +80,8 @@ export type Tournament = {
   requirements: string | null;
   bracket_published_at: string | null;
   cover_url: string | null;
+  default_best_of: number;
+  final_best_of: number;
   created_at: string;
   updated_at: string;
 };

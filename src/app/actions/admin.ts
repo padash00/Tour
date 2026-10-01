@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { countApproved, getPlayerBySteamId, getTournamentById } from "@/lib/data";
 import { fromLocalInput } from "@/lib/format";
+import { slugify } from "@/lib/maps";
 import { db } from "@/lib/supabase";
 import type { PrizeRow, TournamentStatus } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
@@ -30,12 +31,14 @@ const tournamentSchema = z.object({
   format: z.string().trim().min(1).max(20),
   bracket_type: z.enum(["double_elimination", "single_elimination"]),
   max_teams: z.coerce.number().int().min(2).max(64),
+  default_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(1),
+  final_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(3),
   location: z.string().trim().max(120).optional().default(""),
   is_lan: z.string().optional(),
   prize_pool: z.string().trim().max(60).optional().default(""),
   prizes: z.string().optional().default(""),
   match_format: z.string().trim().max(200).optional().default(""),
-  map_pool: z.string().trim().min(1, "Укажите пул карт"),
+  map_pool: z.string().trim().min(1, "Выберите хотя бы одну карту"),
   description: z.string().trim().max(4000).optional().default(""),
   requirements: z.string().trim().max(4000).optional().default(""),
   rules: z.string().trim().max(20000).optional().default(""),
@@ -65,6 +68,8 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     format: data.format,
     bracket_type: data.bracket_type,
     max_teams: data.max_teams,
+    default_best_of: data.default_best_of,
+    final_best_of: data.final_best_of,
     location: data.location || null,
     is_lan: data.is_lan === "on",
     prize_pool: data.prize_pool || null,
@@ -103,9 +108,15 @@ async function uploadCover(tournamentId: string, formData: FormData): Promise<st
   return url;
 }
 
+function withSlug(formData: FormData) {
+  const raw = Object.fromEntries(formData) as Record<string, unknown>;
+  if (!String(raw.slug ?? "").trim()) raw.slug = slugify(String(raw.name ?? ""));
+  return raw;
+}
+
 export async function createTournament(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
-  const parsed = tournamentSchema.safeParse(Object.fromEntries(formData));
+  const parsed = tournamentSchema.safeParse(withSlug(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { data, error } = await db().from("tournaments").insert(tournamentRow(parsed.data)).select("id").single();
@@ -120,7 +131,7 @@ export async function createTournament(_prev: ActionResult, formData: FormData):
 export async function updateTournament(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const id = String(formData.get("id"));
-  const parsed = tournamentSchema.safeParse(Object.fromEntries(formData));
+  const parsed = tournamentSchema.safeParse(withSlug(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const { error } = await db().from("tournaments").update(tournamentRow(parsed.data)).eq("id", id);

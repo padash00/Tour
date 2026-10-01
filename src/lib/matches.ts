@@ -135,6 +135,8 @@ export async function createBracket(tournament: Tournament, seededTeamIds: strin
   const generated = generateBracket({
     seeded: seededTeamIds,
     double: tournament.bracket_type === "double_elimination",
+    bestOf: tournament.default_best_of ?? 1,
+    finalBestOf: tournament.final_best_of ?? 3,
   });
   const ids = new Map(generated.map((m) => [m.key, randomUUID()]));
   const rows = generated.map((m) => ({

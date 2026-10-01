@@ -51,13 +51,16 @@ export type GenerateOptions = {
   /** id команд в порядке посева (первый — 1-й сид) */
   seeded: string[];
   double: boolean;
+  /** формат обычных матчей и финальной стадии (последние 4 команды) */
+  bestOf?: number;
+  finalBestOf?: number;
 };
 
 /**
  * Генерирует структуру сетки. best_of по умолчанию: BO1, а финальная стадия (последние 4 команды) — BO3:
  * финал верхней сетки, два последних раунда нижней и гранд-финал (в SE — полуфиналы и финал).
  */
-export function generateBracket({ seeded, double }: GenerateOptions): BracketMatch[] {
+export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }: GenerateOptions): BracketMatch[] {
   const size = bracketSize(Math.max(seeded.length, double ? 4 : 2));
   const k = Math.log2(size);
   const matches: BracketMatch[] = [];
@@ -81,7 +84,7 @@ export function generateBracket({ seeded, double }: GenerateOptions): BracketMat
   for (let r = 1; r <= k; r++) {
     const count = size / 2 ** r;
     const bo3 = double ? r === k : r >= k - 1;
-    for (let p = 0; p < count; p++) matches.push(blank("upper", r, p, bo3 ? 3 : 1));
+    for (let p = 0; p < count; p++) matches.push(blank("upper", r, p, bo3 ? finalBestOf : bestOf));
   }
   const order = seedOrder(size);
   for (let p = 0; p < size / 2; p++) {
@@ -94,9 +97,9 @@ export function generateBracket({ seeded, double }: GenerateOptions): BracketMat
     const lbRounds = 2 * (k - 1);
     for (let r = 1; r <= lbRounds; r++) {
       const count = lowerRoundSize(size, r);
-      for (let p = 0; p < count; p++) matches.push(blank("lower", r, p, r >= lbRounds - 1 ? 3 : 1));
+      for (let p = 0; p < count; p++) matches.push(blank("lower", r, p, r >= lbRounds - 1 ? finalBestOf : bestOf));
     }
-    matches.push(blank("grand_final", 1, 0, 3));
+    matches.push(blank("grand_final", 1, 0, finalBestOf));
   }
 
   const get = (b: Side, r: number, p: number) => matches.find((x) => x.key === matchKey(b, r, p))!;
