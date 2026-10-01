@@ -102,7 +102,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
               const details = Object.keys(l.payload ?? {}).length ? JSON.stringify(l.payload) : "";
               return (
                 <div key={l.id} className="group flex gap-4 px-4 hover:bg-white/[0.03]">
-                  <span className="text-fg-3 shrink-0 w-[92px]">{formatShortDateTime(l.created_at)}</span>
+                  <span className="text-fg-3 shrink-0 w-[124px] whitespace-nowrap">{formatShortDateTime(l.created_at)}</span>
                   <span className={cn("shrink-0 w-11 uppercase", sevCls[s])}>{s}</span>
                   <span className="text-fg-3 shrink-0 w-28 truncate">{l.actor?.nickname ?? "system"}</span>
                   <span className="text-fg-2 shrink-0">{l.action}</span>
