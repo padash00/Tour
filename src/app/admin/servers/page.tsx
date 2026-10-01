@@ -202,8 +202,8 @@ export default async function ServersPage() {
                 {((commands ?? []) as AgentCommand[]).map((c) => (
                   <tr key={c.id}>
                     <td className="num text-fg-3 whitespace-nowrap">{formatShortDateTime(c.created_at)}</td>
-                    <td className="num">{c.instance ?? "host"}</td>
-                    <td className="num text-fg">{c.type}{c.type === "rcon" ? ` ${String(c.payload.command)}` : ""}</td>
+                    <td className="num whitespace-nowrap">{c.instance ?? "host"}</td>
+                    <td className="num text-fg whitespace-nowrap">{c.type}{c.type === "rcon" ? ` ${String(c.payload.command)}` : ""}</td>
                     <td>
                       <Pill tone={c.status === "done" ? "ok" : c.status === "error" ? "danger" : "warn"}>{c.status}</Pill>
                     </td>
