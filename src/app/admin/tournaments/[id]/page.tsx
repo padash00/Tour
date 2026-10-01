@@ -26,7 +26,7 @@ import { TournamentStatusPill } from "@/components/tournament-bits";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
 import { Avatar, EmptyState, FaceitLevel, Pill, TeamLogo, cn } from "@/components/ui";
 import { AdminHeader, Dot, Metric, Panel, SubTabs, TableBox } from "@/components/admin/control";
-import { getWorkshopMaps } from "@/lib/settings";
+import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
 
@@ -109,7 +109,13 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}
       {tab === "settings" && (
         <div className="space-y-8">
-          <TournamentForm action={updateTournament} t={t} workshopMaps={await getWorkshopMaps()} />
+          <TournamentForm
+            action={updateTournament}
+            t={t}
+            workshopMaps={await getWorkshopMaps()}
+            disabledMaps={await getDisabledMaps()}
+            mapImages={await getMapImages()}
+          />
           <div id="danger" className="max-w-xl pt-6 border-t border-line scroll-mt-8">
             <div className="text-[13px] font-semibold text-danger">Опасная зона</div>
             <p className="mt-1 mb-3 text-[13px] text-fg-3">

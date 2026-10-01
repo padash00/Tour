@@ -126,7 +126,7 @@ export function Metric({ label, value, tone, hint }: { label: ReactNode; value: 
 /** Внутренние вкладки страницы (через ?tab=) */
 export function SubTabs({ items, active }: { items: { key: string; label: ReactNode; href: string }[]; active: string }) {
   return (
-    <div className="flex gap-5 border-b border-line overflow-x-auto">
+    <div className="flex gap-5 border-b border-line overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
       {items.map((t) => (
         <Link
           key={t.key}

@@ -31,12 +31,15 @@ export function MapTile({
   caption,
   interactive,
   className,
+  image,
 }: {
   map: string;
   state?: MapTileState;
   caption?: string;
   interactive?: boolean;
   className?: string;
+  /** картинка карты из «Настройки → Карты» */
+  image?: string | null;
 }) {
   const [a, b] = tint(map);
   return (
@@ -51,9 +54,15 @@ export function MapTile({
       )}
       style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}
     >
-      <svg viewBox="0 0 200 100" className="absolute inset-0 h-full w-full opacity-[0.08]" aria-hidden preserveAspectRatio="none">
-        <path d="M20 20h60v30H50v35H20zM110 15h50v25h25v45h-40V60h-35z" fill="none" stroke="#fff" strokeWidth="1" />
-      </svg>
+      {image ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.55] brightness-[0.7]" />
+          <span className="absolute inset-0 bg-gradient-to-t from-[#070b12f0] via-[#070b1266] to-transparent" />
+        </>
+      ) : (
+        <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff0d,transparent_60%)]" />
+      )}
       <span className={cn("relative text-[17px] font-semibold tracking-[-0.01em]", state === "banned" && "line-through decoration-1")}>
         {mapName(map)}
       </span>

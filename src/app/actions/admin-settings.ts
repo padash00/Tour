@@ -60,3 +60,68 @@ export async function editWorkshopMaps(_prev: ActionResult, formData: FormData):
   revalidatePath("/admin/settings");
   return { success: remove ? "Карта убрана" : "Карта добавлена — сервер проверяет, грузится ли она (до пары минут)" };
 }
+
+// ───────────────────────── карты: картинки и доступность
+
+async function readJson<T>(key: string, fallback: T): Promise<T> {
+  const { data } = await db().from("app_settings").select("value").eq("key", key).maybeSingle();
+  try {
+    return data?.value ? (JSON.parse(data.value) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJson(key: string, value: unknown, adminId: string) {
+  await db()
+    .from("app_settings")
+    .upsert({ key, value: JSON.stringify(value), updated_by: adminId, updated_at: new Date().toISOString() });
+}
+
+const MAP_KEY = /^([a-z0-9_]+|[^@\s]+@\d+)$/;
+
+export async function uploadMapImage(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const map = String(formData.get("map") ?? "");
+  if (!MAP_KEY.test(map)) return { error: "Неизвестная карта" };
+  const file = formData.get("image") as File | null;
+  if (!file || file.size === 0) return { error: "Выберите картинку" };
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return { error: "Картинка — PNG, JPG или WEBP" };
+  if (file.size > 3 * 1024 * 1024) return { error: "Картинка — не больше 3 МБ" };
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `maps/${map.replace(/[^a-z0-9_]/gi, "_")}-${Date.now()}.${ext}`;
+  const { error } = await db()
+    .storage.from("tournament-covers")
+    .upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type, upsert: true });
+  if (error) return { error: "Не удалось загрузить картинку" };
+  const url = db().storage.from("tournament-covers").getPublicUrl(path).data.publicUrl;
+  const images = await readJson<Record<string, string>>("MAP_IMAGES", {});
+  images[map] = url;
+  await writeJson("MAP_IMAGES", images, admin.id);
+  await audit(admin.id, "settings.map_image", undefined, { map });
+  revalidatePath("/", "layout");
+  return { success: "Картинка сохранена" };
+}
+
+export async function removeMapImage(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const map = String(formData.get("map") ?? "");
+  const images = await readJson<Record<string, string>>("MAP_IMAGES", {});
+  delete images[map];
+  await writeJson("MAP_IMAGES", images, admin.id);
+  revalidatePath("/", "layout");
+  return { success: "Картинка убрана" };
+}
+
+export async function toggleMapEnabled(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const map = String(formData.get("map") ?? "");
+  if (!MAP_KEY.test(map)) return { error: "Неизвестная карта" };
+  const disabled = await readJson<string[]>("MAPS_DISABLED", []);
+  const next = disabled.includes(map) ? disabled.filter((m) => m !== map) : [...disabled, map];
+  await writeJson("MAPS_DISABLED", next, admin.id);
+  await audit(admin.id, "settings.map_toggle", undefined, { map, enabled: !next.includes(map) });
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/tournaments", "layout");
+  return { success: next.includes(map) ? "Карта скрыта из выбора" : "Карта доступна в турнирах" };
+}

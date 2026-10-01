@@ -6,7 +6,9 @@ import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
 import { formatShortDateTime } from "@/lib/format";
-import { getSettingsStatus, getWorkshopMaps, type SettingKey } from "@/lib/settings";
+import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, type SettingKey } from "@/lib/settings";
+import { CS2_MAPS } from "@/lib/maps";
+import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { AdminHeader, Dot, Panel, SubTabs } from "@/components/admin/control";
 
@@ -14,6 +16,7 @@ export const metadata: Metadata = { title: "Настройки — F16 Control" 
 
 const TABS = [
   { key: "general", label: "Общие" },
+  { key: "maps", label: "Карты" },
   { key: "steam", label: "Steam" },
   { key: "faceit", label: "FACEIT" },
   { key: "workshop", label: "Workshop-карты" },
@@ -84,7 +87,13 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 export default async function SettingsPage(props: PageProps<"/admin/settings">) {
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info] = await Promise.all([getSettingsStatus(), getWorkshopMaps(), workshopInfo()]);
+  const [settings, workshop, info, mapImages, disabledMaps] = await Promise.all([
+    getSettingsStatus(),
+    getWorkshopMaps(),
+    workshopInfo(),
+    getMapImages(),
+    getDisabledMaps(),
+  ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
   const settingTab = TAB_SETTING[tab];
@@ -127,6 +136,32 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
       )}
 
       {settingTab && byKey.get(settingTab) && <SettingForm s={byKey.get(settingTab)!} />}
+
+      {tab === "maps" && (
+        <div className="space-y-8">
+          <p className="text-[13px] text-fg-3 max-w-3xl">
+            Все официальные карты CS2, которые есть на серверах. «Доступна» — карта предлагается в форме турнира, «Скрыта» — нет.
+            Нажмите на карту, чтобы загрузить картинку (PNG, JPG или WEBP до 3 МБ, лучше широкую) — она появится на странице
+            турнира и в вето, сайт сам её затемнит.
+          </p>
+          <Panel title="Официальные карты">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {CS2_MAPS.map((m) => (
+                <MapCard key={m.id} map={m.id} image={mapImages[m.id] ?? null} enabled={!disabledMaps.includes(m.id)} />
+              ))}
+            </div>
+          </Panel>
+          {workshop.length > 0 && (
+            <Panel title="Карты из Workshop">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {workshop.map((w) => (
+                  <MapCard key={w} map={w} image={mapImages[w] ?? null} enabled toggleable={false} />
+                ))}
+              </div>
+            </Panel>
+          )}
+        </div>
+      )}
 
       {tab === "workshop" && (
         <div className="space-y-6 max-w-3xl">

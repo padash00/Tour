@@ -83,7 +83,7 @@ export async function SiteHeader() {
 export function SiteFooter() {
   return (
     <PublicOnly>
-      <footer className="mt-32 border-t border-line">
+      <footer className="mt-20 border-t border-line">
         <Container className="py-12 flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
           <div>
             <Logo />

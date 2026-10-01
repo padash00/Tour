@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getEntrantTeam, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
+import { getMapImages } from "@/lib/settings";
 import { bracketLabel, formatDate, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
@@ -50,7 +51,11 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
   const t = await getTournamentBySlug(slug, isAdmin(player));
   if (!t) notFound();
 
-  const [regs, matches] = await Promise.all([getTournamentRegistrations(t.id), getTournamentMatches(t.id)]);
+  const [regs, matches, mapImages] = await Promise.all([
+    getTournamentRegistrations(t.id),
+    getTournamentMatches(t.id),
+    getMapImages(),
+  ]);
   const approved = regs.filter((r) => r.status === "approved");
   const pending = regs.filter((r) => r.status === "pending");
   const myTeam = player ? await getEntrantTeam(player, t) : null;
@@ -119,7 +124,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             {tab === "overview" && (
               <>
                 {["live", "finished"].includes(t.status) && <MvpBlock tournamentId={t.id} finished={t.status === "finished"} />}
-                <Overview t={t} />
+                <Overview t={t} mapImages={mapImages} />
               </>
             )}
             {tab === "teams" && <TeamsTab approved={approved} pendingCount={pending.length} solo={solo} />}
@@ -236,7 +241,7 @@ function HeroCta({
   );
 }
 
-function Overview({ t }: { t: Tournament }) {
+function Overview({ t, mapImages }: { t: Tournament; mapImages: Record<string, string> }) {
   const mode = modeOf(t.format);
   return (
     <div className="space-y-16">
@@ -285,7 +290,7 @@ function Overview({ t }: { t: Tournament }) {
         <h2 className="text-[26px] font-bold tracking-[-0.025em] mb-5">Маппул</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2.5">
           {t.map_pool.map((m) => (
-            <MapTile key={m} map={m} />
+            <MapTile key={m} map={m} image={mapImages[m]} />
           ))}
         </div>
         <span className="sr-only">{t.map_pool.map(mapName).join(", ")}</span>

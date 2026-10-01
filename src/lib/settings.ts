@@ -53,3 +53,23 @@ export async function getWorkshopMaps(): Promise<string[]> {
     return [];
   }
 }
+
+/** Картинки карт: { "de_mirage": url, "aim_map@3070549948": url } (app_settings.MAP_IMAGES) */
+export async function getMapImages(): Promise<Record<string, string>> {
+  try {
+    const raw = (await loadAll()).get("MAP_IMAGES");
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Официальные карты, которые админ скрыл из выбора в турнирах (app_settings.MAPS_DISABLED) */
+export async function getDisabledMaps(): Promise<string[]> {
+  try {
+    const raw = (await loadAll()).get("MAPS_DISABLED");
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}

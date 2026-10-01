@@ -1,3 +1,4 @@
+import { mapLabel } from "./maps";
 import type { RegistrationStatus, TournamentStatus } from "./types";
 
 const TZ = "Asia/Almaty";
@@ -76,9 +77,7 @@ export const bracketLabel: Record<string, string> = {
 };
 
 export function mapName(map: string) {
-  if (map.includes("@")) return map.split("@")[0]; // workshop: «aim_map@123456»
-  const name = map.replace(/^de_/, "");
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  return mapLabel(map); // workshop: «aim_map@123456» → aim_map
 }
 
 export function plural(n: number, one: string, few: string, many: string) {

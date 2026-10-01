@@ -127,11 +127,16 @@ export function TournamentForm({
   action,
   t,
   workshopMaps = [],
+  disabledMaps = [],
+  mapImages = {},
 }: {
   action: FormAction;
   t?: Tournament;
   /** библиотека карт из Steam Workshop (Админка → Настройки), формат «name@id» */
   workshopMaps?: string[];
+  /** официальные карты, скрытые в «Настройки → Карты» */
+  disabledMaps?: string[];
+  mapImages?: Record<string, string>;
 }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(t?.name ?? "");
@@ -150,7 +155,9 @@ export function TournamentForm({
   const [finalBo, setFinalBo] = useState(t?.final_best_of ?? 3);
   const [isLan, setIsLan] = useState(t?.is_lan ?? true);
   const [location, setLocation] = useState(t?.location ?? "F16 Arena");
-  const [maps, setMaps] = useState<string[]>(t?.map_pool ?? [...ACTIVE_POOL]);
+  const [maps, setMaps] = useState<string[]>(t?.map_pool ?? ACTIVE_POOL.filter((m) => !disabledMaps.includes(m)));
+  // в выборе — доступные карты и те, что уже стоят в турнире
+  const officialMaps = CS2_MAPS.filter((m) => !disabledMaps.includes(m.id) || (t?.map_pool ?? []).includes(m.id));
   const [start, setStart] = useState(toLocal(t?.starts_at));
   const [regOpen, setRegOpen] = useState(toLocal(t?.registration_opens_at));
   const [regClose, setRegClose] = useState(toLocal(t?.registration_closes_at));
@@ -523,8 +530,9 @@ export function TournamentForm({
 
           <Section show={step === 4} title="Карты" hint="Нажмите на карту, чтобы включить или убрать её">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {CS2_MAPS.map((m) => {
+              {officialMaps.map((m) => {
                 const on = maps.includes(m.id);
+                const img = mapImages[m.id];
                 return (
                   <button
                     key={m.id}
@@ -535,7 +543,14 @@ export function TournamentForm({
                       on ? "border-accent/50 bg-accent-dim" : "border-line bg-bg-2 opacity-50 hover:opacity-80",
                     )}
                   >
-                    <span className="text-[14px] font-semibold">{m.name}</span>
+                    {img && (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img} alt="" className="absolute inset-0 size-full object-cover saturate-[0.55] brightness-[0.55]" />
+                        <span className="absolute inset-0 bg-gradient-to-t from-[#070b12cc] to-transparent" />
+                      </>
+                    )}
+                    <span className="relative text-[14px] font-semibold">{m.name}</span>
                     <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-[#06101f]" : "border border-line-strong")}>
                       {on ? "✓" : ""}
                     </span>

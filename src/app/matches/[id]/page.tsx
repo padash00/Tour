@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getMapImages } from "@/lib/settings";
 import { notFound } from "next/navigation";
 import { openDispute } from "@/app/actions/dispute";
 import { db } from "@/lib/supabase";
@@ -30,6 +31,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const m = await getMatch(id);
   if (!m || m.tournament.status === "draft") notFound();
 
+  const mapImages = await getMapImages();
   const [player, all, rosters, statRows] = await Promise.all([
     getCurrentPlayer(),
     getTournamentMatches(m.tournament_id),
@@ -142,7 +144,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             </div>
           </section>
         ) : m.status === "veto" ? (
-          <VetoBoard m={m} state={state} myTurn={myTurn} />
+          <VetoBoard m={m} state={state} myTurn={myTurn} images={mapImages} />
         ) : serverPhase && (inRoster || admin) ? (
           m.server_address ? (
             <ServerReady
@@ -177,7 +179,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         {m.status !== "veto" && m.veto.length > 0 && (
           <section>
             <h2 className="text-[15px] font-semibold mb-3 text-fg-2">Вето</h2>
-            <VetoBoard m={m} state={state} myTurn={false} compact />
+            <VetoBoard m={m} state={state} myTurn={false} compact images={mapImages} />
           </section>
         )}
 

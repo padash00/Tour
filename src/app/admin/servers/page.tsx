@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { hostCommand, serverCommand, serverRcon } from "@/app/actions/admin-server";
+import { hostCommand, serverRcon } from "@/app/actions/admin-server";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { formatShortDateTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
+import { ServerActions } from "@/components/admin/server-actions";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
 import { cn } from "@/components/ui";
@@ -101,7 +102,7 @@ export default async function ServersPage() {
       {/* инстансы */}
       <Panel title="Инстансы">
         <div className="rounded-xl border border-line bg-surface divide-y divide-line overflow-x-auto">
-          <div className="min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_220px] gap-4 px-4 h-9 items-center text-[12px] text-fg-3">
+          <div className="min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_260px] gap-4 px-4 h-9 items-center text-[12px] text-fg-3">
             <span>Инстанс</span>
             <span>Состояние</span>
             <span>Матч</span>
@@ -121,7 +122,7 @@ export default async function ServersPage() {
               <div
                 key={s.name}
                 className={cn(
-                  "min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_220px] gap-4 px-4 h-14 items-center text-[13px]",
+                  "min-w-[900px] grid grid-cols-[150px_120px_minmax(0,1fr)_150px_90px_260px] gap-4 px-4 h-16 items-center text-[13px]",
                   live && "bg-danger/[0.04]",
                 )}
               >
@@ -152,30 +153,7 @@ export default async function ServersPage() {
                 </div>
                 <span className="num text-fg-2 truncate">{s.map ?? "—"}</span>
                 <span className="num text-right">{s.running ? `${Math.max(0, (s.players ?? 0) - 1)}/10` : "—"}</span>
-                <div className="flex justify-end gap-1">
-                  {(s.running ? ["end_match", "restart", "stop"] : ["start"]).map((type) => (
-                    <ActionForm key={type} action={serverCommand}>
-                      <input type="hidden" name="instance" value={s.name} />
-                      <input type="hidden" name="type" value={type} />
-                      <SubmitButton
-                        size="sm"
-                        variant={type === "start" ? "secondary" : "ghost"}
-                        className={type === "stop" ? "text-danger/80 hover:text-danger" : undefined}
-                        confirm={
-                          type === "start"
-                            ? undefined
-                            : {
-                                stop: `Остановить ${s.name}? Матч на нём прервётся.`,
-                                restart: `Перезапустить ${s.name}?`,
-                                end_match: `Снять матч с ${s.name}?`,
-                              }[type]
-                        }
-                      >
-                        {{ start: "Запустить", stop: "Стоп", restart: "Рестарт", end_match: "Снять матч" }[type]}
-                      </SubmitButton>
-                    </ActionForm>
-                  ))}
-                </div>
+                <ServerActions instance={s.name} running={!!s.running} />
               </div>
             );
           })}

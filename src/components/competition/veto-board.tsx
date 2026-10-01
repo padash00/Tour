@@ -10,7 +10,19 @@ import { MapTile, type MapTileState } from "./map-tile";
 type VetoState = ReturnType<typeof vetoState>;
 
 /** Вето: крупно — чей ход и что делать, сетка карт, ниже — хронология */
-export function VetoBoard({ m, state, myTurn, compact }: { m: MatchFull; state: VetoState; myTurn: boolean; compact?: boolean }) {
+export function VetoBoard({
+  m,
+  state,
+  myTurn,
+  compact,
+  images = {},
+}: {
+  m: MatchFull;
+  state: VetoState;
+  myTurn: boolean;
+  compact?: boolean;
+  images?: Record<string, string>;
+}) {
   const active = m.status === "veto";
   const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
   const tag = (id: string | null) => (id === m.team1_id ? m.team1?.tag : id === m.team2_id ? m.team2?.tag : null);
@@ -62,11 +74,11 @@ export function VetoBoard({ m, state, myTurn, compact }: { m: MatchFull; state: 
                 <input type="hidden" name="matchId" value={m.id} />
                 <input type="hidden" name="map" value={map} />
                 <button type="submit" className="w-full block">
-                  <MapTile map={map} state={state_} caption={caption} interactive />
+                  <MapTile map={map} state={state_} caption={caption} interactive image={images[map]} />
                 </button>
               </ActionForm>
             ) : (
-              <MapTile key={map} map={map} state={state_} caption={caption} />
+              <MapTile key={map} map={map} state={state_} caption={caption} image={images[map]} />
             );
           })}
         </div>

@@ -25,7 +25,7 @@ export default async function HomePage() {
   return (
     <>
       {/* HERO — под прозрачной шапкой */}
-      <section className="relative -mt-[68px] pt-[68px] overflow-hidden atmos">
+      <section className="relative -mt-[68px] pt-[68px] overflow-hidden atmos border-b border-line">
         <Container className="relative grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-12 lg:gap-14 items-center pt-16 pb-20 md:pt-24 md:pb-28">
           <div>
             <div className="eyebrow">CS2 Tournament Platform</div>
@@ -61,8 +61,12 @@ export default async function HomePage() {
       </section>
 
       {/* ТЕКУЩИЙ ТУРНИР */}
-      <section className="pt-24 md:pt-32">
+      <section className="bg-bg-2 border-b border-line py-16 md:py-24">
         <Container>
+          <SectionHead
+            title={featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Текущий турнир"}
+            link={{ href: "/tournaments", label: "Все турниры" }}
+          />
           {featured ? (
             <CurrentTournament t={featured} approved={counts[featured.id] ?? 0} />
           ) : (
@@ -81,16 +85,12 @@ export default async function HomePage() {
 
       {/* МАТЧИ — только если они есть */}
       {upcoming.length > 0 && (
-        <section className="pt-24 md:pt-32">
+        <section className="border-b border-line py-16 md:py-24">
           <Container>
-            <div className="flex items-end justify-between gap-4 mb-4">
-              <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.03em]">
-                {upcoming.some((m) => m.status === "live") ? "Сейчас в игре" : "Ближайшие матчи"}
-              </h2>
-              <Link href="/matches" className="text-sm text-fg-3 hover:text-fg">
-                Все матчи →
-              </Link>
-            </div>
+            <SectionHead
+              title={upcoming.some((m) => m.status === "live") ? "Сейчас в игре" : "Ближайшие матчи"}
+              link={{ href: "/matches", label: "Все матчи" }}
+            />
             <div className="border-t border-white/[0.06]">
               {upcoming.map((m) => (
                 <MatchLine key={m.id} m={m} />
@@ -101,12 +101,12 @@ export default async function HomePage() {
       )}
 
       {/* КАК ЭТО РАБОТАЕТ */}
-      <section className="pt-24 md:pt-32">
+      <section className="bg-bg-2 border-b border-line py-16 md:py-24">
         <Container>
-          <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.03em]">Как это работает</h2>
-          <ol className="mt-10 grid md:grid-cols-3 gap-10 md:gap-12">
-            {STEPS.map((s) => (
-              <li key={s.n} className="border-t border-line-strong pt-6">
+          <SectionHead title="Как это работает" />
+          <ol className="grid md:grid-cols-3 rounded-[16px] border border-line bg-surface overflow-hidden">
+            {STEPS.map((s, i) => (
+              <li key={s.n} className={`p-7 md:p-8 ${i > 0 ? "border-t md:border-t-0 md:border-l border-line" : ""}`}>
                 <span className="num text-sm text-fg-3">{s.n}</span>
                 <div className="mt-4 text-xl font-semibold tracking-[-0.02em]">{s.title}</div>
                 <p className="mt-2 text-fg-3 leading-relaxed">{s.text}</p>
@@ -117,20 +117,34 @@ export default async function HomePage() {
       </section>
 
       {/* ДАЛЬШЕ */}
-      <section className="pt-24 md:pt-32">
+      <section className="py-16 md:py-24">
         <Container>
-          <h2 className="text-[26px] md:text-[32px] font-bold tracking-[-0.03em]">Следующие турниры</h2>
+          <SectionHead title="Следующие турниры" />
           {others.length > 0 ? (
-            <div className="mt-4 border-t border-white/[0.06]">
+            <div className="border-t border-white/[0.06]">
               {others.map((t) => (
                 <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
               ))}
             </div>
           ) : (
-            <p className="mt-3 text-lg text-fg-3">Скоро.</p>
+            <p className="text-lg text-fg-3">Скоро. Анонс появится здесь.</p>
           )}
         </Container>
       </section>
     </>
+  );
+}
+
+/** Заголовок секции главной: название слева, ссылка справа, разделитель снизу */
+function SectionHead({ title, link }: { title: string; link?: { href: string; label: string } }) {
+  return (
+    <div className="flex items-end justify-between gap-4 mb-8 md:mb-10">
+      <h2 className="text-[26px] md:text-[34px] font-bold tracking-[-0.03em] leading-none">{title}</h2>
+      {link && (
+        <Link href={link.href} className="text-sm text-fg-3 hover:text-fg transition-colors">
+          {link.label} →
+        </Link>
+      )}
+    </div>
   );
 }
