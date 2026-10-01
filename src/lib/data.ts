@@ -271,9 +271,10 @@ export async function getUnreadCount(playerId: string) {
 export async function getSoloTeam(player: Player, create = false): Promise<Team | null> {
   const { data } = await db().from("teams").select("*").eq("captain_id", player.id).eq("is_solo", true).maybeSingle();
   if (data) {
-    if (data.name !== player.nickname) {
-      await db().from("teams").update({ name: player.nickname }).eq("id", data.id);
+    if (data.name !== player.nickname || data.logo_url !== player.avatar_url) {
+      await db().from("teams").update({ name: player.nickname, logo_url: player.avatar_url }).eq("id", data.id);
       data.name = player.nickname;
+      data.logo_url = player.avatar_url;
     }
     return data as Team;
   }
@@ -286,6 +287,7 @@ export async function getSoloTeam(player: Player, create = false): Promise<Team 
       tag,
       captain_id: player.id,
       invite_code: `SOLO-${player.steam_id}`,
+      logo_url: player.avatar_url,
       is_solo: true,
     })
     .select("*")

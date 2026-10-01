@@ -49,11 +49,13 @@ function StandingsTable({
   teams,
   advance,
   swiss,
+  solo,
 }: {
   rows: StandingRow[];
   teams: TeamMap;
   advance?: number;
   swiss?: boolean;
+  solo?: boolean;
 }) {
   return (
     <div className="card overflow-x-auto">
@@ -61,7 +63,7 @@ function StandingsTable({
         <thead>
           <tr>
             <th className="w-8">#</th>
-            <th>{swiss ? "Участник" : "Команда"}</th>
+            <th>{solo ? "Участник" : "Команда"}</th>
             <th className="text-right">И</th>
             <th className="text-right">{swiss ? "Счёт" : "В–П"}</th>
             <th className="text-right">Карты</th>
@@ -114,10 +116,12 @@ export function GroupStageView({
   groups,
   teams,
   advance,
+  solo,
 }: {
   groups: { label: string | null; table: StandingRow[]; matches: StageMatchRow[] }[];
   teams: TeamMap;
   advance?: number;
+  solo?: boolean;
 }) {
   const single = groups.length === 1;
   return (
@@ -130,7 +134,7 @@ export function GroupStageView({
               <h3 className="text-lg font-bold tracking-tight">{single ? "Таблица" : `Группа ${g.label}`}</h3>
               {advance != null && <span className="text-xs text-fg-3">выходят {advance} лучших</span>}
             </div>
-            <StandingsTable rows={g.table} teams={teams} advance={advance} />
+            <StandingsTable rows={g.table} teams={teams} advance={advance} solo={solo} />
             <div className={cn("grid gap-4", single && "md:grid-cols-2 lg:grid-cols-3")}>
               {rounds.map((r) => (
                 <div key={r}>
@@ -158,11 +162,13 @@ export function SwissView({
   matches,
   teams,
   wins,
+  solo,
 }: {
   table: StandingRow[];
   matches: StageMatchRow[];
   teams: TeamMap;
   wins: number;
+  solo?: boolean;
 }) {
   const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   // счёт команды перед раундом r: победы/поражения в раундах < r
@@ -219,7 +225,7 @@ export function SwissView({
       </div>
       <div>
         <h3 className="mb-4 text-lg font-bold tracking-tight">Таблица</h3>
-        <StandingsTable rows={table} teams={teams} swiss />
+        <StandingsTable rows={table} teams={teams} swiss solo={solo} />
       </div>
     </div>
   );

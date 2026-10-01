@@ -94,7 +94,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl">
             <HeroFact label="Старт" value={formatDateTime(t.starts_at)} />
             <HeroFact label="Призовой фонд" value={t.prize_pool ?? "—"} />
-            <HeroFact label="Команды" value={`${approved.length} / ${t.max_teams}`} />
+            <HeroFact label={t.format === "1v1" ? "Участники" : "Команды"} value={`${approved.length} / ${t.max_teams}`} />
             <HeroFact label="Сетка" value={bracketLabel[t.bracket_type] ?? t.bracket_type} />
           </div>
         </Container>
@@ -103,7 +103,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             active={tab}
             items={[
               { key: "overview", label: "Обзор", href: base },
-              { key: "teams", label: `Команды · ${approved.length}`, href: `${base}?tab=teams` },
+              { key: "teams", label: `${t.format === "1v1" ? "Участники" : "Команды"} · ${approved.length}`, href: `${base}?tab=teams` },
               { key: "bracket", label: "Сетка", href: `${base}?tab=bracket` },
               { key: "matches", label: "Матчи", href: `${base}?tab=matches` },
               { key: "stats", label: "Статистика", href: `${base}?tab=stats` },
@@ -586,9 +586,14 @@ async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<Retur
     <div className="space-y-12">
       {hasStage &&
         (swiss ? (
-          <SwissView table={groups[0]?.table ?? []} matches={groups[0]?.matches ?? []} teams={teams} wins={t.swiss_wins} />
+          <SwissView table={groups[0]?.table ?? []} matches={groups[0]?.matches ?? []} teams={teams} wins={t.swiss_wins} solo={t.format === "1v1"} />
         ) : (
-          <GroupStageView groups={groups} teams={teams} advance={t.bracket_type === "groups_playoff" ? t.advance_per_group : undefined} />
+          <GroupStageView
+            groups={groups}
+            teams={teams}
+            advance={t.bracket_type === "groups_playoff" ? t.advance_per_group : undefined}
+            solo={t.format === "1v1"}
+          />
         ))}
       {playoff.length > 0 ? (
         <div>
