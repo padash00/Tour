@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { checkIn } from "@/app/actions/tournament";
 import { requirePlayer } from "@/lib/auth";
-import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
+import { getEntrantTeam, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, formatTime, tournamentStatusLabel } from "@/lib/format";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -17,8 +17,8 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
   const t = await getTournamentBySlug(slug);
   if (!t) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/checkin`);
-  const membership = await getActiveMembership(player.id);
-  const reg = membership ? await getRegistration(t.id, membership.team.id) : null;
+  const myTeam = await getEntrantTeam(player, t);
+  const reg = myTeam ? await getRegistration(t.id, myTeam.id) : null;
   const all = await getTournamentRegistrations(t.id);
   const approved = all.filter((r) => r.status === "approved");
   const checked = approved.filter((r) => r.checked_in_at).length;
@@ -35,7 +35,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
     />
   );
 
-  if (!membership || !reg || reg.status !== "approved") {
+  if (!myTeam || !reg || reg.status !== "approved") {
     return (
       <Container className="max-w-3xl">
         {header}
@@ -47,7 +47,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
     );
   }
 
-  const team = membership.team;
+  const team = myTeam;
   const isCaptain = team.captain_id === player.id;
   const mains = reg.roster.filter((r) => r.role === "main");
   const checks = [

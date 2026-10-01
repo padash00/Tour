@@ -25,6 +25,7 @@ export async function getActiveMembership(playerId: string) {
     .select("*, team:teams(*)")
     .eq("player_id", playerId)
     .is("left_at", null)
+    .eq("is_solo", false)
     .maybeSingle();
   if (!data) return null;
   const { team, ...member } = data as TeamMember & { team: Team };
@@ -53,6 +54,7 @@ export async function getTeamByTag(tag: string): Promise<Team | null> {
     .select("*")
     .eq("tag", tag)
     .is("disbanded_at", null)
+    .eq("is_solo", false)
     .maybeSingle();
   return data as Team | null;
 }
@@ -74,6 +76,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
     .from("teams")
     .select("*, team_members(left_at, player:players(faceit_elo))")
     .is("disbanded_at", null)
+    .eq("is_solo", false)
     .order("created_at", { ascending: false });
   type Row = Team & { team_members: { left_at: string | null; player: { faceit_elo: number | null } }[] };
   return ((data ?? []) as Row[]).map(({ team_members, ...team }) => {
@@ -262,4 +265,38 @@ export async function getUnreadCount(playerId: string) {
     .eq("player_id", playerId)
     .is("read_at", null);
   return count ?? 0;
+}
+
+/** Соло-команда игрока для турниров 1×1 (скрытая, по одной на игрока). create — создать, если нет. */
+export async function getSoloTeam(player: Player, create = false): Promise<Team | null> {
+  const { data } = await db().from("teams").select("*").eq("captain_id", player.id).eq("is_solo", true).maybeSingle();
+  if (data) {
+    if (data.name !== player.nickname) {
+      await db().from("teams").update({ name: player.nickname }).eq("id", data.id);
+      data.name = player.nickname;
+    }
+    return data as Team;
+  }
+  if (!create) return null;
+  const tag = (player.nickname.replace(/[^A-Za-z0-9]/g, "").slice(0, 5) || "P").toUpperCase();
+  const { data: team, error } = await db()
+    .from("teams")
+    .insert({
+      name: player.nickname,
+      tag,
+      captain_id: player.id,
+      invite_code: `SOLO-${player.steam_id}`,
+      is_solo: true,
+    })
+    .select("*")
+    .single();
+  if (error || !team) return null;
+  await db().from("team_members").insert({ team_id: team.id, player_id: player.id, role: "captain", is_solo: true });
+  return team as Team;
+}
+
+/** Команда игрока в контексте турнира: для 1×1 — его соло-команда, иначе обычная команда */
+export async function getEntrantTeam(player: Player, tournament: Pick<Tournament, "format">): Promise<Team | null> {
+  if (tournament.format === "1v1") return getSoloTeam(player, false);
+  return (await getActiveMembership(player.id))?.team ?? null;
 }

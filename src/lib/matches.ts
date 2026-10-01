@@ -2,6 +2,17 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { notify } from "./audit";
 import { generateBracket, resolveBracket, type BracketMatch } from "./bracket";
+import {
+  FORMATS,
+  groupLabel,
+  roundRobinRounds,
+  splitGroups,
+  standings,
+  swissFirstRound,
+  swissPairings,
+  type FormatKind,
+  type StageMatch,
+} from "./formats";
 import { db } from "./supabase";
 import type { Match, MatchMap, Player, Team, Tournament, VetoActionRow } from "./types";
 import { VETO_STEP_SECONDS, seriesMaps, vetoState } from "./veto";
@@ -88,10 +99,10 @@ function toBracket(m: Match): BracketMatch {
   };
 }
 
-/** Применяет результаты к сетке: продвигает команды, обрабатывает баи, уведомляет капитанов */
+/** Применяет результаты к сетке плей-офф, затем двигает стадии (следующий раунд швейцарки, создание плей-офф) */
 export async function syncBracket(tournamentId: string) {
   const { data } = await db().from("matches").select("*").eq("tournament_id", tournamentId);
-  const rows = (data ?? []) as Match[];
+  const rows = ((data ?? []) as Match[]).filter((r) => (r.stage ?? "playoff") === "playoff");
   const before = new Map(rows.map((r) => [r.id, r]));
   const bm = rows.map(toBracket);
   const changed = resolveBracket(bm);
@@ -114,27 +125,123 @@ export async function syncBracket(tournamentId: string) {
       .eq("id", m.key);
   }
 
-  if (nowUpcoming.length) {
-    const teamIds = bm.filter((m) => nowUpcoming.includes(m.key)).flatMap((m) => [m.team1_id, m.team2_id]);
-    const { data: teams } = await db().from("teams").select("id, captain_id, name").in("id", teamIds as string[]);
-    for (const m of bm.filter((x) => nowUpcoming.includes(x.key))) {
-      const t1 = teams?.find((t) => t.id === m.team1_id);
-      const t2 = teams?.find((t) => t.id === m.team2_id);
-      if (!t1 || !t2) continue;
-      await notify(
-        [t1.captain_id, t2.captain_id],
-        `Матч #${m.number}: ${t1.name} vs ${t2.name}`,
-        "Соперник определён. Вето карт начнётся по сигналу администратора.",
-        `/matches/${m.key}`,
-      );
+  if (nowUpcoming.length) await afterMatchesUpcoming(tournamentId, nowUpcoming);
+  await progressStages(tournamentId);
+}
+
+/** Уведомить капитанов и, если в маппуле одна карта, сразу подготовить матч (вето не нужно) */
+async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
+  if (matchIds.length === 0) return;
+  const [{ data: t }, { data: list }] = await Promise.all([
+    db().from("tournaments").select("map_pool").eq("id", tournamentId).single(),
+    db().from("matches").select("id, number, team1_id, team2_id").in("id", matchIds),
+  ]);
+  const pool = (t?.map_pool ?? []) as string[];
+  const teamIds = (list ?? []).flatMap((m) => [m.team1_id, m.team2_id]).filter(Boolean) as string[];
+  const { data: teams } = teamIds.length
+    ? await db().from("teams").select("id, captain_id, name").in("id", teamIds)
+    : { data: [] as { id: string; captain_id: string; name: string }[] };
+  for (const m of list ?? []) {
+    if (pool.length === 1) {
+      await db().from("match_maps").insert({ match_id: m.id, map_number: 1, map_name: pool[0] });
+      await db().from("matches").update({ status: "ready", best_of: 1 }).eq("id", m.id);
     }
+    const t1 = teams?.find((x) => x.id === m.team1_id);
+    const t2 = teams?.find((x) => x.id === m.team2_id);
+    if (!t1 || !t2) continue;
+    await notify(
+      [t1.captain_id, t2.captain_id],
+      `Матч #${m.number}: ${t1.name} vs ${t2.name}`,
+      pool.length === 1
+        ? "Соперник определён. Карта одна — вето не нужно, ждите сервер."
+        : "Соперник определён. Вето карт начнётся по сигналу администратора.",
+      `/matches/${m.id}`,
+    );
   }
 }
 
+type NewMatch = {
+  bracket: Match["bracket"];
+  stage: Match["stage"];
+  group_label?: string | null;
+  round: number;
+  position: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  best_of: number;
+};
+
+async function insertStageMatches(tournament: Tournament, list: NewMatch[]) {
+  const { data: last } = await db()
+    .from("matches")
+    .select("number")
+    .eq("tournament_id", tournament.id)
+    .order("number", { ascending: false })
+    .limit(1);
+  let n = last?.[0]?.number ?? 0;
+  const rows = list.map((m) => ({
+    id: randomUUID(),
+    tournament_id: tournament.id,
+    number: ++n,
+    status: m.team1_id && m.team2_id ? "upcoming" : "pending",
+    ...m,
+  }));
+  const { error } = await db().from("matches").insert(rows);
+  if (error) throw new Error(error.message);
+  await afterMatchesUpcoming(
+    tournament.id,
+    rows.filter((r) => r.status === "upcoming").map((r) => r.id),
+  );
+  return rows;
+}
+
+/** Создаёт первую стадию турнира по его формату */
 export async function createBracket(tournament: Tournament, seededTeamIds: string[]) {
+  const kind = tournament.bracket_type as FormatKind;
+  const bo = tournament.default_best_of ?? 1;
+
+  if (kind === "round_robin" || kind === "groups_playoff") {
+    const groupsCount = Math.max(1, Math.min(tournament.groups_count ?? 2, Math.floor(seededTeamIds.length / 2)));
+    const groups = kind === "round_robin" ? [seededTeamIds] : splitGroups(seededTeamIds, groupsCount);
+    const list: NewMatch[] = [];
+    let position = 0;
+    groups.forEach((g, gi) => {
+      roundRobinRounds(g).forEach((pairs, ri) =>
+        pairs.forEach(([a, b]) =>
+          list.push({
+            bracket: "group",
+            stage: "group",
+            group_label: groupLabel(gi),
+            round: ri + 1,
+            position: position++,
+            team1_id: a,
+            team2_id: b,
+            best_of: bo,
+          }),
+        ),
+      );
+    });
+    // номера матчей: тур за туром по всем группам
+    list.sort((x, y) => x.round - y.round || (x.group_label ?? "").localeCompare(y.group_label ?? "") || x.position - y.position);
+    await insertStageMatches(tournament, list);
+  } else if (kind === "swiss" || kind === "swiss_playoff") {
+    const pairs = swissFirstRound(seededTeamIds);
+    await insertStageMatches(
+      tournament,
+      pairs.map(([a, b], i) => ({ bracket: "swiss", stage: "swiss", round: 1, position: i, team1_id: a, team2_id: b, best_of: bo })),
+    );
+  } else {
+    await createEliminationStage(tournament, seededTeamIds, kind === "double_elimination", 0);
+  }
+  await db().from("tournaments").update({ bracket_published_at: new Date().toISOString() }).eq("id", tournament.id);
+  await syncBracket(tournament.id);
+}
+
+/** Сетка на выбывание (весь турнир или плей-офф после групп/швейцарки) */
+async function createEliminationStage(tournament: Tournament, seededTeamIds: string[], double: boolean, numberOffset: number) {
   const generated = generateBracket({
     seeded: seededTeamIds,
-    double: tournament.bracket_type === "double_elimination",
+    double,
     bestOf: tournament.default_best_of ?? 1,
     finalBestOf: tournament.final_best_of ?? 3,
   });
@@ -142,8 +249,9 @@ export async function createBracket(tournament: Tournament, seededTeamIds: strin
   const rows = generated.map((m) => ({
     id: ids.get(m.key)!,
     tournament_id: tournament.id,
-    number: m.number,
+    number: m.number + numberOffset,
     bracket: m.bracket,
+    stage: "playoff",
     round: m.round,
     position: m.position,
     best_of: m.best_of,
@@ -160,7 +268,103 @@ export async function createBracket(tournament: Tournament, seededTeamIds: strin
   }));
   const { error } = await db().from("matches").insert(rows);
   if (error) throw new Error(error.message);
-  await db().from("tournaments").update({ bracket_published_at: new Date().toISOString() }).eq("id", tournament.id);
+}
+
+/** Команды стадии (группы/швейцарки) в порядке посева и матчи стадии */
+export async function getStageData(tournamentId: string) {
+  const [{ data: regs }, { data: ms }] = await Promise.all([
+    db().from("tournament_registrations").select("team_id, seed").eq("tournament_id", tournamentId).eq("status", "approved").order("seed"),
+    db()
+      .from("matches")
+      .select("*, maps:match_maps(team1_score, team2_score, winner_id, status)")
+      .eq("tournament_id", tournamentId)
+      .in("stage", ["group", "swiss"])
+      .order("number"),
+  ]);
+  const matches = (ms ?? []) as (Match & { maps: StageMatch["maps"] })[];
+  const inStage = new Set(matches.flatMap((m) => [m.team1_id, m.team2_id]).filter(Boolean) as string[]);
+  const seeded = (regs ?? []).map((r) => r.team_id as string).filter((id) => inStage.has(id));
+  return { seeded, matches };
+}
+
+/** Таблицы групп / швейцарки */
+export async function getStandings(tournament: Tournament) {
+  const { seeded, matches } = await getStageData(tournament.id);
+  const kind = tournament.bracket_type as FormatKind;
+  if (kind === "swiss" || kind === "swiss_playoff") {
+    return [{ label: null as string | null, table: standings(seeded, matches, { swiss: true, swissWins: tournament.swiss_wins }), matches }];
+  }
+  const labels = [...new Set(matches.map((m) => m.group_label ?? "A"))].sort();
+  return labels.map((label) => {
+    const gm = matches.filter((m) => (m.group_label ?? "A") === label);
+    const ids = seeded.filter((id) => gm.some((m) => m.team1_id === id || m.team2_id === id));
+    return { label: label as string | null, table: standings(ids, gm), matches: gm };
+  });
+}
+
+/**
+ * Двигает стадии: новый раунд швейцарки, когда текущий сыгран; плей-офф, когда закончилась
+ * групповая/швейцарская стадия.
+ */
+export async function progressStages(tournamentId: string) {
+  const { data: t } = await db().from("tournaments").select("*").eq("id", tournamentId).single();
+  const tournament = t as Tournament | null;
+  if (!tournament?.bracket_published_at) return;
+  const kind = tournament.bracket_type as FormatKind;
+  if (!["round_robin", "groups_playoff", "swiss", "swiss_playoff"].includes(kind)) return;
+
+  const { seeded, matches } = await getStageData(tournament.id);
+  if (matches.length === 0 || matches.some((m) => !["finished", "cancelled"].includes(m.status))) return;
+
+  const swiss = kind === "swiss" || kind === "swiss_playoff";
+  if (swiss) {
+    const table = standings(seeded, matches, { swiss: true, swissWins: tournament.swiss_wins });
+    if (table.some((r) => r.status === "active")) {
+      const played = new Set(matches.map((m) => [m.team1_id, m.team2_id].sort().join(":")));
+      const round = Math.max(...matches.map((m) => m.round)) + 1;
+      const pairs = swissPairings(table, played, tournament.swiss_wins);
+      if (pairs.length) {
+        await insertStageMatches(
+          tournament,
+          pairs.map(([a, b], i) => ({
+            bracket: "swiss",
+            stage: "swiss",
+            round,
+            position: i,
+            team1_id: a,
+            team2_id: b,
+            best_of: tournament.default_best_of ?? 1,
+          })),
+        );
+      }
+      return;
+    }
+  }
+
+  // стадия завершена → плей-офф (если формат его предполагает и он ещё не создан)
+  if (!FORMATS[kind].playoff || tournament.playoff_created_at) return;
+  let advancing: string[];
+  if (swiss) {
+    advancing = standings(seeded, matches, { swiss: true, swissWins: tournament.swiss_wins })
+      .filter((r) => r.status === "advanced")
+      .map((r) => r.teamId);
+  } else {
+    const groups = (await getStandings(tournament)).map((g) => g.table.slice(0, tournament.advance_per_group).map((r) => r.teamId));
+    // посев плей-офф: все первые места по группам, затем все вторые… → A1–B2, B1–A2
+    advancing = [];
+    for (let place = 0; place < tournament.advance_per_group; place++) for (const g of groups) if (g[place]) advancing.push(g[place]);
+  }
+  if (advancing.length < 2) return;
+  // отметку ставим до создания — чтобы параллельный вызов не создал плей-офф дважды
+  const { data: claimed } = await db()
+    .from("tournaments")
+    .update({ playoff_created_at: new Date().toISOString() })
+    .eq("id", tournament.id)
+    .is("playoff_created_at", null)
+    .select("id");
+  if (!claimed?.length) return;
+  const last = Math.max(0, ...matches.map((m) => m.number));
+  await createEliminationStage(tournament, advancing, tournament.playoff_type === "double_elimination", last);
   await syncBracket(tournament.id);
 }
 

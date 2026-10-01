@@ -38,7 +38,12 @@ export function MatchStatusBadge({ status, compact }: { status: MatchStatus; com
   return <Pill tone={tone[status]}>{matchStatusLabel[status]}</Pill>;
 }
 
-export function matchStage(m: { bracket: MatchWithTeams["bracket"]; round: number }, all: { bracket: string; round: number }[]) {
+export function matchStage(
+  m: { bracket: MatchWithTeams["bracket"]; round: number; group_label?: string | null },
+  all: { bracket: string; round: number }[],
+) {
+  if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
+  if (m.bracket === "swiss") return `Швейцарка · раунд ${m.round}`;
   const totalUpper = Math.max(0, ...all.filter((x) => x.bracket === "upper").map((x) => x.round));
   const totalLower = Math.max(0, ...all.filter((x) => x.bracket === "lower").map((x) => x.round));
   return roundTitle(m.bracket, m.round, totalUpper, totalLower);

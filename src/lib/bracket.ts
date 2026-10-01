@@ -3,7 +3,7 @@
  * Чистые функции: генерация структуры и «разрешение» сетки (баи, продвижение по результатам).
  */
 
-export type Side = "upper" | "lower" | "grand_final";
+export type Side = "upper" | "lower" | "grand_final" | "group" | "swiss";
 export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
 
 export type BracketMatch = {
@@ -230,6 +230,8 @@ export function resolveBracket(matches: BracketMatch[]): Set<string> {
 
 export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number) {
   if (bracket === "grand_final") return "Гранд-финал";
+  if (bracket === "group") return `Тур ${round}`;
+  if (bracket === "swiss") return `Раунд ${round}`;
   if (bracket === "upper") {
     if (round === totalUpper) return totalLower ? "Финал верхней сетки" : "Финал";
     if (round === totalUpper - 1) return totalLower ? "Полуфинал верхней сетки" : "Полуфинал";

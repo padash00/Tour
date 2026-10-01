@@ -42,3 +42,14 @@ export async function getSettingsStatus() {
     };
   });
 }
+
+/** Библиотека карт Workshop: строки «name@id» (хранится в app_settings.WORKSHOP_MAPS как JSON) */
+export async function getWorkshopMaps(): Promise<string[]> {
+  try {
+    const raw = (await loadAll()).get("WORKSHOP_MAPS");
+    const list = raw ? (JSON.parse(raw) as string[]) : [];
+    return list.filter((x) => /^[^@\s]+@\d+$/.test(x));
+  } catch {
+    return [];
+  }
+}

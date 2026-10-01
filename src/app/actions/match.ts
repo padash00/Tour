@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { getActiveMembership } from "@/lib/data";
 import { applyVetoTimeouts, getMatch, insertVetoAction } from "@/lib/matches";
 import { VETO_STEP_SECONDS, vetoState } from "@/lib/veto";
 import type { ActionResult } from "@/components/forms";
@@ -18,11 +17,8 @@ export async function vetoAct(_prev: ActionResult, formData: FormData): Promise<
   if (!m) return { error: "Матч не найден" };
   if (m.status !== "veto") return { error: "Вето сейчас не идёт" };
 
-  const membership = await getActiveMembership(player.id);
-  const team = membership?.team;
-  if (!team || team.captain_id !== player.id || (team.id !== m.team1_id && team.id !== m.team2_id)) {
-    return { error: "Действовать в вето может только капитан команды" };
-  }
+  const team = m.team1?.captain_id === player.id ? m.team1 : m.team2?.captain_id === player.id ? m.team2 : null;
+  if (!team) return { error: "Действовать в вето может только капитан команды" };
 
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
   if (!state.current || state.current.action === "decider") return { error: "Вето уже завершено" };

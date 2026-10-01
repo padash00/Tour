@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { isAdmin, requireAdmin, requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
-import { getActiveMembership } from "@/lib/data";
 import { env } from "@/lib/env";
 import { getMatch } from "@/lib/matches";
 import { db } from "@/lib/supabase";
@@ -35,9 +34,8 @@ export async function openDispute(_prev: ActionResult, formData: FormData): Prom
   if (!["ready", "live", "finished"].includes(m.status)) return { error: "Спор можно открыть после начала матча" };
 
   const admin = isAdmin(player);
-  const membership = await getActiveMembership(player.id);
-  const team = membership?.team;
-  const isCaptain = !!team && team.captain_id === player.id && (team.id === m.team1_id || team.id === m.team2_id);
+  const team = m.team1?.captain_id === player.id ? m.team1 : m.team2?.captain_id === player.id ? m.team2 : null;
+  const isCaptain = !!team;
   if (!isCaptain && !admin) return { error: "Спор может открыть капитан команды этого матча" };
 
   if (isCaptain) {

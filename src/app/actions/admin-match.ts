@@ -33,7 +33,10 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
   const regs = (await getTournamentRegistrations(t.id)).filter(
     (r) => r.status === "approved" && (!onlyCheckedIn || r.checked_in_at),
   );
-  if (regs.length < 2) return { error: `Недостаточно команд: ${regs.length}` };
+  if (regs.length < 2) return { error: `Недостаточно участников: ${regs.length}` };
+  if ((t.bracket_type === "swiss" || t.bracket_type === "swiss_playoff") && regs.length % 2) {
+    return { error: `Швейцарская система требует чётного числа участников (сейчас ${regs.length})` };
+  }
   if (regs.length > t.max_teams) return { error: `Команд больше лимита (${regs.length} > ${t.max_teams})` };
 
   const avgElo = (r: (typeof regs)[number]) => {
@@ -89,7 +92,7 @@ export async function deleteBracketAction(_prev: ActionResult, formData: FormDat
 
   await db().from("matches").update({ winner_to_match: null, loser_to_match: null }).eq("tournament_id", t.id);
   await db().from("matches").delete().eq("tournament_id", t.id);
-  await db().from("tournaments").update({ bracket_published_at: null }).eq("id", t.id);
+  await db().from("tournaments").update({ bracket_published_at: null, playoff_created_at: null }).eq("id", t.id);
   await audit(admin.id, "bracket.delete", { type: "tournament", id: t.id });
   revalidatePath(`/admin/tournaments/${t.id}`);
   revalidatePath(`/tournaments/${t.slug}`);

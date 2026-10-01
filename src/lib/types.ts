@@ -40,6 +40,7 @@ export type Team = {
   invite_code: string;
   created_at: string;
   disbanded_at: string | null;
+  is_solo?: boolean;
 };
 
 export type TeamMember = {
@@ -93,6 +94,11 @@ export type Tournament = {
   contact: string | null;
   entry_fee: string | null;
   sponsors: { name: string; url?: string }[];
+  groups_count: number;
+  advance_per_group: number;
+  swiss_wins: number;
+  playoff_type: "single_elimination" | "double_elimination";
+  playoff_created_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -140,7 +146,7 @@ export type AuditLog = {
 };
 
 export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
-export type BracketSide = "upper" | "lower" | "grand_final";
+export type BracketSide = "upper" | "lower" | "grand_final" | "group" | "swiss";
 
 export type Match = {
   id: string;
@@ -168,6 +174,8 @@ export type Match = {
   server_instance: string | null;
   server_state: "assigned" | "loading" | "ready" | "error" | null;
   under_review: boolean;
+  stage: "group" | "swiss" | "playoff";
+  group_label: string | null;
   scheduled_at: string | null;
   started_at: string | null;
   finished_at: string | null;

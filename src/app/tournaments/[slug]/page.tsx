@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
-import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
+import { getEntrantTeam, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
 import { bracketLabel, formatDate, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
-import { getTournamentMatches } from "@/lib/matches";
+import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
 import { ShareButton, StreamEmbed } from "@/components/stream";
 import { BracketView } from "@/components/bracket-view";
+import { GroupStageView, SwissView } from "@/components/stage-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 import { MapGraphic, TournamentCover, TournamentStatusPill } from "@/components/tournament-bits";
 import {
@@ -53,8 +54,8 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
   const [regs, matches] = await Promise.all([getTournamentRegistrations(t.id), getTournamentMatches(t.id)]);
   const approved = regs.filter((r) => r.status === "approved");
   const pending = regs.filter((r) => r.status === "pending");
-  const membership = player ? await getActiveMembership(player.id) : null;
-  const myReg = membership ? await getRegistration(t.id, membership.team.id) : null;
+  const myTeam = player ? await getEntrantTeam(player, t) : null;
+  const myReg = myTeam ? await getRegistration(t.id, myTeam.id) : null;
 
   const base = `/tournaments/${t.slug}`;
 
@@ -124,7 +125,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             {tab === "teams" && <TeamsTab approved={approved} pendingCount={pending.length} />}
             {tab === "bracket" &&
               (matches.length ? (
-                <BracketView matches={matches} />
+                <StagesTab t={t} matches={matches} />
               ) : (
                 <EmptyState
                   icon={<IconBracket />}
@@ -155,8 +156,8 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             <RegistrationBox
               t={t}
               loggedIn={!!player}
-              team={membership?.team ?? null}
-              isCaptain={!!membership && membership.team.captain_id === player?.id}
+              team={myTeam}
+              isCaptain={!!myTeam && myTeam.captain_id === player?.id}
               reg={myReg}
               approvedCount={approved.length}
             />
@@ -448,11 +449,21 @@ function RegistrationBox({
           </div>
         )}
         <ButtonLink
-          href={!loggedIn ? `/login?next=${base}/register` : !team ? "/team/create" : `${base}/register`}
+          href={!loggedIn ? `/login?next=${base}/register` : !team && t.format !== "1v1" ? "/team/create" : `${base}/register`}
           className="mt-5 w-full"
           size="lg"
         >
-          {!loggedIn ? "Войти и зарегистрироваться" : !team ? "Сначала создайте команду" : isCaptain ? "Зарегистрировать команду" : "Заявку подаёт капитан"}
+          {t.format === "1v1"
+            ? loggedIn
+              ? "Участвовать"
+              : "Войти и участвовать"
+            : !loggedIn
+              ? "Войти и зарегистрироваться"
+              : !team
+                ? "Сначала создайте команду"
+                : isCaptain
+                  ? "Зарегистрировать команду"
+                  : "Заявку подаёт капитан"}
           <IconArrow />
         </ButtonLink>
       </>
@@ -560,5 +571,36 @@ async function MvpCard({ tournamentId, finished }: { tournamentId: string; finis
         </div>
       </div>
     </Card>
+  );
+}
+
+async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
+  const teams = new Map(
+    matches.flatMap((m) => [m.team1, m.team2]).filter((x): x is NonNullable<typeof x> => !!x).map((x) => [x.id, x]),
+  );
+  const hasStage = matches.some((m) => m.stage === "group" || m.stage === "swiss");
+  const playoff = matches.filter((m) => (m.stage ?? "playoff") === "playoff");
+  const swiss = t.bracket_type === "swiss" || t.bracket_type === "swiss_playoff";
+  const groups = hasStage ? await getStandings(t) : [];
+  return (
+    <div className="space-y-12">
+      {hasStage &&
+        (swiss ? (
+          <SwissView table={groups[0]?.table ?? []} matches={groups[0]?.matches ?? []} teams={teams} wins={t.swiss_wins} />
+        ) : (
+          <GroupStageView groups={groups} teams={teams} advance={t.bracket_type === "groups_playoff" ? t.advance_per_group : undefined} />
+        ))}
+      {playoff.length > 0 ? (
+        <div>
+          {hasStage && <h2 className="mb-6 text-xl font-bold tracking-tight">Плей-офф</h2>}
+          <BracketView matches={playoff} />
+        </div>
+      ) : (
+        hasStage &&
+        (t.bracket_type === "groups_playoff" || t.bracket_type === "swiss_playoff") && (
+          <EmptyState compact title="Плей-офф" description="Сетка плей-офф появится автоматически, когда закончится групповая стадия." />
+        )
+      )}
+    </div>
   );
 }

@@ -32,3 +32,28 @@ export async function saveSetting(_prev: ActionResult, formData: FormData): Prom
   revalidatePath("/admin/settings");
   return { success: clear ? "Удалено" : "Сохранено" };
 }
+
+/** Добавить / убрать карту из библиотеки Workshop */
+export async function editWorkshopMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const { data } = await db().from("app_settings").select("value").eq("key", "WORKSHOP_MAPS").maybeSingle();
+  let list: string[] = [];
+  try {
+    list = data?.value ? JSON.parse(data.value) : [];
+  } catch {}
+  const remove = String(formData.get("remove") ?? "");
+  if (remove) {
+    list = list.filter((x) => x !== remove);
+  } else {
+    const name = String(formData.get("name") ?? "").trim().replace(/[@,\s]+/g, "_");
+    const link = String(formData.get("link") ?? "").trim();
+    const id = link.match(/id=(\d+)/)?.[1] ?? link.match(/^\d+$/)?.[0];
+    if (!name) return { error: "Введите название карты" };
+    if (!id) return { error: "Нужна ссылка на карту в Workshop (…filedetails/?id=123) или её ID" };
+    list = [...list.filter((x) => !x.endsWith(`@${id}`)), `${name}@${id}`];
+  }
+  await db().from("app_settings").upsert({ key: "WORKSHOP_MAPS", value: JSON.stringify(list), updated_by: admin.id, updated_at: new Date().toISOString() });
+  await audit(admin.id, "settings.workshop_maps", undefined, { count: list.length });
+  revalidatePath("/admin/settings");
+  return { success: remove ? "Карта убрана" : "Карта добавлена" };
+}

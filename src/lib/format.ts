@@ -69,9 +69,14 @@ export const registrationStatusLabel: Record<RegistrationStatus, string> = {
 export const bracketLabel: Record<string, string> = {
   double_elimination: "Double Elimination",
   single_elimination: "Single Elimination",
+  round_robin: "Круговая система",
+  groups_playoff: "Группы + плей-офф",
+  swiss: "Швейцарская система",
+  swiss_playoff: "Швейцарка + плей-офф",
 };
 
 export function mapName(map: string) {
+  if (map.includes("@")) return map.split("@")[0]; // workshop: «aim_map@123456»
   const name = map.replace(/^de_/, "");
   return name.charAt(0).toUpperCase() + name.slice(1);
 }

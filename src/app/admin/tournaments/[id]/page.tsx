@@ -20,6 +20,7 @@ import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { Avatar, Card, EmptyState, FaceitLevel, Pill, Tabs, TeamLogo, cn } from "@/components/ui";
+import { getWorkshopMaps } from "@/lib/settings";
 import { TournamentForm } from "../tournament-form";
 
 export const metadata: Metadata = { title: "Турнир — админ" };
@@ -155,7 +156,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
       {tab === "settings" ? (
         <div className="max-w-3xl space-y-6">
-          <TournamentForm action={updateTournament} t={t} />
+          <TournamentForm action={updateTournament} t={t} workshopMaps={await getWorkshopMaps()} />
           {t.status === "draft" && (
             <Card className="p-6 border-[#ef7a7a33]">
               <div className="label mb-3">Опасная зона</div>

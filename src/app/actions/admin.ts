@@ -29,7 +29,11 @@ const tournamentSchema = z.object({
     .trim()
     .regex(/^[a-z0-9-]{3,48}$/, "Адрес — 3–48 символов: латиница в нижнем регистре, цифры и дефис"),
   format: z.string().trim().min(1).max(20),
-  bracket_type: z.enum(["double_elimination", "single_elimination"]),
+  bracket_type: z.enum(["double_elimination", "single_elimination", "round_robin", "groups_playoff", "swiss", "swiss_playoff"]),
+  groups_count: z.coerce.number().int().min(1).max(8).default(2),
+  advance_per_group: z.coerce.number().int().min(1).max(8).default(2),
+  swiss_wins: z.coerce.number().int().min(1).max(5).default(3),
+  playoff_type: z.enum(["single_elimination", "double_elimination"]).default("single_elimination"),
   max_teams: z.coerce.number().int().min(2).max(64),
   default_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(1),
   final_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(3),
@@ -93,6 +97,10 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     slug: data.slug,
     format: data.format,
     bracket_type: data.bracket_type,
+    groups_count: data.groups_count,
+    advance_per_group: data.advance_per_group,
+    swiss_wins: data.swiss_wins,
+    playoff_type: data.playoff_type,
     max_teams: data.max_teams,
     default_best_of: data.default_best_of,
     final_best_of: data.final_best_of,
@@ -114,9 +122,9 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     match_format: data.match_format || null,
     map_pool: data.map_pool
       .split(/[\s,]+/)
-      .map((m) => m.trim().toLowerCase())
+      .map((m) => (m.includes("@") ? m.trim() : m.trim().toLowerCase()))
       .filter(Boolean)
-      .map((m) => (m.startsWith("de_") ? m : `de_${m}`)),
+      .map((m) => (m.includes("@") || /^(de|aim|cs|ar|fy|awp)_/.test(m) ? m : `de_${m}`)),
     description: data.description || null,
     requirements: data.requirements || null,
     rules: data.rules || null,

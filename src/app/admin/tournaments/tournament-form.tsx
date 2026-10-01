@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ACTIVE_POOL, CS2_MAPS, slugify } from "@/lib/maps";
+import { FORMATS, type FormatKind } from "@/lib/formats";
 import { MODES, type ModeKey } from "@/lib/modes";
 import type { PrizeRow, Tournament } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
@@ -106,12 +107,27 @@ function shift(local: string, minutes: number) {
 
 // ───────────────────────── форма
 
-export function TournamentForm({ action, t }: { action: FormAction; t?: Tournament }) {
+export function TournamentForm({
+  action,
+  t,
+  workshopMaps = [],
+}: {
+  action: FormAction;
+  t?: Tournament;
+  /** библиотека карт из Steam Workshop (Админка → Настройки), формат «name@id» */
+  workshopMaps?: string[];
+}) {
   const [name, setName] = useState(t?.name ?? "");
   const [slug, setSlug] = useState(t?.slug ?? "");
   const [slugEdited, setSlugEdited] = useState(!!t);
   const [format, setFormat] = useState(t?.format ?? "5v5");
-  const [bracket, setBracket] = useState(t?.bracket_type ?? "double_elimination");
+  const [bracket, setBracket] = useState<FormatKind>((t?.bracket_type as FormatKind) ?? "double_elimination");
+  const [groupsCount, setGroupsCount] = useState(t?.groups_count ?? 2);
+  const [advance, setAdvance] = useState(t?.advance_per_group ?? 2);
+  const [swissWins, setSwissWins] = useState(t?.swiss_wins ?? 3);
+  const [playoffType, setPlayoffType] = useState<string>(t?.playoff_type ?? "single_elimination");
+  const [wsName, setWsName] = useState("");
+  const [wsId, setWsId] = useState("");
   const [maxTeams, setMaxTeams] = useState(t?.max_teams ?? 16);
   const [bo, setBo] = useState(t?.default_best_of ?? 1);
   const [finalBo, setFinalBo] = useState(t?.final_best_of ?? 3);
@@ -176,6 +192,10 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       <input type="hidden" name="format" value={format} />
       <input type="hidden" name="bracket_type" value={bracket} />
       <input type="hidden" name="max_teams" value={maxTeams} />
+      <input type="hidden" name="groups_count" value={groupsCount} />
+      <input type="hidden" name="advance_per_group" value={advance} />
+      <input type="hidden" name="swiss_wins" value={swissWins} />
+      <input type="hidden" name="playoff_type" value={playoffType} />
       <input type="hidden" name="default_best_of" value={bo} />
       <input type="hidden" name="final_best_of" value={finalBo} />
       <input type="hidden" name="match_format" value={`BO${bo}, финальная стадия — BO${finalBo}`} />
@@ -236,7 +256,14 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
                 active={format === k}
                 onClick={() => {
                   setFormat(k);
-                  setMaps([...MODES[k].maps]);
+                  const aim = workshopMaps.filter((m) => /^aim/i.test(m));
+                  setMaps(k === "1v1" && aim.length ? [aim[0]] : [...MODES[k].maps]);
+                  if (k === "1v1") {
+                    setKnife(false);
+                    setTimeouts(0);
+                    setBracket("round_robin");
+                    setMaxTeams(4);
+                  }
                 }}
                 title={MODES[k].title}
                 text={MODES[k].text}
@@ -244,25 +271,58 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
             ))}
           </div>
         </div>
-        <div className="-mb-2 text-[13px] font-medium text-fg-2">Формат турнира</div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <OptionCard
-            active={bracket === "double_elimination"}
-            onClick={() => setBracket("double_elimination")}
-            title="Double Elimination"
-            text="Команда выбывает после двух поражений. Верхняя и нижняя сетка, гранд-финал."
-          />
-          <OptionCard
-            active={bracket === "single_elimination"}
-            onClick={() => setBracket("single_elimination")}
-            title="Single Elimination"
-            text="Проиграл — выбыл. Быстрее, подходит для коротких турниров."
-          />
+        <div className="pt-1 text-[13px] font-medium text-fg-2">Формат турнира</div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {(Object.keys(FORMATS) as FormatKind[]).map((k) => (
+            <OptionCard key={k} active={bracket === k} onClick={() => setBracket(k)} title={FORMATS[k].title} text={FORMATS[k].text} />
+          ))}
         </div>
+        {(bracket === "groups_playoff" || bracket === "swiss" || bracket === "swiss_playoff" || bracket === "round_robin") && (
+          <div className="grid sm:grid-cols-3 gap-5 rounded-xl border border-line bg-bg-2/60 p-4">
+            {bracket === "groups_playoff" && (
+              <>
+                <div>
+                  <div className="mb-2 text-[13px] font-medium text-fg-2">Групп</div>
+                  <Segmented value={groupsCount} onChange={setGroupsCount} options={[2, 4, 8].map((n) => ({ value: n, label: String(n) }))} />
+                </div>
+                <div>
+                  <div className="mb-2 text-[13px] font-medium text-fg-2">Выходят из группы</div>
+                  <Segmented value={advance} onChange={setAdvance} options={[1, 2, 4].map((n) => ({ value: n, label: String(n) }))} />
+                </div>
+              </>
+            )}
+            {(bracket === "swiss" || bracket === "swiss_playoff") && (
+              <div>
+                <div className="mb-2 text-[13px] font-medium text-fg-2">Побед для выхода / поражений для вылета</div>
+                <Segmented value={swissWins} onChange={setSwissWins} options={[2, 3].map((n) => ({ value: n, label: `${n}–${n}` }))} />
+              </div>
+            )}
+            {(bracket === "groups_playoff" || bracket === "swiss_playoff") && (
+              <div>
+                <div className="mb-2 text-[13px] font-medium text-fg-2">Плей-офф</div>
+                <Segmented
+                  value={playoffType}
+                  onChange={setPlayoffType}
+                  options={[{ value: "single_elimination", label: "Single" }, { value: "double_elimination", label: "Double" }]}
+                />
+              </div>
+            )}
+            {bracket === "round_robin" && (
+              <p className="sm:col-span-3 text-sm text-fg-3">
+                {maxTeams} участников → {(maxTeams * (maxTeams - 1)) / 2} матчей, {maxTeams % 2 ? maxTeams : maxTeams - 1} туров. Места — по
+                победам, затем личная встреча, разница карт и раундов.
+              </p>
+            )}
+          </div>
+        )}
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
-            <div className="mb-2 text-[13px] font-medium text-fg-2">Команд</div>
-            <Segmented value={maxTeams} onChange={setMaxTeams} options={[4, 8, 16, 32].map((n) => ({ value: n, label: String(n) }))} />
+            <div className="mb-2 text-[13px] font-medium text-fg-2">{format === "1v1" ? "Участников" : "Команд"}</div>
+            <Segmented
+              value={maxTeams}
+              onChange={setMaxTeams}
+              options={(bracket === "round_robin" ? [3, 4, 5, 6, 8] : [4, 8, 16, 32]).map((n) => ({ value: n, label: String(n) }))}
+            />
           </div>
 
           <div>
@@ -273,7 +333,11 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
             <div className="mb-2 text-[13px] font-medium text-fg-2">Финальная стадия</div>
             <Segmented value={finalBo} onChange={setFinalBo} options={[1, 3, 5].map((n) => ({ value: n, label: `BO${n}` }))} />
             <p className="mt-1.5 text-xs text-fg-3">
-              {bracket === "double_elimination" ? "Финал верхней, два последних раунда нижней и гранд-финал" : "Полуфиналы и финал"}
+              {bracket === "double_elimination" || playoffType === "double_elimination"
+                ? "Финал верхней, два последних раунда нижней и гранд-финал"
+                : bracket === "round_robin" || bracket === "swiss"
+                  ? "В этом формате нет финальной стадии — действует формат обычных матчей"
+                  : "Полуфиналы и финал плей-офф"}
             </p>
           </div>
         </div>
@@ -306,6 +370,82 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
             );
           })}
         </div>
+        {workshopMaps.length > 0 && (
+          <div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">Карты из Workshop</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {workshopMaps.map((w) => {
+                const on = maps.includes(w);
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setMaps((list) => (on ? list.filter((x) => x !== w) : [...list, w]))}
+                    className={cn(
+                      "relative h-20 overflow-hidden rounded-xl border p-3 text-left transition",
+                      on ? "border-[#8bb8ff55] bg-accent-dim" : "border-line bg-bg-2 opacity-50 hover:opacity-80",
+                    )}
+                  >
+                    <span className="font-semibold">{w.split("@")[0]}</span>
+                    <span className="absolute bottom-2.5 left-3 text-[10px] uppercase tracking-wider text-fg-3">workshop</span>
+                    <span className={cn("absolute bottom-2.5 right-2.5 size-5 rounded-md grid place-items-center text-[11px]", on ? "bg-accent text-[#06101f]" : "border border-line-strong")}>
+                      {on ? "✓" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {maps.filter((m) => m.includes("@") && !workshopMaps.includes(m)).length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {maps
+              .filter((m) => m.includes("@") && !workshopMaps.includes(m))
+              .map((m) => (
+                <span key={m} className="h-9 pl-3 pr-1 inline-flex items-center gap-2 rounded-lg border border-[#8bb8ff55] bg-accent-dim text-sm">
+                  {m.split("@")[0]}
+                  <span className="text-[10px] text-fg-3 num">Workshop</span>
+                  <button
+                    type="button"
+                    onClick={() => setMaps((l) => l.filter((x) => x !== m))}
+                    className="size-7 grid place-items-center rounded-md text-fg-3 hover:text-danger"
+                    aria-label="Убрать"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+          </div>
+        )}
+        <div className="rounded-xl border border-line bg-bg-2/60 p-4">
+          <div className="text-[13px] font-medium text-fg-2">Своя карта из Steam Workshop</div>
+          <p className="mt-1 text-xs text-fg-3">
+            Только для этого турнира. Чтобы карта была всегда под рукой — добавьте её в Админка → Настройки → Карты из Workshop.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder="aim_map" className="field w-40" />
+            <input
+              value={wsId}
+              onChange={(e) => setWsId(e.target.value)}
+              placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…"
+              className="field flex-1 min-w-[220px]"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const id = (wsId.match(/id=(\d+)/)?.[1] ?? wsId.match(/^\d+$/)?.[0]) || "";
+                const name = wsName.trim().replace(/[@,\s]+/g, "_");
+                if (!id || !name) return;
+                setMaps((l) => [...l.filter((x) => !x.endsWith(`@${id}`)), `${name}@${id}`]);
+                setWsName("");
+                setWsId("");
+              }}
+              className="h-[42px] px-4 rounded-[10px] border border-line text-sm text-fg-2 hover:text-fg hover:border-line-strong"
+            >
+              Добавить
+            </button>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className={mapWarning ? "text-warn" : "text-fg-3"}>
             Выбрано {maps.length}
@@ -322,8 +462,17 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       </Section>
 
       {/* 4 */}
-      <Section step={4} title="Правила игры" hint="Уходят в MatchZy на сервер при загрузке каждого матча">
+      <Section
+        step={4}
+        title="Правила игры"
+        hint={
+          format === "1v1"
+            ? "Дуэль: стороны фиксированные, без ножа и тактических пауз. Уходит в MatchZy при загрузке матча"
+            : "Уходят в MatchZy на сервер при загрузке каждого матча"
+        }
+      >
         <div className="grid sm:grid-cols-2 gap-5">
+          {format !== "1v1" && (
           <div>
             <div className="mb-2 text-[13px] font-medium text-fg-2">Стороны на карте</div>
             <Segmented
@@ -335,6 +484,7 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
               {knife ? "Победитель ножа выбирает .stay / .switch" : "Команда 1 начинает за CT, на следующей карте — наоборот"}
             </p>
           </div>
+          )}
           <div>
             <div className="mb-2 text-[13px] font-medium text-fg-2">Овертайм</div>
             <Segmented
@@ -343,6 +493,7 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
               options={[{ value: "on", label: "MR3 при 12:12" }, { value: "off", label: "Без овертайма" }]}
             />
           </div>
+          {format !== "1v1" && (
           <div>
             <div className="mb-2 text-[13px] font-medium text-fg-2">Тактические паузы на команду</div>
             <Segmented value={timeouts} onChange={setTimeouts} options={[0, 1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
@@ -350,8 +501,9 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
               <Segmented value={timeoutSec} onChange={setTimeoutSec} options={[30, 45, 60].map((n) => ({ value: n, label: `${n} с` }))} />
             </div>
           </div>
+          )}
           <div>
-            <div className="mb-2 text-[13px] font-medium text-fg-2">Технические паузы на команду</div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">{format === "1v1" ? "Технические паузы на игрока" : "Технические паузы на команду"}</div>
             <Segmented value={techPauses} onChange={setTechPauses} options={[0, 1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
             <div className="mt-2">
               <Segmented value={techSec} onChange={setTechSec} options={[180, 300, 600].map((n) => ({ value: n, label: `${n / 60} мин` }))} />
@@ -569,7 +721,7 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
           <div className="min-w-0 text-sm">
             <div className="truncate font-semibold">{name || "Новый турнир"}</div>
             <div className="truncate text-xs text-fg-3">
-              {bracket === "double_elimination" ? "Double Elim" : "Single Elim"} · {maxTeams} команд · BO{bo} / финал BO{finalBo} · {maps.length} карт · {knife ? "нож" : "фикс. стороны"}
+              {FORMATS[bracket].title} · {maxTeams} {format === "1v1" ? "участн." : "команд"} · BO{bo} / финал BO{finalBo} · {maps.length} карт · {knife ? "нож" : "фикс. стороны"}
               {overtime ? " · OT" : ""}
             </div>
           </div>

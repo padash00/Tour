@@ -95,7 +95,8 @@ export async function buildMatchzyConfig(matchId: string) {
     team1: { id: m.team1.id, name: m.team1.name, tag: m.team1.tag, players: players(rosters.team1) },
     team2: { id: m.team2.id, name: m.team2.name, tag: m.team2.tag, players: players(rosters.team2) },
     num_maps: m.best_of,
-    maplist: m.maps.map((x) => x.map_name),
+    // workshop-карта хранится как «name@id» — MatchZy грузит её по числовому ID (host_workshop_map)
+    maplist: m.maps.map((x) => (x.map_name.includes("@") ? x.map_name.split("@")[1] : x.map_name)),
     // нож — победитель выбирает сторону; без ножа стороны чередуются (team1 начинает за CT на нечётных картах)
     map_sides: m.maps.map((_, i) => (m.tournament.knife_round ? "knife" : i % 2 === 0 ? "team1_ct" : "team2_ct")),
     skip_veto: true, // вето уже прошло на сайте

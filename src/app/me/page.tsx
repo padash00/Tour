@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { markNotificationsRead, refreshProfile } from "@/app/actions/profile";
 import { isAdmin, requirePlayer } from "@/lib/auth";
-import { getActiveMembership, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
+import { getActiveMembership, getSoloTeam, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
@@ -30,12 +30,18 @@ export const metadata: Metadata = { title: "Личный кабинет" };
 export default async function MePage() {
   const player = await requirePlayer("/me");
   const membership = await getActiveMembership(player.id);
-  const [members, regs, notificationsRes, teamMatches] = await Promise.all([
+  const [members, teamRegs, solo, notificationsRes, ownMatches] = await Promise.all([
     membership ? getTeamMembers(membership.team.id) : Promise.resolve([]),
     membership ? getTeamRegistrations(membership.team.id) : Promise.resolve([]),
+    getSoloTeam(player, false),
     db().from("notifications").select("*").eq("player_id", player.id).order("created_at", { ascending: false }).limit(5),
     membership ? getTeamMatches(membership.team.id) : Promise.resolve([]),
   ]);
+  const [soloRegs, soloMatches] = solo
+    ? await Promise.all([getTeamRegistrations(solo.id), getTeamMatches(solo.id)])
+    : [[], []];
+  const regs = [...teamRegs, ...soloRegs];
+  const teamMatches = [...ownMatches, ...soloMatches];
   const upcoming = teamMatches.filter((m) => m.status !== "finished");
   const notifications = (notificationsRes.data ?? []) as Notification[];
   const unread = notifications.filter((n) => !n.read_at).length;

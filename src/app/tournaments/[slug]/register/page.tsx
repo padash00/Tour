@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { registerTeam, withdrawRegistration } from "@/app/actions/tournament";
 import { requirePlayer } from "@/lib/auth";
-import { getActiveMembership, getRegistration, getTeamMembers, getTournamentBySlug } from "@/lib/data";
+import { getActiveMembership, getRegistration, getSoloTeam, getTeamMembers, getTournamentBySlug } from "@/lib/data";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
@@ -18,6 +18,57 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   const t = await getTournamentBySlug(slug);
   if (!t) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/register`);
+  if (t.format === "1v1") {
+    const solo = await getSoloTeam(player, false);
+    const soloReg = solo ? await getRegistration(t.id, solo.id) : null;
+    const soloActive = soloReg && (soloReg.status === "pending" || soloReg.status === "approved");
+    return (
+      <Container className="max-w-2xl">
+        <PageHeader
+          eyebrow={<Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">← {t.name}</Link>}
+          title="Участие в дуэлях"
+          description="Турнир 1×1 — команда не нужна, вы участвуете сами."
+        />
+        <Card className="p-6 flex items-center gap-4">
+          <TeamLogo src={player.avatar_url} tag={player.nickname} size={56} />
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-semibold truncate">{player.nickname}</div>
+            <div className="text-sm text-fg-3">FACEIT {player.faceit_elo ?? "—"} ELO</div>
+          </div>
+          {soloReg && (
+            <Pill tone={soloReg.status === "approved" ? "ok" : soloReg.status === "pending" ? "warn" : "neutral"} dot>
+              {registrationStatusLabel[soloReg.status]}
+            </Pill>
+          )}
+        </Card>
+        {soloReg?.status === "rejected" && soloReg.note && (
+          <div className="mt-4">
+            <Notice tone="danger">Причина отказа: {soloReg.note}</Notice>
+          </div>
+        )}
+        <div className="mt-4">
+          {t.status !== "registration" ? (
+            <Notice>Регистрация закрыта.</Notice>
+          ) : soloActive ? (
+            <ActionForm action={withdrawRegistration}>
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <SubmitButton variant="ghost" confirm="Отменить участие в турнире?">
+                Отменить участие
+              </SubmitButton>
+            </ActionForm>
+          ) : (
+            <ActionForm action={registerTeam}>
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <SubmitButton size="lg" className="w-full" pendingText="Отправляем…">
+                Участвовать в турнире
+              </SubmitButton>
+            </ActionForm>
+          )}
+        </div>
+      </Container>
+    );
+  }
+
   const membership = await getActiveMembership(player.id);
 
   const header = (
