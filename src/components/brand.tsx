@@ -1,67 +1,83 @@
-import { useId } from "react";
+/* eslint-disable @next/next/no-img-element -- логотип: SVG-файлы бренда как есть */
 
 /**
- * Фирменный знак F16 Arena (по брендбуку): стреловидная «F» из двух штрихов,
- * сталь-белый сверху → ледяной голубой к низу. Работает от 16 px.
+ * Логотип F16 Arena — векторные мастер-файлы из F16_Arena_Clean_Vector_Assets (public/brand).
+ * Файлы не перерисовываются и не обрезаются: в viewBox намеренно заложены поля.
+ *   horizontal — основной цветной (шапка, подвал, вход)
+ *   white      — монохромный на тёмном (трансляции/OBS)
+ *   black      — на светлом (печать, документы)
+ * PNG-рендеры (public/brand/png) — только где SVG нельзя: иконки приложения, печать.
  */
-export const SYMBOL_OUTER = "M21 0H64L57 11H27L8 48H0Z";
-export const SYMBOL_INNER = "M33 17H56L49.5 27H37.5L24 46H17Z";
 
-/** «F16» — нарисованные глифы, наклон вперёд; 6 — угловатая */
-export const WORD_F16 =
-  "M0 0H30L27 9H9V16H24L21.5 24H9V40H0Z" +
-  "M36 0H45V40H36V10L31 12V4Z" +
-  "M53 0H80V9H62V16H76L82 22V34L76 40H59L53 34ZM62 24V31H73V24Z";
+const LOGO = {
+  horizontal: "/brand/f16-arena-horizontal.svg",
+  white: "/brand/f16-arena-white.svg",
+  black: "/brand/f16-arena-black.svg",
+} as const;
+const LOGO_RATIO = 2228 / 842; // viewBox -90 -80 2228 842
 
-export function F16Symbol({ className = "size-7", mono }: { className?: string; mono?: boolean }) {
-  const id = useId().replace(/:/g, "");
+const SYMBOL = {
+  color: "/brand/f16-symbol.svg",
+  white: "/brand/f16-symbol-white.svg",
+  black: "/brand/f16-symbol-black.svg",
+} as const;
+const SYMBOL_RATIO = 2046 / 1700; // viewBox 3 171 2046 1700
+
+export function BrandLogo({
+  height = 40,
+  variant = "horizontal",
+  className,
+}: {
+  height?: number;
+  variant?: keyof typeof LOGO;
+  /** оставлено для совместимости вызовов */
+  priority?: boolean;
+  className?: string;
+}) {
   return (
-    <svg viewBox="0 0 64 48" className={className} aria-hidden>
-      {!mono && (
-        <defs>
-          <linearGradient id={`g${id}`} x1="60" y1="0" x2="4" y2="48" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#F4F7FB" />
-            <stop offset="0.55" stopColor="#C9DCF7" />
-            <stop offset="1" stopColor="#8AB8FF" />
-          </linearGradient>
-        </defs>
-      )}
-      <g fill={mono ? "currentColor" : `url(#g${id})`}>
-        <path d={SYMBOL_OUTER} />
-        <path d={SYMBOL_INNER} />
-      </g>
-    </svg>
+    <img
+      src={LOGO[variant]}
+      alt="F16 Arena"
+      width={Math.round(height * LOGO_RATIO)}
+      height={height}
+      className={className}
+      style={{ height, width: "auto" }}
+      draggable={false}
+    />
   );
 }
 
-export function F16Word({ className = "h-4" }: { className?: string }) {
+export function BrandSymbol({
+  height = 24,
+  variant = "color",
+  className,
+}: {
+  height?: number;
+  variant?: keyof typeof SYMBOL;
+  className?: string;
+}) {
   return (
-    <svg viewBox="-6 0 92 40" className={className} aria-hidden>
-      <path d={WORD_F16} fill="currentColor" fillRule="evenodd" transform="skewX(-12) translate(8 0)" />
-    </svg>
+    <img
+      src={SYMBOL[variant]}
+      alt=""
+      aria-hidden
+      width={Math.round(height * SYMBOL_RATIO)}
+      height={height}
+      className={className}
+      style={{ height, width: "auto" }}
+      draggable={false}
+    />
   );
 }
 
-/**
- * Горизонтальный логотип: знак слева, справа F16 и разреженное ARENA (или CONTROL для админки).
- * size — высота знака в px.
- */
-export function F16Logo({ size = 30, suffix = "ARENA" }: { size?: number; suffix?: string }) {
+/** F16 Control: знак + подпись раздела */
+export function ControlLogo() {
   return (
-    <span className="inline-flex items-center text-fg" style={{ gap: size * 0.3 }}>
-      <span className="shrink-0 block" style={{ width: (size * 4) / 3, height: size }}>
-        <F16Symbol className="block size-full" />
-      </span>
-      <span className="flex flex-col items-start justify-center leading-none" style={{ gap: size * 0.14 }}>
-        <span className="block" style={{ height: size * 0.5, width: size * 0.5 * 2.3 }}>
-          <F16Word className="block size-full" />
-        </span>
-        <span
-          className="block font-medium text-fg-2"
-          style={{ fontSize: Math.max(8, size * 0.27), letterSpacing: "0.42em", marginRight: "-0.42em" }}
-        >
-          {suffix}
-        </span>
+    <span className="inline-flex items-center gap-2.5">
+      <BrandSymbol height={26} />
+      <span className="flex flex-col leading-none">
+        <span className="text-[13px] font-bold tracking-[0.04em] text-fg">F16</span>
+        <span className="mt-1 text-[9px] font-medium tracking-[0.32em] text-fg-3">CONTROL</span>
       </span>
     </span>
   );

@@ -8,7 +8,8 @@ import { cn } from "./ui";
 type Item = { href: string; label: string };
 
 function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(href + "/");
+  const path = href.split("#")[0];
+  return pathname === path || pathname.startsWith(path + "/");
 }
 
 /** Публичная обёртка не нужна в F16 Control — там своя оболочка */
@@ -30,6 +31,7 @@ export function HeaderShell({ children }: { children: ReactNode }) {
   }, []);
   if (pathname.startsWith("/admin")) return null;
   const overHero = pathname === "/" && !scrolled;
+  // на главной шапка лежит поверх фото hero
   return (
     <header
       className={cn(
@@ -45,14 +47,14 @@ export function HeaderShell({ children }: { children: ReactNode }) {
 export function NavLinks({ items }: { items: Item[] }) {
   const pathname = usePathname();
   return (
-    <nav className="hidden md:flex items-center gap-7">
+    <nav className="hidden md:flex items-center gap-9 lg:gap-11 ml-14 lg:ml-[150px]">
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           className={cn(
-            "relative h-[68px] inline-flex items-center text-[14px] transition-colors",
-            isActive(pathname, item.href) ? "text-fg" : "text-fg-3 hover:text-fg",
+            "relative h-[72px] lg:h-[96px] inline-flex items-center text-[14px] lg:text-[16px] transition-colors",
+            isActive(pathname, item.href) ? "text-fg" : "text-fg/80 hover:text-fg",
           )}
         >
           {item.label}
@@ -81,7 +83,7 @@ export function MobileMenu({ items }: { items: Item[] }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute inset-x-0 top-[68px] border-b border-line bg-bg px-4 py-4">
+        <div className="absolute inset-x-0 top-[72px] border-b border-line bg-bg px-4 py-4">
           {items.map((item) => (
             <Link
               key={item.href}

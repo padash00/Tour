@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { Logo } from "@/components/site-header";
+import { ControlLogo } from "@/components/brand";
 import { Avatar } from "@/components/ui";
 import { AdminNav } from "./admin-nav";
 
@@ -10,8 +10,10 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <div className="lg:flex min-h-screen bg-bg">
       <aside className="lg:w-[232px] lg:shrink-0 lg:h-screen lg:sticky lg:top-0 flex flex-col border-b lg:border-b-0 lg:border-r border-line bg-bg-2">
-        <div className="h-14 lg:h-16 px-5 flex items-center">
-          <Logo href="/admin" suffix="CONTROL" />
+        <div className="h-14 lg:h-16 px-5 flex items-center shrink-0">
+          <Link href="/admin" aria-label="F16 Control">
+            <ControlLogo />
+          </Link>
         </div>
         <div className="px-3 pb-3 lg:pb-0 lg:flex-1">
           <AdminNav />

@@ -3,7 +3,6 @@ import { bracketLabel, formatDate, formatDateTime, formatTime, tournamentStatusL
 import { modeOf } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { MatchStatus, Tournament, TournamentStatus } from "@/lib/types";
-import { F16Mark } from "../site-header";
 import { ButtonLink, IconArrow, Meta, Pill, TeamLogo, cn } from "../ui";
 
 // ───────────────────────── статусы
@@ -64,8 +63,6 @@ export function BrandVisual({ className }: { className?: string }) {
   return (
     <div className={cn("relative overflow-hidden bg-bg-2", className)} aria-hidden>
       <div className="absolute inset-0 bg-[radial-gradient(600px_380px_at_70%_30%,#14233b,transparent_70%)]" />
-      <F16Mark className="absolute -right-[12%] -bottom-[18%] w-[95%] h-auto text-white/[0.045]" />
-      <F16Mark className="absolute right-[18%] top-[22%] w-[16%] h-auto text-white/[0.12]" />
       <div className="absolute left-0 right-0 bottom-0 h-1/2 bg-gradient-to-t from-bg/80 to-transparent" />
     </div>
   );

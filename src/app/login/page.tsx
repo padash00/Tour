@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentPlayer } from "@/lib/auth";
 import { safeNext } from "@/lib/redirect";
-import { F16Logo } from "@/components/brand";
+import { BrandLogo } from "@/components/brand";
 import { IconSteam, Notice, buttonClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Вход" };
@@ -22,7 +22,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
     <div className="flex min-h-[calc(100vh-68px)] items-center justify-center px-4 py-16">
       <div className="w-full max-w-[400px] text-center">
         <span className="inline-flex justify-center">
-          <F16Logo size={44} />
+          <BrandLogo height={64} />
         </span>
         <h1 className="mt-8 text-[32px] font-bold tracking-[-0.035em]">Войти через Steam</h1>
         <p className="mt-3 text-fg-2 leading-relaxed">Steam используется как единый аккаунт игрока F16 Arena.</p>
