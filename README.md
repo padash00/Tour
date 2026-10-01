@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# F16 Arena — турнирная платформа CS2
 
-## Getting Started
+Next.js (App Router) на Vercel, база — Supabase. Вход только через Steam.
 
-First, run the development server:
+## Деплой
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+`main` → GitHub → Vercel автоматически. Локальный запуск не обязателен.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Переменные окружения (Vercel → Project → Settings → Environment Variables) — см. `.env.example`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## База данных
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Миграции лежат в `supabase/migrations/`. Применяются по порядку
+(Supabase → SQL Editor, либо `supabase db push`).
 
-## Learn More
+## Этапы
 
-To learn more about Next.js, take a look at the following resources:
+1. **Регистрация** — Steam, FACEIT, команды, инвайты, заявки, check-in, админка. ✅
+2. **Турнир** — сетка Double Elimination, посев, вето, страницы матчей, ручной ввод результата.
+3. **Сервер** — F16 Server Agent, MatchZy, выдача IP, автоматический результат.
+4. **Статистика** — F16Stats, live, MVP.
+5. **Трансляция** — HUD, Broadcast Controller.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Устройство
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/lib/steam.ts` — Steam OpenID 2.0 (проверка `check_authentication`) и профиль.
+- `src/lib/session.ts` — своя сессия: подписанный JWT в httpOnly cookie.
+- `src/lib/supabase.ts` — серверный клиент с service role. Все записи идут только через сервер,
+  RLS включён на всех таблицах, публично читаются только публичные данные.
+- `src/app/actions/*` — серверные действия (команды, заявки, админка). Каждое ручное действие пишется в `audit_logs`.
+- Администраторы: `ADMIN_STEAM_IDS` в env или флаг `is_admin` (выдаётся в админке).

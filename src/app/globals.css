@@ -1,26 +1,159 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg: #070b12;
+  --color-bg-2: #0a1018;
+  --color-surface: #0f1724;
+  --color-surface-2: #121c2a;
+  --color-surface-3: #172334;
+  --color-line: #1c2738;
+  --color-line-strong: #2a3850;
+
+  --color-fg: #f2f5fa;
+  --color-fg-2: #a7b2c3;
+  --color-fg-3: #6b788c;
+
+  --color-accent: #8bb8ff;
+  --color-accent-strong: #a9cbff;
+  --color-accent-dim: #8bb8ff1f;
+  --color-steel: #7fc4d8;
+  --color-warm: #ff8a3d;
+  --color-ok: #6cc59a;
+  --color-ok-dim: #6cc59a1a;
+  --color-warn: #e3b465;
+  --color-warn-dim: #e3b4651a;
+  --color-danger: #ef7a7a;
+  --color-danger-dim: #ef7a7a1a;
+
+  --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-card: 14px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #8bb8ff40;
+}
+
+/* атмосферный фон для hero-зон */
+.atmos {
+  background:
+    radial-gradient(1200px 520px at 78% -10%, #1b2c4a66, transparent 60%),
+    radial-gradient(800px 400px at 0% 0%, #12203a55, transparent 60%),
+    linear-gradient(180deg, #0a1018 0%, #070b12 100%);
+}
+
+.grid-lines {
+  background-image:
+    linear-gradient(to right, #ffffff08 1px, transparent 1px),
+    linear-gradient(to bottom, #ffffff08 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 70% 30%, black 20%, transparent 70%);
+}
+
+.card {
+  background: linear-gradient(180deg, var(--color-surface) 0%, #0d1520 100%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 1px 0 #ffffff06;
+}
+
+.card-hover {
+  transition:
+    border-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.card-hover:hover {
+  border-color: var(--color-line-strong);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 #ffffff08,
+    0 12px 32px -16px #000;
+}
+
+.label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-3);
+  font-weight: 600;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.field {
+  width: 100%;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--color-fg);
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.field::placeholder {
+  color: var(--color-fg-3);
+}
+.field:focus {
+  border-color: #8bb8ff80;
+  box-shadow: 0 0 0 3px #8bb8ff1a;
+}
+
+.prose-f16 {
+  color: var(--color-fg-2);
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.tbl th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-fg-3);
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-line);
+}
+.tbl td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #1c273899;
+  color: var(--color-fg-2);
+}
+.tbl tr:last-child td {
+  border-bottom: none;
+}
+.tbl tbody tr {
+  transition: background 0.15s;
+}
+.tbl tbody tr:hover {
+  background: #ffffff04;
 }
