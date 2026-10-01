@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentPlayer } from "@/lib/auth";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
 import { bracketLabel, formatDate, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
@@ -44,14 +44,12 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
   const sp = await props.searchParams;
   const tab: Tab = TABS.includes(sp.tab as Tab) ? (sp.tab as Tab) : "overview";
 
-  const t = await getTournamentBySlug(slug);
+  const player = await getCurrentPlayer();
+  // черновик видит только админ — для предпросмотра
+  const t = await getTournamentBySlug(slug, isAdmin(player));
   if (!t) notFound();
 
-  const [regs, player, matches] = await Promise.all([
-    getTournamentRegistrations(t.id),
-    getCurrentPlayer(),
-    getTournamentMatches(t.id),
-  ]);
+  const [regs, matches] = await Promise.all([getTournamentRegistrations(t.id), getTournamentMatches(t.id)]);
   const approved = regs.filter((r) => r.status === "approved");
   const pending = regs.filter((r) => r.status === "pending");
   const membership = player ? await getActiveMembership(player.id) : null;
@@ -69,9 +67,21 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           <MapGraphic className="absolute right-0 top-0 h-full opacity-30 hidden md:block" />
         )}
         <Container className="relative pt-14 pb-10">
-          <Link href="/tournaments" className="text-sm text-fg-3 hover:text-fg-2">
-            ← Все турниры
-          </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link href="/tournaments" className="text-sm text-fg-3 hover:text-fg-2">
+              ← Все турниры
+            </Link>
+            {isAdmin(player) && (
+              <Link href={`/admin/tournaments/${t.id}`} className="text-sm text-accent hover:underline">
+                Управление турниром →
+              </Link>
+            )}
+          </div>
+          {t.status === "draft" && (
+            <div className="mt-4 rounded-xl border border-[#e3b46544] bg-warn-dim px-4 py-2.5 text-sm text-warn">
+              Черновик — эту страницу видят только администраторы. Откройте регистрацию в управлении турниром, чтобы опубликовать.
+            </div>
+          )}
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <TournamentStatusPill status={t.status} />
             <Pill>{t.game}</Pill>

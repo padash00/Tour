@@ -69,7 +69,9 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
               публичная страница ↗
             </Link>
           ) : (
-            "черновик не виден публично"
+            <Link href={`/tournaments/${t.slug}`} className="text-accent hover:underline">
+              предпросмотр черновика ↗
+            </Link>
           )}
         </div>
       </div>
