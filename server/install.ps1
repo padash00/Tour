@@ -1,4 +1,4 @@
-# F16 Arena — установка Metamod, CounterStrikeSharp, MatchZy и конфигов F16 в CS2 Dedicated Server.
+﻿# F16 Arena — установка Metamod, CounterStrikeSharp, MatchZy и конфигов F16 в CS2 Dedicated Server.
 # Запускать после каждого обновления CS2 через SteamCMD (обновление перезаписывает gameinfo.gi).
 #
 #   powershell -ExecutionPolicy Bypass -File server\install.ps1 [-ServerDir D:\cs2server] [-Staging D:\cs2-staging]

@@ -1,4 +1,4 @@
-# F16 Arena — запуск инстансов CS2.
+﻿# F16 Arena — запуск инстансов CS2.
 #   start.ps1 -Name CS2-01        один инстанс
 #   start.ps1 -Active             все активные (CS2-01..03)
 #   start.ps1 -Name CS2-01 -Stop  остановить
@@ -29,7 +29,8 @@ foreach ($i in $targets) {
   if ($running) { Write-Host "SKIP $($i.name) уже запущен (pid $($running.ProcessId))"; continue }
 
   $argList = @(
-    "-dedicated", "-console", "-usercon",
+    "-dedicated", "-console", "-usercon", "-condebug",
+    "-ip", "0.0.0.0",
     "-port", $port,
     "+tv_port", ($port + 5),
     "-maxplayers", "12",
