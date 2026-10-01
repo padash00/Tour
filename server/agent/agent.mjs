@@ -187,7 +187,7 @@ async function execute(cmd) {
       return runStartScript(inst.name, false);
     }
     case "load_match": {
-      const { url, header_key, header_value, events_url, log_url } = cmd.payload;
+      const { url, header_key, header_value, events_url, log_url, post_cmds = [] } = cmd.payload;
       // на случай, если на сервере остался старый матч
       await rcon(inst.port, secrets.rcon, "get5_endmatch").catch(() => {});
       const out = await rcon(inst.port, secrets.rcon, `matchzy_loadmatch_url ${q(url)} ${q(header_key)} ${q(header_value)}`);
@@ -200,6 +200,8 @@ async function execute(cmd) {
         // HTTP-лог CS2 для Swing: каждое убийство, плент, дефьюз и конец раунда
         "logaddress_delall_http",
         ...(log_url ? [`logaddress_add_http ${q(log_url)}`] : []),
+        // настройки MatchZy из турнира (без кавычек — int-convar'ы)
+        ...post_cmds.filter((c) => /^matchzy_[a-z_]+ \d+$/.test(c)),
       ]) {
         await rcon(inst.port, secrets.rcon, c).catch(() => {});
       }

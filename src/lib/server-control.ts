@@ -123,8 +123,6 @@ export async function buildMatchzyConfig(matchId: string) {
       mp_overtime_maxrounds: 6,
       mp_team_timeout_max: m.tournament.timeouts_per_team,
       mp_team_timeout_time: m.tournament.timeout_seconds,
-      matchzy_max_tech_pauses_allowed: m.tournament.tech_pauses,
-      matchzy_tech_pause_duration: m.tournament.tech_pause_seconds,
     },
   };
 }
@@ -226,7 +224,7 @@ export async function takePendingCommands(siteOrigin: string) {
     .update({ status: "sent", sent_at: new Date().toISOString() })
     .in("id", commands.map((c) => c.id));
 
-  return commands.map((c) => {
+  return Promise.all(commands.map(async (c) => {
     if (c.type === "load_match") {
       return {
         ...c,
@@ -237,11 +235,24 @@ export async function takePendingCommands(siteOrigin: string) {
           header_value: process.env.MATCHZY_TOKEN,
           events_url: `${siteOrigin}/api/matchzy/events`,
           log_url: `${siteOrigin}/api/cs2/log?m=${c.payload.matchzy_id}&t=${process.env.MATCHZY_TOKEN}`,
+          // настройки плагина MatchZy (int-convar'ы) не принимаются из cvars конфига матча — ставим RCON-ом
+          post_cmds: await matchzyPostCommands(String(c.payload.match_id)),
         },
       };
     }
     return c;
-  });
+  }));
+}
+
+async function matchzyPostCommands(matchId: string) {
+  const { data } = await db()
+    .from("matches")
+    .select("tournament:tournaments(tech_pauses, tech_pause_seconds)")
+    .eq("id", matchId)
+    .single();
+  const t = (data as unknown as { tournament: { tech_pauses: number; tech_pause_seconds: number } } | null)?.tournament;
+  if (!t) return [];
+  return [`matchzy_max_tech_pauses_allowed ${t.tech_pauses}`, `matchzy_tech_pause_duration ${t.tech_pause_seconds}`];
 }
 
 export async function ackCommand(id: string, ok: boolean, result: string) {
@@ -417,13 +428,24 @@ export async function autopilotTick() {
   for (const t of ts) {
     const { data: list } = await db()
       .from("matches")
-      .select("id, number, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
+      .select("id, number, round, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
       .eq("tournament_id", t.id)
-      .in("status", ["upcoming", "ready"])
+      .in("status", ["upcoming", "veto", "ready", "live"])
       .order("number");
     const matches = (list ?? []).sort(
-      (a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.number - b.number,
+      (a, b) =>
+        (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.round - b.round || a.number - b.number,
     );
+    // участник не может играть два матча одновременно: занят, если его матч уже на сервере или идёт
+    const busy = new Set<string>();
+    for (const m of matches) {
+      if (m.status === "live" || (m.status === "ready" && m.server_instance && m.server_state !== "error")) {
+        if (m.team1_id) busy.add(m.team1_id);
+        if (m.team2_id) busy.add(m.team2_id);
+      }
+    }
+    const free = (m: { team1_id: string | null; team2_id: string | null }) =>
+      !!m.team1_id && !!m.team2_id && !busy.has(m.team1_id) && !busy.has(m.team2_id);
 
     // 1. вето — как только соперники известны
     for (const m of matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x))) {
@@ -445,8 +467,11 @@ export async function autopilotTick() {
 
     // 2. готовые матчи — на свободные серверы
     for (const m of matches.filter((x) => x.status === "ready" && (!x.server_instance || x.server_state === "error") && due(x))) {
+      if (!free(m)) continue; // кто-то из участников ещё доигрывает другой матч
       const inst = await pickFreeInstance();
       if (!inst) return; // свободных серверов нет — ждём следующей синхронизации
+      busy.add(m.team1_id!);
+      busy.add(m.team2_id!);
       const { data: full } = await db().from("matches").select("*").eq("id", m.id).single();
       if (!full) continue;
       await assignServer(full as Match, inst.name);
