@@ -86,6 +86,18 @@ const send = async (ev) => {
 
 console.log(`матч matchzy_id=${m.matchzy_id}`);
 await send({ event: "going_live", map_number: 0 });
+// HTTP-лог CS2 одного раунда → Swing
+const P = (i, side) => `"ev_${i}<${i + 2}><[U:1:${Number(BigInt(players[i].steam_id) - 76561197960265728n)}]><${side}>"`;
+const logBody = [
+  'L 10/01/2026 - 12:00:00: World triggered "Round_Start"',
+  `L 10/01/2026 - 12:00:20: ${P(0, "CT")} [1 2 3] killed ${P(5, "TERRORIST")} [1 2 3] with "ak47" (headshot)`,
+  `L 10/01/2026 - 12:00:20: ${P(1, "CT")} assisted killing ${P(5, "TERRORIST")}`,
+  `L 10/01/2026 - 12:00:30: ${P(6, "TERRORIST")} [1 2 3] killed ${P(2, "CT")} [1 2 3] with "awp"`,
+  'L 10/01/2026 - 12:01:00: Team "CT" triggered "SFUI_Notice_Target_Saved" (CT "1") (T "0")',
+  'L 10/01/2026 - 12:01:00: World triggered "Round_End"',
+].join("\n");
+const lr = await fetch(`${SITE}/api/cs2/log?m=${m.matchzy_id}&t=${env.MATCHZY_TOKEN}`, { method: "POST", body: logBody });
+console.log(`  cs2 log      → ${lr.status} ${await lr.text()}`);
 await send({ event: "round_end", map_number: 0, round_number: 8, round_time: 60, reason: 1, winner: { side: "ct", team: "team1" }, team1: statsTeam(players.slice(0, 5), 5), team2: statsTeam(players.slice(5), 3) });
 await send({ event: "map_result", map_number: 0, winner: { side: "t", team: "team1" }, team1: statsTeam(players.slice(0, 5), 13), team2: statsTeam(players.slice(5), 8) });
 await send({ event: "series_end", time_until_restore: 0, winner: { side: "t", team: "team1" }, team1_series_score: 1, team2_series_score: 0 });
@@ -94,6 +106,9 @@ const mm = must(await db.from("matches").select("status, winner_id, team1_score,
 const map = must(await db.from("match_maps").select("status, team1_score, team2_score, winner_id").eq("match_id", m.id).single(), "map");
 const stats = must(await db.from("player_map_stats").select("steam_id, kills, first_kills, clutch_wins, player_id").eq("match_id", m.id), "stats");
 const events = must(await db.from("match_events").select("event").eq("match_id", m.id), "events");
+const swing = must(await db.from("player_map_swing").select("steam_id, swing_sum, rounds").eq("match_id", m.id), "swing");
+const top = swing.sort((x, y) => y.swing_sum - x.swing_sum)[0];
+console.log(`  swing: ${swing.length} игроков, лучший ${top?.steam_id.slice(-3)} ${top ? (top.swing_sum * 100).toFixed(1) : "-"} п.п.`);
 
 const checks = [
   ["матч завершён", mm.status === "finished"],
@@ -104,9 +119,13 @@ const checks = [
   ["first_kills = t + ct (3)", stats.every((s) => s.first_kills === 3)],
   ["игроки привязаны к профилям", stats.every((s) => s.player_id)],
   ["4 сырых события сохранены", events.length === 4],
+  ["swing посчитан по логу", swing.length >= 3 && top?.steam_id === players[0].steam_id],
 ];
 for (const [name, ok] of checks) console.log(`${ok ? "✓" : "✕"} ${name}`);
 
 await db.from("match_events").delete().eq("match_id", m.id);
+await db.from("match_rounds").delete().eq("match_id", m.id);
+await db.from("player_map_swing").delete().eq("match_id", m.id);
+await db.from("match_log_state").delete().eq("match_id", m.id);
 await cleanup();
 process.exit(checks.every(([, ok]) => ok) ? 0 : 1);
