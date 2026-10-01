@@ -126,14 +126,14 @@ async function collectInstances() {
 // ───────────────────────── команды
 
 function runStartScript(name, stop) {
+  // Без перехвата вывода: cs2.exe, запущенный через Start-Process, унаследовал бы наши pipe'ы
+  // и держал их открытыми, и агент ждал бы вечно. Ждём только код выхода PowerShell.
   return new Promise((resolve) => {
     const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", START_PS1, "-Name", name];
     if (stop) args.push("-Stop");
-    const p = spawn("powershell", args, { windowsHide: true });
-    let out = "";
-    p.stdout.on("data", (d) => (out += d));
-    p.stderr.on("data", (d) => (out += d));
-    p.on("close", (code) => resolve({ ok: code === 0, result: out.trim() }));
+    const p = spawn("powershell", args, { windowsHide: true, stdio: "ignore" });
+    p.on("error", (e) => resolve({ ok: false, result: e.message }));
+    p.on("exit", (code) => resolve({ ok: code === 0, result: `${stop ? "stop" : "start"} ${name}: exit ${code}` }));
   });
 }
 
@@ -202,7 +202,10 @@ async function tick() {
     log("cmd", cmd.type, cmd.instance ?? "");
     let r;
     try {
-      r = await execute(cmd);
+      r = await Promise.race([
+        execute(cmd),
+        sleep(60_000).then(() => ({ ok: false, result: "timeout 60s" })),
+      ]);
     } catch (e) {
       r = { ok: false, result: String(e?.message ?? e) };
     }
