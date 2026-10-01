@@ -1,0 +1,6 @@
+name,port,role
+CS2-01,27015,active
+CS2-02,27115,active
+CS2-03,27215,active
+CS2-04,27315,reserve
+CS2-05,27415,reserve
