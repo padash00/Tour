@@ -66,6 +66,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
                 <th>Статус</th>
                 <th>Счёт</th>
                 <th>Сервер</th>
+                <th>Ожидание</th>
               </tr>
             </thead>
             <tbody>
@@ -82,6 +83,18 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
                   <td><MatchStatusBadge status={m.status} /></td>
                   <td className="num">{["live", "finished"].includes(m.status) ? `${m.team1_score}:${m.team2_score}` : "—"}</td>
                   <td className="num text-xs">{m.server_address ?? "—"}</td>
+                  <td className="num text-xs">
+                    {m.status === "ready" && m.server_ready_at ? (
+                      (() => {
+                        const min = Math.floor((Date.now() - new Date(m.server_ready_at).getTime()) / 60000);
+                        return <span className={min >= 15 ? "text-danger font-semibold" : min >= 10 ? "text-warn" : ""}>{min} мин{min >= 15 ? " · неявка" : ""}</span>;
+                      })()
+                    ) : m.server_state === "error" ? (
+                      <span className="text-danger">ошибка сервера</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -214,8 +214,8 @@ export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, p
     await rcon(target.port, rconPassword, `host_workshop_map ${id}`);
     const started = Date.now();
     let map = before;
-    // ждём смены карты: скачивание + загрузка, до 10 минут
-    while (Date.now() - started < 10 * 60_000) {
+    // ждём смены карты: скачивание + загрузка, до 4 минут
+    while (Date.now() - started < 4 * 60_000) {
       await new Promise((r) => setTimeout(r, 5000));
       const info = await a2sInfo(target.port);
       if (info?.map && info.map !== before) {

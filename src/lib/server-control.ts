@@ -150,7 +150,14 @@ export async function pickFreeInstance(preferRole: "active" | "reserve" = "activ
 export async function assignServer(match: Match, instanceName: string, actorId?: string) {
   await db()
     .from("matches")
-    .update({ server_instance: instanceName, server_state: "loading", server_address: null, server_password: null })
+    .update({
+      server_instance: instanceName,
+      server_state: "loading",
+      server_address: null,
+      server_password: null,
+      server_assigned_at: new Date().toISOString(),
+      server_ready_at: null,
+    })
     .eq("id", match.id);
   await enqueueCommand(instanceName, "load_match", { match_id: match.id, matchzy_id: match.matchzy_id }, actorId);
 }
@@ -196,17 +203,37 @@ export async function applyAgentReport(report: AgentReport) {
       })
       .eq("name", inst.name);
 
-    // health check: матч загрузился на назначенный сервер → выдаём адрес игрокам
+    // health check: матч загрузился на назначенный сервер и на нём нужная карта → выдаём адрес игрокам
     const m = match as Match | null;
     if (m && m.server_instance === inst.name && m.server_state === "loading" && gamestate && gamestate !== "none" && lanIp) {
+      const expected = await expectedMapName(m.id);
+      if (expected && inst.map && inst.map !== expected) {
+        // карта ещё грузится (Workshop качается) или не загрузилась вовсе
+        const waited = m.server_assigned_at ? Date.now() - new Date(m.server_assigned_at).getTime() : 0;
+        if (waited > MAP_LOAD_TIMEOUT_MS) {
+          await db().from("matches").update({ server_state: "error" }).eq("id", m.id);
+          await notify(
+            await adminIds(),
+            `Матч #${m.number}: карта не загрузилась на ${inst.name}`,
+            `Ожидалась ${expected}, на сервере ${inst.map}. Проверьте карту (Workshop-карта из CS:GO в CS2 не работает) или перенесите матч.`,
+            `/admin/matches/${m.id}`,
+          );
+        }
+        continue;
+      }
       const { data: row } = await db().from("server_instances").select("port").eq("name", inst.name).single();
       await db()
         .from("matches")
-        .update({ server_state: "ready", server_address: `${lanIp}:${row?.port}` })
+        .update({ server_state: "ready", server_address: `${lanIp}:${row?.port}`, server_ready_at: new Date().toISOString() })
         .eq("id", m.id);
       const full = await getMatch(m.id);
       const captains = [full?.team1?.captain_id, full?.team2?.captain_id].filter(Boolean) as string[];
-      await notify(captains, `Сервер для матча #${m.number} готов`, "Откройте страницу матча и нажмите «Подключиться».", `/matches/${m.id}`);
+      await notify(
+        captains,
+        `Сервер для матча #${m.number} готов: ${lanIp}:${row?.port}`,
+        "Откройте страницу матча и нажмите «Подключиться». На подключение — 15 минут.",
+        `/matches/${m.id}`,
+      );
     }
   }
 }
@@ -252,10 +279,10 @@ export async function takePendingCommands(siteOrigin: string) {
  * агент проверяет их каждые 5 секунд и возвращает, пока идёт матч.
  */
 export function modeCvars(format: string): Record<string, number> {
-  if (modeOf(format).size === 1) {
-    return { mp_maxrounds: 24, mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 };
-  }
-  return {};
+  const size = modeOf(format).size;
+  if (size === 1) return { mp_maxrounds: 24, mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 };
+  if (size === 2) return { mp_maxrounds: 16 }; // Wingman MR16
+  return { mp_maxrounds: 24 }; // MR24
 }
 
 async function matchEnforce(matchId: string) {
@@ -285,6 +312,7 @@ export async function ackCommand(id: string, ok: boolean, result: string) {
     .select("*")
     .maybeSingle();
   const cmd = data as AgentCommand | null;
+  if (cmd?.type === "prefetch_maps") await saveWorkshopResults(result);
   if (cmd?.type === "load_match" && !ok) {
     await db().from("matches").update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
   }
@@ -524,4 +552,50 @@ export async function enqueuePrefetch(tournamentId: string, actorId?: string) {
   if (!ids.length) return 0;
   await enqueueCommand(null, "prefetch_maps", { workshop_ids: ids }, actorId);
   return ids.length;
+}
+
+// ───────────────────────── проверка карты
+
+const MAP_LOAD_TIMEOUT_MS = 2 * 60_000;
+
+async function adminIds() {
+  const { data } = await db().from("players").select("id, steam_id, is_admin");
+  const envAdmins = (process.env.ADMIN_STEAM_IDS ?? "").split(",").map((s) => s.trim());
+  return (data ?? []).filter((p) => p.is_admin || envAdmins.includes(p.steam_id)).map((p) => p.id);
+}
+
+/**
+ * Какое имя карты должен показать сервер: стандартная — её id (de_mirage),
+ * workshop — внутреннее имя, которое агент узнал при проверке (aim_map@3070549948 → aim_map_d).
+ * null — проверить нельзя (workshop-карта ещё не проверялась).
+ */
+export async function expectedMapName(matchId: string): Promise<string | null> {
+  const { data: maps } = await db().from("match_maps").select("map_name, status, map_number").eq("match_id", matchId).order("map_number");
+  const current = (maps ?? []).find((x) => x.status !== "finished") ?? maps?.[0];
+  if (!current) return null;
+  if (!current.map_name.includes("@")) return current.map_name;
+  const info = await workshopInfo();
+  return info[current.map_name.split("@")[1]]?.map ?? null;
+}
+
+export type WorkshopInfo = Record<string, { map: string | null; ok: boolean; seconds?: number; checked_at: string; note?: string }>;
+
+export async function workshopInfo(): Promise<WorkshopInfo> {
+  const { data } = await db().from("app_settings").select("value").eq("key", "WORKSHOP_MAP_INFO").maybeSingle();
+  try {
+    return data?.value ? (JSON.parse(data.value) as WorkshopInfo) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Результат прогрева от агента («123 → aim_map_d (5 с)» / «123: не загрузилась за 600 с») → в библиотеку */
+async function saveWorkshopResults(result: string) {
+  const info = await workshopInfo();
+  const now = new Date().toISOString();
+  for (const m of result.matchAll(/(\d+) → ([\w.-]+) \((\d+) с\)/g)) info[m[1]] = { map: m[2], ok: true, seconds: Number(m[3]), checked_at: now };
+  for (const m of result.matchAll(/(\d+): не загрузилась за (\d+) с/g)) {
+    info[m[1]] = { map: null, ok: false, checked_at: now, note: "не загружается в CS2 — возможно, карта из CS:GO" };
+  }
+  await db().from("app_settings").upsert({ key: "WORKSHOP_MAP_INFO", value: JSON.stringify(info), updated_at: now });
 }

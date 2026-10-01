@@ -299,12 +299,22 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                       <CopyField value={`connect ${m.server_address}${m.server_password ? `; password ${m.server_password}` : ""}`} />
                     </div>
                   </div>
-                  <a
-                    href={`steam://connect/${m.server_address}${m.server_password ? `/${m.server_password}` : ""}`}
-                    className={buttonClass("primary", "lg")}
-                  >
-                    Подключиться
-                  </a>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <a
+                      href={`steam://connect/${m.server_address}${m.server_password ? `/${m.server_password}` : ""}`}
+                      className={buttonClass("primary", "lg")}
+                    >
+                      Подключиться
+                    </a>
+                    {m.status === "ready" && m.server_ready_at && (
+                      <div className="text-sm">
+                        <div className="text-fg-3">На подключение осталось</div>
+                        <div className="num text-lg font-bold">
+                          <Countdown deadline={new Date(new Date(m.server_ready_at).getTime() + 15 * 60_000).toISOString()} long />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <p className="text-xs text-fg-3">
                     В разминке напишите <span className="num text-fg-2">.ready</span>. После ножевого раунда —{" "}
                     <span className="num text-fg-2">.stay</span> или <span className="num text-fg-2">.switch</span>.

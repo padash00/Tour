@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { SETTINGS, type SettingKey } from "@/lib/settings";
+import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -51,9 +52,11 @@ export async function editWorkshopMaps(_prev: ActionResult, formData: FormData):
     if (!name) return { error: "Введите название карты" };
     if (!id) return { error: "Нужна ссылка на карту в Workshop (…filedetails/?id=123) или её ID" };
     list = [...list.filter((x) => !x.endsWith(`@${id}`)), `${name}@${id}`];
+    // сразу проверяем на сервере, грузится ли карта в CS2, и узнаём её внутреннее имя
+    await enqueueCommand(null, "prefetch_maps", { workshop_ids: [id] }, admin.id);
   }
   await db().from("app_settings").upsert({ key: "WORKSHOP_MAPS", value: JSON.stringify(list), updated_by: admin.id, updated_at: new Date().toISOString() });
   await audit(admin.id, "settings.workshop_maps", undefined, { count: list.length });
   revalidatePath("/admin/settings");
-  return { success: remove ? "Карта убрана" : "Карта добавлена" };
+  return { success: remove ? "Карта убрана" : "Карта добавлена — сервер проверяет, грузится ли она (до пары минут)" };
 }

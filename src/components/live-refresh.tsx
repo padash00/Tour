@@ -15,16 +15,18 @@ export function LiveRefresh({ intervalMs = 3000 }: { intervalMs?: number }) {
   return null;
 }
 
-export function Countdown({ deadline }: { deadline: string }) {
+export function Countdown({ deadline, long }: { deadline: string; long?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
   const left = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
+  const mm = Math.floor(left / 60);
+  const ss = String(left % 60).padStart(2, "0");
   return (
-    <span className={left <= 10 ? "text-danger" : "text-fg"}>
-      0:{String(left).padStart(2, "0")}
+    <span className={left <= (long ? 120 : 10) ? "text-danger" : "text-fg"}>
+      {mm}:{ss}
     </span>
   );
 }

@@ -175,6 +175,8 @@ export type Match = {
   server_instance: string | null;
   server_state: "assigned" | "loading" | "ready" | "error" | null;
   under_review: boolean;
+  server_assigned_at: string | null;
+  server_ready_at: string | null;
   stage: "group" | "swiss" | "playoff";
   group_label: string | null;
   scheduled_at: string | null;

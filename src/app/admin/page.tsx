@@ -25,6 +25,15 @@ export default async function AdminOverview() {
     .from("disputes")
     .select("id, match:matches(id, number)")
     .eq("status", "open");
+  const { data: waitingRows } = await db()
+    .from("matches")
+    .select("id, number, server_ready_at, server_state")
+    .eq("status", "ready")
+    .not("server_instance", "is", null);
+  const now = serverNow();
+  const waiting = (waitingRows ?? []).filter(
+    (m) => m.server_state === "error" || (m.server_ready_at && now - new Date(m.server_ready_at).getTime() > 10 * 60_000),
+  );
   const disputes = (openDisputes ?? []) as unknown as { id: string; match: { id: string; number: number } }[];
   const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
@@ -56,6 +65,27 @@ export default async function AdminOverview() {
           </Card>
         ))}
       </div>
+
+      {waiting.length > 0 && (
+        <Card className="p-5 border-[#ef7a7a44]">
+          <div className="flex flex-wrap items-center gap-3">
+            <Pill tone="danger" dot>Матчи стоят</Pill>
+            <span className="text-sm text-fg-2">
+              {waiting.map((m, i) => (
+                <span key={m.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
+                    #{m.number}
+                  </Link>{" "}
+                  {m.server_state === "error"
+                    ? "— ошибка сервера"
+                    : `— игроки не подключились ${Math.floor((now - new Date(m.server_ready_at!).getTime()) / 60000)} мин`}
+                </span>
+              ))}
+            </span>
+          </div>
+        </Card>
+      )}
 
       {disputes.length > 0 && (
         <Card className="p-5 border-[#e3b46544]">
@@ -147,4 +177,9 @@ export default async function AdminOverview() {
       </section>
     </div>
   );
+}
+
+/** Время запроса (серверный компонент рендерится один раз на запрос) */
+function serverNow() {
+  return Date.now();
 }

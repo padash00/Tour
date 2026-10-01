@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { editWorkshopMaps, saveSetting } from "@/app/actions/admin-settings";
+import { workshopInfo } from "@/lib/server-control";
 import { getSettingsStatus, getWorkshopMaps } from "@/lib/settings";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { Card, Pill } from "@/components/ui";
@@ -7,7 +8,7 @@ import { Card, Pill } from "@/components/ui";
 export const metadata: Metadata = { title: "Настройки" };
 
 export default async function SettingsPage() {
-  const [settings, workshop] = await Promise.all([getSettingsStatus(), getWorkshopMaps()]);
+  const [settings, workshop, info] = await Promise.all([getSettingsStatus(), getWorkshopMaps(), workshopInfo()]);
   return (
     <div className="space-y-8 max-w-3xl">
       <div>
@@ -37,6 +38,19 @@ export default async function SettingsPage() {
                   >
                     {w.split("@")[1]}
                   </a>
+                  {(() => {
+                    const i = info[w.split("@")[1]];
+                    if (!i) return <span className="text-[11px] text-warn">проверяется…</span>;
+                    return i.ok ? (
+                      <span className="text-[11px] text-ok" title={`загрузилась за ${i.seconds} с`}>
+                        ✓ {i.map}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-danger" title={i.note}>
+                        ✕ не грузится в CS2
+                      </span>
+                    );
+                  })()}
                   <SubmitButton variant="ghost" size="sm" confirm={`Убрать ${w.split("@")[0]} из библиотеки?`}>
                     ✕
                   </SubmitButton>
