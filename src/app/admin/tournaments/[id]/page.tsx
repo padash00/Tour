@@ -16,6 +16,8 @@ import { formatDateTime, registrationStatusLabel, tournamentStatusLabel } from "
 import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
+import { db } from "@/lib/supabase";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { Avatar, Card, EmptyState, FaceitLevel, Pill, Tabs, TeamLogo, cn } from "@/components/ui";
 import { TournamentForm } from "../tournament-form";
@@ -39,6 +41,8 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   const t = await getTournamentById(id);
   if (!t) notFound();
   const regs = await getTournamentRegistrations(t.id);
+  const { data: playersData } = await db().from("players").select("steam_id, nickname").eq("is_banned", false).order("nickname").limit(1000);
+  const players = (playersData ?? []) as PickPlayer[];
 
   const groups: { key: string; title: string; items: RegistrationWithTeam[] }[] = [
     { key: "pending", title: "На рассмотрении", items: regs.filter((r) => r.status === "pending") },
@@ -175,7 +179,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
                 </h2>
                 <div className="space-y-3">
                   {g.items.map((r) => (
-                    <RegistrationCard key={r.id} r={r} tournamentStatus={t.status} />
+                    <RegistrationCard key={r.id} r={r} tournamentStatus={t.status} players={players} />
                   ))}
                 </div>
               </section>
@@ -186,7 +190,15 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   );
 }
 
-function RegistrationCard({ r, tournamentStatus }: { r: RegistrationWithTeam; tournamentStatus: TournamentStatus }) {
+function RegistrationCard({
+  r,
+  tournamentStatus,
+  players,
+}: {
+  r: RegistrationWithTeam;
+  tournamentStatus: TournamentStatus;
+  players: PickPlayer[];
+}) {
   const mains = r.roster.filter((p) => p.role === "main");
   const elo = averageElo(r.roster);
   const tone = r.status === "approved" ? "ok" : r.status === "pending" ? "warn" : r.status === "rejected" ? "danger" : "neutral";
@@ -219,10 +231,15 @@ function RegistrationCard({ r, tournamentStatus }: { r: RegistrationWithTeam; to
           </ActionForm>
         )}
         {r.status !== "rejected" && r.status !== "withdrawn" && (
-          <ActionForm action={decideRegistration} className="flex gap-2">
+          <ActionForm action={decideRegistration} className="flex flex-wrap items-end gap-2 w-full">
             <input type="hidden" name="registrationId" value={r.id} />
             <input type="hidden" name="decision" value="reject" />
-            <input name="note" placeholder="Причина (видна капитану)" className="field h-8 py-0 text-[13px] w-56" />
+            <ChipInput
+              name="note"
+              chips={["Неполный состав", "Нарушение правил", "Нет свободных мест", "Повторная заявка"]}
+              placeholder="Причина (видна капитану)"
+              className="w-full sm:w-[420px]"
+            />
             <SubmitButton size="sm" variant="danger" confirm={`Отклонить заявку ${r.team.name}?`}>
               Отклонить
             </SubmitButton>
@@ -284,7 +301,9 @@ function RegistrationCard({ r, tournamentStatus }: { r: RegistrationWithTeam; to
         {tournamentStatus !== "registration" && (
           <ActionForm action={adminAddRosterPlayer} className="mt-3 flex flex-wrap gap-2">
             <input type="hidden" name="registrationId" value={r.id} />
-            <input name="steamId" placeholder="SteamID64 игрока" className="field h-8 py-0 text-[13px] num w-52" />
+            <div className="w-full sm:w-72">
+              <PlayerPicker name="steamId" players={players} />
+            </div>
             <select name="role" className="field h-8 py-0 text-[13px] w-28">
               <option value="main">Основа</option>
               <option value="sub">Запас</option>

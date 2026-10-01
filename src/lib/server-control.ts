@@ -95,15 +95,24 @@ export async function buildMatchzyConfig(matchId: string) {
     team2: { id: m.team2.id, name: m.team2.name, tag: m.team2.tag, players: players(rosters.team2) },
     num_maps: m.best_of,
     maplist: m.maps.map((x) => x.map_name),
-    map_sides: m.maps.map(() => "knife"),
+    // нож — победитель выбирает сторону; без ножа стороны чередуются (team1 начинает за CT на нечётных картах)
+    map_sides: m.maps.map((_, i) => (m.tournament.knife_round ? "knife" : i % 2 === 0 ? "team1_ct" : "team2_ct")),
     skip_veto: true, // вето уже прошло на сайте
     clinch_series: true,
     players_per_team: 5,
     min_players_to_ready: 10,
     min_spectators_to_ready: 0,
     spectators: { players: Object.fromEntries(observers.map((id, i) => [id, `F16 Observer ${i + 1}`])) },
-    // адрес отправки событий агент выставляет через RCON сразу после загрузки:
-    // cvars из конфига MatchZy выполняет без кавычек, и URL с токеном портятся
+    // только числовые cvars: MatchZy выполняет их без кавычек.
+    // Адрес отправки событий агент выставляет отдельно через RCON.
+    cvars: {
+      mp_overtime_enable: m.tournament.overtime ? 1 : 0,
+      mp_overtime_maxrounds: 6,
+      mp_team_timeout_max: m.tournament.timeouts_per_team,
+      mp_team_timeout_time: m.tournament.timeout_seconds,
+      matchzy_max_tech_pauses_allowed: m.tournament.tech_pauses,
+      matchzy_tech_pause_duration: m.tournament.tech_pause_seconds,
+    },
   };
 }
 

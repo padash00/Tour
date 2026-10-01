@@ -33,6 +33,17 @@ const tournamentSchema = z.object({
   max_teams: z.coerce.number().int().min(2).max(64),
   default_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(1),
   final_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(3),
+  overtime: z.string().optional(),
+  knife_round: z.string().optional(),
+  timeouts_per_team: z.coerce.number().int().min(0).max(10).default(3),
+  timeout_seconds: z.coerce.number().int().min(15).max(120).default(30),
+  tech_pauses: z.coerce.number().int().min(0).max(10).default(2),
+  tech_pause_seconds: z.coerce.number().int().min(60).max(900).default(300),
+  stream_url: z.union([z.literal(""), z.string().trim().url("Трансляция — полная ссылка https://…")]).optional().default(""),
+  discord_url: z.union([z.literal(""), z.string().trim().url("Discord — полная ссылка https://…")]).optional().default(""),
+  contact: z.string().trim().max(120).optional().default(""),
+  entry_fee: z.string().trim().max(80).optional().default(""),
+  sponsors: z.string().optional().default("[]"),
   location: z.string().trim().max(120).optional().default(""),
   is_lan: z.string().optional(),
   prize_pool: z.string().trim().max(60).optional().default(""),
@@ -61,6 +72,21 @@ function parsePrizes(text: string): PrizeRow[] {
     });
 }
 
+function parseSponsors(raw: string) {
+  try {
+    const list = JSON.parse(raw) as { name?: string; url?: string }[];
+    return list
+      .filter((x) => x?.name?.trim())
+      .slice(0, 12)
+      .map((x) => {
+        const url = x.url?.trim();
+        return { name: x.name!.trim().slice(0, 60), ...(url && /^https?:\/\//.test(url) ? { url } : {}) };
+      });
+  } catch {
+    return [];
+  }
+}
+
 function tournamentRow(data: z.infer<typeof tournamentSchema>) {
   return {
     name: data.name,
@@ -70,6 +96,17 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     max_teams: data.max_teams,
     default_best_of: data.default_best_of,
     final_best_of: data.final_best_of,
+    overtime: data.overtime === "on",
+    knife_round: data.knife_round === "on",
+    timeouts_per_team: data.timeouts_per_team,
+    timeout_seconds: data.timeout_seconds,
+    tech_pauses: data.tech_pauses,
+    tech_pause_seconds: data.tech_pause_seconds,
+    stream_url: data.stream_url || null,
+    discord_url: data.discord_url || null,
+    contact: data.contact || null,
+    entry_fee: data.entry_fee || null,
+    sponsors: parseSponsors(data.sponsors),
     location: data.location || null,
     is_lan: data.is_lan === "on",
     prize_pool: data.prize_pool || null,

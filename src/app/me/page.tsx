@@ -72,6 +72,16 @@ export default async function MePage() {
         </div>
       </div>
 
+      <NextSteps
+        steps={[
+          { done: true, title: "Войти через Steam", href: null },
+          { done: !!player.faceit_id, title: "FACEIT найден", hint: "Привяжите Steam в FACEIT и нажмите «Обновить Steam и FACEIT»", href: null, optional: true },
+          { done: !!membership, title: "Вступить в команду или создать свою", href: membership ? null : "/team/create" },
+          { done: members.length >= 5, title: "Собрать 5 игроков", hint: "Отправьте игрокам ссылку-приглашение со страницы команды", href: membership ? "/team" : null },
+          { done: activeRegs.length > 0, title: "Подать заявку на турнир", hint: isCaptain ? undefined : "Заявку подаёт капитан", href: "/tournaments" },
+        ]}
+      />
+
       <div className="grid lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
         <div className="space-y-6">
           <section>
@@ -215,5 +225,64 @@ export default async function MePage() {
         </div>
       </div>
     </Container>
+  );
+}
+
+function NextSteps({
+  steps,
+}: {
+  steps: { done: boolean; title: string; hint?: string; href: string | null; optional?: boolean }[];
+}) {
+  const required = steps.filter((s) => !s.optional);
+  if (required.every((s) => s.done)) return null;
+  const current = steps.find((s) => !s.done && !s.optional);
+  const doneCount = required.filter((s) => s.done).length;
+  return (
+    <Card className="p-6 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="label">Что дальше</div>
+          <div className="mt-1 font-semibold">{current?.title}</div>
+          {current?.hint && <div className="mt-0.5 text-sm text-fg-3">{current.hint}</div>}
+        </div>
+        <span className="num text-sm text-fg-3">
+          {doneCount} / {required.length}
+        </span>
+      </div>
+      <div className="mt-4 h-1.5 rounded-full bg-bg-2 overflow-hidden">
+        <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${(100 * doneCount) / required.length}%` }} />
+      </div>
+      <ol className="mt-5 grid sm:grid-cols-5 gap-2">
+        {steps.map((s, i) => {
+          const body = (
+            <div
+              className={cn(
+                "h-full rounded-xl border p-3 text-sm transition",
+                s.done ? "border-[#6cc59a33] bg-ok-dim text-fg-2" : s === current ? "border-[#8bb8ff55] bg-accent-dim text-fg" : "border-line text-fg-3",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className={cn("grid place-items-center size-5 rounded-full text-[11px] num", s.done ? "bg-ok text-[#06101f]" : "border border-line-strong")}>
+                  {s.done ? "✓" : i + 1}
+                </span>
+                {s.optional && <span className="text-[10px] uppercase tracking-wider text-fg-3">необяз.</span>}
+              </div>
+              <div className="mt-2 leading-snug">{s.title}</div>
+            </div>
+          );
+          return (
+            <li key={s.title}>
+              {s.href && !s.done ? (
+                <Link href={s.href} className="block h-full hover:opacity-90">
+                  {body}
+                </Link>
+              ) : (
+                body
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
   );
 }

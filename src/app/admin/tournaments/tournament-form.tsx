@@ -127,6 +127,15 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
     t?.prize_distribution?.length ? t.prize_distribution : [{ place: "1 место", prize: "" }, { place: "2 место", prize: "" }, { place: "3 место", prize: "" }],
   );
   const [cover, setCover] = useState<string | null>(t?.cover_url ?? null);
+  const [overtime, setOvertime] = useState(t?.overtime ?? true);
+  const [knife, setKnife] = useState(t?.knife_round ?? true);
+  const [timeouts, setTimeouts] = useState(t?.timeouts_per_team ?? 3);
+  const [timeoutSec, setTimeoutSec] = useState(t?.timeout_seconds ?? 30);
+  const [techPauses, setTechPauses] = useState(t?.tech_pauses ?? 2);
+  const [techSec, setTechSec] = useState(t?.tech_pause_seconds ?? 300);
+  const [freeEntry, setFreeEntry] = useState(!t?.entry_fee || t.entry_fee === "Бесплатно");
+  const [entryFee, setEntryFee] = useState(t?.entry_fee && t.entry_fee !== "Бесплатно" ? t.entry_fee : "");
+  const [sponsors, setSponsors] = useState<{ name: string; url?: string }[]>(t?.sponsors ?? []);
 
   const effectiveSlug = slugEdited ? slug : slugify(name);
   const mapWarning =
@@ -177,6 +186,14 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       <input type="hidden" name="registration_closes_at" value={regClose} />
       <input type="hidden" name="checkin_opens_at" value={checkinOpen} />
       <input type="hidden" name="checkin_closes_at" value={checkinClose} />
+      {overtime && <input type="hidden" name="overtime" value="on" />}
+      {knife && <input type="hidden" name="knife_round" value="on" />}
+      <input type="hidden" name="timeouts_per_team" value={timeouts} />
+      <input type="hidden" name="timeout_seconds" value={timeoutSec} />
+      <input type="hidden" name="tech_pauses" value={techPauses} />
+      <input type="hidden" name="tech_pause_seconds" value={techSec} />
+      <input type="hidden" name="entry_fee" value={freeEntry ? "Бесплатно" : entryFee} />
+      <input type="hidden" name="sponsors" value={JSON.stringify(sponsors.filter((x) => x.name.trim()))} />
 
       {/* 1 */}
       <Section step={1} title="Название">
@@ -282,7 +299,46 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
       </Section>
 
       {/* 4 */}
-      <Section step={4} title="Где и когда" hint="Время Алматы">
+      <Section step={4} title="Правила игры" hint="Уходят в MatchZy на сервер при загрузке каждого матча">
+        <div className="grid sm:grid-cols-2 gap-5">
+          <div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">Стороны на карте</div>
+            <Segmented
+              value={knife ? "knife" : "fixed"}
+              onChange={(v) => setKnife(v === "knife")}
+              options={[{ value: "knife", label: "Ножевой раунд" }, { value: "fixed", label: "Фиксированные" }]}
+            />
+            <p className="mt-1.5 text-xs text-fg-3">
+              {knife ? "Победитель ножа выбирает .stay / .switch" : "Команда 1 начинает за CT, на следующей карте — наоборот"}
+            </p>
+          </div>
+          <div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">Овертайм</div>
+            <Segmented
+              value={overtime ? "on" : "off"}
+              onChange={(v) => setOvertime(v === "on")}
+              options={[{ value: "on", label: "MR3 при 12:12" }, { value: "off", label: "Без овертайма" }]}
+            />
+          </div>
+          <div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">Тактические паузы на команду</div>
+            <Segmented value={timeouts} onChange={setTimeouts} options={[0, 1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
+            <div className="mt-2">
+              <Segmented value={timeoutSec} onChange={setTimeoutSec} options={[30, 45, 60].map((n) => ({ value: n, label: `${n} с` }))} />
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 text-[13px] font-medium text-fg-2">Технические паузы на команду</div>
+            <Segmented value={techPauses} onChange={setTechPauses} options={[0, 1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
+            <div className="mt-2">
+              <Segmented value={techSec} onChange={setTechSec} options={[180, 300, 600].map((n) => ({ value: n, label: `${n / 60} мин` }))} />
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* 5 */}
+      <Section step={5} title="Где и когда" hint="Время Алматы">
         <div className="flex flex-wrap items-end gap-3">
           <Segmented value={isLan ? "lan" : "online"} onChange={(v) => setIsLan(v === "lan")} options={[{ value: "lan", label: "LAN" }, { value: "online", label: "Онлайн" }]} />
           <input
@@ -322,8 +378,21 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
         </div>
       </Section>
 
-      {/* 5 */}
-      <Section step={5} title="Призы">
+      {/* 6 */}
+      <Section step={6} title="Призы и участие">
+        <div>
+          <div className="mb-2 text-[13px] font-medium text-fg-2">Взнос за участие</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Segmented
+              value={freeEntry ? "free" : "paid"}
+              onChange={(v) => setFreeEntry(v === "free")}
+              options={[{ value: "free", label: "Бесплатно" }, { value: "paid", label: "Платно" }]}
+            />
+            {!freeEntry && (
+              <input value={entryFee} onChange={(e) => setEntryFee(e.target.value)} placeholder="10 000 ₸ с команды" className="field w-64" />
+            )}
+          </div>
+        </div>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Призовой фонд" className="flex-1 min-w-[200px]">
             <input name="prize_pool" value={prizePool} onChange={(e) => setPrizePool(e.target.value)} placeholder="500 000 ₸" className="field text-lg font-semibold" />
@@ -370,8 +439,55 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
         </div>
       </Section>
 
-      {/* 6 */}
-      <Section step={6} title="Оформление и тексты">
+      {/* 7 */}
+      <Section step={7} title="Для зрителей и участников" hint="Показывается на странице турнира">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Трансляция" hint="Twitch или YouTube — встроится в страницу турнира">
+            <input name="stream_url" defaultValue={t?.stream_url ?? ""} placeholder="https://twitch.tv/f16arena" className="field" />
+          </Field>
+          <Field label="Discord" hint="Сервер для участников">
+            <input name="discord_url" defaultValue={t?.discord_url ?? ""} placeholder="https://discord.gg/…" className="field" />
+          </Field>
+          <Field label="Связь с организатором" hint="Telegram, WhatsApp или телефон">
+            <input name="contact" defaultValue={t?.contact ?? ""} placeholder="@f16arena или +7 …" className="field" />
+          </Field>
+        </div>
+        <div>
+          <div className="mb-2 text-[13px] font-medium text-fg-2">Спонсоры и партнёры</div>
+          <div className="space-y-2">
+            {sponsors.map((sp, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  value={sp.name}
+                  onChange={(e) => setSponsors((l) => l.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                  placeholder="Название"
+                  className="field w-48"
+                />
+                <input
+                  value={sp.url ?? ""}
+                  onChange={(e) => setSponsors((l) => l.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                  placeholder="Сайт (необязательно)"
+                  className="field flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSponsors((l) => l.filter((_, j) => j !== i))}
+                  className="size-[42px] shrink-0 rounded-[10px] border border-line text-fg-3 hover:text-danger"
+                  aria-label="Убрать"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setSponsors((l) => [...l, { name: "", url: "" }])} className="text-sm text-accent hover:underline">
+              + Добавить спонсора
+            </button>
+          </div>
+        </div>
+      </Section>
+
+      {/* 8 */}
+      <Section step={8} title="Оформление и тексты">
         <label className="block cursor-pointer">
           <div
             className={cn(
@@ -430,7 +546,8 @@ export function TournamentForm({ action, t }: { action: FormAction; t?: Tourname
           <div className="min-w-0 text-sm">
             <div className="truncate font-semibold">{name || "Новый турнир"}</div>
             <div className="truncate text-xs text-fg-3">
-              {bracket === "double_elimination" ? "Double Elim" : "Single Elim"} · {maxTeams} команд · BO{bo} / финал BO{finalBo} · {maps.length} карт
+              {bracket === "double_elimination" ? "Double Elim" : "Single Elim"} · {maxTeams} команд · BO{bo} / финал BO{finalBo} · {maps.length} карт · {knife ? "нож" : "фикс. стороны"}
+              {overtime ? " · OT" : ""}
             </div>
           </div>
           <SubmitButton size="lg" pendingText="Сохраняем…">

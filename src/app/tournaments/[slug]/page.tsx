@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentPlayer } from "@/lib/auth";
 import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
-import { bracketLabel, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
+import { bracketLabel, formatDate, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
 import { getTournamentMatches } from "@/lib/matches";
 import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
+import { ShareButton, StreamEmbed } from "@/components/stream";
 import { BracketView } from "@/components/bracket-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 import { MapGraphic, TournamentCover, TournamentStatusPill } from "@/components/tournament-bits";
@@ -26,6 +27,7 @@ import {
   Pill,
   Tabs,
   TeamLogo,
+  buttonClass,
 } from "@/components/ui";
 
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]">): Promise<Metadata> {
@@ -156,6 +158,19 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
               </KV>
               <KV label="Старт">{formatDateTime(t.starts_at)}</KV>
             </Card>
+            {(t.entry_fee || t.discord_url || t.contact) && (
+              <Card className="p-6">
+                <div className="label mb-2">Участникам</div>
+                {t.entry_fee && <KV label="Взнос">{t.entry_fee}</KV>}
+                {t.contact && <KV label="Организатор">{t.contact}</KV>}
+                {t.discord_url && (
+                  <a href={t.discord_url} target="_blank" rel="noreferrer" className={buttonClass("secondary", "md", "mt-4 w-full")}>
+                    Discord турнира ↗
+                  </a>
+                )}
+              </Card>
+            )}
+            <ShareButton title={t.name} />
           </aside>
         </div>
       </Container>
@@ -172,9 +187,23 @@ function HeroFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+const MEDALS = ["#e8c27a", "#c3ccd8", "#c98a5a"];
+
 function Overview({ t }: { t: Tournament }) {
   return (
     <div className="space-y-8">
+      {t.stream_url && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold tracking-tight">Трансляция</h2>
+            <a href={t.stream_url} target="_blank" rel="noreferrer" className="text-sm text-fg-3 hover:text-fg">
+              Открыть отдельно ↗
+            </a>
+          </div>
+          <StreamEmbed url={t.stream_url} />
+        </section>
+      )}
+
       {t.description && (
         <section>
           <h2 className="text-xl font-bold tracking-tight mb-4">О турнире</h2>
@@ -196,16 +225,65 @@ function Overview({ t }: { t: Tournament }) {
           <div className="label mb-2">Призовой фонд</div>
           <div className="text-3xl font-bold tracking-tight py-2">{t.prize_pool ?? "Будет объявлен"}</div>
           {t.prize_distribution.length > 0 && (
-            <div className="mt-2">
-              {t.prize_distribution.map((p) => (
-                <KV key={p.place} label={p.place}>
+            <div className="mt-3 space-y-2">
+              {t.prize_distribution.map((p, i) => (
+                <div key={p.place} className="flex items-center gap-3 rounded-lg border border-line bg-bg-2 px-3 py-2.5">
+                  <span
+                    className="grid place-items-center size-7 rounded-full text-[12px] font-bold num"
+                    style={{ background: `${MEDALS[i] ?? "#6b788c"}22`, color: MEDALS[i] ?? "#a7b2c3" }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="text-sm text-fg-2 flex-1">{p.place}</span>
                   <span className="font-semibold">{p.prize}</span>
-                </KV>
+                </div>
               ))}
             </div>
           )}
         </Card>
       </section>
+
+      <section>
+        <h2 className="text-xl font-bold tracking-tight mb-4">Правила игры</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Стороны", value: t.knife_round ? "Ножевой раунд" : "Фиксированные" },
+            { label: "Овертайм", value: t.overtime ? "MR3 при 12:12" : "Нет" },
+            { label: "Тактические паузы", value: `${t.timeouts_per_team} × ${t.timeout_seconds} с` },
+            { label: "Технические паузы", value: `${t.tech_pauses} × ${Math.round(t.tech_pause_seconds / 60)} мин` },
+          ].map((x) => (
+            <Card key={x.label} className="p-4">
+              <div className="label">{x.label}</div>
+              <div className="mt-1.5 text-[15px] font-semibold">{x.value}</div>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {t.sponsors?.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold tracking-tight mb-4">Партнёры</h2>
+          <div className="flex flex-wrap gap-2">
+            {t.sponsors.map((sp) =>
+              sp.url ? (
+                <a
+                  key={sp.name}
+                  href={sp.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-12 px-5 inline-flex items-center rounded-xl border border-line bg-surface font-semibold hover:border-line-strong"
+                >
+                  {sp.name}
+                </a>
+              ) : (
+                <span key={sp.name} className="h-12 px-5 inline-flex items-center rounded-xl border border-line bg-surface font-semibold">
+                  {sp.name}
+                </span>
+              ),
+            )}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="text-xl font-bold tracking-tight mb-4">Маппул</h2>
@@ -390,9 +468,19 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
   if (list.length === 0) {
     return <EmptyState title="Матчей пока нет" description="Расписание матчей появится вместе с сеткой турнира." />;
   }
+  // предстоящие — по дням расписания, без времени — отдельной группой
+  const upcoming = list
+    .filter((m) => ["upcoming", "pending"].includes(m.status))
+    .sort((a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.number - b.number);
+  const byDay = new Map<string, typeof upcoming>();
+  for (const m of upcoming) {
+    const key = m.scheduled_at ? formatDate(m.scheduled_at) : "Время не назначено";
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key)!.push(m);
+  }
   const groups = [
     { title: "Сейчас", items: list.filter((m) => ["veto", "ready", "live"].includes(m.status)) },
-    { title: "Предстоящие", items: list.filter((m) => ["upcoming", "pending"].includes(m.status)) },
+    ...[...byDay].map(([day, items]) => ({ title: day, items })),
     { title: "Сыгранные", items: list.filter((m) => m.status === "finished").reverse() },
   ];
   return (

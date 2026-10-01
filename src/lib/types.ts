@@ -82,6 +82,17 @@ export type Tournament = {
   cover_url: string | null;
   default_best_of: number;
   final_best_of: number;
+  overtime: boolean;
+  knife_round: boolean;
+  timeouts_per_team: number;
+  timeout_seconds: number;
+  tech_pauses: number;
+  tech_pause_seconds: number;
+  stream_url: string | null;
+  discord_url: string | null;
+  contact: string | null;
+  entry_fee: string | null;
+  sponsors: { name: string; url?: string }[];
   created_at: string;
   updated_at: string;
 };

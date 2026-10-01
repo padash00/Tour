@@ -21,6 +21,7 @@ import { formatDateTime, mapName, toLocalInput } from "@/lib/format";
 import { getServerState } from "@/lib/server-control";
 import { applyVetoTimeouts, getMatch } from "@/lib/matches";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { ChipInput, PlayerPicker, Stepper } from "@/components/pickers";
 import { LiveRefresh } from "@/components/live-refresh";
 import { MatchStatusBadge } from "@/components/match-bits";
 import { Card, Field, Notice, cn } from "@/components/ui";
@@ -37,6 +38,20 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
     getMatchRosters(m),
     db().from("disputes").select("*, opener:players!disputes_opened_by_fkey(nickname)").eq("match_id", m.id).order("created_at", { ascending: false }),
   ]);
+  // для замены: все игроки платформы + участники обеих команд, которых нет в турнирном составе
+  const [{ data: playersData }, { data: membersData }] = await Promise.all([
+    db().from("players").select("steam_id, nickname").eq("is_banned", false).order("nickname").limit(1000),
+    db()
+      .from("team_members")
+      .select("team_id, player:players(steam_id, nickname)")
+      .in("team_id", [m.team1_id, m.team2_id].filter(Boolean) as string[])
+      .is("left_at", null),
+  ]);
+  const allPlayers = (playersData ?? []) as { steam_id: string; nickname: string }[];
+  const inRoster = new Set([...rosters.team1, ...rosters.team2].map((r) => r.player.steam_id));
+  const bench = ((membersData ?? []) as unknown as { team_id: string; player: { steam_id: string; nickname: string } }[])
+    .filter((x) => !inRoster.has(x.player.steam_id))
+    .map((x) => ({ ...x.player, hint: x.team_id === m.team1_id ? (m.team1?.tag ?? "") : (m.team2?.tag ?? "") }));
   const disputes = (disputesRes.data ?? []) as (Dispute & { opener: Pick<Player, "nickname"> | null })[];
   const t1 = m.team1?.name ?? "TBD";
   const t2 = m.team2?.name ?? "TBD";
@@ -209,12 +224,8 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                   <input type="hidden" name="matchId" value={m.id} />
                   <input type="hidden" name="mapId" value={map.id} />
                   <div className="flex flex-wrap items-end gap-3">
-                    <Field label={t1}>
-                      <input name="score1" type="number" min={0} max={99} defaultValue={map.team1_score} className="field num w-24" />
-                    </Field>
-                    <Field label={t2}>
-                      <input name="score2" type="number" min={0} max={99} defaultValue={map.team2_score} className="field num w-24" />
-                    </Field>
+                    <Stepper name="score1" label={t1} defaultValue={map.team1_score} />
+                    <Stepper name="score2" label={t2} defaultValue={map.team2_score} />
                     <SubmitButton variant="secondary" name="finish" value="0">
                       Обновить счёт
                     </SubmitButton>
@@ -250,8 +261,8 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     <option value="2">{t2}</option>
                   </select>
                 </Field>
-                <Field label="Причина (неявка, дисквалификация…)">
-                  <input name="reason" className="field" />
+                <Field label="Причина">
+                  <ChipInput name="reason" chips={["Неявка команды", "Дисквалификация", "Отказ от игры", "Техническая проблема"]} />
                 </Field>
                 <SubmitButton variant="danger" confirm="Зафиксировать техническую победу?">
                   Тех. победа
@@ -263,7 +274,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               <input type="hidden" name="matchId" value={m.id} />
               <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
                 <Field label="Причина отмены результата">
-                  <input name="reason" className="field" />
+                  <ChipInput name="reason" chips={["Ошибка в счёте", "Решение по спору", "Сбой сервера"]} />
                 </Field>
                 <SubmitButton variant="danger" confirm="Отменить результат матча? Команды уберутся из следующих матчей.">
                   Отменить результат
@@ -350,12 +361,12 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                   ))}
                 </select>
               </Field>
-              <Field label="SteamID64 нового игрока">
-                <input name="inSteamId" placeholder="7656119…" className="field num" />
+              <Field label="Новый игрок">
+                <PlayerPicker name="inSteamId" players={allPlayers} suggested={bench} />
               </Field>
             </div>
             <Field label="Причина" className="mt-3">
-              <input name="reason" placeholder="Игрок не пришёл / техническая проблема…" className="field" />
+              <ChipInput name="reason" chips={["Игрок не пришёл", "Техническая проблема", "Болезнь / травма"]} />
             </Field>
             <div className="mt-3">
               <SubmitButton variant="secondary" confirm="Заменить игрока в турнирном составе?">Заменить</SubmitButton>
