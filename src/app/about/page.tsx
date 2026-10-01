@@ -25,7 +25,8 @@ export default function AboutPage() {
         title="О платформе"
         description="Соревновательная платформа для CS2 при клубе F16. LAN-турниры для команд, которые хотят играть всерьёз: с регламентом, настоящими серверами и статистикой каждого матча."
       />
-      <div className={`${WRAP} pt-14 max-w-[1100px] lg:ml-0`}>
+      <div className={`${WRAP} pt-14`}>
+      <div className="max-w-[1100px]">
       <p className="text-[17px] lg:text-[19px] text-fg-2 leading-[1.7] max-w-[780px]">
         Платформа только запускается. Мы начинаем с одного турнира и растём вместе с теми, кто в нём играет.
       </p>
@@ -68,6 +69,7 @@ export default function AboutPage() {
           <OutlineBtn href="https://f16-arena.kz">f16-arena.kz ↗</OutlineBtn>
         </div>
       </section>
+      </div>
       </div>
     </>
   );
