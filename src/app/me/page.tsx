@@ -6,7 +6,9 @@ import { getActiveMembership, getTeamMembers, getTeamRegistrations, isActiveRegi
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
+import { getTeamMatches } from "@/lib/matches";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { MatchRow } from "@/components/match-bits";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import {
   Avatar,
@@ -28,11 +30,13 @@ export const metadata: Metadata = { title: "Личный кабинет" };
 export default async function MePage() {
   const player = await requirePlayer("/me");
   const membership = await getActiveMembership(player.id);
-  const [members, regs, notificationsRes] = await Promise.all([
+  const [members, regs, notificationsRes, teamMatches] = await Promise.all([
     membership ? getTeamMembers(membership.team.id) : Promise.resolve([]),
     membership ? getTeamRegistrations(membership.team.id) : Promise.resolve([]),
     db().from("notifications").select("*").eq("player_id", player.id).order("created_at", { ascending: false }).limit(20),
+    membership ? getTeamMatches(membership.team.id) : Promise.resolve([]),
   ]);
+  const upcoming = teamMatches.filter((m) => m.status !== "finished");
   const notifications = (notificationsRes.data ?? []) as Notification[];
   const unread = notifications.filter((n) => !n.read_at).length;
   const activeRegs = regs.filter((r) => isActiveRegistration(r) && !["finished", "cancelled"].includes(r.tournament.status));
@@ -137,7 +141,15 @@ export default async function MePage() {
 
           <section>
             <SectionTitle title="Ближайшие матчи" />
-            <EmptyState compact title="Матчей пока нет" description="Ваши матчи появятся здесь после публикации сетки." />
+            {upcoming.length ? (
+              <div className="grid gap-2">
+                {upcoming.map((m) => (
+                  <MatchRow key={m.id} m={m} stage={m.tournament.name} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState compact title="Матчей пока нет" description="Ваши матчи появятся здесь после публикации сетки." />
+            )}
           </section>
         </div>
 

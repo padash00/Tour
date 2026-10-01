@@ -14,6 +14,7 @@ import {
 import { averageElo, getTournamentById, getTournamentRegistrations, type RegistrationWithTeam } from "@/lib/data";
 import { formatDateTime, registrationStatusLabel, tournamentStatusLabel } from "@/lib/format";
 import type { TournamentStatus } from "@/lib/types";
+import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { Avatar, Card, EmptyState, FaceitLevel, Pill, Tabs, TeamLogo, cn } from "@/components/ui";
@@ -94,6 +95,48 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             </ActionForm>
           ))}
         </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="label mb-4">Сетка</div>
+        {t.bracket_published_at ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-fg-2 flex-1">
+              Сетка опубликована.{" "}
+              <Link href={`/tournaments/${t.slug}?tab=bracket`} className="text-accent hover:underline">
+                Смотреть
+              </Link>{" "}
+              ·{" "}
+              <Link href="/admin/matches" className="text-accent hover:underline">
+                Матчи
+              </Link>
+            </p>
+            <ActionForm action={deleteBracketAction}>
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <SubmitButton size="sm" variant="danger" confirm="Удалить сетку? Можно только пока ни один матч не начат.">
+                Удалить сетку
+              </SubmitButton>
+            </ActionForm>
+          </div>
+        ) : (
+          <ActionForm action={generateBracketAction}>
+            <input type="hidden" name="tournamentId" value={t.id} />
+            <div className="flex flex-wrap items-center gap-4">
+              <select name="seeding" className="field w-auto">
+                <option value="elo">Посев: ручной seed, затем средний FACEIT ELO</option>
+                <option value="random">Посев: случайный</option>
+              </select>
+              <label className="flex items-center gap-2 text-sm text-fg-2">
+                <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-4 accent-[#8bb8ff]" />
+                Только прошедшие check-in ({checkedIn})
+              </label>
+              <SubmitButton confirm="Создать и опубликовать сетку? Посев зафиксируется.">Создать сетку</SubmitButton>
+            </div>
+            <p className="mt-3 text-xs text-fg-3">
+              Одобрено {approved.length}, check-in {checkedIn}. Пустые места заполнятся баями — команды проходят дальше автоматически.
+            </p>
+          </ActionForm>
+        )}
       </Card>
 
       <Tabs

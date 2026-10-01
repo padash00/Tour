@@ -78,6 +78,7 @@ export type Tournament = {
   description: string | null;
   rules: string | null;
   requirements: string | null;
+  bracket_published_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -121,5 +122,60 @@ export type AuditLog = {
   entity_type: string | null;
   entity_id: string | null;
   payload: Record<string, unknown>;
+  created_at: string;
+};
+
+export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
+export type BracketSide = "upper" | "lower" | "grand_final";
+
+export type Match = {
+  id: string;
+  tournament_id: string;
+  number: number;
+  bracket: BracketSide;
+  round: number;
+  position: number;
+  best_of: number;
+  status: MatchStatus;
+  team1_id: string | null;
+  team2_id: string | null;
+  team1_score: number;
+  team2_score: number;
+  winner_id: string | null;
+  is_walkover: boolean;
+  winner_to_match: string | null;
+  winner_to_slot: 1 | 2 | null;
+  loser_to_match: string | null;
+  loser_to_slot: 1 | 2 | null;
+  veto_deadline: string | null;
+  server_address: string | null;
+  server_password: string | null;
+  scheduled_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+};
+
+export type MatchMap = {
+  id: string;
+  match_id: string;
+  map_number: number;
+  map_name: string;
+  picked_by: string | null;
+  team1_score: number;
+  team2_score: number;
+  winner_id: string | null;
+  status: "pending" | "live" | "finished";
+};
+
+export type VetoActionRow = {
+  id: string;
+  match_id: string;
+  step: number;
+  team_id: string | null;
+  action: "ban" | "pick" | "decider";
+  map_name: string;
+  auto: boolean;
+  actor_id: string | null;
   created_at: string;
 };

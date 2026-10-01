@@ -1,4 +1,4 @@
-// Применяет миграции из supabase/migrations через Supabase Management API
+// Применяет новые миграции из supabase/migrations через Supabase Management API
 // и сохраняет ключи проекта в .env.local (файл в .gitignore).
 // Запуск: SUPABASE_ACCESS_TOKEN=sbp_... node scripts/apply-migrations.mjs
 import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
@@ -18,19 +18,29 @@ const query = async (sql) => {
   if (!r.ok) throw new Error(`${r.status} ${text}`);
   return JSON.parse(text);
 };
+const esc = (s) => s.replace(/'/g, "''");
 
-const [{ exists }] = await query(
-  "select exists(select 1 from information_schema.tables where table_schema='public' and table_name='players') as exists",
+const [{ has_migrations, has_players }] = await query(`
+  select exists(select 1 from information_schema.tables where table_schema='public' and table_name='_migrations') as has_migrations,
+         exists(select 1 from information_schema.tables where table_schema='public' and table_name='players') as has_players`);
+
+const applied = new Set(
+  has_migrations ? (await query("select name from _migrations")).map((r) => r.name) : [],
 );
+// первая миграция применялась до появления учёта
+if (!has_migrations && has_players) applied.add("20261001000000_core.sql");
 
-if (exists) {
-  console.log("Таблицы уже есть — миграцию пропускаю");
-} else {
-  for (const file of readdirSync("supabase/migrations").sort()) {
-    await query(readFileSync(`supabase/migrations/${file}`, "utf8"));
-    console.log("✓ применена", file);
-  }
+const files = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+for (const file of files) {
+  if (applied.has(file)) continue;
+  await query(readFileSync(`supabase/migrations/${file}`, "utf8"));
+  console.log("✓ применена", file);
 }
+// записываем всё, что применено
+await query("create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())");
+await query(
+  `insert into _migrations(name) values ${files.map((f) => `('${esc(f)}')`).join(",")} on conflict do nothing`,
+);
 
 const tables = await query("select table_name from information_schema.tables where table_schema='public' order by 1");
 console.log("Таблицы:", tables.map((t) => t.table_name).join(", "));
@@ -53,4 +63,4 @@ const set = (k, v) => {
 set("SUPABASE_URL", `https://${REF}.supabase.co`);
 set("SUPABASE_SERVICE_ROLE_KEY", secret);
 writeFileSync(".env.local", lines.join("\n") + "\n");
-console.log("✓ ключи сохранены в .env.local");
+console.log("✓ ключи в .env.local актуальны");

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
+import { getTeamMatches } from "@/lib/matches";
+import { MatchRow } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { TournamentStatusPill } from "@/components/tournament-bits";
 import { Card, Container, EmptyState, Pill, SectionTitle, Stat, TeamLogo } from "@/components/ui";
@@ -18,7 +20,12 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team) notFound();
 
-  const [members, regs] = await Promise.all([getTeamMembers(team.id), getTeamRegistrations(team.id)]);
+  const [members, regs, matches] = await Promise.all([
+    getTeamMembers(team.id),
+    getTeamRegistrations(team.id),
+    getTeamMatches(team.id),
+  ]);
+  const recent = matches.filter((m) => m.status === "finished").reverse().slice(0, 10);
   const participations = regs.filter((r) => r.status === "approved");
   const captain = members.find((m) => m.role === "captain");
 
@@ -55,7 +62,15 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           </Card>
           <div>
             <SectionTitle title="Последние матчи" />
-            <EmptyState compact title="История матчей появится после первого участия" />
+            {recent.length ? (
+              <div className="grid gap-2">
+                {recent.map((m) => (
+                  <MatchRow key={m.id} m={m} stage={m.tournament.name} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState compact title="История матчей появится после первого участия" />
+            )}
           </div>
         </div>
         <div className="space-y-6">

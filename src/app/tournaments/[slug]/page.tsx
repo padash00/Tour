@@ -5,6 +5,9 @@ import { getCurrentPlayer } from "@/lib/auth";
 import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamentRegistrations } from "@/lib/data";
 import { bracketLabel, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
+import { getTournamentMatches } from "@/lib/matches";
+import { BracketView } from "@/components/bracket-view";
+import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 import { MapGraphic, TournamentStatusPill } from "@/components/tournament-bits";
 import {
   Avatar,
@@ -40,7 +43,11 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
   const t = await getTournamentBySlug(slug);
   if (!t) notFound();
 
-  const [regs, player] = await Promise.all([getTournamentRegistrations(t.id), getCurrentPlayer()]);
+  const [regs, player, matches] = await Promise.all([
+    getTournamentRegistrations(t.id),
+    getCurrentPlayer(),
+    getTournamentMatches(t.id),
+  ]);
   const approved = regs.filter((r) => r.status === "approved");
   const pending = regs.filter((r) => r.status === "pending");
   const membership = player ? await getActiveMembership(player.id) : null;
@@ -86,23 +93,21 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
       </section>
 
       <Container className="pt-10">
-        <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
+        <div className={tab === "bracket" && matches.length ? "space-y-8" : "grid lg:grid-cols-[1fr_360px] gap-8 items-start"}>
           <div className="min-w-0">
             {tab === "overview" && <Overview t={t} />}
             {tab === "teams" && <TeamsTab approved={approved} pendingCount={pending.length} />}
-            {tab === "bracket" && (
-              <EmptyState
-                icon={<IconBracket />}
-                title="Сетка появится после check-in"
-                description={`${bracketLabel[t.bracket_type] ?? t.bracket_type} на ${t.max_teams} команд. Посев будет опубликован после завершения check-in.`}
-              />
-            )}
-            {tab === "matches" && (
-              <EmptyState
-                title="Матчей пока нет"
-                description="Расписание матчей появится вместе с сеткой турнира."
-              />
-            )}
+            {tab === "bracket" &&
+              (matches.length ? (
+                <BracketView matches={matches} />
+              ) : (
+                <EmptyState
+                  icon={<IconBracket />}
+                  title="Сетка появится после check-in"
+                  description={`${bracketLabel[t.bracket_type] ?? t.bracket_type} на ${t.max_teams} команд. Посев будет опубликован после завершения check-in.`}
+                />
+              ))}
+            {tab === "matches" && <MatchesTab matches={matches} />}
             {tab === "rules" && (
               <Card className="p-6 sm:p-8">
                 {t.rules ? (
@@ -120,7 +125,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
             )}
           </div>
 
-          <aside className="space-y-4 lg:sticky lg:top-24">
+          <aside className={tab === "bracket" && matches.length ? "hidden" : "space-y-4 lg:sticky lg:top-24"}>
             <RegistrationBox
               t={t}
               loggedIn={!!player}
@@ -364,5 +369,33 @@ function RegistrationBox({
       <div className="label mb-4">Участие</div>
       {body}
     </Card>
+  );
+}
+
+function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
+  const list = visibleMatches(matches);
+  if (list.length === 0) {
+    return <EmptyState title="Матчей пока нет" description="Расписание матчей появится вместе с сеткой турнира." />;
+  }
+  const groups = [
+    { title: "Сейчас", items: list.filter((m) => ["veto", "ready", "live"].includes(m.status)) },
+    { title: "Предстоящие", items: list.filter((m) => ["upcoming", "pending"].includes(m.status)) },
+    { title: "Сыгранные", items: list.filter((m) => m.status === "finished").reverse() },
+  ];
+  return (
+    <div className="space-y-8">
+      {groups
+        .filter((g) => g.items.length)
+        .map((g) => (
+          <section key={g.title}>
+            <div className="label mb-3">{g.title}</div>
+            <div className="grid gap-2">
+              {g.items.map((m) => (
+                <MatchRow key={m.id} m={m} stage={matchStage(m, matches)} />
+              ))}
+            </div>
+          </section>
+        ))}
+    </div>
   );
 }
