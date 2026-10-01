@@ -134,8 +134,52 @@ async function scenario(bestOf: number, winners: (1 | 2)[], label: string) {
   check(end.status === "finished" && end.team1_score === s1 && end.team2_score === s2, `series_end от MatchZy не ломает итог ${s1}:${s2}`);
 }
 
+/** Гранд-финал Double Elimination: BO5, команда из верхней сетки (слот 1) начинает 1:0 */
+async function grandFinal(winners: (1 | 2)[], label: string, expect: [number, number]) {
+  console.log(`\n${label}`);
+  const k = ++run;
+  const { data: ps } = await db()
+    .from("players")
+    .insert([0, 1].map((i) => ({ steam_id: `765611990000009${k}${i}`, nickname: `ser_${k}_${i}` })))
+    .select("id");
+  const { data: teams } = await db()
+    .from("teams")
+    .insert(ps!.map((p, i) => ({ name: `GF ${k} ${i ? "LB" : "UB"}`, tag: `G${k}${i}`, captain_id: p.id, invite_code: `E2ES-${k}${i}` })))
+    .select("id");
+  const [ub, lb] = teams!;
+  const { data: t } = await db()
+    .from("tournaments")
+    .insert({ slug: `${PREFIX}gf-${winners.join("")}`, name: `E2E ${label}`, status: "draft", map_pool: POOL })
+    .select("id")
+    .single();
+  const { data: m0 } = await db()
+    .from("matches")
+    .insert({ tournament_id: t!.id, number: 1, bracket: "grand_final", round: 1, position: 0, best_of: 5, status: "live", team1_id: ub.id, team2_id: lb.id })
+    .select("id, matchzy_id")
+    .single();
+  await db().from("match_maps").insert(POOL.slice(0, 5).map((map_name, i) => ({ match_id: m0!.id, map_number: i + 1, map_name })));
+  for (let i = 0; i < winners.length; i++) {
+    const w = winners[i];
+    await handleMatchzyEvent({
+      event: "map_result",
+      matchid: m0!.matchzy_id,
+      map_number: i,
+      winner: { team: w === 1 ? "team1" : "team2" },
+      team1: { score: w === 1 ? 13 : 9 },
+      team2: { score: w === 2 ? 13 : 9 },
+    } as never);
+    const cur = (await getMatch(m0!.id))!;
+    console.log(`  карта ${i + 1}: победа ${w === 1 ? "UB" : "LB"} → серия ${cur.team1_score}:${cur.team2_score}, матч ${cur.status}`);
+  }
+  const end = (await getMatch(m0!.id))!;
+  check(end.team1_score === expect[0] && end.team2_score === expect[1], `итог с форой ${expect[0]}:${expect[1]}`);
+  check(end.status === "finished" && end.winner_id === (expect[0] > expect[1] ? ub.id : lb.id), "победитель верный, матч завершён");
+}
+
 await cleanup();
 try {
+  await grandFinal([1, 1], "Гранд-финал: верхняя сетка 2 карты подряд → 3:0 с форой", [3, 0]);
+  await grandFinal([2, 1, 2, 2], "Гранд-финал: нижняя сетка берёт 3 карты → 2:3", [2, 3]);
   await scenario(3, [1, 2, 1], "BO3 — все три карты (2:1)");
   await scenario(3, [2, 2], "BO3 — досрочно (0:2), третья карта не играется");
   await scenario(5, [1, 2, 2, 1, 1], "BO5 — все пять карт (3:2)");

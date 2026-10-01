@@ -3,6 +3,10 @@
  * Чистые функции: генерация структуры и «разрешение» сетки (баи, продвижение по результатам).
  */
 
+/** Гранд-финал Double Elimination: BO5, команда из верхней сетки начинает с +1 картой */
+export const GRAND_FINAL_BEST_OF = 5;
+export const GRAND_FINAL_ADVANTAGE = 1;
+
 export type Side = "upper" | "lower" | "grand_final" | "group" | "swiss";
 export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
 
@@ -99,7 +103,8 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }:
       const count = lowerRoundSize(size, r);
       for (let p = 0; p < count; p++) matches.push(blank("lower", r, p, r >= lbRounds - 1 ? finalBestOf : bestOf));
     }
-    matches.push(blank("grand_final", 1, 0, finalBestOf));
+    // гранд-финал — BO5, команда из верхней сетки (слот 1) начинает со счётом 1:0 (GRAND_FINAL_ADVANTAGE)
+    matches.push(blank("grand_final", 1, 0, GRAND_FINAL_BEST_OF));
   }
 
   const get = (b: Side, r: number, p: number) => matches.find((x) => x.key === matchKey(b, r, p))!;
@@ -229,7 +234,7 @@ export function resolveBracket(matches: BracketMatch[]): Set<string> {
 }
 
 export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number) {
-  if (bracket === "grand_final") return "Гранд-финал";
+  if (bracket === "grand_final") return "Гранд-финал · фора 1:0";
   if (bracket === "group") return `Тур ${round}`;
   if (bracket === "swiss") return `Раунд ${round}`;
   if (bracket === "upper") {

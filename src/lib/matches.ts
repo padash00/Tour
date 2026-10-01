@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { notify } from "./audit";
-import { generateBracket, resolveBracket, type BracketMatch } from "./bracket";
+import { generateBracket, resolveBracket, type BracketMatch, GRAND_FINAL_ADVANTAGE } from "./bracket";
 import {
   FORMATS,
   groupLabel,
@@ -460,7 +460,9 @@ export async function recomputeSeries(matchId: string) {
   const m = await getMatch(matchId);
   if (!m) return;
   const need = Math.floor(m.best_of / 2) + 1;
-  const s1 = m.maps.filter((x) => x.winner_id && x.winner_id === m.team1_id).length;
+  // фора в гранд-финале Double Elimination: команде из верхней сетки (слот 1) +1 карта
+  const advantage = m.bracket === "grand_final" && m.best_of >= 3 ? GRAND_FINAL_ADVANTAGE : 0;
+  const s1 = m.maps.filter((x) => x.winner_id && x.winner_id === m.team1_id).length + advantage;
   const s2 = m.maps.filter((x) => x.winner_id && x.winner_id === m.team2_id).length;
   const winner = s1 >= need ? m.team1_id : s2 >= need ? m.team2_id : null;
 
@@ -472,6 +474,12 @@ export async function recomputeSeries(matchId: string) {
       ...(winner && { status: "finished", winner_id: winner, finished_at: new Date().toISOString() }),
     })
     .eq("id", m.id);
+
+  if (winner && advantage && winner === m.team1_id && m.server_instance) {
+    // серию закрыла фора — MatchZy об этом не знает и запустил бы следующую карту
+    await db().from("agent_commands").insert({ instance: m.server_instance, type: "end_match", payload: {} });
+    await db().from("matches").update({ server_instance: null, server_state: null, server_address: null }).eq("id", m.id);
+  }
 
   if (winner) {
     // несыгранные карты серии больше не нужны

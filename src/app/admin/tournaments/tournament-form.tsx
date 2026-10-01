@@ -424,6 +424,9 @@ export function TournamentForm({
               <div>
                 <Label>Финальная стадия</Label>
                 <Segmented value={finalBo} onChange={setFinalBo} options={[1, 3, 5].map((n) => ({ value: n, label: `BO${n}` }))} />
+                {bracket === "double_elimination" && (
+                  <p className="mt-2 text-[12px] text-fg-3">Гранд-финал Double Elimination всегда BO5: команда из верхней сетки начинает со счётом 1:0.</p>
+                )}
                 <p className="mt-1.5 text-xs text-fg-3">
                   {bracket === "double_elimination" || playoffType === "double_elimination"
                     ? "Финал верхней, два последних раунда нижней и гранд-финал"
