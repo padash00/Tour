@@ -124,7 +124,7 @@ export async function buildMatchzyConfig(matchId: string) {
       mp_team_timeout_max: m.tournament.timeouts_per_team,
       mp_team_timeout_time: m.tournament.timeout_seconds,
       // дуэль: без фризтайма (MatchZy применяет эти cvars через секунду после live.cfg, где стоит 18 с)
-      ...(modeOf(m.tournament.format).size === 1 && { mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 }),
+      ...modeCvars(m.tournament.format),
     },
   };
 }
@@ -239,11 +239,31 @@ export async function takePendingCommands(siteOrigin: string) {
           log_url: `${siteOrigin}/api/cs2/log?m=${c.payload.matchzy_id}&t=${process.env.MATCHZY_TOKEN}`,
           // настройки плагина MatchZy (int-convar'ы) не принимаются из cvars конфига матча — ставим RCON-ом
           post_cmds: await matchzyPostCommands(String(c.payload.match_id)),
+          enforce: await matchEnforce(String(c.payload.match_id)),
         },
       };
     }
     return c;
   }));
+}
+
+/**
+ * Настройки режима. Workshop-карты (aim_map и т.п.) часто сами ставят mp_maxrounds и прочее —
+ * агент проверяет их каждые 5 секунд и возвращает, пока идёт матч.
+ */
+export function modeCvars(format: string): Record<string, number> {
+  if (modeOf(format).size === 1) {
+    return { mp_maxrounds: 24, mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 };
+  }
+  return {};
+}
+
+async function matchEnforce(matchId: string) {
+  const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format)").eq("id", matchId).single();
+  const row = data as unknown as { matchzy_id: number; tournament: { format: string } } | null;
+  if (!row) return null;
+  const cvars = modeCvars(row.tournament.format);
+  return Object.keys(cvars).length ? { matchid: row.matchzy_id, cvars } : null;
 }
 
 async function matchzyPostCommands(matchId: string) {

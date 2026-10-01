@@ -6,7 +6,7 @@
 // Запуск:  node agent.mjs   (или D:\cs2server\F16-agent.bat)
 
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +34,37 @@ const INSTANCES = readFileSync(instancesCsv, "utf8")
 const START_PS1 = path.join(F16_DIR, "start.ps1");
 const STEAMCMD_DIR = config.steamcmdDir ?? "D:\\SteamCMD";
 let busy = null; // долгая команда обслуживания, которая сейчас выполняется
+
+// настройки режима, которые надо держать на инстансе весь матч: { [instance]: { matchid, cvars } }
+const ENFORCE_FILE = path.join(F16_DIR, "enforce.json");
+let enforce = {};
+try {
+  enforce = JSON.parse(readFileSync(ENFORCE_FILE, "utf8"));
+} catch {}
+const saveEnforce = () => writeFileSync(ENFORCE_FILE, JSON.stringify(enforce));
+
+async function enforceCvars(inst, get5) {
+  const rule = enforce[inst.name];
+  if (!rule) return;
+  const active = get5 && get5.matchid === rule.matchid && ["warmup", "knife", "waiting_for_knife_decision", "going_live", "live"].includes(get5.gamestate);
+  if (!active) {
+    if (!get5 || get5.gamestate === "none" || get5.matchid !== rule.matchid) {
+      delete enforce[inst.name];
+      saveEnforce();
+    }
+    return;
+  }
+  const names = Object.keys(rule.cvars);
+  const out = await rcon(inst.port, secrets.rcon, names.join(";")).catch(() => "");
+  const fix = names.filter((n) => {
+    const m = new RegExp(`${n} = ([\\d.]+)`).exec(out);
+    return m && Number(m[1]) !== Number(rule.cvars[n]);
+  });
+  if (fix.length) {
+    await rcon(inst.port, secrets.rcon, fix.map((n) => `${n} ${rule.cvars[n]}`).join(";")).catch(() => {});
+    log(`enforce ${inst.name}: ${fix.map((n) => `${n}=${rule.cvars[n]}`).join(" ")}`);
+  }
+}
 const INTERVAL_MS = 5000;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
@@ -115,6 +146,7 @@ async function collectInstances() {
       try {
         get5 = status ? JSON.parse(status.slice(status.indexOf("{"))) : null;
       } catch {}
+      await enforceCvars(inst, get5).catch(() => {});
       return {
         name: inst.name,
         running: true,
@@ -187,7 +219,10 @@ async function execute(cmd) {
       return runStartScript(inst.name, false);
     }
     case "load_match": {
-      const { url, header_key, header_value, events_url, log_url, post_cmds = [] } = cmd.payload;
+      const { url, header_key, header_value, events_url, log_url, post_cmds = [], enforce: rule = null } = cmd.payload;
+      if (rule) enforce[inst.name] = rule;
+      else delete enforce[inst.name];
+      saveEnforce();
       // на случай, если на сервере остался старый матч
       await rcon(inst.port, secrets.rcon, "get5_endmatch").catch(() => {});
       const out = await rcon(inst.port, secrets.rcon, `matchzy_loadmatch_url ${q(url)} ${q(header_key)} ${q(header_value)}`);
