@@ -34,7 +34,7 @@ export function StreamEmbed({ url }: { url: string }) {
     );
   }
   return (
-    <div className="card overflow-hidden">
+    <div className="overflow-hidden rounded-2xl">
       <div className="relative aspect-video bg-bg-2">
         <iframe src={src} allowFullScreen className="absolute inset-0 h-full w-full" title="Трансляция" />
       </div>
@@ -47,7 +47,7 @@ export function ShareButton({ title }: { title: string }) {
   return (
     <button
       type="button"
-      className={buttonClass("secondary", "md", "w-full")}
+      className={buttonClass("ghost", "sm", "-ml-3")}
       onClick={async () => {
         const url = window.location.href.split("?")[0];
         if (navigator.share) {
@@ -61,7 +61,7 @@ export function ShareButton({ title }: { title: string }) {
         setTimeout(() => setDone(false), 1800);
       }}
     >
-      {done ? "Ссылка скопирована" : "Поделиться турниром"}
+      {done ? "Ссылка скопирована" : "Поделиться ↗"}
     </button>
   );
 }

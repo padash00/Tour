@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { openDispute } from "@/app/actions/dispute";
-import { vetoAct } from "@/app/actions/match";
 import { db } from "@/lib/supabase";
 import type { Dispute } from "@/lib/types";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { formatDateTime, mapName } from "@/lib/format";
 import { applyVetoTimeouts, getMatch, getMatchRosters, getTournamentMatches } from "@/lib/matches";
-import type { Team } from "@/lib/types";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
 import { PlayerStatsTable } from "@/components/stats-table";
-import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
-import { Countdown, LiveRefresh } from "@/components/live-refresh";
-import { MatchStatusBadge, matchStage } from "@/components/match-bits";
+import { ActionForm, SubmitButton } from "@/components/forms";
+import { LiveRefresh } from "@/components/live-refresh";
+import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
-import { ButtonLink, Card, Container, EmptyState, Notice, SectionTitle, TeamLogo, buttonClass, cn } from "@/components/ui";
+import { MatchHero } from "@/components/competition/match-hero";
+import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
+import { VetoBoard } from "@/components/competition/veto-board";
+import { ButtonLink, Container, EmptyState, Pill, cn } from "@/components/ui";
 
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
@@ -42,302 +42,153 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const isCaptain = !!myTeam;
   const inRoster = [...rosters.team1, ...rosters.team2].some((r) => r.player.id === player?.id);
   const admin = isAdmin(player);
-  const finished = m.status === "finished";
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
   const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
   const myTurn = m.status === "veto" && isCaptain && turnTeam?.id === myTeam?.id;
   const stage = matchStage(m, all);
+  const serverPhase = ["ready", "live"].includes(m.status);
+  const currentMap = m.maps.find((x) => x.status === "live") ?? m.maps.find((x) => x.status === "pending");
+
+  const seriesMaps = m.maps.length > 0 && (
+    <section>
+      <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-5">{m.status === "finished" ? "Итоги серии" : "Карты серии"}</h2>
+      <div>
+        {m.maps.map((map) => {
+          const w1 = map.status === "finished" && map.team1_score > map.team2_score;
+          const w2 = map.status === "finished" && map.team2_score > map.team1_score;
+          return (
+            <div key={map.id} className="grid grid-cols-[56px_1fr_auto] sm:grid-cols-[72px_1fr_auto_120px] items-center gap-4 h-14 border-b border-white/[0.05] last:border-0">
+              <span className="text-[13px] text-fg-3">Карта {map.map_number}</span>
+              <span className="font-semibold text-[16px]">{mapName(map.map_name)}</span>
+              <span className="hidden sm:block text-[13px] text-fg-3">
+                {map.picked_by ? `пик ${map.picked_by === m.team1_id ? m.team1?.tag : m.team2?.tag}` : "decider"}
+              </span>
+              {map.status === "pending" ? (
+                <span className="text-[13px] text-fg-3 text-right">—</span>
+              ) : (
+                <span className="num text-right text-lg font-semibold">
+                  {map.status === "live" && <span className="mr-2 inline-block size-1.5 rounded-full bg-danger animate-pulse align-middle" />}
+                  <span className={cn(w2 && "text-fg-3")}>{map.team1_score}</span>
+                  <span className="text-fg-3 mx-1">:</span>
+                  <span className={cn(w1 && "text-fg-3")}>{map.team2_score}</span>
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+
+  const scoreboard = statRows.length > 0 && (
+    <section className="space-y-10">
+      <h2 className="text-[22px] font-bold tracking-[-0.025em]">Статистика</h2>
+      {[...new Set(statRows.map((r) => r.map_number))]
+        .sort((a, b) => a - b)
+        .map((n) => {
+          const map = m.maps.find((x) => x.map_number === n);
+          const rows = statRows.filter((r) => r.map_number === n);
+          const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
+          return (
+            <div key={n} className="space-y-6">
+              <div className="text-sm text-fg-3">
+                Карта {n}
+                {map ? ` · ${mapName(map.map_name)} · ${map.team1_score}:${map.team2_score}` : ""}
+              </div>
+              {[m.team1, m.team2].map((team, i) => {
+                const teamRows = aggregatePlayers(rows.filter((r) => r.team_id === team?.id))
+                  .map((a) => ({ ...a, player: rosterPlayers.find((p) => p.steam_id === a.steam_id) ?? null }))
+                  .sort((a, b) => b.rating - a.rating);
+                if (!teamRows.length) return null;
+                return (
+                  <div key={i}>
+                    <div className="mb-2 font-semibold">{team?.name}</div>
+                    <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+    </section>
+  );
 
   return (
     <>
       {["upcoming", "veto", "ready", "live"].includes(m.status) && <LiveRefresh intervalMs={m.status === "veto" ? 2000 : 5000} />}
 
-      <section className="relative overflow-hidden border-b border-line/60">
-        <div className="absolute inset-0 atmos" />
-        <Container className="relative pt-10 pb-12">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-fg-3">
-            <Link href={`/tournaments/${m.tournament.slug}?tab=bracket`} className="hover:text-fg-2">
-              ← {m.tournament.name}
-            </Link>
-            <div className="flex items-center gap-3">
-              <span>{stage}</span>
-              <span className="num">#{m.number}</span>
-              <span>BO{m.best_of}</span>
-              <MatchStatusBadge status={m.status} />
-              {m.under_review && (
-                <span className="h-6 px-2.5 inline-flex items-center rounded-full border border-[#e3b46544] bg-warn-dim text-warn text-[11px] font-semibold uppercase tracking-[0.08em]">
-                  На рассмотрении
-                </span>
-              )}
-              {admin && (
-                <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
-                  Управление →
-                </Link>
-              )}
-            </div>
-          </div>
+      <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
 
-          <div className="mt-10 grid grid-cols-[1fr_auto_1fr] items-center gap-4 sm:gap-10">
-            <TeamSide team={m.team1} align="left" winner={finished && m.winner_id === m.team1_id} dim={finished && m.winner_id !== m.team1_id} />
-            <div className="text-center">
-              {finished || m.status === "live" ? (
-                <div className="num text-4xl sm:text-6xl font-bold tracking-tight">
-                  <span className={cn(finished && m.winner_id !== m.team1_id && "text-fg-3")}>{m.team1_score}</span>
-                  <span className="text-fg-3 mx-2 sm:mx-4">:</span>
-                  <span className={cn(finished && m.winner_id !== m.team2_id && "text-fg-3")}>{m.team2_score}</span>
-                </div>
-              ) : (
-                <div className="text-2xl sm:text-3xl font-bold text-fg-3">VS</div>
-              )}
-              {m.is_walkover && finished && <div className="mt-2 text-xs text-fg-3">техническая победа</div>}
-              {m.scheduled_at && !finished && <div className="mt-2 text-xs text-fg-3">{formatDateTime(m.scheduled_at)}</div>}
+      <Container size="competition" className="pt-12 md:pt-16 space-y-16">
+        {/* ── главный блок по состоянию матча */}
+        {m.status === "pending" || m.status === "upcoming" ? (
+          <section className="grid sm:grid-cols-3 gap-8">
+            <div>
+              <div className="label">Начало</div>
+              <div className="mt-1.5 text-lg font-semibold">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Будет объявлено"}</div>
             </div>
-            <TeamSide team={m.team2} align="right" winner={finished && m.winner_id === m.team2_id} dim={finished && m.winner_id !== m.team2_id} />
-          </div>
-        </Container>
-      </section>
-
-      <Container className="pt-10 grid lg:grid-cols-[1.5fr_1fr] gap-6 items-start">
-        <div className="space-y-6">
-          {/* VETO */}
-          {m.status === "pending" || m.status === "upcoming" ? (
-            <EmptyState
-              compact
-              title={m.status === "pending" ? "Ожидаем соперников" : "Вето ещё не началось"}
-              description={
-                m.status === "pending"
-                  ? "Команды определятся по итогам предыдущих матчей."
-                  : "Администратор запустит вето, когда команды будут готовы. Капитанам придёт уведомление."
-              }
+            <div>
+              <div className="label">Формат</div>
+              <div className="mt-1.5 text-lg font-semibold">BO{m.best_of}</div>
+            </div>
+            <div>
+              <div className="label">Вето</div>
+              <div className="mt-1.5 text-lg font-semibold">
+                {m.status === "pending" ? "Ожидаем соперников" : "Ещё не началось"}
+              </div>
+              <div className="mt-1 text-[13px] text-fg-3">
+                {m.status === "pending" ? "Команды определятся по итогам предыдущих матчей." : "Капитанам придёт уведомление."}
+              </div>
+            </div>
+          </section>
+        ) : m.status === "veto" ? (
+          <VetoBoard m={m} state={state} myTurn={myTurn} />
+        ) : serverPhase && (inRoster || admin) ? (
+          m.server_address ? (
+            <ServerReady
+              address={m.server_address}
+              password={m.server_password}
+              readyAt={m.server_ready_at}
+              waiting={m.status === "ready"}
+              map={currentMap?.map_name}
             />
-          ) : m.veto.length > 0 || m.status === "veto" ? (
-            <Card className="p-6">
-              <SectionTitle
-                title="Вето карт"
-                action={
-                  m.status === "veto" && state.current && m.veto_deadline ? (
-                    <div className="text-right">
-                      <div className="text-xs text-fg-3">
-                        {state.current.action === "ban" ? "Бан" : "Пик"} · {turnTeam?.name}
-                      </div>
-                      <div className="num text-xl font-bold">
-                        <Countdown deadline={m.veto_deadline} />
-                      </div>
-                    </div>
-                  ) : null
-                }
-              />
-              {myTurn && (
-                <div className="mb-4">
-                  <Notice tone="warn">
-                    Ваш ход: {state.current?.action === "ban" ? "забаньте" : "выберите"} карту. Если время выйдет — карта
-                    выберется случайно.
-                  </Notice>
-                </div>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {m.tournament.map_pool.map((map) => {
-                  const act = m.veto.find((a) => a.map_name === map);
-                  const by = act?.team_id === m.team1_id ? m.team1 : act?.team_id === m.team2_id ? m.team2 : null;
-                  const available = !act && m.status === "veto";
-                  const tile = (
-                    <div
-                      className={cn(
-                        "relative h-20 rounded-xl border p-3 flex flex-col justify-between text-left transition w-full",
-                        act?.action === "ban" && "border-line bg-bg-2 opacity-50",
-                        act?.action === "pick" && "border-[#8bb8ff55] bg-accent-dim",
-                        act?.action === "decider" && "border-[#6cc59a55] bg-ok-dim",
-                        !act && "border-line bg-surface-2",
-                        available && myTurn && "hover:border-accent cursor-pointer",
-                      )}
-                    >
-                      <span className={cn("font-semibold", act?.action === "ban" && "line-through")}>{mapName(map)}</span>
-                      <span className="text-[11px] text-fg-3">
-                        {act
-                          ? act.action === "decider"
-                            ? "Decider"
-                            : `${act.action === "ban" ? "Бан" : "Пик"} · ${by?.tag ?? "авто"}${act.auto ? " (таймер)" : ""}`
-                          : " "}
-                      </span>
-                    </div>
-                  );
-                  return available && myTurn ? (
-                    <ActionForm key={map} action={vetoAct}>
-                      <input type="hidden" name="matchId" value={m.id} />
-                      <input type="hidden" name="map" value={map} />
-                      <button type="submit" className="w-full">
-                        {tile}
-                      </button>
-                    </ActionForm>
-                  ) : (
-                    <div key={map}>{tile}</div>
-                  );
-                })}
-              </div>
-              <ol className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-3">
-                {state.plan.map((s) => {
-                  const done = m.veto.find((a) => a.step === s.step);
-                  const t = s.team === 1 ? m.team1?.tag : s.team === 2 ? m.team2?.tag : null;
-                  return (
-                    <li key={s.step} className={cn(done ? "text-fg-2" : state.current?.step === s.step ? "text-warn" : "")}>
-                      {s.step}. {t ?? ""} {s.action === "ban" ? "ban" : s.action === "pick" ? "pick" : "decider"}
-                      {done ? ` · ${mapName(done.map_name)}` : ""}
-                    </li>
-                  );
-                })}
-              </ol>
-            </Card>
-          ) : null}
+          ) : (
+            <ServerPreparing loading={m.server_state === "loading"} />
+          )
+        ) : m.status === "ready" ? (
+          <section className="flex items-center gap-3">
+            <Pill tone="accent">Подготовка к матчу</Pill>
+            <span className="text-sm text-fg-3">Игроки подключаются к серверу.</span>
+          </section>
+        ) : null}
 
-          {/* MAPS */}
-          {m.maps.length > 0 && (
-            <Card className="p-6">
-              <SectionTitle title="Карты серии" />
-              <div className="divide-y divide-line">
-                {m.maps.map((map) => (
-                  <div key={map.id} className="flex items-center gap-4 py-3">
-                    <span className="num text-xs text-fg-3 w-12">Map {map.map_number}</span>
-                    <span className="font-semibold flex-1">{mapName(map.map_name)}</span>
-                    <span className="text-xs text-fg-3 hidden sm:block">
-                      {map.picked_by ? `пик ${map.picked_by === m.team1_id ? m.team1?.tag : m.team2?.tag}` : "decider"}
-                    </span>
-                    {map.status === "pending" ? (
-                      <span className="text-xs text-fg-3 w-16 text-right">—</span>
-                    ) : (
-                      <span className="num w-16 text-right font-semibold">
-                        {map.status === "live" && <span className="mr-2 inline-block size-1.5 rounded-full bg-danger animate-pulse" />}
-                        {map.team1_score}:{map.team2_score}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+        {m.status === "live" ? (
+          <>
+            {scoreboard}
+            {seriesMaps}
+          </>
+        ) : (
+          <>
+            {seriesMaps}
+            {scoreboard}
+          </>
+        )}
 
-          {/* SCOREBOARD */}
-          {statRows.length > 0 && (
-            <section className="space-y-6">
-              {[...new Set(statRows.map((r) => r.map_number))]
-                .sort((a, b) => a - b)
-                .map((n) => {
-                  const map = m.maps.find((x) => x.map_number === n);
-                  const rows = statRows.filter((r) => r.map_number === n);
-                  const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
-                  return [m.team1, m.team2].map((team, i) => {
-                    const teamRows = aggregatePlayers(rows.filter((r) => r.team_id === team?.id))
-                      .map((a) => ({ ...a, player: rosterPlayers.find((p) => p.steam_id === a.steam_id) ?? null }))
-                      .sort((a, b) => b.rating - a.rating);
-                    if (!teamRows.length) return null;
-                    return (
-                      <div key={`${n}-${i}`}>
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                          <span className="font-semibold">{team?.name}</span>
-                          <span className="text-fg-3">
-                            Map {n} · {map ? mapName(map.map_name) : ""} {map ? `· ${i === 0 ? map.team1_score : map.team2_score}` : ""}
-                          </span>
-                        </div>
-                        <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} />
-                      </div>
-                    );
-                  });
-                })}
-            </section>
-          )}
+        {m.status !== "veto" && m.veto.length > 0 && (
+          <section>
+            <h2 className="text-[15px] font-semibold mb-3 text-fg-2">Вето</h2>
+            <VetoBoard m={m} state={state} myTurn={false} compact />
+          </section>
+        )}
 
-          {/* DISPUTES */}
-          {(disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status))) && (
-            <Card className={cn("p-6", m.under_review && "border-[#e3b46544]")}>
-              <SectionTitle title="Спор по матчу" />
-              {disputes.length > 0 && (
-                <div className="space-y-3 mb-5">
-                  {disputes.map((d) => (
-                    <div key={d.id} className="rounded-xl border border-line p-4 text-sm">
-                      <div className="flex justify-between gap-2 text-xs text-fg-3">
-                        <span>
-                          {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} ·{" "}
-                          {formatDateTime(d.created_at)}
-                        </span>
-                        <span className={d.status === "open" ? "text-warn" : d.status === "resolved" ? "text-ok" : ""}>
-                          {d.status === "open" ? "рассматривается" : d.status === "resolved" ? "принят" : "отклонён"}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-fg whitespace-pre-line">{d.reason}</p>
-                      {d.decision && <p className="mt-2 text-fg-2">Решение администратора: {d.decision}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
-                <ActionForm action={openDispute}>
-                  <input type="hidden" name="matchId" value={m.id} />
-                  <textarea
-                    name="reason"
-                    rows={3}
-                    placeholder="Что произошло: раунд, время, игроки. Результат не изменится без решения администратора."
-                    className="field resize-y text-sm"
-                  />
-                  <div className="mt-3">
-                    <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
-                      Открыть спор
-                    </SubmitButton>
-                  </div>
-                </ActionForm>
-              )}
-            </Card>
-          )}
-
-          {/* SERVER */}
-          {["ready", "live"].includes(m.status) && (inRoster || admin) && (
-            <Card className="p-6">
-              <SectionTitle title="Подключение" />
-              {m.server_address ? (
-                <div className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <div>
-                      <div className="label mb-2">Сервер</div>
-                      <CopyField value={`connect ${m.server_address}${m.server_password ? `; password ${m.server_password}` : ""}`} />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <a
-                      href={`steam://connect/${m.server_address}${m.server_password ? `/${m.server_password}` : ""}`}
-                      className={buttonClass("primary", "lg")}
-                    >
-                      Подключиться
-                    </a>
-                    {m.status === "ready" && m.server_ready_at && (
-                      <div className="text-sm">
-                        <div className="text-fg-3">На подключение осталось</div>
-                        <div className="num text-lg font-bold">
-                          <Countdown deadline={new Date(new Date(m.server_ready_at).getTime() + 15 * 60_000).toISOString()} long />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-fg-3">
-                    В разминке напишите <span className="num text-fg-2">.ready</span>. После ножевого раунда —{" "}
-                    <span className="num text-fg-2">.stay</span> или <span className="num text-fg-2">.switch</span>.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-fg-3">
-                  {m.server_state === "loading"
-                    ? "Сервер загружает матч и проверяет составы. Адрес появится здесь через несколько секунд."
-                    : "Сервер готовится. Адрес появится здесь — страница обновится сама."}
-                </p>
-              )}
-            </Card>
-          )}
-        </div>
-
-        <div className="space-y-6">
+        {/* ── составы */}
+        <section className="grid md:grid-cols-2 gap-x-16 gap-y-10">
           {[
             { team: m.team1, roster: rosters.team1 },
             { team: m.team2, roster: rosters.team2 },
           ].map(({ team, roster }, i) => (
-            <Card key={i} className="p-6">
-              <div className="label mb-2">{team?.name ?? "TBD"}</div>
+            <div key={i}>
+              <h3 className="text-lg font-semibold tracking-[-0.015em] mb-3">{team?.name ?? "TBD"}</h3>
               {roster.length ? (
                 <RosterList
                   items={roster
@@ -349,35 +200,60 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                     }))}
                 />
               ) : (
-                <p className="text-sm text-fg-3">Состав появится, когда команда определится.</p>
+                <EmptyState compact title="Состав появится" description="Когда команда определится." />
               )}
-            </Card>
+            </div>
           ))}
-          {!player && m.status === "veto" && (
-            <ButtonLink href={`/login?next=/matches/${m.id}`} variant="secondary" className="w-full">
-              Войти — для капитанов
-            </ButtonLink>
-          )}
-        </div>
+        </section>
+
+        {!player && m.status === "veto" && (
+          <ButtonLink href={`/login?next=/matches/${m.id}`} variant="secondary">
+            Войти — для капитанов
+          </ButtonLink>
+        )}
+
+        {/* ── спор */}
+        {(disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status))) && (
+          <section className="max-w-2xl">
+            <h2 className="text-[15px] font-semibold text-fg-2 mb-4">Спор по матчу</h2>
+            {disputes.length > 0 && (
+              <div className="mb-6">
+                {disputes.map((d) => (
+                  <div key={d.id} className="py-4 border-b border-white/[0.05] last:border-0 text-sm">
+                    <div className="flex justify-between gap-2 text-[13px] text-fg-3">
+                      <span>
+                        {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} ·{" "}
+                        {formatDateTime(d.created_at)}
+                      </span>
+                      <Pill tone={d.status === "open" ? "warn" : d.status === "resolved" ? "ok" : "neutral"}>
+                        {d.status === "open" ? "рассматривается" : d.status === "resolved" ? "принят" : "отклонён"}
+                      </Pill>
+                    </div>
+                    <p className="mt-2 text-fg whitespace-pre-line">{d.reason}</p>
+                    {d.decision && <p className="mt-2 text-fg-2">Решение: {d.decision}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
+              <ActionForm action={openDispute}>
+                <input type="hidden" name="matchId" value={m.id} />
+                <textarea
+                  name="reason"
+                  rows={3}
+                  placeholder="Что произошло: раунд, время, игроки. Результат не изменится без решения администратора."
+                  className="field resize-y text-sm"
+                />
+                <div className="mt-3">
+                  <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
+                    Открыть спор
+                  </SubmitButton>
+                </div>
+              </ActionForm>
+            )}
+          </section>
+        )}
       </Container>
     </>
-  );
-}
-
-function TeamSide({ team, align, winner, dim }: { team: Team | null; align: "left" | "right"; winner: boolean; dim: boolean }) {
-  return (
-    <div className={cn("flex items-center gap-4 min-w-0", align === "right" && "flex-row-reverse text-right")}>
-      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={72} /> : <div className="size-[72px] rounded-xl border border-dashed border-line-strong" />}
-      <div className="min-w-0">
-        {team ? (
-          <Link href={`/teams/${team.tag}`} className={cn("block text-xl sm:text-3xl font-bold tracking-tight truncate hover:text-accent", dim && "text-fg-3")}>
-            {team.name}
-          </Link>
-        ) : (
-          <div className="text-xl sm:text-3xl font-bold text-fg-3">TBD</div>
-        )}
-        {winner && <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-accent">Победитель</div>}
-      </div>
-    </div>
   );
 }

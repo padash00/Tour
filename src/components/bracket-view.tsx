@@ -6,18 +6,24 @@ import { MatchStatusBadge } from "./match-bits";
 import { TeamLogo, cn } from "./ui";
 
 // размеры сетки
-const W = 236; // ширина карточки матча
-const H = 74; // высота карточки
+const W = 228; // ширина карточки матча
+const H = 68; // высота карточки
 const GAP_Y = 18; // зазор между матчами первого раунда
 const GAP_X = 64; // расстояние между колонками (место под линии)
-const HEAD = 34; // заголовок колонки
+const HEAD = 30; // заголовок колонки
 
 function Slot({ team, score, winner, loser, showScore }: { team: Team | null; score: number; winner: boolean; loser: boolean; showScore: boolean }) {
   return (
-    <div className={cn("flex items-center gap-2 h-[26px] px-2.5", winner ? "text-fg" : loser ? "text-fg-3" : team ? "text-fg-2" : "text-fg-3")}>
-      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={18} /> : <span className="size-[18px] rounded-md border border-dashed border-line-strong" />}
+    <div
+      className={cn(
+        "relative flex items-center gap-2 h-[26px] px-2.5",
+        winner ? "text-fg" : loser ? "text-fg-3" : team ? "text-fg-2" : "text-fg-3",
+      )}
+    >
+      {winner && <span className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full bg-accent" />}
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size={18} /> : <span className="size-[18px] rounded-[5px] bg-white/[0.04]" />}
       <span className={cn("flex-1 truncate text-[13px]", winner && "font-semibold")}>{team?.name ?? "TBD"}</span>
-      {showScore && <span className={cn("num text-[13px] w-4 text-right", winner ? "text-accent font-semibold" : "text-fg-3")}>{score}</span>}
+      {showScore && <span className={cn("num text-[13px] w-4 text-right", winner ? "text-fg font-semibold" : "text-fg-3")}>{score}</span>}
     </div>
   );
 }
@@ -27,7 +33,7 @@ function Node({ m }: { m: MatchWithTeams }) {
   const bye = m.is_walkover && (!m.team1_id || !m.team2_id);
   if (m.status === "cancelled" || bye) {
     return (
-      <div className="h-full rounded-lg border border-dashed border-line/70 px-3 flex items-center text-[11px] text-fg-3">
+      <div className="h-full rounded-lg bg-white/[0.015] px-3 flex items-center text-[11px] text-fg-3">
         #{m.number} · {bye ? `${(m.team1 ?? m.team2)?.name ?? "—"} проходит дальше` : "пустой матч"}
       </div>
     );
@@ -38,12 +44,12 @@ function Node({ m }: { m: MatchWithTeams }) {
     <Link
       href={`/matches/${m.id}`}
       className={cn(
-        "block h-full rounded-lg border bg-surface transition hover:border-line-strong hover:bg-surface-2",
-        live ? "border-[#ef7a7a66] shadow-[0_0_0_1px_#ef7a7a22]" : "border-line",
+        "block h-full rounded-lg border bg-surface transition-colors hover:bg-surface-2",
+        live ? "border-danger/40" : "border-transparent hover:border-line",
       )}
     >
-      <div className="flex items-center justify-between px-2.5 h-[20px] text-[10px] text-fg-3">
-        <span className="num">#{m.number} · BO{m.best_of}</span>
+      <div className="flex items-center justify-between px-2.5 h-[16px] pt-1 text-[10px] text-fg-3">
+        <span>BO{m.best_of}</span>
         <MatchStatusBadge status={m.status} compact />
       </div>
       <Slot team={m.team1} score={m.team1_score} winner={finished && m.winner_id === m.team1_id} loser={finished && m.winner_id !== m.team1_id} showScore={showScore} />
@@ -112,18 +118,18 @@ function Section({
 
   return (
     <section>
-      <div className="label mb-3">{title}</div>
+      <h3 className="text-[15px] font-semibold tracking-[-0.01em] mb-4">{title}</h3>
       <div className="overflow-x-auto pb-4 -mx-4 px-4">
         <div className="relative" style={{ width, height }}>
           <svg className="absolute inset-0 pointer-events-none" width={width} height={height} aria-hidden>
             {lines.map((l) => (
-              <path key={l.key} d={l.d} fill="none" stroke={l.done ? "#3a4c6a" : "#1c2738"} strokeWidth="1.5" />
+              <path key={l.key} d={l.d} fill="none" stroke={l.done ? "#ffffff38" : "#ffffff14"} strokeWidth="1" />
             ))}
           </svg>
           {rounds.map((r, col) => (
             <div
               key={r}
-              className="absolute text-xs font-medium text-fg-2 whitespace-nowrap"
+              className="absolute text-[12px] text-fg-3 whitespace-nowrap"
               style={{ left: col * (W + GAP_X), top: 0, width: W }}
             >
               {roundTitle(matches.find((m) => m.round === r)?.bracket ?? side, r, totalUpper, totalLower)}
@@ -154,7 +160,7 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const upperWithFinal = gf.length ? [...upper, ...gf.map((m) => ({ ...m, round: totalUpper + 1 }))] : upper;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <Section
         title={lower.length ? "Верхняя сетка" : "Плей-офф"}
         matches={upperWithFinal}

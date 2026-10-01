@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "./ui";
 
 type Item = { href: string; label: string };
@@ -11,20 +11,52 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/** Публичная обёртка не нужна в F16 Control — там своя оболочка */
+export function PublicOnly({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  if (pathname.startsWith("/admin")) return null;
+  return <>{children}</>;
+}
+
+/** Шапка: прозрачная поверх hero на главной, плотная после прокрутки и на остальных страницах */
+export function HeaderShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 24);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  if (pathname.startsWith("/admin")) return null;
+  const overHero = pathname === "/" && !scrolled;
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-40 transition-colors duration-200",
+        overHero ? "bg-transparent border-b border-transparent" : "bg-bg/85 backdrop-blur-xl border-b border-line",
+      )}
+    >
+      {children}
+    </header>
+  );
+}
+
 export function NavLinks({ items }: { items: Item[] }) {
   const pathname = usePathname();
   return (
-    <nav className="hidden md:flex items-center gap-1">
+    <nav className="hidden md:flex items-center gap-7">
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           className={cn(
-            "px-3 h-9 inline-flex items-center rounded-lg text-sm transition-colors",
-            isActive(pathname, item.href) ? "text-fg bg-white/[0.05]" : "text-fg-3 hover:text-fg",
+            "relative h-[68px] inline-flex items-center text-[14px] transition-colors",
+            isActive(pathname, item.href) ? "text-fg" : "text-fg-3 hover:text-fg",
           )}
         >
           {item.label}
+          {isActive(pathname, item.href) && <span className="absolute inset-x-0 bottom-0 h-px bg-fg" />}
         </Link>
       ))}
     </nav>
@@ -40,24 +72,24 @@ export function MobileMenu({ items }: { items: Item[] }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="grid place-items-center size-9 rounded-lg text-fg-2 hover:bg-white/[0.04]"
+        className="grid place-items-center size-10 rounded-lg text-fg-2 hover:bg-white/[0.04]"
         aria-label="Меню"
         aria-expanded={open}
       >
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-          {open ? <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" /> : <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />}
+          {open ? <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" /> : <path d="M4 8h16M4 16h16" strokeLinecap="round" />}
         </svg>
       </button>
       {open && (
-        <div className="absolute inset-x-0 top-16 border-b border-line bg-bg/95 backdrop-blur-xl px-4 py-3">
+        <div className="absolute inset-x-0 top-[68px] border-b border-line bg-bg px-4 py-4">
           {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex h-11 items-center px-3 rounded-lg text-[15px]",
-                isActive(pathname, item.href) ? "text-fg bg-white/[0.05]" : "text-fg-2",
+                "flex h-12 items-center px-2 text-[17px] border-b border-white/[0.05] last:border-0",
+                isActive(pathname, item.href) ? "text-fg" : "text-fg-2",
               )}
             >
               {item.label}

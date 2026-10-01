@@ -1,80 +1,55 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { approvedCounts, listPublicTournaments } from "@/lib/data";
-import { TournamentRow } from "@/components/tournament-bits";
-import { Container, EmptyState, IconTrophy, PageHeader, cn } from "@/components/ui";
+import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
+import { CurrentTournament, TournamentLine } from "@/components/public/bits";
+import { Container, EmptyState, PageHeader } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Турниры" };
 
-const FILTERS = [
-  { key: "all", label: "Все" },
-  { key: "open", label: "Регистрация" },
-  { key: "active", label: "Идут" },
-  { key: "finished", label: "Завершённые" },
-];
-
-export default async function TournamentsPage(props: PageProps<"/tournaments">) {
-  const sp = await props.searchParams;
-  const filter = typeof sp.status === "string" ? sp.status : "all";
-  const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
-
-  const all = await listPublicTournaments();
+export default async function TournamentsPage() {
+  const [all, featured] = await Promise.all([listPublicTournaments(), getFeaturedTournament()]);
   const counts = await approvedCounts(all.map((t) => t.id));
-  const list = all.filter((t) => {
-    if (q && !t.name.toLowerCase().includes(q)) return false;
-    if (filter === "open") return t.status === "registration";
-    if (filter === "active") return ["registration_closed", "checkin", "live"].includes(t.status);
-    if (filter === "finished") return ["finished", "cancelled"].includes(t.status);
-    return true;
-  });
+  const current = featured && !["finished", "cancelled"].includes(featured.status) ? featured : null;
+  const upcoming = all.filter((t) => t.id !== current?.id && !["finished", "cancelled"].includes(t.status));
+  const archive = all.filter((t) => ["finished", "cancelled"].includes(t.status));
 
   return (
     <Container>
-      <PageHeader
-        eyebrow="CS2"
-        title="Турниры"
-        description="Все соревнования F16 Arena — текущие, предстоящие и завершённые."
-      />
+      <PageHeader title="Турниры" />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map((f) => (
-            <Link
-              key={f.key}
-              href={{ pathname: "/tournaments", query: { ...(f.key !== "all" && { status: f.key }), ...(q && { q }) } }}
-              className={cn(
-                "h-8 px-3.5 inline-flex items-center rounded-full border text-[13px] transition",
-                filter === f.key
-                  ? "border-[#8bb8ff55] bg-accent-dim text-accent"
-                  : "border-line text-fg-3 hover:text-fg-2 hover:border-line-strong",
-              )}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </div>
-        <form className="sm:w-72">
-          {filter !== "all" && <input type="hidden" name="status" value={filter} />}
-          <input name="q" defaultValue={q} placeholder="Поиск по названию" className="field h-9 py-0" />
-        </form>
-      </div>
+      <section>
+        <h2 className="text-sm text-fg-3 mb-8">Текущий</h2>
+        {current ? (
+          <CurrentTournament t={current} approved={counts[current.id] ?? 0} />
+        ) : (
+          <EmptyState
+            title="Сейчас турниров нет"
+            description="Следующий турнир F16 Arena будет объявлен здесь."
+          />
+        )}
+      </section>
 
-      {list.length > 0 ? (
-        <div className="grid gap-3">
-          {list.map((t) => (
-            <TournamentRow key={t.id} t={t} approved={counts[t.id] ?? 0} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          icon={<IconTrophy />}
-          title={all.length === 0 ? "Турниров пока нет" : "Ничего не найдено"}
-          description={
-            all.length === 0
-              ? "Первый турнир F16 Arena скоро будет объявлен. Соберите команду заранее."
-              : "Попробуйте изменить фильтр или поисковый запрос."
-          }
-        />
+      <section className="mt-24">
+        <h2 className="text-sm text-fg-3">Предстоящие</h2>
+        {upcoming.length > 0 ? (
+          <div className="mt-2">
+            {upcoming.map((t) => (
+              <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-fg-2">Следующие турниры будут объявлены позже.</p>
+        )}
+      </section>
+
+      {archive.length > 0 && (
+        <section className="mt-24">
+          <h2 className="text-sm text-fg-3">Архив</h2>
+          <div className="mt-2">
+            {archive.map((t) => (
+              <TournamentLine key={t.id} t={t} approved={counts[t.id] ?? 0} />
+            ))}
+          </div>
+        </section>
       )}
     </Container>
   );

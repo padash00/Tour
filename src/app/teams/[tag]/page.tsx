@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import { averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
-import { MatchRow } from "@/components/match-bits";
-import { RosterList } from "@/components/roster-list";
-import { TournamentStatusPill } from "@/components/tournament-bits";
-import { Card, Container, EmptyState, Pill, SectionTitle, Stat, TeamLogo } from "@/components/ui";
+import { getPlayerLeaderboard } from "@/lib/stats";
+import { MatchLine, TStatus } from "@/components/public/bits";
+import { Avatar, BigStat, Container, EmptyState, FaceitLevel, Meta, Pill, TeamLogo } from "@/components/ui";
 
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;
@@ -15,101 +14,141 @@ export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promis
   return { title: team?.name ?? "Команда" };
 }
 
+const roleLabel = { captain: "Капитан", player: "Основа", substitute: "Запасной" } as Record<string, string>;
+
 export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team) notFound();
 
-  const [members, regs, matches] = await Promise.all([
+  const [members, regs, matches, board] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getTeamMatches(team.id),
+    getPlayerLeaderboard(),
   ]);
   const recent = matches.filter((m) => m.status === "finished").reverse().slice(0, 10);
   const participations = regs.filter((r) => r.status === "approved");
+  const visibleRegs = regs.filter((r) => r.status !== "withdrawn");
   const captain = members.find((m) => m.role === "captain");
+  const ratingByPlayer = new Map(board.filter((b) => b.player_id).map((b) => [b.player_id!, b]));
+  const wins = recent.filter((m) => m.winner_id === team.id).length;
+  const ordered = [...members].sort(
+    (a, b) => ["captain", "player", "substitute"].indexOf(a.role) - ["captain", "player", "substitute"].indexOf(b.role),
+  );
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-line/60">
-        <div className="absolute inset-0 atmos" />
-        <Container className="relative py-14 flex flex-col md:flex-row md:items-center gap-8">
-          <TeamLogo src={team.logo_url} tag={team.tag} size={112} />
-          <div className="flex-1">
-            <div className="label">{team.tag}{team.region ? ` · ${team.region}` : ""}</div>
-            <h1 className="mt-2 text-4xl md:text-5xl font-bold tracking-[-0.04em]">{team.name}</h1>
-            {team.description && <p className="mt-4 max-w-xl text-fg-2 leading-relaxed">{team.description}</p>}
-          </div>
-          <div className="grid grid-cols-3 gap-8">
-            <Stat label="Игроков" value={<span className="num">{members.length}</span>} />
-            <Stat label="Avg ELO" value={<span className="num">{averageElo(members) ?? "—"}</span>} />
-            <Stat label="Турниров" value={<span className="num">{participations.length}</span>} />
+      <section className="atmos">
+        <Container className="pt-16 pb-14 md:pt-24 md:pb-16 flex flex-col md:flex-row md:items-end gap-8 md:gap-10">
+          <TeamLogo src={team.logo_url} tag={team.tag} size={128} />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[44px] md:text-[64px] font-bold tracking-[-0.045em] leading-[0.95]">{team.name}</h1>
+            <Meta
+              className="mt-5"
+              items={[
+                team.tag,
+                team.region,
+                captain ? `Капитан — ${captain.player.nickname}` : null,
+                `С ${formatDate(team.created_at)}`,
+              ]}
+            />
+            {team.description && <p className="mt-5 max-w-xl text-fg-2 leading-relaxed">{team.description}</p>}
           </div>
         </Container>
       </section>
 
-      <Container className="pt-10 grid lg:grid-cols-[1.4fr_1fr] gap-6 items-start">
-        <div className="space-y-6">
-          <Card className="p-6">
-            <SectionTitle title="Состав" />
-            <RosterList
-              items={members.map((m) => ({
-                key: m.id,
-                player: m.player,
-                role: m.role === "captain" ? "captain" : m.role === "substitute" ? "sub" : "main",
-              }))}
-            />
-          </Card>
+      <Container className="pt-14">
+        <div className="flex flex-wrap gap-x-16 gap-y-8">
+          <BigStat label="Игроков" value={members.length} />
+          <BigStat label="Средний FACEIT ELO" value={averageElo(members) ?? "—"} />
+          <BigStat label="Турниров" value={participations.length} />
+          {recent.length > 0 && <BigStat label="Побед в последних матчах" value={`${wins}/${recent.length}`} />}
+        </div>
+
+        {/* СОСТАВ */}
+        <section className="mt-20">
+          <h2 className="text-[26px] md:text-[30px] font-bold tracking-[-0.03em]">Состав</h2>
+          <div className="mt-6">
+            <div className="hidden md:grid grid-cols-[1fr_120px_80px_90px_90px] gap-4 px-1 pb-3 text-[12px] text-fg-3 border-b border-line">
+              <span>Игрок</span>
+              <span>Роль</span>
+              <span className="text-center">FACEIT</span>
+              <span className="text-right">ELO</span>
+              <span className="text-right">F16 Rating</span>
+            </div>
+            {ordered.map((m) => {
+              const s = ratingByPlayer.get(m.player.id);
+              return (
+                <div
+                  key={m.id}
+                  className="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_120px_80px_90px_90px] items-center gap-4 px-1 py-4 border-b border-white/[0.06]"
+                >
+                  <Link href={`/players/${m.player.steam_id}`} className="flex items-center gap-4 min-w-0 group">
+                    <Avatar src={m.player.avatar_url} name={m.player.nickname} size={44} />
+                    <div className="min-w-0">
+                      <div className="text-[17px] font-semibold truncate group-hover:text-accent transition-colors">
+                        {m.player.nickname}
+                      </div>
+                      <div className="md:hidden text-[13px] text-fg-3">{roleLabel[m.role] ?? m.role}</div>
+                    </div>
+                  </Link>
+                  <span className="hidden md:block text-sm text-fg-2">
+                    {m.player.is_banned ? <Pill tone="danger">Бан</Pill> : (roleLabel[m.role] ?? m.role)}
+                  </span>
+                  <span className="hidden md:flex justify-center">
+                    <FaceitLevel level={m.player.faceit_level} />
+                  </span>
+                  <span className="hidden md:block num text-sm text-right text-fg-2">{m.player.faceit_elo ?? "—"}</span>
+                  <span className="num text-sm text-right">{s ? s.rating.toFixed(2) : <span className="text-fg-3">—</span>}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* МАТЧИ */}
+        <section className="mt-20">
+          <h2 className="text-[26px] md:text-[30px] font-bold tracking-[-0.03em]">Последние матчи</h2>
+          {recent.length ? (
+            <div className="mt-4">
+              {recent.map((m) => (
+                <MatchLine key={m.id} m={m} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState compact title="Матчей пока нет" description="История появится после первого участия в турнире." />
+          )}
+        </section>
+
+        {/* ТУРНИРЫ */}
+        <section className="mt-20 grid md:grid-cols-2 gap-14">
           <div>
-            <SectionTitle title="Последние матчи" />
-            {recent.length ? (
-              <div className="grid gap-2">
-                {recent.map((m) => (
-                  <MatchRow key={m.id} m={m} stage={m.tournament.name} />
+            <h2 className="text-[22px] font-bold tracking-[-0.025em]">Турниры</h2>
+            {visibleRegs.length === 0 ? (
+              <p className="mt-3 text-fg-3">Команда ещё не участвовала в турнирах.</p>
+            ) : (
+              <div className="mt-3">
+                {visibleRegs.map((r) => (
+                  <div key={r.id} className="flex items-center gap-4 py-3.5 border-b border-white/[0.06]">
+                    <Link href={`/tournaments/${r.tournament.slug}`} className="flex-1 font-medium hover:text-accent truncate">
+                      {r.tournament.name}
+                    </Link>
+                    {r.status === "approved" ? (
+                      <TStatus status={r.tournament.status} />
+                    ) : (
+                      <Pill>{registrationStatusLabel[r.status]}</Pill>
+                    )}
+                  </div>
                 ))}
               </div>
-            ) : (
-              <EmptyState compact title="История матчей появится после первого участия" />
             )}
           </div>
-        </div>
-        <div className="space-y-6">
-          <Card className="p-6">
-            <div className="label mb-4">Информация</div>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-fg-3">Капитан</span><span>{captain?.player.nickname ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-fg-3">Регион</span><span>{team.region ?? "—"}</span></div>
-              <div className="flex justify-between"><span className="text-fg-3">Создана</span><span>{formatDate(team.created_at)}</span></div>
-            </div>
-          </Card>
-          <Card className="p-6">
-            <div className="label mb-4">Турниры</div>
-            {regs.filter((r) => r.status !== "withdrawn").length === 0 ? (
-              <p className="text-sm text-fg-3">Команда ещё не участвовала в турнирах.</p>
-            ) : (
-              <div className="divide-y divide-line">
-                {regs
-                  .filter((r) => r.status !== "withdrawn")
-                  .map((r) => (
-                    <div key={r.id} className="py-3 flex items-center gap-3">
-                      <Link href={`/tournaments/${r.tournament.slug}`} className="flex-1 text-sm font-medium hover:text-accent">
-                        {r.tournament.name}
-                      </Link>
-                      {r.status === "approved" ? (
-                        <TournamentStatusPill status={r.tournament.status} />
-                      ) : (
-                        <Pill>{registrationStatusLabel[r.status]}</Pill>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </Card>
-          <Card className="p-6">
-            <div className="label mb-2">Достижения</div>
-            <p className="text-sm text-fg-3">Пока пусто — первые трофеи впереди.</p>
-          </Card>
-        </div>
+          <div>
+            <h2 className="text-[22px] font-bold tracking-[-0.025em]">Достижения</h2>
+            <p className="mt-3 text-fg-3">Первые трофеи впереди.</p>
+          </div>
+        </section>
       </Container>
     </>
   );

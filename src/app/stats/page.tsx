@@ -4,7 +4,8 @@ import { listPublicTournaments } from "@/lib/data";
 import { mapName } from "@/lib/format";
 import { getMapTable, getPlayerLeaderboard, getTeamTable } from "@/lib/stats";
 import { PlayerStatsTable, RatingExplainer } from "@/components/stats-table";
-import { Container, EmptyState, IconChart, PageHeader, TeamLogo, cn } from "@/components/ui";
+import { SelectNav } from "@/components/public/select-nav";
+import { Container, EmptyState, PageHeader, Tabs, TeamLogo, cn } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Статистика" };
 
@@ -19,57 +20,38 @@ export default async function StatsPage(props: PageProps<"/stats">) {
   const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "players";
   const tournaments = await listPublicTournaments();
   const t = tournaments.find((x) => x.slug === sp.t) ?? null;
-  const q = (extra: Record<string, string>) => {
-    const params = new URLSearchParams({ ...(t && { t: t.slug }), tab, ...extra });
+  const href = (nextTab: string, slug?: string | null) => {
+    const params = new URLSearchParams({ tab: nextTab, ...(slug && { t: slug }) });
     return `/stats?${params}`;
   };
 
   return (
     <Container>
       <PageHeader
-        eyebrow="F16 Rating"
         title="Статистика"
-        description="Показатели собираются прямо с игровых серверов F16: каждое убийство, урон, клатч и раунд."
+        actions={
+          tournaments.length > 0 ? (
+            <SelectNav
+              label="Турнир"
+              value={t?.slug ?? ""}
+              options={[
+                { value: "", label: "Все турниры", href: href(tab) },
+                ...tournaments.map((x) => ({ value: x.slug, label: x.name, href: href(tab, x.slug) })),
+              ]}
+            />
+          ) : undefined
+        }
       />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex gap-2">
-          {TABS.map((x) => (
-            <Link
-              key={x.key}
-              href={q({ tab: x.key })}
-              className={cn(
-                "h-8 px-3.5 inline-flex items-center rounded-full border text-[13px] transition",
-                x.key === tab ? "border-[#8bb8ff55] bg-accent-dim text-accent" : "border-line text-fg-3 hover:text-fg-2 hover:border-line-strong",
-              )}
-            >
-              {x.label}
-            </Link>
-          ))}
-        </div>
-        {tournaments.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-[13px]">
-            <Link href={`/stats?tab=${tab}`} className={cn("px-2 py-1 rounded-md", !t ? "text-fg bg-white/[0.05]" : "text-fg-3 hover:text-fg-2")}>
-              Все турниры
-            </Link>
-            {tournaments.map((x) => (
-              <Link
-                key={x.id}
-                href={`/stats?tab=${tab}&t=${x.slug}`}
-                className={cn("px-2 py-1 rounded-md", t?.id === x.id ? "text-fg bg-white/[0.05]" : "text-fg-3 hover:text-fg-2")}
-              >
-                {x.name}
-              </Link>
-            ))}
-          </div>
-        )}
+      <Tabs items={TABS.map((x) => ({ ...x, href: href(x.key, t?.slug) }))} active={tab} />
+
+      <div className="mt-2">
+        {tab === "players" && <PlayersTab tournamentId={t?.id} />}
+        {tab === "teams" && <TeamsTab tournamentId={t?.id} />}
+        {tab === "maps" && <MapsTab tournamentId={t?.id} />}
       </div>
 
-      {tab === "players" && <PlayersTab tournamentId={t?.id} />}
-      {tab === "teams" && <TeamsTab tournamentId={t?.id} />}
-      {tab === "maps" && <MapsTab tournamentId={t?.id} />}
-
-      <div className="mt-10">
+      <div className="mt-20">
         <RatingExplainer />
       </div>
     </Container>
@@ -77,11 +59,7 @@ export default async function StatsPage(props: PageProps<"/stats">) {
 }
 
 const empty = (
-  <EmptyState
-    icon={<IconChart />}
-    title="Статистика появится после первых матчей"
-    description="Как только начнётся первый турнир, здесь появятся рейтинги игроков, команд и карт."
-  />
+  <EmptyState title="Статистика появится после первого матча" description="Рейтинги игроков, команд и карт считаются с игровых серверов." />
 );
 
 async function PlayersTab({ tournamentId }: { tournamentId?: string }) {
@@ -93,7 +71,7 @@ async function TeamsTab({ tournamentId }: { tournamentId?: string }) {
   const rows = await getTeamTable(tournamentId);
   if (!rows.length) return empty;
   return (
-    <div className="card overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className="tbl min-w-[720px]">
         <thead>
           <tr>
@@ -145,7 +123,7 @@ async function MapsTab({ tournamentId }: { tournamentId?: string }) {
   const rows = await getMapTable(tournamentId);
   if (!rows.length) return empty;
   return (
-    <div className="card overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className="tbl min-w-[560px]">
         <thead>
           <tr>

@@ -1,34 +1,40 @@
 @import "tailwindcss";
 
+/*
+ * F16 Arena — дизайн-система.
+ * Холодная сине-чёрная палитра, один сдержанный голубой акцент, оранжевый — только как знак бренда.
+ * Иерархия строится типографикой и отступами, а не рамками и карточками.
+ */
 @theme {
   --color-bg: #070b12;
-  --color-bg-2: #0a1018;
-  --color-surface: #0f1724;
-  --color-surface-2: #121c2a;
-  --color-surface-3: #172334;
-  --color-line: #1c2738;
-  --color-line-strong: #2a3850;
+  --color-bg-2: #09111b;
+  --color-surface: #0c1622;
+  --color-surface-2: #101b28;
+  --color-surface-3: #13202e;
+  --color-line: #ffffff12;
+  --color-line-strong: #ffffff1f;
 
-  --color-fg: #f2f5fa;
-  --color-fg-2: #a7b2c3;
-  --color-fg-3: #6b788c;
+  --color-fg: #f4f7fb;
+  --color-fg-2: #a8b2c2;
+  --color-fg-3: #687588;
 
-  --color-accent: #8bb8ff;
-  --color-accent-strong: #a9cbff;
-  --color-accent-dim: #8bb8ff1f;
+  --color-accent: #8ab8ff;
+  --color-accent-strong: #a6cbff;
+  --color-accent-dim: #8ab8ff14;
   --color-steel: #7fc4d8;
-  --color-warm: #ff8a3d;
-  --color-ok: #6cc59a;
-  --color-ok-dim: #6cc59a1a;
-  --color-warn: #e3b465;
-  --color-warn-dim: #e3b4651a;
-  --color-danger: #ef7a7a;
-  --color-danger-dim: #ef7a7a1a;
+  --color-warm: #ff8a43;
+  --color-ok: #6fc49a;
+  --color-ok-dim: #6fc49a14;
+  --color-warn: #d6aa63;
+  --color-warn-dim: #d6aa6314;
+  --color-danger: #e66f74;
+  --color-danger-dim: #e66f7414;
 
   --font-sans: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
-  --radius-card: 14px;
+  --radius-card: 12px;
+  --radius-section: 16px;
 }
 
 :root {
@@ -43,54 +49,56 @@ body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: #8bb8ff40;
+  background: #8ab8ff40;
 }
 
 @layer components {
-  /* атмосферный фон для hero-зон */
+  /* мягкий холодный свет сверху — только для hero-зон */
   .atmos {
     background:
-      radial-gradient(1200px 520px at 78% -10%, #1b2c4a66, transparent 60%),
-      radial-gradient(800px 400px at 0% 0%, #12203a55, transparent 60%),
-      linear-gradient(180deg, #0a1018 0%, #070b12 100%);
+      radial-gradient(900px 420px at 75% -12%, #14233b59, transparent 65%),
+      linear-gradient(180deg, #09111b 0%, #070b12 100%);
   }
 
+  /* устарело: декоративная сетка убрана из дизайна */
   .grid-lines {
-    background-image:
-      linear-gradient(to right, #ffffff08 1px, transparent 1px),
-      linear-gradient(to bottom, #ffffff08 1px, transparent 1px);
-    background-size: 64px 64px;
-    mask-image: radial-gradient(ellipse at 70% 30%, black 20%, transparent 70%);
+    display: none;
   }
 
+  /* отдельный объект: матч, сервер, форма. Не для всего подряд */
   .card {
-    background: linear-gradient(180deg, var(--color-surface) 0%, #0d1520 100%);
+    background: var(--color-surface);
     border: 1px solid var(--color-line);
     border-radius: var(--radius-card);
-    box-shadow: inset 0 1px 0 #ffffff06;
   }
 
   .card-hover {
     transition:
       border-color 0.2s,
-      transform 0.2s,
-      box-shadow 0.2s;
+      background 0.2s;
   }
   .card-hover:hover {
     border-color: var(--color-line-strong);
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 #ffffff08,
-      0 12px 32px -16px #000;
+    background: var(--color-surface-2);
   }
 
+  /* подпись к значению: спокойная, без капса */
   .label {
-    font-size: 11px;
-    letter-spacing: 0.12em;
+    font-size: 12px;
+    letter-spacing: 0;
+    color: var(--color-fg-3);
+    font-weight: 500;
+  }
+
+  /* редкая надпись капсом — над hero-заголовком */
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--color-fg-3);
     font-weight: 600;
@@ -103,10 +111,11 @@ body {
 
   .field {
     width: 100%;
+    height: 40px;
     background: var(--color-bg-2);
     border: 1px solid var(--color-line);
-    border-radius: 10px;
-    padding: 10px 14px;
+    border-radius: 8px;
+    padding: 0 12px;
     font-size: 14px;
     color: var(--color-fg);
     outline: none;
@@ -114,21 +123,26 @@ body {
       border-color 0.15s,
       box-shadow 0.15s;
   }
+  textarea.field {
+    height: auto;
+    padding: 10px 12px;
+  }
   .field::placeholder {
     color: var(--color-fg-3);
   }
   .field:focus {
-    border-color: #8bb8ff80;
-    box-shadow: 0 0 0 3px #8bb8ff1a;
+    border-color: #8ab8ff99;
+    box-shadow: 0 0 0 3px #8ab8ff14;
   }
 
   .prose-f16 {
     color: var(--color-fg-2);
-    font-size: 15px;
-    line-height: 1.7;
+    font-size: 16px;
+    line-height: 1.75;
     white-space: pre-line;
   }
 
+  /* таблицы: тихие, выровненные, разделители почти не видны */
   .tbl {
     width: 100%;
     border-collapse: collapse;
@@ -136,17 +150,17 @@ body {
   }
   .tbl th {
     text-align: left;
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: 12px;
     color: var(--color-fg-3);
-    font-weight: 600;
-    padding: 12px 16px;
+    font-weight: 500;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--color-line);
+    white-space: nowrap;
   }
   .tbl td {
-    padding: 14px 16px;
-    border-bottom: 1px solid #1c273899;
+    height: 52px;
+    padding: 8px 16px;
+    border-bottom: 1px solid #ffffff0a;
     color: var(--color-fg-2);
   }
   .tbl tr:last-child td {
@@ -156,10 +170,48 @@ body {
     transition: background 0.15s;
   }
   .tbl tbody tr:hover {
+    background: #ffffff05;
+  }
+  /* плотная таблица F16 Control */
+  .tbl-dense td {
+    height: 44px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .tbl-dense th {
+    padding: 8px 12px;
+  }
+
+  /* строка списка без рамки-карточки */
+  .row-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 4px;
+    border-bottom: 1px solid #ffffff0a;
+    transition: background 0.15s;
+  }
+  .row-link:hover {
     background: #ffffff04;
   }
 }
 
+/* скелетон загрузки */
+.skeleton {
+  background: linear-gradient(90deg, #ffffff08 0%, #ffffff10 50%, #ffffff08 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
 @keyframes fade {
   from {
     opacity: 0;
@@ -168,6 +220,6 @@ body {
 @keyframes pop {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(6px) scale(0.99);
   }
 }

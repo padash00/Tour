@@ -39,7 +39,7 @@ export function PlayerStatsTable({
   rank?: boolean;
 }) {
   return (
-    <div className="card overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className={cn("tbl", compact ? "min-w-[640px] text-[13px]" : "min-w-[900px]")}>
         <thead>
           <tr>
@@ -123,17 +123,17 @@ export function PlayerStatsTable({
 
 export function RatingExplainer() {
   return (
-    <details className="card p-6 group">
-      <summary className="list-none cursor-pointer flex items-center justify-between font-semibold">
+    <details className="group border-t border-white/[0.06] pt-6">
+      <summary className="list-none cursor-pointer flex items-center justify-between font-semibold text-fg-2 hover:text-fg">
         Как считаются F16 Rating, Swing и MVP
         <span className="text-fg-3 transition group-open:rotate-45 text-xl leading-none">+</span>
       </summary>
-      <div className="mt-4 space-y-3 text-sm text-fg-2 leading-relaxed">
+      <div className="mt-4 max-w-[760px] space-y-3 text-sm text-fg-2 leading-relaxed">
         <p>
           F16 Rating v1 зафиксирован до начала турниров. Основа — открытая формула в духе HLTV Rating 2.0, вклад
           в раунды расширен входами, клатчами, мультикиллами и трейдами. Средний игрок — около 1.00.
         </p>
-        <pre className="num text-xs bg-bg-2 border border-line rounded-lg p-4 overflow-x-auto text-fg-2">
+        <pre className="num text-xs bg-bg-2 rounded-lg p-4 overflow-x-auto text-fg-2">
 {`Impact = 2.13·KPR + 0.42·APR − 0.41
        + (первые убийства − первые смерти) / раунды
        + 1.5 · выигранные клатчи / раунды

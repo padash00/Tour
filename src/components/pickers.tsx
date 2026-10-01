@@ -22,7 +22,7 @@ export function Stepper({
   return (
     <div>
       {label && <div className="mb-1.5 text-[13px] font-medium text-fg-2 truncate max-w-[180px]">{label}</div>}
-      <div className="inline-flex items-center rounded-xl border border-line bg-bg-2">
+      <div className="inline-flex items-center rounded-lg border border-line bg-bg-2">
         <button type="button" onClick={() => set(v - 1)} className="size-10 grid place-items-center text-lg text-fg-2 hover:text-fg">
           −
         </button>
@@ -64,7 +64,7 @@ export function ChipInput({
             onClick={() => setV(c)}
             className={cn(
               "h-7 px-2.5 rounded-full border text-xs transition",
-              v === c ? "border-[#8bb8ff55] bg-accent-dim text-accent" : "border-line text-fg-3 hover:text-fg-2",
+              v === c ? "border-accent/40 bg-accent-dim text-accent" : "border-line text-fg-3 hover:text-fg-2",
             )}
           >
             {c}
@@ -106,7 +106,7 @@ export function PlayerPicker({
               onClick={() => setText(p.nickname)}
               className={cn(
                 "h-7 px-2.5 rounded-full border text-xs transition",
-                match?.steam_id === p.steam_id ? "border-[#8bb8ff55] bg-accent-dim text-accent" : "border-line text-fg-3 hover:text-fg-2",
+                match?.steam_id === p.steam_id ? "border-accent/40 bg-accent-dim text-accent" : "border-line text-fg-3 hover:text-fg-2",
               )}
             >
               {p.nickname}

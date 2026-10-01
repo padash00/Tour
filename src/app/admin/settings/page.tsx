@@ -1,108 +1,255 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { editWorkshopMaps, saveSetting } from "@/app/actions/admin-settings";
-import { workshopInfo } from "@/lib/server-control";
-import { getSettingsStatus, getWorkshopMaps } from "@/lib/settings";
+import { getServerState, workshopInfo } from "@/lib/server-control";
+import { getAgentBundle } from "@/lib/agent-bundle";
+import { env } from "@/lib/env";
+import { formatShortDateTime } from "@/lib/format";
+import { getSettingsStatus, getWorkshopMaps, type SettingKey } from "@/lib/settings";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { Card, Pill } from "@/components/ui";
+import { AdminHeader, Dot, Panel, SubTabs } from "@/components/admin/control";
 
-export const metadata: Metadata = { title: "Настройки" };
+export const metadata: Metadata = { title: "Настройки — F16 Control" };
 
-export default async function SettingsPage() {
-  const [settings, workshop, info] = await Promise.all([getSettingsStatus(), getWorkshopMaps(), workshopInfo()]);
+const TABS = [
+  { key: "general", label: "Общие" },
+  { key: "steam", label: "Steam" },
+  { key: "faceit", label: "FACEIT" },
+  { key: "workshop", label: "Workshop-карты" },
+  { key: "servers", label: "Серверы и MatchZy" },
+  { key: "broadcast", label: "Трансляция" },
+  { key: "security", label: "Безопасность" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const TAB_SETTING: Partial<Record<TabKey, SettingKey>> = {
+  steam: "STEAM_API_KEY",
+  faceit: "FACEIT_API_KEY",
+  broadcast: "OBSERVER_STEAM_IDS",
+};
+
+type SettingRow = Awaited<ReturnType<typeof getSettingsStatus>>[number];
+
+function SettingForm({ s }: { s: SettingRow }) {
   return (
-    <div className="space-y-8 max-w-3xl">
-      <div>
-        <div className="label">Платформа</div>
-        <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em]">Настройки</h1>
-        <p className="mt-2 text-sm text-fg-3">
-          Ключи хранятся в базе и читаются только сервером сайта. Значения не показываются целиком и не пишутся в журнал.
-        </p>
-      </div>
-      <Card className="p-6">
-        <div className="font-semibold">Карты из Steam Workshop</div>
-        <div className="mt-1 text-xs text-fg-3">
-          Например aim_map для дуэлей. Добавьте один раз — карта появится плиткой в форме любого турнира. Сервер скачивает её сам по ID.
+    <div className="rounded-xl border border-line bg-surface p-5 max-w-2xl">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[14px] font-semibold">{s.label}</div>
+          <div className="mt-0.5 text-[12px] text-fg-3">{s.hint}</div>
         </div>
-        {workshop.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {workshop.map((w) => (
-              <ActionForm key={w} action={editWorkshopMaps}>
-                <input type="hidden" name="remove" value={w} />
-                <span className="h-9 pl-3 pr-1 inline-flex items-center gap-2 rounded-lg border border-line bg-bg-2 text-sm">
-                  {w.split("@")[0]}
-                  <a
-                    href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${w.split("@")[1]}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="num text-[11px] text-fg-3 hover:text-accent"
-                  >
-                    {w.split("@")[1]}
-                  </a>
-                  {(() => {
-                    const i = info[w.split("@")[1]];
-                    if (!i) return <span className="text-[11px] text-warn">проверяется…</span>;
-                    return i.ok ? (
-                      <span className="text-[11px] text-ok" title={`загрузилась за ${i.seconds} с`}>
-                        ✓ {i.map}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-danger" title={i.note}>
-                        ✕ не грузится в CS2
-                      </span>
-                    );
-                  })()}
-                  <SubmitButton variant="ghost" size="sm" confirm={`Убрать ${w.split("@")[0]} из библиотеки?`}>
-                    ✕
-                  </SubmitButton>
-                </span>
-              </ActionForm>
-            ))}
-          </div>
-        )}
-        <ActionForm action={editWorkshopMaps} className="mt-4">
-          <div className="flex flex-wrap gap-2">
-            <input name="name" placeholder="aim_map" className="field w-40" />
-            <input name="link" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" className="field flex-1 min-w-[240px] num" />
-            <SubmitButton variant="secondary">Добавить карту</SubmitButton>
-          </div>
-        </ActionForm>
-      </Card>
+        <span className="flex items-center gap-2 text-[12px]">
+          <Dot tone={s.source ? "ok" : "warn"} />
+          {s.source ? (
+            <span className="text-fg-2">
+              {s.source === "site" ? "задан" : "задан в Vercel"} {s.preview && <span className="num text-fg-3">{s.preview}</span>}
+            </span>
+          ) : (
+            <span className="text-warn">не задан</span>
+          )}
+        </span>
+      </div>
+      <ActionForm action={saveSetting} className="mt-4">
+        <input type="hidden" name="key" value={s.key} />
+        <div className="flex flex-wrap gap-2">
+          <input
+            name="value"
+            type={s.secret ? "password" : "text"}
+            autoComplete="off"
+            placeholder={s.source ? "Новое значение" : "Значение"}
+            className="field num flex-1 min-w-[240px]"
+          />
+          <SubmitButton variant="secondary">Сохранить</SubmitButton>
+          {s.source === "site" && (
+            <SubmitButton variant="ghost" name="clear" value="1" confirm="Удалить значение?">
+              Удалить
+            </SubmitButton>
+          )}
+        </div>
+      </ActionForm>
+    </div>
+  );
+}
 
-      {settings.map((s) => (
-        <Card key={s.key} className="p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="font-semibold">{s.label}</div>
-              <div className="mt-1 text-xs text-fg-3">{s.hint}</div>
-            </div>
-            {s.source ? (
-              <Pill tone="ok" dot>
-                {s.source === "site" ? "задан" : "задан в Vercel"} {s.preview && <span className="num normal-case tracking-normal">{s.preview}</span>}
-              </Pill>
-            ) : (
-              <Pill tone="warn" dot>не задан</Pill>
-            )}
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 px-4 h-11 text-[13px]">
+      <span className="text-fg-3">{label}</span>
+      <span className="text-fg text-right">{children}</span>
+    </div>
+  );
+}
+
+export default async function SettingsPage(props: PageProps<"/admin/settings">) {
+  const sp = await props.searchParams;
+  const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
+  const [settings, workshop, info] = await Promise.all([getSettingsStatus(), getWorkshopMaps(), workshopInfo()]);
+  const byKey = new Map(settings.map((s) => [s.key, s]));
+  const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
+  const settingTab = TAB_SETTING[tab];
+  const unchecked = workshop.filter((w) => !info[w.split("@")[1]]).length;
+  const broken = workshop.filter((w) => info[w.split("@")[1]] && !info[w.split("@")[1]].ok).length;
+
+  return (
+    <div className="space-y-6">
+      <AdminHeader
+        eyebrow="F16 Control"
+        title="Настройки"
+        description="Ключи хранятся в базе и читаются только сервером сайта. Значения не показываются целиком и не пишутся в журнал."
+      />
+      <SubTabs active={tab} items={TABS.map((t) => ({ key: t.key, label: t.label, href: href(t.key) }))} />
+
+      {tab === "general" && (
+        <Panel title="Состояние">
+          <div className="rounded-xl border border-line bg-surface divide-y divide-line max-w-2xl">
+            {settings.map((s) => (
+              <Link
+                key={s.key}
+                href={href(Object.entries(TAB_SETTING).find(([, v]) => v === s.key)?.[0] ?? "general")}
+                className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-white/[0.03]"
+              >
+                <Dot tone={s.source ? "ok" : "warn"} />
+                <span className="flex-1">{s.label}</span>
+                <span className={s.source ? "text-fg-3" : "text-warn"}>{s.source ? (s.source === "site" ? "задан" : "в Vercel") : "не задан"}</span>
+              </Link>
+            ))}
+            <Link href={href("workshop")} className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-white/[0.03]">
+              <Dot tone={broken ? "danger" : unchecked ? "warn" : "ok"} />
+              <span className="flex-1">Workshop-карты</span>
+              <span className="text-fg-3">
+                {workshop.length} в библиотеке{broken ? ` · ${broken} не грузятся` : ""}
+                {unchecked ? ` · ${unchecked} проверяются` : ""}
+              </span>
+            </Link>
           </div>
-          <ActionForm action={saveSetting} className="mt-4">
-            <input type="hidden" name="key" value={s.key} />
+        </Panel>
+      )}
+
+      {settingTab && byKey.get(settingTab) && <SettingForm s={byKey.get(settingTab)!} />}
+
+      {tab === "workshop" && (
+        <div className="space-y-6 max-w-3xl">
+          <p className="text-[13px] text-fg-3">
+            Например aim_map для дуэлей. Добавьте один раз — карта появится в форме любого турнира. Сервер сам скачивает её по ID и
+            проверяет, грузится ли она в CS2.
+          </p>
+          {workshop.length > 0 && (
+            <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              {workshop.map((w) => {
+                const [name, id] = w.split("@");
+                const i = info[id];
+                return (
+                  <ActionForm key={w} action={editWorkshopMaps}>
+                    <input type="hidden" name="remove" value={w} />
+                    <div className="flex items-center gap-3 px-4 h-12 text-[13px]">
+                      <span className="font-medium w-40 truncate">{name}</span>
+                      <a
+                        href={`https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="num text-[12px] text-fg-3 hover:text-accent"
+                      >
+                        {id} ↗
+                      </a>
+                      <span className="flex-1 text-right">
+                        {!i ? (
+                          <span className="text-[12px] text-warn">проверяется…</span>
+                        ) : i.ok ? (
+                          <span className="text-[12px] text-ok" title={`загрузилась за ${i.seconds} с`}>
+                            ✓ {i.map}
+                          </span>
+                        ) : (
+                          <span className="text-[12px] text-danger" title={i.note}>
+                            ✕ не грузится в CS2
+                          </span>
+                        )}
+                      </span>
+                      <SubmitButton variant="ghost" size="sm" confirm={`Убрать ${name} из библиотеки?`}>
+                        ✕
+                      </SubmitButton>
+                    </div>
+                  </ActionForm>
+                );
+              })}
+            </div>
+          )}
+          <ActionForm action={editWorkshopMaps}>
             <div className="flex flex-wrap gap-2">
-              <input
-                name="value"
-                type={s.secret ? "password" : "text"}
-                autoComplete="off"
-                placeholder={s.source ? "Новое значение" : "Значение"}
-                className="field num flex-1 min-w-[240px]"
-              />
-              <SubmitButton variant="secondary">Сохранить</SubmitButton>
-              {s.source === "site" && (
-                <SubmitButton variant="ghost" name="clear" value="1" confirm="Удалить значение?">
-                  Удалить
-                </SubmitButton>
-              )}
+              <input name="name" placeholder="aim_map" className="field w-40" />
+              <input name="link" placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" className="field flex-1 min-w-[240px] num" />
+              <SubmitButton variant="secondary">Добавить карту</SubmitButton>
             </div>
           </ActionForm>
-        </Card>
-      ))}
+        </div>
+      )}
+
+      {tab === "servers" && <ServersInfo />}
+
+      {tab === "broadcast" && (
+        <p className="text-[13px] text-fg-3 max-w-2xl">
+          Observer-аккаунты пускаются на сервер любого матча зрителями — для трансляции с ПК 801–805.
+        </p>
+      )}
+
+      {tab === "security" && (
+        <div className="space-y-6 max-w-2xl">
+          <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+            <InfoRow label="Вход">Только через Steam OpenID</InfoRow>
+            <InfoRow label="Администраторы из Vercel (ADMIN_STEAM_IDS)">
+              <span className="num">{env.adminSteamIds.length}</span>
+            </InfoRow>
+            <InfoRow label="Ключи API">хранятся в базе, только на сервере</InfoRow>
+            <InfoRow label="Агент серверов">токен AGENT_TOKEN, только исходящие запросы</InfoRow>
+          </div>
+          <p className="text-[13px] text-fg-3">
+            Права администратора выдаются на странице{" "}
+            <Link href="/admin/players" className="text-accent hover:underline">
+              Игроки
+            </Link>
+            . Все действия пишутся в{" "}
+            <Link href="/admin/logs" className="text-accent hover:underline">
+              Журнал
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+async function ServersInfo() {
+  const { host, online } = await getServerState();
+  const info = (host?.info ?? {}) as Record<string, string | number>;
+  const versions = ((host?.info as { versions?: Record<string, string> } | undefined)?.versions ?? {}) as Record<string, string>;
+  const bundle = getAgentBundle().version;
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+        <InfoRow label="F16 Server Agent">
+          <span className="flex items-center gap-2">
+            <Dot tone={online ? "ok" : "danger"} />
+            {online ? "на связи" : `не на связи${host?.last_seen_at ? ` с ${formatShortDateTime(host.last_seen_at)}` : ""}`}
+          </span>
+        </InfoRow>
+        <InfoRow label="Версия агента">
+          <span className={`num ${info.agent_version === bundle ? "text-ok" : "text-warn"}`}>{info.agent_version ?? "—"}</span>
+          <span className="num text-fg-3"> / сайт {bundle}</span>
+        </InfoRow>
+        <InfoRow label="LAN IP"><span className="num">{host?.lan_ip ?? "—"}</span></InfoRow>
+        <InfoRow label="CS2 build"><span className="num">{info.cs2_build ?? "—"}</span></InfoRow>
+        <InfoRow label="Metamod"><span className="num">{versions.metamod ?? "—"}</span></InfoRow>
+        <InfoRow label="CounterStrikeSharp"><span className="num">{versions.counterstrikesharp ?? "—"}</span></InfoRow>
+        <InfoRow label="MatchZy"><span className="num">{versions.matchzy ?? "—"}</span></InfoRow>
+      </div>
+      <p className="text-[13px] text-fg-3">
+        Конфиги MatchZy и инстансов берутся из репозитория и доезжают до серверного ПК автоматически. Обновления и перезапуск —{" "}
+        <Link href="/admin/servers" className="text-accent hover:underline">
+          Серверы
+        </Link>
+        .
+      </p>
     </div>
   );
 }

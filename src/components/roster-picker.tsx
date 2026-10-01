@@ -36,7 +36,7 @@ export function RosterPicker({
           </span>
         )}
       </div>
-      <div className="divide-y divide-line">
+      <div>
         {members.map((m) => {
           const s = slots[m.player_id] ?? "out";
           const options: { v: Slot; label: string; disabled: boolean }[] = [
@@ -45,14 +45,14 @@ export function RosterPicker({
             { v: "out", label: "Не играет", disabled: false },
           ];
           return (
-            <div key={m.player_id} className="flex flex-wrap items-center gap-3 py-3">
+            <div key={m.player_id} className="flex flex-wrap items-center gap-3 min-h-14 py-2 border-b border-white/[0.05] last:border-0">
               <Avatar src={m.avatar_url} name={m.nickname} size={34} />
               <span className={cn("flex-1 min-w-[120px] font-medium truncate", s === "out" && "text-fg-3")}>{m.nickname}</span>
               <FaceitLevel level={m.faceit_level} />
               {m.banned ? (
                 <span className="text-xs text-danger">заблокирован</span>
               ) : (
-                <div className="inline-flex rounded-lg border border-line bg-bg-2 p-0.5">
+                <div className="inline-flex rounded-lg bg-white/[0.04] p-0.5">
                   {options.map((o) => (
                     <button
                       key={o.v}
@@ -61,7 +61,7 @@ export function RosterPicker({
                       onClick={() => set(m.player_id, o.v)}
                       className={cn(
                         "h-8 px-3 rounded-md text-xs font-medium transition disabled:opacity-30",
-                        s === o.v ? "bg-surface-3 text-fg shadow-[inset_0_0_0_1px_#2a3850]" : "text-fg-3 hover:text-fg-2",
+                        s === o.v ? "bg-surface-3 text-fg" : "text-fg-3 hover:text-fg-2",
                       )}
                     >
                       {o.label}

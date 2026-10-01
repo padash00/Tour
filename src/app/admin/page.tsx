@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { db } from "@/lib/supabase";
-import { formatShortDateTime, tournamentStatusLabel } from "@/lib/format";
+import { formatDateTime, formatShortDateTime } from "@/lib/format";
 import type { AuditLog, Player, Tournament } from "@/lib/types";
+import type { MatchWithTeams } from "@/lib/matches";
 import { TournamentStatusPill } from "@/components/tournament-bits";
-import { ButtonLink, Card, EmptyState, Pill, SectionTitle } from "@/components/ui";
+import { ButtonLink, EmptyState } from "@/components/ui";
+import { AdminHeader, AlertRow, Dot, Metric, Panel } from "@/components/admin/control";
 import { getServerState } from "@/lib/server-control";
 
-export const metadata: Metadata = { title: "Админ-панель" };
+export const metadata: Metadata = { title: "F16 Control" };
 
 export default async function AdminOverview() {
-  const [players, teams, pendingRes, tournamentsRes, logsRes] = await Promise.all([
+  const [players, teams, pendingRes, tournamentsRes, logsRes, liveRes] = await Promise.all([
     db().from("players").select("id", { count: "exact", head: true }),
     db().from("teams").select("id", { count: "exact", head: true }).is("disbanded_at", null),
     db()
@@ -18,7 +20,12 @@ export default async function AdminOverview() {
       .select("id, tournament:tournaments(id, name)")
       .eq("status", "pending"),
     db().from("tournaments").select("*").not("status", "in", "(finished,cancelled)").order("starts_at"),
-    db().from("audit_logs").select("*, actor:players(nickname)").order("created_at", { ascending: false }).limit(8),
+    db().from("audit_logs").select("*, actor:players(nickname)").order("created_at", { ascending: false }).limit(10),
+    db()
+      .from("matches")
+      .select("*, team1:teams!matches_team1_id_fkey(*), team2:teams!matches_team2_id_fkey(*)")
+      .in("status", ["live", "veto", "ready"])
+      .order("number"),
   ]);
   const servers = await getServerState();
   const { data: openDisputes } = await db()
@@ -38,39 +45,35 @@ export default async function AdminOverview() {
   const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
   const logs = (logsRes.data ?? []) as (AuditLog & { actor: Pick<Player, "nickname"> | null })[];
+  const active = (liveRes.data ?? []) as MatchWithTeams[];
+  const live = active.filter((m) => m.status === "live");
 
-  const stats = [
-    { label: "Игроков", value: players.count ?? 0 },
-    { label: "Команд", value: teams.count ?? 0 },
-    { label: "Активных турниров", value: tournaments.length },
-    { label: "Заявок ждут", value: pending.length, alert: pending.length > 0 },
-    { label: "Открытых споров", value: disputes.length, alert: disputes.length > 0 },
-  ];
+  const current = tournaments.find((t) => t.status === "live") ?? tournaments[0] ?? null;
+  const running = servers.instances.filter((s) => s.running);
+  const busy = running.filter((s) => (s.gamestate ?? "none") !== "none");
+  const disputeMatches = [...new Map(disputes.map((d) => [d.match.id, d.match])).values()];
+  const pendingTournaments = [...new Map(pending.map((p) => [p.tournament.id, p.tournament])).values()];
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <div className="label">F16 Control</div>
-          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em]">Обзор</h1>
-        </div>
-        <ButtonLink href="/admin/tournaments/new">Новый турнир</ButtonLink>
-      </div>
+    <div className="space-y-8">
+      <AdminHeader
+        eyebrow="F16 Control"
+        title="Операции турнира"
+        description={`${players.count ?? 0} игроков · ${teams.count ?? 0} команд`}
+        actions={<ButtonLink href="/admin/tournaments/new" size="sm">Новый турнир</ButtonLink>}
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {stats.map((s) => (
-          <Card key={s.label} className="p-5">
-            <div className="label">{s.label}</div>
-            <div className={`mt-2 text-3xl font-bold num ${s.alert ? "text-warn" : ""}`}>{s.value}</div>
-          </Card>
-        ))}
-      </div>
-
-      {waiting.length > 0 && (
-        <Card className="p-5 border-[#ef7a7a44]">
-          <div className="flex flex-wrap items-center gap-3">
-            <Pill tone="danger" dot>Матчи стоят</Pill>
-            <span className="text-sm text-fg-2">
+      {/* сигналы, требующие действия */}
+      {(waiting.length > 0 || disputeMatches.length > 0 || pendingTournaments.length > 0 || !servers.online) && (
+        <div className="space-y-2">
+          {!servers.online && (
+            <AlertRow tone="danger" title="Агент не на связи">
+              Серверы не управляются.{" "}
+              <Link href="/admin/servers" className="text-accent hover:underline">Серверы →</Link>
+            </AlertRow>
+          )}
+          {waiting.length > 0 && (
+            <AlertRow tone="danger" title="Матчи стоят">
               {waiting.map((m, i) => (
                 <span key={m.id}>
                   {i > 0 && ", "}
@@ -82,18 +85,11 @@ export default async function AdminOverview() {
                     : `— игроки не подключились ${Math.floor((now - new Date(m.server_ready_at!).getTime()) / 60000)} мин`}
                 </span>
               ))}
-            </span>
-          </div>
-        </Card>
-      )}
-
-      {disputes.length > 0 && (
-        <Card className="p-5 border-[#e3b46544]">
-          <div className="flex flex-wrap items-center gap-3">
-            <Pill tone="warn" dot>Споры</Pill>
-            <span className="text-sm text-fg-2">
-              На рассмотрении:{" "}
-              {[...new Map(disputes.map((d) => [d.match.id, d.match])).values()].map((m, i) => (
+            </AlertRow>
+          )}
+          {disputeMatches.length > 0 && (
+            <AlertRow tone="warn" title="Споры">
+              {disputeMatches.map((m, i) => (
                 <span key={m.id}>
                   {i > 0 && ", "}
                   <Link href={`/admin/matches/${m.id}`} className="text-accent hover:underline">
@@ -101,80 +97,158 @@ export default async function AdminOverview() {
                   </Link>
                 </span>
               ))}
-            </span>
-          </div>
-        </Card>
-      )}
-
-      {pending.length > 0 && (
-        <Card className="p-5 border-[#e3b46544]">
-          <div className="flex flex-wrap items-center gap-3">
-            <Pill tone="warn" dot>Требует внимания</Pill>
-            <span className="text-sm text-fg-2">
-              {pending.length} заявок на рассмотрении:{" "}
-              {[...new Map(pending.map((p) => [p.tournament.id, p.tournament])).values()].map((t, i) => (
+            </AlertRow>
+          )}
+          {pendingTournaments.length > 0 && (
+            <AlertRow tone="warn" title={`Заявки ждут: ${pending.length}`}>
+              {pendingTournaments.map((t, i) => (
                 <span key={t.id}>
                   {i > 0 && ", "}
-                  <Link href={`/admin/tournaments/${t.id}`} className="text-accent hover:underline">
+                  <Link href={`/admin/tournaments/${t.id}?tab=registration`} className="text-accent hover:underline">
                     {t.name}
                   </Link>
                 </span>
               ))}
-            </span>
-          </div>
-        </Card>
+            </AlertRow>
+          )}
+        </div>
       )}
 
-      <section>
-        <SectionTitle title="Турниры" action={<Link href="/admin/tournaments" className="text-sm text-fg-3 hover:text-fg">Все →</Link>} />
-        {tournaments.length === 0 ? (
-          <EmptyState compact title="Активных турниров нет" action={<ButtonLink href="/admin/tournaments/new" variant="secondary">Создать турнир</ButtonLink>} />
-        ) : (
-          <div className="card divide-y divide-line">
-            {tournaments.map((t) => (
-              <Link key={t.id} href={`/admin/tournaments/${t.id}`} className="flex items-center gap-4 p-4 hover:bg-white/[0.02]">
-                <span className="flex-1 font-medium">{t.name}</span>
-                <span className="text-xs text-fg-3 hidden sm:block">{tournamentStatusLabel[t.status]}</span>
-                <TournamentStatusPill status={t.status} />
-              </Link>
-            ))}
+      {/* операционная сводка: одна полоса вместо пяти одинаковых карточек */}
+      <div className="rounded-xl border border-line bg-surface">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-line">
+          <div className="p-5 min-w-0">
+            <div className="text-[12px] text-fg-3">Текущий турнир</div>
+            {current ? (
+              <>
+                <Link href={`/admin/tournaments/${current.id}`} className="mt-1 block text-[18px] font-semibold tracking-[-0.02em] truncate hover:text-accent">
+                  {current.name}
+                </Link>
+                <div className="mt-1.5 flex items-center gap-3 text-[12px] text-fg-3">
+                  <TournamentStatusPill status={current.status} />
+                  <span>{formatDateTime(current.starts_at)}</span>
+                </div>
+              </>
+            ) : (
+              <div className="mt-1 text-[14px] text-fg-3">Нет активного турнира</div>
+            )}
           </div>
-        )}
-      </section>
-
-      <section>
-        <SectionTitle title="Серверы" action={<Link href="/admin/servers" className="text-sm text-fg-3 hover:text-fg">Подробнее →</Link>} />
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {servers.instances.map((s) => (
-            <Card key={s.name} className="p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold num text-sm">{s.name}</span>
-                <span className={`size-2 rounded-full ${!servers.online || !s.running ? "bg-fg-3" : (s.gamestate ?? "none") === "none" ? "bg-ok" : "bg-danger"}`} />
-              </div>
-              <div className="mt-3 text-xs text-fg-3 uppercase">
-                {!servers.online ? "agent offline" : !s.running ? (s.role === "reserve" ? "standby" : "offline") : (s.gamestate ?? "none") === "none" ? "free" : s.gamestate}
-              </div>
-            </Card>
-          ))}
+          <div className="p-5">
+            <Metric label="Матчи live" value={live.length} tone={live.length ? "danger" : undefined} hint={`${active.length} в работе`} />
+          </div>
+          <div className="p-5">
+            <Metric
+              label="Серверы"
+              value={servers.online ? `${running.length}/${servers.instances.length}` : "—"}
+              tone={servers.online ? "ok" : "danger"}
+              hint={servers.online ? `${busy.length} заняты` : "агент офлайн"}
+            />
+          </div>
+          <div className="p-5">
+            <Metric label="Заявки" value={pending.length} tone={pending.length ? "warn" : undefined} hint="на рассмотрении" />
+          </div>
+          <div className="p-5">
+            <Metric label="Споры" value={disputes.length} tone={disputes.length ? "warn" : undefined} hint="открыто" />
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section>
-        <SectionTitle title="Последние действия" action={<Link href="/admin/logs" className="text-sm text-fg-3 hover:text-fg">Журнал →</Link>} />
-        {logs.length === 0 ? (
-          <EmptyState compact title="Журнал пуст" />
-        ) : (
-          <div className="card divide-y divide-line">
-            {logs.map((l) => (
-              <div key={l.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
-                <span className="num text-xs text-fg-3 w-32">{formatShortDateTime(l.created_at)}</span>
-                <span className="text-fg-2 w-32 truncate">{l.actor?.nickname ?? "system"}</span>
-                <span className="num text-[13px] text-fg">{l.action}</span>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-8">
+        <div className="space-y-8 min-w-0">
+          <Panel title="Матчи в работе" action={<Link href="/admin/matches" className="text-[12px] text-fg-3 hover:text-fg">Все матчи →</Link>}>
+            {active.length === 0 ? (
+              <EmptyState compact title="Сейчас матчей нет" description="Здесь появятся матчи в вето, ожидании и live." />
+            ) : (
+              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+                {active.map((m) => (
+                  <Link
+                    key={m.id}
+                    href={`/admin/matches/${m.id}`}
+                    className={`flex items-center gap-4 px-4 h-12 text-[13px] hover:bg-white/[0.03] ${m.status === "live" ? "bg-danger/[0.04]" : ""}`}
+                  >
+                    <span className="num text-fg-3 w-8">#{m.number}</span>
+                    <span className="flex-1 min-w-0 truncate font-medium">
+                      {m.team1?.name ?? "TBD"} <span className="text-fg-3">vs</span> {m.team2?.name ?? "TBD"}
+                    </span>
+                    {m.status === "live" && (
+                      <span className="num text-fg">
+                        {m.team1_score}:{m.team2_score}
+                      </span>
+                    )}
+                    <span className="num text-[12px] text-fg-3 w-16 hidden sm:block">{m.server_instance ?? "—"}</span>
+                    <span className="w-16 text-right">
+                      <span className={`text-[12px] ${m.status === "live" ? "text-danger" : m.status === "veto" ? "text-warn" : "text-ok"}`}>
+                        {m.status === "live" ? "LIVE" : m.status === "veto" ? "Вето" : "Готов"}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </Panel>
+
+          <Panel title="Активные турниры" action={<Link href="/admin/tournaments" className="text-[12px] text-fg-3 hover:text-fg">Все турниры →</Link>}>
+            {tournaments.length === 0 ? (
+              <EmptyState
+                compact
+                title="Активных турниров нет"
+                action={<ButtonLink href="/admin/tournaments/new" variant="secondary" size="sm">Создать турнир</ButtonLink>}
+              />
+            ) : (
+              <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+                {tournaments.map((t) => (
+                  <Link key={t.id} href={`/admin/tournaments/${t.id}`} className="flex items-center gap-4 px-4 h-12 text-[13px] hover:bg-white/[0.03]">
+                    <span className="flex-1 min-w-0 truncate font-medium">{t.name}</span>
+                    <span className="text-[12px] text-fg-3 hidden sm:block">{formatShortDateTime(t.starts_at)}</span>
+                    <TournamentStatusPill status={t.status} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div className="space-y-8 min-w-0">
+          <Panel title="Серверы" action={<Link href="/admin/servers" className="text-[12px] text-fg-3 hover:text-fg">Управление →</Link>}>
+            <div className="rounded-xl border border-line bg-surface divide-y divide-line">
+              {servers.instances.map((s) => {
+                const state = !servers.online
+                  ? { t: "агент офлайн", tone: "muted" as const }
+                  : !s.running
+                    ? { t: s.role === "reserve" ? "резерв" : "выключен", tone: "muted" as const }
+                    : (s.gamestate ?? "none") === "none"
+                      ? { t: "свободен", tone: "ok" as const }
+                      : { t: s.gamestate ?? "", tone: "danger" as const };
+                return (
+                  <div key={s.name} className="flex items-center gap-3 px-4 h-11 text-[13px]">
+                    <Dot tone={state.tone} />
+                    <span className="num font-medium w-16">{s.name}</span>
+                    <span className="flex-1 text-fg-3 truncate">{s.map ?? ""}</span>
+                    <span className="num text-[12px] text-fg-3">{s.running && s.players != null ? `${s.players} игр.` : ""}</span>
+                    <span className="text-[12px] text-fg-2 w-24 text-right">{state.t}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+
+          <Panel title="Последние действия" action={<Link href="/admin/logs" className="text-[12px] text-fg-3 hover:text-fg">Журнал →</Link>}>
+            {logs.length === 0 ? (
+              <EmptyState compact title="Журнал пуст" />
+            ) : (
+              <div className="rounded-xl border border-line bg-[#060a10] px-4 py-3 font-mono text-[12px] leading-6">
+                {logs.map((l) => (
+                  <div key={l.id} className="flex gap-3 min-w-0">
+                    <span className="text-fg-3 shrink-0">{formatShortDateTime(l.created_at)}</span>
+                    <span className="text-fg-2 shrink-0 w-24 truncate">{l.actor?.nickname ?? "system"}</span>
+                    <span className="text-fg truncate">{l.action}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      </div>
     </div>
   );
 }

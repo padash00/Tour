@@ -25,18 +25,7 @@ import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
 import { TeamForm } from "@/components/team-form";
 import { TournamentStatusPill } from "@/components/tournament-bits";
-import {
-  ButtonLink,
-  Card,
-  Container,
-  EmptyState,
-  IconUsers,
-  Notice,
-  PageHeader,
-  Pill,
-  SectionTitle,
-  TeamLogo,
-} from "@/components/ui";
+import { ButtonLink, Container, EmptyState, Notice, Pill, TeamLogo } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Моя команда" };
 
@@ -46,14 +35,16 @@ export default async function MyTeamPage() {
 
   if (!membership) {
     return (
-      <Container className="max-w-3xl">
-        <PageHeader eyebrow="Команда" title="У вас пока нет команды" />
-        <EmptyState
-          icon={<IconUsers />}
-          title="Создайте команду или вступите в существующую"
-          description="Чтобы вступить в команду, попросите капитана прислать ссылку-приглашение."
-          action={<ButtonLink href="/team/create">Создать команду</ButtonLink>}
-        />
+      <Container size="narrow">
+        <div className="pt-16 md:pt-24">
+          <h1 className="text-[36px] md:text-[48px] font-bold tracking-[-0.035em] leading-[1.02]">У вас пока нет команды</h1>
+          <p className="mt-4 text-fg-2 max-w-lg">Создайте команду или попросите капитана прислать ссылку-приглашение.</p>
+          <div className="mt-8">
+            <ButtonLink href="/team/create" size="lg">
+              Создать команду
+            </ButtonLink>
+          </div>
+        </div>
       </Container>
     );
   }
@@ -69,50 +60,57 @@ export default async function MyTeamPage() {
   const mains = members.filter((m) => m.role !== "substitute").length;
   const subs = members.length - mains;
   const elo = averageElo(members);
+  const full = mains >= MAX_MAIN;
 
   return (
-    <Container>
-      <div className="flex flex-col gap-6 md:flex-row md:items-center pt-12 pb-10">
-        <TeamLogo src={team.logo_url} tag={team.tag} size={88} />
-        <div className="flex-1">
-          <div className="label">Моя команда · {team.tag}</div>
-          <h1 className="mt-2 text-4xl font-bold tracking-[-0.03em]">{team.name}</h1>
-          <div className="mt-2 text-sm text-fg-3">
-            {team.region ?? "Регион не указан"} · создана {formatDate(team.created_at)}
-          </div>
-        </div>
-        <div className="flex gap-8">
-          <div>
-            <div className="label">Основа</div>
-            <div className="mt-1 text-2xl font-bold num">
-              {mains}<span className="text-fg-3">/{MAX_MAIN}</span>
+    <Container size="competition">
+      {/* ── идентичность команды */}
+      <section className="pt-12 md:pt-16 pb-12 flex flex-col gap-8 md:flex-row md:items-end md:justify-between border-b border-line">
+        <div className="flex items-center gap-6 min-w-0">
+          <TeamLogo src={team.logo_url} tag={team.tag} size={88} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 text-sm text-fg-3">
+              <span>{team.tag}</span>
+              <Pill tone={full ? "ok" : "warn"}>{full ? "Состав собран" : "Состав неполный"}</Pill>
+            </div>
+            <h1 className="mt-2 text-[36px] md:text-[48px] font-bold tracking-[-0.04em] leading-[1] truncate">{team.name}</h1>
+            <div className="mt-2 text-sm text-fg-3">
+              {team.region ?? "Регион не указан"} · с {formatDate(team.created_at)}
             </div>
           </div>
+        </div>
+        <div className="flex gap-10">
           <div>
-            <div className="label">Запас</div>
-            <div className="mt-1 text-2xl font-bold num">
-              {subs}<span className="text-fg-3">/{MAX_SUBS}</span>
+            <div className="num text-[28px] font-semibold leading-none">
+              {mains}
+              <span className="text-fg-3">/{MAX_MAIN}</span>
             </div>
+            <div className="mt-2 text-[13px] text-fg-3">Основа</div>
           </div>
           <div>
-            <div className="label">Avg ELO</div>
-            <div className="mt-1 text-2xl font-bold num">{elo ?? "—"}</div>
+            <div className="num text-[28px] font-semibold leading-none">
+              {subs}
+              <span className="text-fg-3">/{MAX_SUBS}</span>
+            </div>
+            <div className="mt-2 text-[13px] text-fg-3">Запас</div>
+          </div>
+          <div>
+            <div className="num text-[28px] font-semibold leading-none">{elo ?? "—"}</div>
+            <div className="mt-2 text-[13px] text-fg-3">Avg FACEIT ELO</div>
           </div>
         </div>
-      </div>
+      </section>
 
       {locked && (
-        <div className="mb-6">
-          <Notice tone="warn">
-            Состав заблокирован турниром «{locked.name}». Изменить его может только администратор.
-          </Notice>
+        <div className="mt-8">
+          <Notice tone="warn">Состав заблокирован турниром «{locked.name}». Изменить его может только администратор.</Notice>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6 items-start">
-        <div className="space-y-6">
-          <Card className="p-6">
-            <SectionTitle title="Состав" />
+      <div className="pt-12 grid lg:grid-cols-[minmax(0,1fr)_340px] gap-x-16 gap-y-12 items-start">
+        <div className="space-y-16 min-w-0">
+          <section>
+            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Состав</h2>
             <RosterList
               slots={MAX_MAIN + MAX_SUBS}
               items={members.map((m) => ({
@@ -125,7 +123,7 @@ export default async function MyTeamPage() {
                       <summary className="list-none cursor-pointer grid place-items-center size-8 rounded-lg text-fg-3 hover:text-fg hover:bg-white/[0.04]">
                         ⋯
                       </summary>
-                      <div className="absolute right-0 z-10 mt-1 w-56 card p-1.5 shadow-xl">
+                      <div className="absolute right-0 z-10 mt-1 w-56 rounded-xl bg-surface-2 border border-line p-1.5">
                         <ActionForm action={setMemberRole}>
                           <input type="hidden" name="memberId" value={m.id} />
                           <input type="hidden" name="role" value={m.role === "substitute" ? "player" : "substitute"} />
@@ -160,87 +158,88 @@ export default async function MyTeamPage() {
                   ) : null,
               }))}
             />
-          </Card>
+          </section>
 
-          <Card className="p-6">
-            <SectionTitle title="Турниры" />
+          <section>
+            <h2 className="text-[22px] font-bold tracking-[-0.025em] mb-3">Турниры</h2>
             {regs.length === 0 ? (
-              <p className="text-sm text-fg-3">
-                Команда ещё не подавала заявок.{" "}
-                <Link href="/tournaments" className="text-accent hover:underline">
-                  Посмотреть турниры →
-                </Link>
-              </p>
+              <EmptyState
+                compact
+                title="Команда ещё не подавала заявок"
+                action={
+                  <Link href="/tournaments" className="text-sm text-accent hover:text-accent-strong">
+                    Посмотреть турниры →
+                  </Link>
+                }
+              />
             ) : (
-              <div className="divide-y divide-line">
+              <div>
                 {regs.map((r) => (
-                  <div key={r.id} className="flex flex-wrap items-center gap-3 py-3">
-                    <Link href={`/tournaments/${r.tournament.slug}`} className="font-medium hover:text-accent flex-1">
+                  <div key={r.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 min-h-14 py-2 border-b border-white/[0.05] last:border-0">
+                    <Link href={`/tournaments/${r.tournament.slug}`} className="font-medium hover:text-accent-strong flex-1">
                       {r.tournament.name}
                     </Link>
                     <TournamentStatusPill status={r.tournament.status} />
                     <Pill tone={r.status === "approved" ? "ok" : r.status === "pending" ? "warn" : "neutral"}>
                       {registrationStatusLabel[r.status]}
                     </Pill>
-                    {r.checked_in_at && <Pill tone="ok">Check-in ✓</Pill>}
+                    {r.checked_in_at && <Pill tone="ok">Check-in</Pill>}
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </section>
 
           {isCaptain && (
-            <Card className="p-6">
-              <SectionTitle title="Настройки команды" />
-              <TeamForm action={updateTeam} team={team} submitLabel="Сохранить" />
-            </Card>
+            <details className="group">
+              <summary className="list-none cursor-pointer flex items-center justify-between py-4 border-y border-line text-[15px] font-semibold">
+                Настройки команды
+                <span className="text-fg-3 transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <div className="pt-6">
+                <TeamForm action={updateTeam} team={team} submitLabel="Сохранить" />
+              </div>
+            </details>
           )}
         </div>
 
-        <div className="space-y-6 lg:sticky lg:top-24">
-          {isCaptain ? (
-            <Card className="p-6">
-              <div className="label mb-2">Приглашение</div>
-              <p className="text-sm text-fg-2 mb-4">
-                Отправьте ссылку игрокам. Они войдут через Steam и подтвердят вступление.
-              </p>
+        <aside className="space-y-10 lg:sticky lg:top-24">
+          {isCaptain && (
+            <div className="rounded-2xl bg-surface p-6">
+              <h3 className="text-[15px] font-semibold">Пригласить игрока</h3>
+              <p className="mt-1 text-sm text-fg-3 mb-4">Игрок войдёт через Steam и подтвердит вступление.</p>
               <CopyField value={`${origin}/join/${team.invite_code}`} />
               <ActionForm action={regenerateInvite} className="mt-3">
                 <SubmitButton variant="ghost" size="sm" confirm="Старая ссылка перестанет работать. Продолжить?">
-                  Создать новую ссылку
+                  Новая ссылка
                 </SubmitButton>
               </ActionForm>
-            </Card>
-          ) : null}
-
-          <Card className="p-6">
-            <div className="label mb-4">Действия</div>
-            {isCaptain ? (
-              <ActionForm action={disbandTeam}>
-                <SubmitButton
-                  variant="danger"
-                  className="w-full"
-                  confirm="Распустить команду? Все игроки будут исключены. Это действие необратимо."
-                >
-                  Распустить команду
-                </SubmitButton>
-                <p className="mt-3 text-xs text-fg-3">
-                  Чтобы уйти из команды, сначала передайте капитанство другому игроку.
-                </p>
-              </ActionForm>
-            ) : (
-              <ActionForm action={leaveTeam}>
-                <SubmitButton variant="danger" className="w-full" confirm={`Покинуть ${team.name}?`}>
-                  Покинуть команду
-                </SubmitButton>
-              </ActionForm>
-            )}
-            <Link href={`/teams/${team.tag}`} className="mt-4 block text-sm text-accent hover:underline">
-              Публичная страница команды →
-            </Link>
-          </Card>
-        </div>
+            </div>
+          )}
+          <Link href={`/teams/${team.tag}`} className="block text-sm text-fg-2 hover:text-fg">
+            Публичная страница команды →
+          </Link>
+        </aside>
       </div>
+
+      {/* ── опасные действия — внизу, отдельно */}
+      <section className="mt-24 pt-8 border-t border-line max-w-xl">
+        <h3 className="text-[13px] text-fg-3 mb-3">Опасная зона</h3>
+        {isCaptain ? (
+          <ActionForm action={disbandTeam}>
+            <SubmitButton variant="danger" size="sm" confirm="Распустить команду? Все игроки будут исключены. Это действие необратимо.">
+              Распустить команду
+            </SubmitButton>
+            <p className="mt-3 text-xs text-fg-3">Чтобы уйти из команды, сначала передайте капитанство другому игроку.</p>
+          </ActionForm>
+        ) : (
+          <ActionForm action={leaveTeam}>
+            <SubmitButton variant="danger" size="sm" confirm={`Покинуть ${team.name}?`}>
+              Покинуть команду
+            </SubmitButton>
+          </ActionForm>
+        )}
+      </section>
     </Container>
   );
 }

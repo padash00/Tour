@@ -18,7 +18,7 @@ const ITEMS = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex lg:flex-col gap-1 overflow-x-auto">
+    <nav className="flex lg:flex-col gap-0.5 overflow-x-auto">
       {ITEMS.map((i) => {
         const active = i.exact ? pathname === i.href : pathname.startsWith(i.href);
         return (
@@ -26,10 +26,11 @@ export function AdminNav() {
             key={i.href}
             href={i.href}
             className={cn(
-              "h-9 px-3 inline-flex items-center rounded-lg text-sm whitespace-nowrap transition",
-              active ? "bg-white/[0.05] text-fg" : "text-fg-3 hover:text-fg-2",
+              "relative h-9 px-3 inline-flex items-center rounded-md text-[13px] whitespace-nowrap transition",
+              active ? "bg-white/[0.06] text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]",
             )}
           >
+            {active && <span className="hidden lg:block absolute left-0 top-2 bottom-2 w-[2px] rounded-full bg-accent" />}
             {i.label}
           </Link>
         );

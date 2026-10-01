@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="1500" height="320">
+  <defs>
+    <linearGradient id="g" x1="60" y1="0" x2="4" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F4F7FB"/>
+      <stop offset="0.55" stop-color="#C9DCF7"/>
+      <stop offset="1" stop-color="#8AB8FF"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(4 8)" fill="url(#g)">
+    <path d="M21 0H64L57 11H27L8 48H0Z"/>
+    <path d="M33 17H56L49.5 27H37.5L24 46H17Z"/>
+  </g>
+  <g transform="translate(86 8) scale(0.7)" fill="#F4F7FB" fill-rule="evenodd">
+    <path transform="skewX(-12) translate(8 0)" d="M0 0H30L27 9H9V16H24L21.5 24H9V40H0ZM36 0H45V40H36V10L31 12V4ZM53 0H80V9H62V16H76L82 22V34L76 40H59L53 34ZM62 24V31H73V24Z"/>
+  </g>
+  <text x="86" y="56" fill="#A8B2C2" font-family="Inter Tight, Inter, Arial, sans-serif" font-size="12" font-weight="500" letter-spacing="5">ARENA</text>
+</svg>

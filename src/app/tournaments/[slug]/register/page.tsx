@@ -9,86 +9,92 @@ import { RosterPicker } from "@/components/roster-picker";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
-import { ButtonLink, Card, Container, EmptyState, IconUsers, Notice, PageHeader, Pill, TeamLogo } from "@/components/ui";
+import { FlowHeader, Step } from "@/components/competition/step";
+import { Avatar, ButtonLink, Container, FaceitLevel, Notice, Pill, TeamLogo } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Регистрация команды" };
+export const metadata: Metadata = { title: "Регистрация на турнир" };
 
 export default async function RegisterPage(props: PageProps<"/tournaments/[slug]/register">) {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
   if (!t) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/register`);
+  const back = (
+    <Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">
+      ← {t.name}
+    </Link>
+  );
+
   if (t.format === "1v1") {
     const solo = await getSoloTeam(player, false);
     const soloReg = solo ? await getRegistration(t.id, solo.id) : null;
     const soloActive = soloReg && (soloReg.status === "pending" || soloReg.status === "approved");
     return (
-      <Container className="max-w-2xl">
-        <PageHeader
-          eyebrow={<Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">← {t.name}</Link>}
-          title="Участие в дуэлях"
-          description="Турнир 1×1 — команда не нужна, вы участвуете сами."
-        />
-        <Card className="p-6 flex items-center gap-4">
-          <TeamLogo src={player.avatar_url} tag={player.nickname} size={56} />
-          <div className="flex-1 min-w-0">
-            <div className="text-lg font-semibold truncate">{player.nickname}</div>
-            <div className="text-sm text-fg-3">FACEIT {player.faceit_elo ?? "—"} ELO</div>
+      <Container size="form">
+        <FlowHeader back={back} title={`Регистрация на ${t.name}`} description="Турнир 1×1 — команда не нужна, вы участвуете сами." />
+        <Step n={1} title="Участник" done>
+          <div className="flex items-center gap-4">
+            <Avatar src={player.avatar_url} name={player.nickname} size={48} />
+            <div className="flex-1 min-w-0">
+              <div className="text-lg font-semibold truncate">{player.nickname}</div>
+              <div className="flex items-center gap-2 text-sm text-fg-3">
+                <span className="text-ok">Steam ✓</span>
+                <span>·</span>
+                <FaceitLevel level={player.faceit_level} />
+                <span className="num">{player.faceit_elo ?? "—"} ELO</span>
+              </div>
+            </div>
+            {soloReg && (
+              <Pill tone={soloReg.status === "approved" ? "ok" : soloReg.status === "pending" ? "warn" : "neutral"}>
+                {registrationStatusLabel[soloReg.status]}
+              </Pill>
+            )}
           </div>
-          {soloReg && (
-            <Pill tone={soloReg.status === "approved" ? "ok" : soloReg.status === "pending" ? "warn" : "neutral"} dot>
-              {registrationStatusLabel[soloReg.status]}
-            </Pill>
+        </Step>
+        <Step n={2} title="Подтверждение" done={!!soloActive}>
+          {soloReg?.status === "rejected" && soloReg.note && (
+            <div className="mb-4">
+              <Notice tone="danger">Причина отказа: {soloReg.note}</Notice>
+            </div>
           )}
-        </Card>
-        {soloReg?.status === "rejected" && soloReg.note && (
-          <div className="mt-4">
-            <Notice tone="danger">Причина отказа: {soloReg.note}</Notice>
-          </div>
-        )}
-        <div className="mt-4">
           {t.status !== "registration" ? (
             <Notice>Регистрация закрыта.</Notice>
           ) : soloActive ? (
-            <ActionForm action={withdrawRegistration}>
-              <input type="hidden" name="tournamentId" value={t.id} />
-              <SubmitButton variant="ghost" confirm="Отменить участие в турнире?">
-                Отменить участие
-              </SubmitButton>
-            </ActionForm>
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-sm text-fg-2">Заявка подана.</span>
+              <ActionForm action={withdrawRegistration}>
+                <input type="hidden" name="tournamentId" value={t.id} />
+                <SubmitButton variant="ghost" size="sm" confirm="Отменить участие в турнире?">
+                  Отменить участие
+                </SubmitButton>
+              </ActionForm>
+            </div>
           ) : (
             <ActionForm action={registerTeam}>
               <input type="hidden" name="tournamentId" value={t.id} />
               <SubmitButton size="lg" className="w-full" pendingText="Отправляем…">
-                Участвовать в турнире
+                Подать заявку
               </SubmitButton>
             </ActionForm>
           )}
-        </div>
+        </Step>
       </Container>
     );
   }
 
   const membership = await getActiveMembership(player.id);
-
-  const header = (
-    <PageHeader
-      eyebrow={<Link href={`/tournaments/${t.slug}`} className="hover:text-fg-2">← {t.name}</Link>}
-      title="Регистрация команды"
-      description={`Регистрация открыта до ${formatDateTime(t.registration_closes_at)}. После закрытия состав меняет только администратор.`}
-    />
-  );
+  const description = `Регистрация открыта до ${formatDateTime(t.registration_closes_at)}. После закрытия состав меняет только администратор.`;
 
   if (!membership) {
     return (
-      <Container className="max-w-3xl">
-        {header}
-        <EmptyState
-          icon={<IconUsers />}
-          title="Соберите состав, чтобы зарегистрироваться"
-          description="Создайте команду и пригласите игроков по ссылке — затем капитан подаёт заявку."
-          action={<ButtonLink href="/team/create">Создать команду</ButtonLink>}
-        />
+      <Container size="form">
+        <FlowHeader back={back} title={`Регистрация на ${t.name}`} description={description} />
+        <Step n={1} title="Команда">
+          <p className="text-sm text-fg-2 mb-5">Создайте команду и пригласите игроков по ссылке — затем капитан подаёт заявку.</p>
+          <ButtonLink href="/team/create">Создать команду</ButtonLink>
+        </Step>
+        <Step n={2} title="Состав" muted />
+        <Step n={3} title="Подтверждение" muted />
       </Container>
     );
   }
@@ -109,92 +115,111 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
     ordered.forEach((m, i) => (initial[m.player_id] = i < mode.size ? "main" : i < mode.size + mode.subs ? "sub" : "out"));
   }
   const enough = members.filter((m) => !m.player.is_banned).length >= mode.size;
+  const captain = members.find((m) => m.player_id === team.captain_id)?.player;
 
   return (
-    <Container className="max-w-3xl">
-      {header}
-      <div className="space-y-4">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <TeamLogo src={team.logo_url} tag={team.tag} size={52} />
-            <div className="flex-1">
-              <div className="text-lg font-semibold">{team.name}</div>
-              <div className="text-sm text-fg-3">
-                {mode.title} · в основе {mainPlayersLabel(mode.size)}
-                {mode.subs ? `, до ${mode.subs} запасн.` : ""}
-              </div>
+    <Container size="form">
+      <FlowHeader back={back} title={`Регистрация на ${t.name}`} description={description} />
+
+      <Step n={1} title="Команда" done>
+        <div className="flex items-center gap-4">
+          <TeamLogo src={team.logo_url} tag={team.tag} size={48} />
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-semibold truncate">{team.name}</div>
+            <div className="text-sm text-fg-3">
+              {team.tag}
+              {captain ? ` · капитан ${captain.nickname}` : ""}
             </div>
-            {reg && (
-              <Pill tone={reg.status === "approved" ? "ok" : reg.status === "pending" ? "warn" : "neutral"} dot>
-                {registrationStatusLabel[reg.status]}
-              </Pill>
-            )}
           </div>
-        </Card>
+          {reg && (
+            <Pill tone={reg.status === "approved" ? "ok" : reg.status === "pending" ? "warn" : "neutral"}>
+              {registrationStatusLabel[reg.status]}
+            </Pill>
+          )}
+        </div>
+      </Step>
 
-        {reg?.status === "rejected" && reg.note && <Notice tone="danger">Причина отказа: {reg.note}</Notice>}
-
-        {!isCaptain ? (
+      {!isCaptain ? (
+        <Step n={2} title="Состав">
           <Notice>Заявку подаёт капитан команды.</Notice>
-        ) : !enough ? (
-          <EmptyState
-            icon={<IconUsers />}
-            title={`Нужно минимум ${mainPlayersLabel(mode.size)}`}
-            description={`Сейчас в команде ${members.length}. Пригласите игроков по ссылке со страницы команды.`}
-            action={<ButtonLink href="/team">Моя команда</ButtonLink>}
-          />
-        ) : canEdit ? (
-          <ActionForm action={registerTeam}>
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <Card className="p-6">
-              <div className="label mb-3">Состав на турнир</div>
-              <RosterPicker
-                size={mode.size}
-                subs={mode.subs}
-                initial={initial}
-                members={members.map((m) => ({
-                  player_id: m.player_id,
-                  nickname: m.player.nickname,
-                  avatar_url: m.player.avatar_url,
-                  faceit_level: m.player.faceit_level,
-                  banned: m.player.is_banned,
-                }))}
-              />
-            </Card>
-            <div className="mt-4 flex flex-col sm:flex-row gap-3">
-              <SubmitButton size="lg" className="flex-1" pendingText="Сохраняем…">
-                {active ? "Сохранить состав заявки" : "Подать заявку на турнир"}
-              </SubmitButton>
-            </div>
-            {active && (
-              <p className="mt-3 text-sm text-fg-3">
-                {reg.status === "approved" ? "Заявка одобрена." : "Заявка ждёт решения администратора."} Состав можно менять, пока
-                открыта регистрация.
-              </p>
-            )}
-          </ActionForm>
-        ) : (
-          <Card className="p-6">
-            <div className="label mb-2">Состав заявки</div>
-            {reg?.roster.length ? (
+          {reg?.roster.length ? (
+            <div className="mt-4">
               <RosterList
                 items={reg.roster.map((r) => ({ key: r.id, player: r.player, role: r.player_id === team.captain_id ? "captain" : r.role }))}
               />
-            ) : (
-              <p className="text-sm text-fg-3">Регистрация закрыта.</p>
+            </div>
+          ) : null}
+        </Step>
+      ) : !enough ? (
+        <>
+          <Step n={2} title={`Нужно минимум ${mainPlayersLabel(mode.size)}`}>
+            <p className="text-sm text-fg-2 mb-5">Сейчас в команде {members.length}. Пригласите игроков по ссылке со страницы команды.</p>
+            <ButtonLink href="/team" variant="secondary">
+              Пригласить игроков
+            </ButtonLink>
+          </Step>
+          <Step n={3} title="Подтверждение" muted />
+        </>
+      ) : canEdit ? (
+        <ActionForm action={registerTeam}>
+          <input type="hidden" name="tournamentId" value={t.id} />
+          {reg?.status === "rejected" && reg.note && (
+            <div className="py-4">
+              <Notice tone="danger">Причина отказа: {reg.note}</Notice>
+            </div>
+          )}
+          <Step n={2} title="Состав">
+            <p className="-mt-2 mb-4 text-sm text-fg-3">
+              {mode.title} · в основе {mainPlayersLabel(mode.size)}
+              {mode.subs ? `, до ${mode.subs} запасн.` : ""}
+            </p>
+            <RosterPicker
+              size={mode.size}
+              subs={mode.subs}
+              initial={initial}
+              members={members.map((m) => ({
+                player_id: m.player_id,
+                nickname: m.player.nickname,
+                avatar_url: m.player.avatar_url,
+                faceit_level: m.player.faceit_level,
+                banned: m.player.is_banned,
+              }))}
+            />
+          </Step>
+          <Step n={3} title="Подтверждение" done={!!active}>
+            {active && (
+              <p className="mb-4 text-sm text-fg-3">
+                {reg.status === "approved" ? "Заявка одобрена." : "Заявка ждёт решения администратора."} Состав можно менять, пока открыта
+                регистрация.
+              </p>
             )}
-          </Card>
-        )}
+            <SubmitButton size="lg" className="w-full" pendingText="Сохраняем…">
+              {active ? "Сохранить состав" : "Подать заявку"}
+            </SubmitButton>
+          </Step>
+        </ActionForm>
+      ) : (
+        <Step n={2} title="Состав заявки">
+          {reg?.roster.length ? (
+            <RosterList
+              items={reg.roster.map((r) => ({ key: r.id, player: r.player, role: r.player_id === team.captain_id ? "captain" : r.role }))}
+            />
+          ) : (
+            <p className="text-sm text-fg-3">Регистрация закрыта.</p>
+          )}
+        </Step>
+      )}
 
-        {active && canEdit && (
+      {active && canEdit && (
+        <div className="pt-8 mt-8 border-t border-line">
           <ActionForm action={withdrawRegistration}>
             <input type="hidden" name="tournamentId" value={t.id} />
-            <SubmitButton variant="ghost" confirm="Отозвать заявку команды?">
+            <SubmitButton variant="ghost" size="sm" confirm="Отозвать заявку команды?">
               Отозвать заявку
             </SubmitButton>
           </ActionForm>
-        )}
-      </div>
+        </div>
+      )}
     </Container>
   );
 }

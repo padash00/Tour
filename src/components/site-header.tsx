@@ -1,19 +1,19 @@
 import Link from "next/link";
+import { F16Logo, F16Symbol } from "./brand";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/data";
 import { Avatar, ButtonLink, Container, IconBell, IconSteam } from "./ui";
-import { NavLinks, MobileMenu } from "./nav-links";
+import { HeaderShell, MobileMenu, NavLinks, PublicOnly } from "./nav-links";
 
-export function Logo() {
+/** Знак F16 одним цветом (для фоновых композиций) */
+export function F16Mark({ className = "size-6" }: { className?: string }) {
+  return <F16Symbol className={className} mono />;
+}
+
+export function Logo({ href = "/", suffix, size = 28 }: { href?: string; suffix?: string; size?: number }) {
   return (
-    <Link href="/" className="flex items-center gap-2.5 group" aria-label="F16 Arena — главная">
-      <span className="relative grid place-items-center h-8 px-2 rounded-lg bg-fg text-bg font-black tracking-[-0.04em] text-[15px] leading-none">
-        F16
-        <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-warm ring-2 ring-bg" />
-      </span>
-      <span className="font-semibold tracking-[0.18em] text-[12px] text-fg-2 group-hover:text-fg transition-colors">
-        ARENA
-      </span>
+    <Link href={href} className="flex items-center" aria-label="F16 Arena — главная">
+      <F16Logo size={size} suffix={suffix} />
     </Link>
   );
 }
@@ -21,22 +21,35 @@ export function Logo() {
 export const NAV = [
   { href: "/tournaments", label: "Турниры" },
   { href: "/teams", label: "Команды" },
-  { href: "/players", label: "Игроки" },
+  { href: "/matches", label: "Матчи" },
   { href: "/stats", label: "Статистика" },
-  { href: "/rules", label: "Правила" },
 ];
 
 export async function SiteHeader() {
   const player = await getCurrentPlayer();
   const unread = player ? await getUnreadCount(player.id) : 0;
   const admin = isAdmin(player);
+  const mobileItems = [
+    ...NAV,
+    { href: "/players", label: "Игроки" },
+    { href: "/rules", label: "Правила" },
+    ...(admin ? [{ href: "/admin", label: "F16 Control" }] : []),
+  ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/75 backdrop-blur-xl">
-      <Container className="flex h-16 items-center gap-8">
+    <HeaderShell>
+      <Container className="flex h-[68px] items-center gap-10">
         <Logo />
-        <NavLinks items={admin ? [...NAV, { href: "/admin", label: "Админ" }] : NAV} />
-        <div className="ml-auto flex items-center gap-2">
+        <NavLinks items={NAV} />
+        <div className="ml-auto flex items-center gap-1.5">
+          {admin && (
+            <Link
+              href="/admin"
+              className="hidden md:inline-flex h-9 px-3 items-center rounded-lg text-[13px] text-fg-3 hover:text-fg transition"
+            >
+              Control
+            </Link>
+          )}
           {player ? (
             <>
               <Link
@@ -46,15 +59,10 @@ export async function SiteHeader() {
               >
                 <IconBell className="size-[18px]" />
                 {unread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center rounded-full bg-accent text-[10px] font-bold text-[#06101f] ring-2 ring-bg num">
-                    {unread > 99 ? "99+" : unread}
-                  </span>
+                  <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-accent ring-2 ring-bg" />
                 )}
               </Link>
-              <Link
-                href="/me"
-                className="flex items-center gap-2.5 h-9 pl-1 pr-3 rounded-lg hover:bg-white/[0.04] transition"
-              >
+              <Link href="/me" className="flex items-center gap-2.5 h-9 pl-1 pr-2.5 rounded-full hover:bg-white/[0.04] transition">
                 <Avatar src={player.avatar_url} name={player.nickname} size={28} />
                 <span className="hidden sm:block text-sm font-medium max-w-[140px] truncate">{player.nickname}</span>
               </Link>
@@ -62,54 +70,41 @@ export async function SiteHeader() {
           ) : (
             <ButtonLink href="/login" variant="secondary" size="sm" className="h-9 px-3.5">
               <IconSteam />
-              Войти через Steam
+              Войти
             </ButtonLink>
           )}
-          <MobileMenu items={admin ? [...NAV, { href: "/admin", label: "Админ" }] : NAV} />
+          <MobileMenu items={mobileItems} />
         </div>
       </Container>
-    </header>
+    </HeaderShell>
   );
 }
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-line">
-      <Container className="py-12 grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div className="col-span-2 md:col-span-1">
-          <Logo />
-          <p className="mt-4 max-w-xs text-sm text-fg-3 leading-relaxed">
-            Турнирная платформа F16 Arena для соревнований по CS2. Реальные серверы, честная статистика.
-          </p>
-        </div>
-        <div>
-          <div className="label mb-4">Платформа</div>
-          <ul className="space-y-2.5 text-sm text-fg-2">
-            <li><Link href="/tournaments" className="hover:text-fg">Турниры</Link></li>
-            <li><Link href="/teams" className="hover:text-fg">Команды</Link></li>
-            <li><Link href="/players" className="hover:text-fg">Игроки</Link></li>
-            <li><Link href="/stats" className="hover:text-fg">Статистика</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="label mb-4">Участникам</div>
-          <ul className="space-y-2.5 text-sm text-fg-2">
-            <li><Link href="/team/create" className="hover:text-fg">Создать команду</Link></li>
-            <li><Link href="/rules" className="hover:text-fg">Правила и FAQ</Link></li>
-            <li><Link href="/about" className="hover:text-fg">О платформе</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="label mb-4">F16</div>
-          <ul className="space-y-2.5 text-sm text-fg-2">
-            <li><a href="https://f16-arena.kz" className="hover:text-fg">f16-arena.kz</a></li>
-          </ul>
-        </div>
-      </Container>
-      <Container className="py-6 border-t border-line text-xs text-fg-3 flex flex-wrap justify-between gap-2">
-        <span>© {new Date().getFullYear()} F16 Arena</span>
-        <span>Не аффилировано с Valve Corporation</span>
-      </Container>
-    </footer>
+    <PublicOnly>
+      <footer className="mt-32 border-t border-line">
+        <Container className="py-12 flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
+          <div>
+            <Logo />
+            <p className="mt-4 max-w-xs text-sm text-fg-3 leading-relaxed">Соревновательная платформа для CS2.</p>
+          </div>
+          <nav className="grid grid-cols-2 sm:grid-cols-3 gap-x-14 gap-y-3 text-sm text-fg-2">
+            <Link href="/tournaments" className="hover:text-fg">Турниры</Link>
+            <Link href="/teams" className="hover:text-fg">Команды</Link>
+            <Link href="/matches" className="hover:text-fg">Матчи</Link>
+            <Link href="/players" className="hover:text-fg">Игроки</Link>
+            <Link href="/stats" className="hover:text-fg">Статистика</Link>
+            <Link href="/rules" className="hover:text-fg">Правила</Link>
+            <Link href="/about" className="hover:text-fg">О платформе</Link>
+            <a href="https://f16-arena.kz" className="hover:text-fg">f16-arena.kz</a>
+          </nav>
+        </Container>
+        <Container className="pb-10 text-xs text-fg-3 flex flex-wrap justify-between gap-2">
+          <span>© {new Date().getFullYear()} F16 Arena</span>
+          <span>Не аффилировано с Valve Corporation</span>
+        </Container>
+      </footer>
+    </PublicOnly>
   );
 }

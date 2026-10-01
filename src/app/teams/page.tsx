@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
-import { ButtonLink, Container, EmptyState, IconUsers, PageHeader, TeamLogo } from "@/components/ui";
+import { ButtonLink, Container, EmptyState, PageHeader, TeamLogo } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Команды" };
 
@@ -13,38 +13,44 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
 
   return (
     <Container>
-      <PageHeader
-        eyebrow="Сообщество"
-        title="Команды"
-        description="Все команды F16 Arena. Средний ELO считается по FACEIT-профилям игроков."
-        actions={<ButtonLink href="/team/create">Создать команду</ButtonLink>}
-      />
-      <form className="mb-6 sm:w-72">
-        <input name="q" defaultValue={q} placeholder="Поиск команды или тега" className="field h-9 py-0" />
-      </form>
+      <PageHeader title="Команды" actions={<ButtonLink href="/team/create" variant="secondary">Создать команду</ButtonLink>} />
+
+      {all.length > 0 && (
+        <form className="mb-4 sm:w-80">
+          <input name="q" defaultValue={q} placeholder="Поиск по названию или тегу" className="field" />
+        </form>
+      )}
 
       {teams.length === 0 ? (
         <EmptyState
-          icon={<IconUsers />}
           title={all.length === 0 ? "Команд пока нет" : "Ничего не найдено"}
           description={all.length === 0 ? "Станьте первой командой на платформе." : "Попробуйте другой запрос."}
+          action={all.length === 0 ? <ButtonLink href="/team/create">Создать команду</ButtonLink> : undefined}
         />
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div>
+          <div className="hidden sm:grid grid-cols-[1fr_140px_100px_100px] gap-4 px-1 pb-3 text-[12px] text-fg-3 border-b border-line">
+            <span>Команда</span>
+            <span>Регион</span>
+            <span className="text-right">Игроки</span>
+            <span className="text-right">Avg ELO</span>
+          </div>
           {teams.map((t) => (
-            <Link key={t.id} href={`/teams/${t.tag}`} className="card card-hover p-5 flex items-center gap-4">
-              <TeamLogo src={t.logo_url} tag={t.tag} size={52} />
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold truncate">{t.name}</div>
-                <div className="text-xs text-fg-3 mt-1">
-                  {t.tag}
-                  {t.region ? ` · ${t.region}` : ""}
+            <Link
+              key={t.id}
+              href={`/teams/${t.tag}`}
+              className="group grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_140px_100px_100px] items-center gap-4 px-1 py-4 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <TeamLogo src={t.logo_url} tag={t.tag} size={40} />
+                <div className="min-w-0">
+                  <div className="font-semibold truncate group-hover:text-accent transition-colors">{t.name}</div>
+                  <div className="text-[13px] text-fg-3">{t.tag}</div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="num text-sm">{t.member_count}/5</div>
-                <div className="num text-xs text-fg-3 mt-1">{t.avg_elo ?? "—"} elo</div>
-              </div>
+              <span className="hidden sm:block text-sm text-fg-2 truncate">{t.region ?? "—"}</span>
+              <span className="num text-sm text-right text-fg-2">{t.member_count}</span>
+              <span className="hidden sm:block num text-sm text-right text-fg-2">{t.avg_elo ?? "—"}</span>
             </Link>
           ))}
         </div>

@@ -11,34 +11,33 @@ export type RosterItem = {
 
 const roleLabel = { captain: "Капитан", main: "Основа", sub: "Запасной" };
 
+/** Состав: крупные чистые строки игроков */
 export function RosterList({ items, slots }: { items: RosterItem[]; slots?: number }) {
   const empty = Math.max(0, (slots ?? 0) - items.length);
   return (
-    <div className="divide-y divide-line">
+    <div>
       {items.map((it) => (
-        <div key={it.key} className="flex items-center gap-3 py-3">
+        <div key={it.key} className="flex items-center gap-4 h-16 border-b border-white/[0.05] last:border-0">
           <Avatar src={it.player.avatar_url} name={it.player.nickname} size={36} />
           <div className="min-w-0 flex-1">
-            <Link href={`/players/${it.player.steam_id}`} className="font-medium hover:text-accent truncate block">
+            <Link href={`/players/${it.player.steam_id}`} className="font-medium hover:text-accent-strong truncate block">
               {it.player.nickname}
             </Link>
-            <div className="text-xs text-fg-3 num">{it.player.steam_id}</div>
+            <div className="text-[12px] text-fg-3">
+              {it.player.is_banned ? <span className="text-danger">Заблокирован</span> : roleLabel[it.role]}
+            </div>
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-fg-3">
+          <div className="hidden sm:flex items-center gap-3 text-sm text-fg-3">
             <FaceitLevel level={it.player.faceit_level} />
             <span className="num w-12 text-right">{it.player.faceit_elo ?? "—"}</span>
           </div>
-          {it.player.is_banned ? (
-            <Pill tone="danger">Бан</Pill>
-          ) : (
-            <Pill tone={it.role === "captain" ? "accent" : "neutral"}>{roleLabel[it.role]}</Pill>
-          )}
+          {it.role === "captain" && !it.player.is_banned && <Pill tone="accent">C</Pill>}
           {it.extra}
         </div>
       ))}
       {Array.from({ length: empty }, (_, i) => (
-        <div key={`empty-${i}`} className="flex items-center gap-3 py-3 text-fg-3">
-          <div className="size-9 rounded-lg border border-dashed border-line-strong" />
+        <div key={`empty-${i}`} className="flex items-center gap-4 h-16 border-b border-white/[0.05] last:border-0 text-fg-3">
+          <div className="size-9 rounded-full border border-dashed border-white/15" />
           <span className="text-sm">Свободный слот</span>
         </div>
       ))}

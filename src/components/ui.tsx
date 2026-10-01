@@ -11,19 +11,19 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "warm";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary:
-    "bg-accent text-[#06101f] hover:bg-accent-strong shadow-[inset_0_1px_0_#ffffff40,0_1px_2px_#0006] focus-visible:ring-2 focus-visible:ring-accent/40",
+  primary: "bg-accent text-[#06101f] hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent/40",
   secondary:
-    "bg-white/[0.04] text-fg border border-line-strong hover:bg-white/[0.07] hover:border-[#3a4c6a] focus-visible:ring-2 focus-visible:ring-accent/30",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
-  danger: "bg-danger-dim text-danger border border-[#ef7a7a33] hover:bg-[#ef7a7a26] hover:border-[#ef7a7a55]",
-  warm: "bg-warm text-[#1a0d03] hover:brightness-110 shadow-[inset_0_1px_0_#ffffff55]",
+    "bg-transparent text-fg border border-line-strong hover:bg-white/[0.04] hover:border-white/20 focus-visible:ring-2 focus-visible:ring-accent/30",
+  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.04]",
+  danger: "bg-danger-dim text-danger border border-[#e66f7433] hover:bg-[#e66f7424]",
+  // знак бренда — использовать крайне редко
+  warm: "bg-warm text-[#1a0d03] hover:brightness-110",
 };
 
 const sizes: Record<Size, string> = {
   sm: "h-8 px-3 text-[13px] rounded-lg gap-1.5",
-  md: "h-10 px-4 text-sm rounded-[10px] gap-2",
-  lg: "h-12 px-6 text-[15px] rounded-xl gap-2",
+  md: "h-10 px-4 text-sm rounded-[9px] gap-2",
+  lg: "h-12 px-5 text-[15px] rounded-[10px] gap-2",
 };
 
 export function buttonClass(variant: Variant = "primary", size: Size = "md", extra?: string) {
@@ -53,39 +53,79 @@ export function ButtonLink({
   return <Link className={buttonClass(variant, size, className)} {...props} />;
 }
 
-// ───────────────────────── pills / badges
+// ───────────────────────── статусы
 
 type Tone = "neutral" | "accent" | "ok" | "warn" | "danger" | "live";
 
-const tones: Record<Tone, string> = {
-  neutral: "bg-white/[0.04] text-fg-2 border-line",
-  accent: "bg-accent-dim text-accent border-[#8bb8ff33]",
-  ok: "bg-ok-dim text-ok border-[#6cc59a33]",
-  warn: "bg-warn-dim text-warn border-[#e3b46533]",
-  danger: "bg-danger-dim text-danger border-[#ef7a7a33]",
-  live: "bg-danger-dim text-danger border-[#ef7a7a33]",
+const toneText: Record<Tone, string> = {
+  neutral: "text-fg-3",
+  accent: "text-accent",
+  ok: "text-ok",
+  warn: "text-warn",
+  danger: "text-danger",
+  live: "text-danger",
 };
 
+/**
+ * Статус: маленькая точка и спокойная подпись, без заливки и рамки.
+ * Единая система по всей платформе: LIVE — красный, готов — синий, регистрация — зелёный,
+ * ожидание — серый, предупреждение — янтарный.
+ */
 export function Pill({ tone = "neutral", children, dot }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full border text-[11px] font-semibold uppercase tracking-[0.08em]",
-        tones[tone],
+    <span className={cn("inline-flex items-center gap-1.5 text-[13px] font-medium whitespace-nowrap", toneText[tone])}>
+      {(dot || tone !== "neutral") && (
+        <span className={cn("size-1.5 rounded-full bg-current shrink-0", tone === "live" && "animate-pulse")} />
       )}
-    >
-      {(dot || tone === "live") && (
-        <span className={cn("size-1.5 rounded-full bg-current", tone === "live" && "animate-pulse")} />
-      )}
+      {tone === "live" ? <span className="font-semibold tracking-[0.08em] uppercase text-[11px]">{children}</span> : children}
+    </span>
+  );
+}
+
+/** Метка-факт без статуса: формат, режим. Используется редко */
+export function Tag({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center h-6 px-2 rounded-md bg-white/[0.04] text-[12px] text-fg-2 whitespace-nowrap">
       {children}
     </span>
   );
 }
 
+/** Строка фактов через точку: CS2 · 5×5 · LAN */
+export function Meta({ items, className }: { items: ReactNode[]; className?: string }) {
+  const list = items.filter((x) => x !== null && x !== undefined && x !== false && x !== "");
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-fg-2", className)}>
+      {list.map((x, i) => (
+        <span key={i} className="inline-flex items-center gap-2.5">
+          {i > 0 && <span className="size-[3px] rounded-full bg-fg-3/60" />}
+          {x}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ───────────────────────── layout
 
-export function Container({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8", className)}>{children}</div>;
+const widths = {
+  public: "max-w-[1320px]",
+  competition: "max-w-[1280px]",
+  admin: "max-w-[1480px]",
+  narrow: "max-w-[820px]",
+  form: "max-w-[640px]",
+};
+
+export function Container({
+  children,
+  className,
+  size = "public",
+}: {
+  children: ReactNode;
+  className?: string;
+  size?: keyof typeof widths;
+}) {
+  return <div className={cn("mx-auto w-full px-4 sm:px-6 lg:px-10", widths[size], className)}>{children}</div>;
 }
 
 export function PageHeader({
@@ -100,11 +140,11 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between pt-12 pb-8 md:pt-16 md:pb-10">
-      <div className="max-w-2xl">
-        {eyebrow && <div className="label mb-3">{eyebrow}</div>}
-        <h1 className="text-3xl md:text-[44px] font-bold tracking-[-0.03em] leading-[1.05]">{title}</h1>
-        {description && <p className="mt-4 text-fg-2 text-[15px] leading-relaxed">{description}</p>}
+    <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between pt-14 pb-10 md:pt-20 md:pb-12">
+      <div className="max-w-3xl">
+        {eyebrow && <div className="text-sm text-fg-3 mb-4">{eyebrow}</div>}
+        <h1 className="text-[36px] md:text-[48px] font-bold tracking-[-0.035em] leading-[1.02]">{title}</h1>
+        {description && <p className="mt-4 text-fg-2 text-base md:text-[17px] leading-relaxed max-w-2xl">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
     </div>
@@ -113,10 +153,10 @@ export function PageHeader({
 
 export function SectionTitle({ title, action, eyebrow }: { title: ReactNode; action?: ReactNode; eyebrow?: ReactNode }) {
   return (
-    <div className="flex items-end justify-between gap-4 mb-5">
+    <div className="flex items-end justify-between gap-4 mb-6">
       <div>
-        {eyebrow && <div className="label mb-2">{eyebrow}</div>}
-        <h2 className="text-xl md:text-2xl font-bold tracking-[-0.02em]">{title}</h2>
+        {eyebrow && <div className="text-sm text-fg-3 mb-2">{eyebrow}</div>}
+        <h2 className="text-[22px] md:text-[28px] font-bold tracking-[-0.025em] leading-tight">{title}</h2>
       </div>
       {action}
     </div>
@@ -127,25 +167,44 @@ export function Card({ children, className, hover }: { children: ReactNode; clas
   return <div className={cn("card", hover && "card-hover", className)}>{children}</div>;
 }
 
+/** Цифра с подписью — без рамки */
 export function Stat({ label, value, hint }: { label: ReactNode; value: ReactNode; hint?: ReactNode }) {
   return (
     <div>
       <div className="label">{label}</div>
-      <div className="mt-2 text-lg font-semibold text-fg">{value}</div>
+      <div className="mt-1.5 text-lg font-semibold text-fg">{value}</div>
       {hint && <div className="mt-1 text-xs text-fg-3">{hint}</div>}
+    </div>
+  );
+}
+
+/** Крупная цифра — для ключевой статистики профиля и матча */
+export function BigStat({ label, value, tone }: { label: ReactNode; value: ReactNode; tone?: "ok" | "danger" | "accent" }) {
+  return (
+    <div>
+      <div
+        className={cn(
+          "num text-[32px] md:text-[40px] font-semibold tracking-[-0.03em] leading-none",
+          tone === "ok" ? "text-ok" : tone === "danger" ? "text-danger" : tone === "accent" ? "text-accent" : "text-fg",
+        )}
+      >
+        {value}
+      </div>
+      <div className="mt-2 text-[13px] text-fg-3">{label}</div>
     </div>
   );
 }
 
 export function KV({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-3 border-b border-line last:border-0">
+    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-white/[0.05] last:border-0">
       <span className="text-sm text-fg-3">{label}</span>
       <span className="text-sm text-fg text-right">{children}</span>
     </div>
   );
 }
 
+/** Честное пустое состояние: платформа новая, пустота — это нормально */
 export function EmptyState({
   title,
   description,
@@ -160,20 +219,17 @@ export function EmptyState({
   compact?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        "card flex flex-col items-center justify-center text-center border-dashed",
-        compact ? "py-10 px-6" : "py-16 px-6",
-      )}
-    >
-      <div className="mb-5 grid place-items-center size-12 rounded-xl border border-line bg-bg-2 text-fg-3">
-        {icon ?? <IconSpark />}
-      </div>
-      <div className="text-base font-semibold">{title}</div>
-      {description && <p className="mt-2 max-w-sm text-sm text-fg-3 leading-relaxed">{description}</p>}
-      {action && <div className="mt-6">{action}</div>}
+    <div className={cn("flex flex-col items-start", compact ? "py-8" : "py-14")}>
+      {icon && <div className="mb-4 text-fg-3/70">{icon}</div>}
+      <div className={cn("font-semibold tracking-[-0.01em]", compact ? "text-base" : "text-lg")}>{title}</div>
+      {description && <p className="mt-1.5 max-w-md text-sm text-fg-3 leading-relaxed">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
+}
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cn("skeleton", className)} />;
 }
 
 // ───────────────────────── avatars
@@ -186,12 +242,12 @@ export function Avatar({ src, name, size = 36 }: { src?: string | null; name: st
       alt=""
       width={size}
       height={size}
-      className="rounded-lg border border-line object-cover bg-surface-2 shrink-0"
+      className="rounded-full object-cover bg-surface-2 shrink-0"
       style={{ width: size, height: size }}
     />
   ) : (
     <div
-      className="rounded-lg border border-line bg-surface-2 grid place-items-center text-fg-3 font-semibold shrink-0"
+      className="rounded-full bg-surface-3 grid place-items-center text-fg-3 font-semibold shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
     >
       {name.slice(0, 1).toUpperCase()}
@@ -205,13 +261,13 @@ export function TeamLogo({ src, tag, size = 48 }: { src?: string | null; tag: st
     <img
       src={src}
       alt=""
-      className="rounded-xl border border-line object-cover bg-surface-2 shrink-0"
-      style={{ width: size, height: size }}
+      className="object-contain shrink-0"
+      style={{ width: size, height: size, borderRadius: size > 40 ? 12 : 8 }}
     />
   ) : (
     <div
-      className="rounded-xl border border-line bg-gradient-to-br from-surface-3 to-bg-2 grid place-items-center font-bold tracking-tight text-fg-2 shrink-0"
-      style={{ width: size, height: size, fontSize: Math.max(11, size * 0.28) }}
+      className="bg-surface-3 grid place-items-center font-bold tracking-tight text-fg-2 shrink-0"
+      style={{ width: size, height: size, fontSize: Math.max(11, size * 0.28), borderRadius: size > 40 ? 12 : 8 }}
     >
       {tag.slice(0, 4).toUpperCase()}
     </div>
@@ -237,19 +293,19 @@ export function FaceitLevel({ level }: { level: number | null }) {
 
 export function Tabs({ items, active }: { items: { key: string; label: string; href: string }[]; active: string }) {
   return (
-    <div className="flex gap-1 border-b border-line overflow-x-auto">
+    <div className="flex gap-6 border-b border-line overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
       {items.map((t) => (
         <Link
           key={t.key}
           href={t.href}
           scroll={false}
           className={cn(
-            "relative px-4 h-11 inline-flex items-center text-sm font-medium transition-colors whitespace-nowrap",
+            "relative h-12 inline-flex items-center text-[15px] font-medium transition-colors whitespace-nowrap",
             t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
           )}
         >
           {t.label}
-          {t.key === active && <span className="absolute inset-x-3 -bottom-px h-[2px] rounded-full bg-accent" />}
+          {t.key === active && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-fg" />}
         </Link>
       ))}
     </div>
@@ -271,7 +327,7 @@ export function Field({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="block text-[13px] font-medium text-fg-2 mb-2">{label}</span>
+      <span className="block text-[13px] font-medium text-fg-2 mb-1.5">{label}</span>
       {children}
       {hint && <span className="block mt-1.5 text-xs text-fg-3">{hint}</span>}
     </label>
@@ -280,12 +336,12 @@ export function Field({
 
 export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "ok" | "warn" | "danger"; children: ReactNode }) {
   const t = {
-    neutral: "border-line bg-white/[0.02] text-fg-2",
-    ok: "border-[#6cc59a33] bg-ok-dim text-ok",
-    warn: "border-[#e3b46533] bg-warn-dim text-warn",
-    danger: "border-[#ef7a7a33] bg-danger-dim text-danger",
+    neutral: "border-fg-3/40 text-fg-2",
+    ok: "border-ok text-fg-2",
+    warn: "border-warn text-fg-2",
+    danger: "border-danger text-fg-2",
   }[tone];
-  return <div className={cn("rounded-xl border px-4 py-3 text-sm leading-relaxed", t)}>{children}</div>;
+  return <div className={cn("border-l-2 bg-white/[0.02] rounded-r-lg px-4 py-3 text-sm leading-relaxed", t)}>{children}</div>;
 }
 
 // ───────────────────────── icons
