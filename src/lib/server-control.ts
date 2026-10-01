@@ -124,7 +124,7 @@ export async function buildMatchzyConfig(matchId: string) {
       mp_team_timeout_max: m.tournament.timeouts_per_team,
       mp_team_timeout_time: m.tournament.timeout_seconds,
       // дуэль: без фризтайма (MatchZy применяет эти cvars через секунду после live.cfg, где стоит 18 с)
-      ...(modeOf(m.tournament.format).size === 1 && { mp_freezetime: 0 }),
+      ...(modeOf(m.tournament.format).size === 1 && { mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 }),
     },
   };
 }
