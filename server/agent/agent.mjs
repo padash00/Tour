@@ -196,7 +196,7 @@ let failures = 0;
 
 async function tick() {
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
-  const { _cpu, ...publicInfo } = info;
+  const publicInfo = Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu"));
   const { commands } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances });
   for (const cmd of commands ?? []) {
     log("cmd", cmd.type, cmd.instance ?? "");

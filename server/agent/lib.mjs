@@ -22,7 +22,8 @@ export function rcon(port, password, command, { host = "127.0.0.1", timeoutMs = 
       clearTimeout(timer);
       clearTimeout(settle);
       sock.destroy();
-      err ? reject(err) : resolve(out);
+      if (err) reject(err);
+      else resolve(out);
     };
     const timer = setTimeout(() => (authed ? finish() : finish(new Error("rcon timeout"))), timeoutMs);
     sock.on("error", finish);

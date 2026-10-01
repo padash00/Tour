@@ -45,3 +45,21 @@ powershell -ExecutionPolicy Bypass -File server\start.ps1 -Name CS2-01 -Stop
 
 Порты UDP 27015/27115/27215/27315/27415 (+5 для SourceTV) — только внутри LAN.
 Входящие из интернета закрыты, исходящие разрешены (Steam).
+
+## F16 Server Agent
+
+`server/agent/agent.mjs` (Node.js, без зависимостей) — копируется `install.ps1` в `D:\cs2server\f16\agent`.
+Раз в 5 секунд отправляет на сайт состояние инстансов (A2S + `get5_status`) и получает команды:
+start / stop / restart / load_match / end_match / rcon. Сайт к серверу не подключается — только исходящие HTTPS.
+
+- Конфиг: `D:\cs2server\f16\agent.json` — `siteUrl`, `token` (= `AGENT_TOKEN` в Vercel), `lanIp`. В git не хранится.
+- Ручной запуск: `D:\cs2server\F16-agent.bat` (перезапускается сам при падении).
+- Автозапуск при входе в Windows: `shell:startup\F16-Arena.bat` → `D:\cs2server\F16-autostart.bat` (CS2-01..03 + агент).
+
+Поток матча: вето на сайте → админ «Отправить на сервер» → агент `matchzy_loadmatch_url` →
+MatchZy забирает конфиг (составы по SteamID, карты) → агент ставит адрес событий → сайт видит
+`get5_status` = warmup и выдаёт игрокам IP → события MatchZy (`round_end`, `map_result`, `series_end`)
+обновляют счёт, статистику и сетку.
+
+Проверки: `node scripts/e2e-server-test.mjs CS2-01` (загрузка матча на сервер),
+`node scripts/e2e-events-test.mjs` (обработка событий).
