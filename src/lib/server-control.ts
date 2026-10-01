@@ -608,12 +608,13 @@ export async function verifyWorkshopLibrary() {
   const [library, info] = await Promise.all([getWorkshopMaps(), workshopInfo()]);
   const unchecked = library.map((w) => w.split("@")[1]).filter((id) => !info[id]);
   if (!unchecked.length) return;
+  // прогрев идёт до 4 минут; команда старше 10 минут считается зависшей (агент перезапускался) и не блокирует
   const since = new Date(Date.now() - 10 * 60_000).toISOString();
   const { count } = await db()
     .from("agent_commands")
     .select("id", { count: "exact", head: true })
     .eq("type", "prefetch_maps")
-    .or(`status.in.(pending,sent),created_at.gte.${since}`);
+    .gte("created_at", since);
   if (count) return;
   await enqueueCommand(null, "prefetch_maps", { workshop_ids: unchecked });
 }
