@@ -6,6 +6,8 @@ import { getActiveMembership, getRegistration, getTournamentBySlug, getTournamen
 import { bracketLabel, formatDateTime, mapName, registrationStatusLabel } from "@/lib/format";
 import type { Registration, Team, Tournament } from "@/lib/types";
 import { getTournamentMatches } from "@/lib/matches";
+import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
+import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
 import { BracketView } from "@/components/bracket-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 import { MapGraphic, TournamentStatusPill } from "@/components/tournament-bits";
@@ -32,7 +34,7 @@ export async function generateMetadata(props: PageProps<"/tournaments/[slug]">):
   return { title: t?.name ?? "Турнир" };
 }
 
-const TABS = ["overview", "teams", "bracket", "matches", "rules"] as const;
+const TABS = ["overview", "teams", "bracket", "matches", "stats", "rules"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function TournamentPage(props: PageProps<"/tournaments/[slug]">) {
@@ -86,6 +88,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
               { key: "teams", label: `Команды · ${approved.length}`, href: `${base}?tab=teams` },
               { key: "bracket", label: "Сетка", href: `${base}?tab=bracket` },
               { key: "matches", label: "Матчи", href: `${base}?tab=matches` },
+              { key: "stats", label: "Статистика", href: `${base}?tab=stats` },
               { key: "rules", label: "Правила", href: `${base}?tab=rules` },
             ]}
           />
@@ -95,7 +98,12 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
       <Container className="pt-10">
         <div className={tab === "bracket" && matches.length ? "space-y-8" : "grid lg:grid-cols-[1fr_360px] gap-8 items-start"}>
           <div className="min-w-0">
-            {tab === "overview" && <Overview t={t} />}
+            {tab === "overview" && (
+              <>
+                {["live", "finished"].includes(t.status) && <MvpCard tournamentId={t.id} finished={t.status === "finished"} />}
+                <Overview t={t} />
+              </>
+            )}
             {tab === "teams" && <TeamsTab approved={approved} pendingCount={pending.length} />}
             {tab === "bracket" &&
               (matches.length ? (
@@ -108,6 +116,7 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
                 />
               ))}
             {tab === "matches" && <MatchesTab matches={matches} />}
+            {tab === "stats" && <StatsTab tournamentId={t.id} />}
             {tab === "rules" && (
               <Card className="p-6 sm:p-8">
                 {t.rules ? (
@@ -397,5 +406,52 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
           </section>
         ))}
     </div>
+  );
+}
+
+async function StatsTab({ tournamentId }: { tournamentId: string }) {
+  const rows = await getPlayerLeaderboard(tournamentId);
+  return (
+    <div className="space-y-6">
+      {rows.length ? (
+        <PlayerStatsTable rows={rows} />
+      ) : (
+        <EmptyState title="Статистика появится после первых сыгранных карт" />
+      )}
+      <RatingExplainer />
+    </div>
+  );
+}
+
+async function MvpCard({ tournamentId, finished }: { tournamentId: string; finished: boolean }) {
+  const mvp = await getTournamentMvp(tournamentId);
+  if (!mvp) return null;
+  const nick = mvp.player?.nickname ?? mvp.name;
+  return (
+    <Card className="p-6 mb-8 relative overflow-hidden">
+      <div className="absolute inset-0 atmos opacity-50" />
+      <div className="relative flex flex-wrap items-center gap-5">
+        <Avatar src={mvp.player?.avatar_url} name={nick} size={64} />
+        <div className="flex-1 min-w-0">
+          <div className="label text-warm">{finished ? "MVP турнира" : "Лидер по рейтингу"}</div>
+          <div className="mt-1 text-2xl font-bold tracking-tight truncate">
+            {mvp.player ? (
+              <Link href={`/players/${mvp.player.steam_id}`} className="hover:text-accent">
+                {nick}
+              </Link>
+            ) : (
+              nick
+            )}
+          </div>
+          <div className="text-sm text-fg-3">{mvp.team?.name ?? ""}</div>
+        </div>
+        <div className="flex gap-6 text-center">
+          <div><div className="label">Rating</div><div className="mt-1 text-xl font-bold num text-ok">{fmt.r(mvp.rating)}</div></div>
+          <div><div className="label">ADR</div><div className="mt-1 text-xl font-bold num">{fmt.d1(mvp.adr)}</div></div>
+          <div><div className="label">K/D</div><div className="mt-1 text-xl font-bold num">{mvp.kd.toFixed(2)}</div></div>
+          <div><div className="label">Карты</div><div className="mt-1 text-xl font-bold num">{mvp.maps}</div></div>
+        </div>
+      </div>
+    </Card>
   );
 }

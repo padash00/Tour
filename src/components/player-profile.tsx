@@ -1,24 +1,43 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDate, mapName } from "@/lib/format";
+import type { PlayerAgg } from "@/lib/stats";
 import type { Player } from "@/lib/types";
-import { Avatar, Card, Container, EmptyState, FaceitLevel, IconChart, SectionTitle, TeamLogo } from "./ui";
+import { fmt, ratingColor } from "./stats-table";
+import { Avatar, Card, Container, EmptyState, FaceitLevel, IconChart, SectionTitle, TeamLogo, cn } from "./ui";
+
+export type MapHistoryItem = {
+  key: string;
+  matchId: string;
+  tournament: { name: string; slug: string };
+  opponent: { name: string; tag: string } | null;
+  mapName: string;
+  scoreFor: number;
+  scoreAgainst: number;
+  stats: PlayerAgg;
+};
 
 export function PlayerProfile({
   player,
   team,
   actions,
+  agg,
+  history = [],
+  tournaments = 0,
 }: {
   player: Player;
   team: { name: string; tag: string; logo_url: string | null } | null;
   actions?: React.ReactNode;
+  agg?: PlayerAgg | null;
+  history?: MapHistoryItem[];
+  tournaments?: number;
 }) {
   const stats = [
-    { label: "Rating", value: "—" },
-    { label: "K/D", value: "—" },
-    { label: "ADR", value: "—" },
-    { label: "KAST", value: "—" },
-    { label: "Матчи", value: "0" },
-    { label: "Карты", value: "0" },
+    { label: "Rating", value: agg ? fmt.r(agg.rating) : "—", cls: agg ? ratingColor(agg.rating) : "text-fg-3" },
+    { label: "K/D", value: agg ? agg.kd.toFixed(2) : "—" },
+    { label: "ADR", value: agg ? fmt.d1(agg.adr) : "—" },
+    { label: "KAST", value: agg ? fmt.pct(agg.kast) : "—" },
+    { label: "HS", value: agg ? fmt.pct(agg.hsPct) : "—" },
+    { label: "Карты", value: String(agg?.maps ?? 0) },
   ];
 
   return (
@@ -74,22 +93,79 @@ export function PlayerProfile({
             {stats.map((s) => (
               <div key={s.label} className="p-5">
                 <div className="label">{s.label}</div>
-                <div className="mt-2 text-2xl font-bold num text-fg-3">{s.value}</div>
+                <div className={cn("mt-2 text-2xl font-bold num", agg ? (s.cls ?? "text-fg") : "text-fg-3")}>{s.value}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="grid lg:grid-cols-2 gap-6">
+        {agg && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            {[
+              ["Убийства", agg.kills],
+              ["Смерти", agg.deaths],
+              ["Ассисты", agg.assists],
+              ["Entry", `${agg.firstKills}/${agg.firstDeaths}`],
+              ["Клатчи", agg.clutches],
+              ["Трейды", agg.trades],
+              ["3K+", agg.k3 + agg.k4 + agg.k5],
+              ["Ace", agg.k5],
+            ].map(([label, value]) => (
+              <Card key={String(label)} className="p-4">
+                <div className="label">{label}</div>
+                <div className="mt-1.5 text-lg font-semibold num">{value}</div>
+              </Card>
+            ))}
+          </div>
+        )}
+        <div className="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
           <div>
-            <SectionTitle title="История матчей" />
-            <EmptyState compact icon={<IconChart />} title="История матчей появится после первого участия" />
+            <SectionTitle title="История карт" />
+            {history.length === 0 ? (
+              <EmptyState compact icon={<IconChart />} title="История матчей появится после первого участия" />
+            ) : (
+              <div className="card overflow-x-auto">
+                <table className="tbl min-w-[560px] text-[13px]">
+                  <thead>
+                    <tr>
+                      <th>Соперник</th>
+                      <th>Карта</th>
+                      <th className="text-right">Счёт</th>
+                      <th className="text-right">K-D</th>
+                      <th className="text-right">ADR</th>
+                      <th className="text-right">Rating</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h) => (
+                      <tr key={h.key}>
+                        <td>
+                          <Link href={`/matches/${h.matchId}`} className="text-fg hover:text-accent">
+                            vs {h.opponent?.name ?? "—"}
+                          </Link>
+                          <div className="text-[11px] text-fg-3">{h.tournament.name}</div>
+                        </td>
+                        <td>{mapName(h.mapName)}</td>
+                        <td className={cn("text-right num", h.scoreFor > h.scoreAgainst ? "text-ok" : "text-danger")}>
+                          {h.scoreFor}:{h.scoreAgainst}
+                        </td>
+                        <td className="text-right num">
+                          {h.stats.kills}-{h.stats.deaths}
+                        </td>
+                        <td className="text-right num">{fmt.d1(h.stats.adr)}</td>
+                        <td className={cn("text-right num font-semibold", ratingColor(h.stats.rating))}>{fmt.r(h.stats.rating)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
           <div>
             <SectionTitle title="Турниры F16" />
             <Card className="p-6 grid grid-cols-3 gap-4">
-              <div><div className="label">Турниров</div><div className="mt-2 text-xl font-bold num">0</div></div>
-              <div><div className="label">Финалов</div><div className="mt-2 text-xl font-bold num">0</div></div>
-              <div><div className="label">MVP</div><div className="mt-2 text-xl font-bold num">0</div></div>
+              <div><div className="label">Турниров</div><div className="mt-2 text-xl font-bold num">{tournaments}</div></div>
+              <div><div className="label">Матчей</div><div className="mt-2 text-xl font-bold num">{agg?.matches ?? 0}</div></div>
+              <div><div className="label">Раундов</div><div className="mt-2 text-xl font-bold num">{agg?.rounds ?? 0}</div></div>
             </Card>
           </div>
         </div>

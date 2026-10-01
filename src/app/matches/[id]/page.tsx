@@ -7,7 +7,9 @@ import { getActiveMembership } from "@/lib/data";
 import { formatDateTime, mapName } from "@/lib/format";
 import { applyVetoTimeouts, getMatch, getMatchRosters, getTournamentMatches } from "@/lib/matches";
 import type { Team } from "@/lib/types";
+import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
+import { PlayerStatsTable } from "@/components/stats-table";
 import { ActionForm, CopyField } from "@/components/forms";
 import { Countdown, LiveRefresh } from "@/components/live-refresh";
 import { MatchStatusBadge, matchStage } from "@/components/match-bits";
@@ -26,10 +28,11 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const m = await getMatch(id);
   if (!m || m.tournament.status === "draft") notFound();
 
-  const [player, all, rosters] = await Promise.all([
+  const [player, all, rosters, statRows] = await Promise.all([
     getCurrentPlayer(),
     getTournamentMatches(m.tournament_id),
     getMatchRosters(m),
+    getStatRows({ matchId: m.id }),
   ]);
   const membership = player ? await getActiveMembership(player.id) : null;
   const myTeam = membership && (membership.team.id === m.team1_id || membership.team.id === m.team2_id) ? membership.team : null;
@@ -202,6 +205,36 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                 ))}
               </div>
             </Card>
+          )}
+
+          {/* SCOREBOARD */}
+          {statRows.length > 0 && (
+            <section className="space-y-6">
+              {[...new Set(statRows.map((r) => r.map_number))]
+                .sort((a, b) => a - b)
+                .map((n) => {
+                  const map = m.maps.find((x) => x.map_number === n);
+                  const rows = statRows.filter((r) => r.map_number === n);
+                  const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
+                  return [m.team1, m.team2].map((team, i) => {
+                    const teamRows = aggregatePlayers(rows.filter((r) => r.team_id === team?.id))
+                      .map((a) => ({ ...a, player: rosterPlayers.find((p) => p.steam_id === a.steam_id) ?? null }))
+                      .sort((a, b) => b.rating - a.rating);
+                    if (!teamRows.length) return null;
+                    return (
+                      <div key={`${n}-${i}`}>
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-semibold">{team?.name}</span>
+                          <span className="text-fg-3">
+                            Map {n} · {map ? mapName(map.map_name) : ""} {map ? `· ${i === 0 ? map.team1_score : map.team2_score}` : ""}
+                          </span>
+                        </div>
+                        <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} />
+                      </div>
+                    );
+                  });
+                })}
+            </section>
           )}
 
           {/* SERVER */}

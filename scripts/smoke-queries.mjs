@@ -37,6 +37,43 @@ const checks = {
   playersList: () => db.from("players").select("*, team_members(left_at, team:teams(name, tag))").limit(1),
   audit: () => db.from("audit_logs").select("*, actor:players(nickname, steam_id)").limit(1),
   tournamentsBracketCol: () => db.from("tournaments").select("id, bracket_published_at").limit(1),
+  statRows: () =>
+    db
+      .from("player_map_stats")
+      .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status))")
+      .neq("match.tournament.status", "draft")
+      .gt("rounds_played", 0)
+      .limit(1),
+  teamTable: () =>
+    db
+      .from("matches")
+      .select("id, maps:match_maps(team1_score, team2_score, winner_id, status), team1:teams!matches_team1_id_fkey(id, name, tag, logo_url), team2:teams!matches_team2_id_fkey(id, name, tag, logo_url), tournament:tournaments!inner(status)")
+      .eq("status", "finished")
+      .neq("tournament.status", "draft")
+      .limit(1),
+  mapTable: () =>
+    db
+      .from("match_maps")
+      .select("map_name, match:matches!inner(tournament_id, tournament:tournaments!inner(status))")
+      .neq("match.tournament.status", "draft")
+      .limit(1),
+  vetoTable: () =>
+    db.from("veto_actions").select("map_name, action, match:matches!inner(tournament_id, tournament:tournaments!inner(status))").neq("match.tournament.status", "draft").limit(1),
+  history: () =>
+    db
+      .from("player_map_stats")
+      .select("*, match:matches!inner(id, number, tournament:tournaments!inner(name, slug, status), team1:teams!matches_team1_id_fkey(name, tag), team2:teams!matches_team2_id_fkey(name, tag), maps:match_maps(map_number, map_name, team1_score, team2_score))")
+      .neq("match.tournament.status", "draft")
+      .limit(1),
+  rosterTournaments: () =>
+    db
+      .from("tournament_roster_players")
+      .select("tournament_id, registration:tournament_registrations!inner(status), tournament:tournaments!inner(status)")
+      .eq("registration.status", "approved")
+      .neq("tournament.status", "draft")
+      .limit(1),
+  serverPage: () =>
+    db.from("matches").select("id, number, server_instance, server_state, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag)").not("server_instance", "is", null).limit(1),
 };
 
 let failed = 0;
