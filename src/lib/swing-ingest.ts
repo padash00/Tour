@@ -1,4 +1,5 @@
 import "server-only";
+import { modeOf } from "./modes";
 import { db } from "./supabase";
 import { computeRoundSwing, parseLogLine, updateRoster, type LogEvent, type Side } from "./swing";
 
@@ -56,8 +57,14 @@ async function addSwing(matchId: string, mapNumber: number, swing: Map<string, n
 
 /** Строки HTTP-лога CS2 для матча → события раундов → swing после каждого раунда */
 export async function ingestLog(matchzyId: number, body: string) {
-  const { data: match } = await db().from("matches").select("id").eq("matchzy_id", matchzyId).maybeSingle();
+  const { data: match } = await db()
+    .from("matches")
+    .select("id, tournament:tournaments(format)")
+    .eq("matchzy_id", matchzyId)
+    .maybeSingle();
   if (!match) return { ignored: "unknown match" };
+  // размер команды режима: в дуэли одно убийство решает раунд (1 на 0), а не 5 на 4
+  const teamSize = modeOf((match as unknown as { tournament: { format: string } }).tournament?.format).size;
   const { data } = await db().from("match_log_state").select("*").eq("match_id", match.id).maybeSingle();
   const state = data as State | null;
   if (!state?.live) return { ignored: "map not live" };
@@ -77,7 +84,7 @@ export async function ingestLog(matchzyId: number, body: string) {
     buffer.push(e);
     if (e.type === "round_end") {
       updateRoster(roster, buffer);
-      const swing = computeRoundSwing(buffer, roster);
+      const swing = computeRoundSwing(buffer, roster, teamSize);
       round++;
       rounds++;
       const rosterObj = Object.fromEntries(roster);
@@ -107,4 +114,48 @@ export async function ingestLog(matchzyId: number, body: string) {
     })
     .eq("match_id", match.id);
   return { rounds };
+}
+
+/** Пересчитать Swing матча по сохранённым событиям раундов (после исправления модели) */
+export async function recomputeMatchSwing(matchId: string) {
+  const { data: m } = await db().from("matches").select("tournament:tournaments(format)").eq("id", matchId).single();
+  const teamSize = modeOf((m as unknown as { tournament: { format: string } } | null)?.tournament?.format).size;
+  const { data: rounds } = await db()
+    .from("match_rounds")
+    .select("map_number, round_number, events")
+    .eq("match_id", matchId)
+    .order("map_number")
+    .order("round_number");
+  const totals = new Map<string, { sum: number; rounds: number }>();
+  const roster = new Map<string, Side>();
+  let lastMap = -1;
+  for (const r of rounds ?? []) {
+    if (r.map_number !== lastMap) {
+      roster.clear();
+      lastMap = r.map_number;
+    }
+    const events = r.events as LogEvent[];
+    updateRoster(roster, events);
+    const swing = computeRoundSwing(events, roster, teamSize);
+    await db()
+      .from("match_rounds")
+      .update({ swing: Object.fromEntries(swing) })
+      .eq("match_id", matchId)
+      .eq("map_number", r.map_number)
+      .eq("round_number", r.round_number);
+    for (const id of new Set([...roster.keys(), ...swing.keys()])) {
+      const key = `${r.map_number}:${id}`;
+      const cur = totals.get(key) ?? { sum: 0, rounds: 0 };
+      cur.sum += swing.get(id) ?? 0;
+      cur.rounds += 1;
+      totals.set(key, cur);
+    }
+  }
+  for (const [key, v] of totals) {
+    const [map, steam] = key.split(":");
+    await db()
+      .from("player_map_swing")
+      .upsert({ match_id: matchId, map_number: Number(map), steam_id: steam, swing_sum: v.sum, rounds: v.rounds }, { onConflict: "match_id,map_number,steam_id" });
+  }
+  return totals.size;
 }
