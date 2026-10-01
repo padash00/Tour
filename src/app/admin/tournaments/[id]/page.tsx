@@ -26,7 +26,7 @@ import { BarCell, CARD, Label } from "@/components/admin/tournament-kit";
 import { TournamentStatusChip } from "@/components/primitives";
 import { Lifecycle, type LifeStep } from "@/components/admin/kit";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
-import { Avatar, EmptyState, FaceitLevel, TeamLogo, cn } from "@/components/ui";
+import { Avatar, EmptyState, FaceitLevel, TeamLogo, cn, buttonClass } from "@/components/ui";
 import { AdminHeader, Dot, Panel, SubTabs, TableBox } from "@/components/admin/control";
 import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
@@ -57,7 +57,7 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default async function AdminTournamentPage(props: PageProps<"/admin/tournaments/[id]">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin(`/admin/tournaments/${(await props.params).id}`); // права проверяются в каждой странице, не только в layout
   const { id } = await props.params;
   const sp = await props.searchParams;
   // старые ссылки ?tab=registrations ведут на регистрацию
@@ -110,6 +110,20 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       />
 
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
+      {tab === "overview" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-2 text-[12px] uppercase tracking-[0.2em] text-fg-3">Экспорт CSV</span>
+          {[
+            ["results", "Результаты матчей"],
+            ["rosters", "Составы"],
+            ["stats", "Статистика игроков"],
+          ].map(([type, label]) => (
+            <a key={type} href={`/admin/tournaments/${t.id}/export?type=${type}`} className={buttonClass("secondary", "sm")} download>
+              {label}
+            </a>
+          ))}
+        </div>
+      )}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
       {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} />}
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}

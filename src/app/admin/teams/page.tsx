@@ -11,7 +11,7 @@ import { requireAdmin } from "@/lib/auth";
 export const metadata: Metadata = { title: "Команды — F16 Control" };
 
 export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/teams"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const all = await listTeams();

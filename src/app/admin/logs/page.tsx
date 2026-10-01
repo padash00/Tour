@@ -36,7 +36,7 @@ const sevCls: Record<Severity, string> = { info: "text-fg-3", warn: "text-warn",
 type Row = AuditLog & { actor: Pick<Player, "nickname" | "steam_id"> | null };
 
 export default async function LogsPage(props: PageProps<"/admin/logs">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/logs"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const filter = FILTERS.find((f) => f.key === sp.f)?.key ?? "all";
   const sev = (["info", "warn", "error"] as const).find((s) => s === sp.s) ?? null;

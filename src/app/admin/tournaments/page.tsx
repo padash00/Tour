@@ -43,7 +43,7 @@ function nextAction(t: Tournament, pending: number): { text: string; tab?: strin
 }
 
 export default async function AdminTournamentsPage() {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/tournaments"); // права проверяются в каждой странице, не только в layout
   const [{ data }, { data: pendingRows }] = await Promise.all([
     db().from("tournaments").select("*").order("created_at", { ascending: false }),
     db().from("tournament_registrations").select("tournament_id").eq("status", "pending"),

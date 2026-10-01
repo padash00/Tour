@@ -86,7 +86,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export default async function SettingsPage(props: PageProps<"/admin/settings">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
   const [settings, workshop, info, mapImages, disabledMaps] = await Promise.all([

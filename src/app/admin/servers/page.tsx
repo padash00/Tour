@@ -24,7 +24,7 @@ const CMD_STATUS: Record<AgentCommand["status"], string> = {
 };
 
 export default async function ServersPage() {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/servers"); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
   const [{ data: matches }, { data: commands }] = await Promise.all([
     db()

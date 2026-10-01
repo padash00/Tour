@@ -157,7 +157,7 @@ function NextStep({
 }
 
 export default async function AdminMatchPage(props: PageProps<"/admin/matches/[id]">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin(`/admin/matches/${(await props.params).id}`); // права проверяются в каждой странице, не только в layout
   const { id } = await props.params;
   await applyVetoTimeouts(id);
   const m = await getMatch(id);

@@ -24,8 +24,8 @@ export async function requirePlayer(next = "/me"): Promise<Player> {
   return player;
 }
 
-export async function requireAdmin(): Promise<Player> {
-  const player = await requirePlayer("/admin");
+export async function requireAdmin(next = "/admin"): Promise<Player> {
+  const player = await requirePlayer(next.startsWith("/admin") ? next : "/admin");
   if (!isAdmin(player)) redirect("/");
   return player;
 }

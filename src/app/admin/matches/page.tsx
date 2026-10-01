@@ -23,7 +23,7 @@ type Row = MatchWithTeams & {
 };
 
 export default async function AdminMatchesPage(props: PageProps<"/admin/matches">) {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/matches"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const filter = FILTERS.find((f) => f.key === sp.f) ?? FILTERS[0];
   const { data } = await db()

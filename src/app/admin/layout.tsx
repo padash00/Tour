@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/auth";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { getServerState } from "@/lib/server-control";
 import { BrandSymbol, ControlLogo } from "@/components/brand";
@@ -12,7 +12,9 @@ import { serverNow } from "@/components/admin/kit";
  * и глобальным статусом площадки на каждой странице.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const admin = await requireAdmin();
+  // перенаправление на вход делает сама страница (requireAdmin с точным адресом) — так ссылка не теряется
+  const admin = await getCurrentPlayer();
+  if (!admin || !isAdmin(admin)) return <>{children}</>;
   const [servers, matchesRes, tournamentsRes] = await Promise.all([
     getServerState(),
     db()

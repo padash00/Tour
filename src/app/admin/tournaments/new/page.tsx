@@ -8,7 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 export const metadata: Metadata = { title: "Новый турнир — F16 Control" };
 
 export default async function NewTournamentPage() {
-  await requireAdmin(); // права проверяются в каждой странице, не только в layout
+  await requireAdmin("/admin/tournaments/new"); // права проверяются в каждой странице, не только в layout
   return (
     <div className="space-y-8">
       <AdminHeader back={{ href: "/admin/tournaments", label: "Турниры" }} title="Новый турнир" />

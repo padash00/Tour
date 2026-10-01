@@ -58,7 +58,8 @@ export async function getTeamMatches(teamId: string): Promise<(MatchWithTeams & 
     .neq("status", "cancelled")
     .order("number");
   return ((data ?? []) as (MatchWithTeams & { tournament: Tournament })[]).filter(
-    (m) => !(m.is_walkover && (!m.team1_id || !m.team2_id)),
+    // черновик турнира виден только админу — его матчи игроку не показываем
+    (m) => !(m.is_walkover && (!m.team1_id || !m.team2_id)) && m.tournament?.status !== "draft",
   );
 }
 

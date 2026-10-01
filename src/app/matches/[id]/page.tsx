@@ -120,7 +120,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   return (
     <>
-      {["upcoming", "veto", "ready", "live"].includes(m.status) && <LiveRefresh intervalMs={m.status === "veto" ? 2000 : 5000} />}
+      {["upcoming", "veto", "ready", "live"].includes(m.status) && <LiveRefresh watch={`match:${m.id}`} intervalMs={m.status === "veto" ? 1500 : 2500} />}
 
       <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
 

@@ -31,7 +31,7 @@ export default async function MatchesPage() {
 
   return (
     <>
-      {live.length > 0 && <LiveRefresh intervalMs={10000} />}
+      {live.length > 0 && <LiveRefresh watch="matches" intervalMs={4000} />}
       <PageHero eyebrow="Матчи F16 Arena" title="Матчи" description="Live, ближайшие и сыгранные матчи всех турниров." />
       <div className={`${WRAP} pt-14`}>
 
