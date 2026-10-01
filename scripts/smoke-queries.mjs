@@ -72,6 +72,19 @@ const checks = {
       .eq("registration.status", "approved")
       .neq("tournament.status", "draft")
       .limit(1),
+  disputesAdmin: () =>
+    db.from("disputes").select("*, opener:players!disputes_opened_by_fkey(nickname)").limit(1),
+  disputesOverview: () => db.from("disputes").select("id, match:matches(id, number)").eq("status", "open").limit(1),
+  rosterChanges: () => db.from("roster_changes").select("*").limit(1),
+  covers: () => db.from("tournaments").select("id, cover_url").limit(1),
+  underReview: () => db.from("matches").select("id, under_review").limit(1),
+  upcoming: () =>
+    db
+      .from("matches")
+      .select("*, team1:teams!matches_team1_id_fkey(*), team2:teams!matches_team2_id_fkey(*), tournament:tournaments!inner(id, name, slug, status)")
+      .in("status", ["upcoming", "veto", "ready", "live"])
+      .neq("tournament.status", "draft")
+      .limit(1),
   serverPage: () =>
     db.from("matches").select("id, number, server_instance, server_state, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag)").not("server_instance", "is", null).limit(1),
 };
