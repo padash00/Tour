@@ -15,28 +15,34 @@ export async function GET(request: NextRequest) {
   const [profile, faceit] = await Promise.all([fetchSteamProfile(steamId), fetchFaceitBySteamId(steamId)]);
   const now = new Date().toISOString();
 
-  const { data: player, error } = await db()
-    .from("players")
-    .upsert(
-      {
-        steam_id: steamId,
-        nickname: profile.nickname,
-        avatar_url: profile.avatarUrl,
-        profile_url: profile.profileUrl,
-        country: profile.country,
-        last_login_at: now,
-        ...(faceit && {
-          faceit_id: faceit.id,
-          faceit_nickname: faceit.nickname,
-          faceit_level: faceit.level,
-          faceit_elo: faceit.elo,
-          faceit_updated_at: now,
-        }),
-      },
-      { onConflict: "steam_id" },
-    )
-    .select("id, steam_id")
-    .single();
+  const faceitFields = faceit && {
+    faceit_id: faceit.id,
+    faceit_nickname: faceit.nickname,
+    faceit_level: faceit.level,
+    faceit_elo: faceit.elo,
+    faceit_updated_at: now,
+  };
+  const steamFields = {
+    nickname: profile.nickname,
+    avatar_url: profile.avatarUrl,
+    profile_url: profile.profileUrl,
+    country: profile.country,
+  };
+
+  const { data: existing } = await db().from("players").select("id").eq("steam_id", steamId).maybeSingle();
+  // если Steam не ответил — не затираем сохранённые ник и аватар
+  const { data: player, error } = existing
+    ? await db()
+        .from("players")
+        .update({ last_login_at: now, ...(profile.ok && steamFields), ...faceitFields })
+        .eq("id", existing.id)
+        .select("id, steam_id")
+        .single()
+    : await db()
+        .from("players")
+        .insert({ steam_id: steamId, last_login_at: now, ...steamFields, ...faceitFields })
+        .select("id, steam_id")
+        .single();
 
   if (error || !player) {
     console.error("steam login upsert failed", error);

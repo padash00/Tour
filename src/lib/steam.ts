@@ -48,6 +48,8 @@ export async function verifySteamCallback(url: URL): Promise<string | null> {
 }
 
 export type SteamProfile = {
+  /** false — Steam не ответил, данные заглушечные */
+  ok: boolean;
   nickname: string;
   avatarUrl: string | null;
   profileUrl: string;
@@ -56,6 +58,7 @@ export type SteamProfile = {
 
 export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> {
   const fallback: SteamProfile = {
+    ok: false,
     nickname: steamId,
     avatarUrl: null,
     profileUrl: `https://steamcommunity.com/profiles/${steamId}`,
@@ -73,6 +76,7 @@ export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> 
       const p = data?.response?.players?.[0];
       if (p) {
         return {
+          ok: true,
           nickname: p.personaname ?? steamId,
           avatarUrl: p.avatarfull ?? null,
           profileUrl: p.profileurl ?? fallback.profileUrl,
@@ -85,11 +89,9 @@ export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> 
     const xml = await res.text();
     const pick = (tag: string) =>
       new RegExp(`<${tag}><!\[CDATA\[([\s\S]*?)\]\]></${tag}>`).exec(xml)?.[1] ?? null;
-    return {
-      ...fallback,
-      nickname: pick("steamID") ?? steamId,
-      avatarUrl: pick("avatarFull"),
-    };
+    const nickname = pick("steamID");
+    if (!nickname) return fallback;
+    return { ...fallback, ok: true, nickname, avatarUrl: pick("avatarFull") };
   } catch {
     return fallback;
   }

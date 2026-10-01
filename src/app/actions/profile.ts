@@ -17,8 +17,7 @@ export async function refreshProfile(): Promise<ActionResult> {
   await db()
     .from("players")
     .update({
-      nickname: profile.nickname,
-      avatar_url: profile.avatarUrl ?? player.avatar_url,
+      ...(profile.ok && { nickname: profile.nickname, avatar_url: profile.avatarUrl ?? player.avatar_url }),
       ...(faceit && {
         faceit_id: faceit.id,
         faceit_nickname: faceit.nickname,
@@ -29,6 +28,7 @@ export async function refreshProfile(): Promise<ActionResult> {
     })
     .eq("id", player.id);
   revalidatePath("/me");
+  if (!profile.ok) return { error: "Steam не ответил — попробуйте позже" };
   return faceit ? { success: "Профиль и FACEIT обновлены" } : { success: "Профиль Steam обновлён. FACEIT-профиль не найден." };
 }
 
