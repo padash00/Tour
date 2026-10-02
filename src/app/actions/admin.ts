@@ -169,6 +169,27 @@ function withSlug(formData: FormData) {
   return raw;
 }
 
+/** Даты турнира идут по порядку: регистрация → check-in → старт */
+function checkDates(row: {
+  starts_at: string | null;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+  checkin_opens_at: string | null;
+  checkin_closes_at: string | null;
+}) {
+  const t = (s: string | null) => (s ? new Date(s).getTime() : null);
+  const start = t(row.starts_at);
+  const regOpen = t(row.registration_opens_at);
+  const regClose = t(row.registration_closes_at);
+  const ciOpen = t(row.checkin_opens_at);
+  const ciClose = t(row.checkin_closes_at);
+  if (regOpen && regClose && regClose <= regOpen) return "Закрытие регистрации должно быть позже её открытия";
+  if (regClose && start && regClose > start) return "Регистрация должна закрыться до старта турнира";
+  if (ciOpen && ciClose && ciClose <= ciOpen) return "Конец check-in должен быть позже его начала";
+  if (ciClose && start && ciClose > start) return "Check-in должен закончиться до старта турнира";
+  return null;
+}
+
 export async function createTournament(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const parsed = tournamentSchema.safeParse(withSlug(formData));
@@ -176,6 +197,8 @@ export async function createTournament(_prev: ActionResult, formData: FormData):
 
   const row = tournamentRow(parsed.data);
   if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
+  const datesError = checkDates(row);
+  if (datesError) return { error: datesError };
   const { data, error } = await db().from("tournaments").insert(row).select("id").single();
   if (error || !data) {
     return { error: error?.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось создать турнир" };
@@ -193,6 +216,8 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
 
   const row = tournamentRow(parsed.data);
   if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
+  const datesError = checkDates(row);
+  if (datesError) return { error: datesError };
   const { error } = await db().from("tournaments").update(row).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось сохранить" };
   if (formData.get("removeCover") === "on") await db().from("tournaments").update({ cover_url: null }).eq("id", id);

@@ -135,7 +135,7 @@ async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
   if (matchIds.length === 0) return;
   const [{ data: t }, { data: list }] = await Promise.all([
     db().from("tournaments").select("map_pool").eq("id", tournamentId).single(),
-    db().from("matches").select("id, number, team1_id, team2_id").in("id", matchIds),
+    db().from("matches").select("id, number, team1_id, team2_id, best_of").in("id", matchIds),
   ]);
   const pool = (t?.map_pool ?? []) as string[];
   const teamIds = (list ?? []).flatMap((m) => [m.team1_id, m.team2_id]).filter(Boolean) as string[];
@@ -144,8 +144,13 @@ async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
     : { data: [] as { id: string; captain_id: string; name: string }[] };
   for (const m of list ?? []) {
     if (pool.length === 1) {
-      await db().from("match_maps").insert({ match_id: m.id, map_number: 1, map_name: pool[0] });
-      await db().from("matches").update({ status: "ready", best_of: 1 }).eq("id", m.id);
+      // одна карта (например aim_map): BO3 — эта карта три раза, MatchZy перезагружает её между играми
+      const n = Math.max(1, m.best_of ?? 1);
+      await db().from("match_maps").delete().eq("match_id", m.id);
+      await db()
+        .from("match_maps")
+        .insert(Array.from({ length: n }, (_, i) => ({ match_id: m.id, map_number: i + 1, map_name: pool[0] })));
+      await db().from("matches").update({ status: "ready" }).eq("id", m.id);
     }
     const t1 = teams?.find((x) => x.id === m.team1_id);
     const t2 = teams?.find((x) => x.id === m.team2_id);
@@ -277,6 +282,12 @@ async function createEliminationStage(tournament: Tournament, seededTeamIds: str
   }));
   const { error } = await db().from("matches").insert(rows);
   if (error) throw new Error(error.message);
+  // матчи первого раунда создаются сразу «скоро» — уведомить и (при одной карте) подготовить серию,
+  // как это делает syncBracket для следующих раундов
+  await afterMatchesUpcoming(
+    tournament.id,
+    rows.filter((r) => r.status === "upcoming" && r.team1_id && r.team2_id).map((r) => r.id),
+  );
 }
 
 /** Команды стадии (группы/швейцарки) в порядке посева и матчи стадии */

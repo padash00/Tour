@@ -125,8 +125,8 @@ export async function buildMatchzyConfig(matchId: string) {
       mp_overtime_maxrounds: 6,
       mp_team_timeout_max: m.tournament.timeouts_per_team,
       mp_team_timeout_time: m.tournament.timeout_seconds,
-      // дуэль: без фризтайма (MatchZy применяет эти cvars через секунду после live.cfg, где стоит 18 с)
-      ...modeCvars(m.tournament.format),
+      // MatchZy применяет эти cvars через секунду после live.cfg; на aim-картах — без фризтайма
+      ...modeCvars(m.tournament.format, m.maps.map((x) => x.map_name)),
     },
   };
 }
@@ -282,18 +282,27 @@ export async function takePendingCommands(siteOrigin: string) {
  * Настройки режима. Workshop-карты (aim_map и т.п.) часто сами ставят mp_maxrounds и прочее —
  * агент проверяет их каждые 5 секунд и возвращает, пока идёт матч.
  */
-export function modeCvars(format: string): Record<string, number> {
+export function modeCvars(format: string, maps: string[] = []): Record<string, number> {
   const size = modeOf(format).size;
-  if (size === 1) return { mp_maxrounds: 24, mp_freezetime: 0, mp_round_restart_delay: 2, mp_halftime_duration: 5 };
-  if (size === 2) return { mp_maxrounds: 16 }; // Wingman MR16
-  return { mp_maxrounds: 24 }; // MR24
+  const base: Record<string, number> =
+    size === 1 ? { mp_maxrounds: 24, mp_halftime_duration: 5 } : size === 2 ? { mp_maxrounds: 16 } : { mp_maxrounds: 24 };
+  // aim-карты (aim_map и т.п.): без фризтайма и с быстрым рестартом раунда; на обычных картах — стандарт MatchZy
+  if (maps.length > 0 && maps.every(isAimMap)) return { ...base, mp_freezetime: 0, mp_round_restart_delay: 2 };
+  // обычные карты: фризтайм 15 с, как в соревновательном CS2 (в live.cfg MatchZy стоит 18); Wingman — свой конфиг
+  return size === 2 ? base : { ...base, mp_freezetime: 15 };
+}
+
+/** aim-карта: aim_map, aim_map@3070549948, aim_redline… */
+export function isAimMap(map: string) {
+  return /^aim[_-]/i.test(map.split("@")[0]);
 }
 
 async function matchEnforce(matchId: string) {
   const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format)").eq("id", matchId).single();
   const row = data as unknown as { matchzy_id: number; tournament: { format: string } } | null;
   if (!row) return null;
-  const cvars = modeCvars(row.tournament.format);
+  const { data: maps } = await db().from("match_maps").select("map_name").eq("match_id", matchId);
+  const cvars = modeCvars(row.tournament.format, (maps ?? []).map((x) => x.map_name));
   return Object.keys(cvars).length ? { matchid: row.matchzy_id, cvars } : null;
 }
 

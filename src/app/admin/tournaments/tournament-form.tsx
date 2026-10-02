@@ -186,21 +186,25 @@ export function TournamentForm({
 
   const effectiveSlug = slugEdited ? slug : slugify(name);
   const mapWarning =
-    maps.length < Math.max(bo, finalBo)
-      ? `Для BO${Math.max(bo, finalBo)} нужно минимум ${Math.max(bo, finalBo)} карт`
+    maps.length > 1 && maps.length < Math.max(bo, finalBo)
+      ? `Для BO${Math.max(bo, finalBo)} нужно минимум ${Math.max(bo, finalBo)} карт (или одна карта — она сыграется несколько раз)`
       : maps.length !== 7 && format !== "1v1"
         ? "Стандартное вето рассчитано на 7 карт"
         : null;
 
   const autoDates = () => {
     if (!start) return;
-    setRegClose(shift(start, -24 * 60));
-    setCheckinOpen(shift(start, -60));
+    // «сейчас» в часовом поясе Алматы (UTC+5), формат datetime-local
+    const nowLocal = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 16);
+    const open = regOpen && regOpen < start ? regOpen : nowLocal;
+    // регистрация закрывается за сутки до старта; если до старта меньше суток — за 75 минут, но не раньше открытия
+    let close = shift(start, -24 * 60);
+    if (close <= open) close = shift(start, -75);
+    if (close <= open) close = shift(start, -30);
+    setRegOpen(open);
+    setRegClose(close);
+    setCheckinOpen(shift(start, -60) > close ? shift(start, -60) : close);
     setCheckinClose(shift(start, -15));
-    if (!regOpen) {
-      const now = new Date(Date.now() + 5 * 3600 * 1000);
-      setRegOpen(now.toISOString().slice(0, 16));
-    }
   };
 
   const splitPrize = () => {
@@ -219,7 +223,7 @@ export function TournamentForm({
   const missing: Record<number, string | null> = {
     0: name.trim() ? null : "Нет названия",
     2: start ? null : "Нет даты старта",
-    4: mapWarning && maps.length < Math.max(bo, finalBo) ? mapWarning : null,
+    4: mapWarning && maps.length > 1 && maps.length < Math.max(bo, finalBo) ? mapWarning : null,
   };
   const canSubmit = !!name.trim();
 
