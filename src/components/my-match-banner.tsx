@@ -2,9 +2,84 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useViewer } from "./viewer";
 import { cn } from "./ui";
+
+/** Короткий сигнал без файла: два тона через Web Audio (браузер пускает звук после любого клика на сайте) */
+function chime() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    [880, 1320].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = f;
+      o.type = "sine";
+      const t = ctx.currentTime + i * 0.18;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.4);
+    });
+    setTimeout(() => ctx.close(), 1000);
+  } catch {}
+}
+
+/**
+ * Матч стал «готов» или началось вето — звук и мигающий заголовок вкладки, пока игрок не вернётся на неё.
+ * Срабатывает один раз на матч и статус.
+ */
+function useMatchAlert(key: string | null, label: string) {
+  const last = useRef<string | null>(null);
+  useEffect(() => {
+    if (!key) {
+      last.current = null;
+      return;
+    }
+    if (last.current === key) return;
+    const first = last.current === null && sessionStorageGet(key);
+    last.current = key;
+    if (first) return; // уже звенели в этой вкладке до перехода
+    sessionStorageSet(key);
+    chime();
+    const base = document.title;
+    let on = false;
+    const id = setInterval(() => {
+      on = !on;
+      document.title = on ? `🔔 ${label}` : base;
+    }, 1000);
+    const stop = () => {
+      if (document.visibilityState !== "visible") return;
+      clearInterval(id);
+      document.title = base;
+      document.removeEventListener("visibilitychange", stop);
+    };
+    // если вкладка на виду — помигаем 6 секунд, иначе до возвращения
+    document.addEventListener("visibilitychange", stop);
+    const t = document.visibilityState === "visible" ? setTimeout(() => stop(), 6000) : null;
+    return () => {
+      clearInterval(id);
+      if (t) clearTimeout(t);
+      document.title = base;
+      document.removeEventListener("visibilitychange", stop);
+    };
+  }, [key, label]);
+}
+const sessionStorageGet = (k: string) => {
+  try {
+    return sessionStorage.getItem(`f16-alert:${k}`) === "1";
+  } catch {
+    return false;
+  }
+};
+const sessionStorageSet = (k: string) => {
+  try {
+    sessionStorage.setItem(`f16-alert:${k}`, "1");
+  } catch {}
+};
 
 /**
  * Плашка под шапкой на любой странице сайта: «твой матч готов — заходи», «твоё вето», «идёт твой матч».
@@ -14,6 +89,8 @@ export function MyMatchBanner() {
   const { match } = useViewer();
   const pathname = usePathname();
   const [copied, setCopied] = useState(false);
+  const alertKey = match && ((match.status === "ready" && match.address) || match.status === "veto") ? `${match.id}:${match.status}` : null;
+  useMatchAlert(alertKey, match?.status === "veto" ? "Твоё вето" : "Матч готов — заходи");
   if (!match || pathname.startsWith("/admin")) return null;
   // на странице самого матча всё и так видно
   if (pathname === `/matches/${match.id}` && match.status !== "ready") return null;

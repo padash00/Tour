@@ -69,6 +69,7 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
   const player = await requirePlayer("/team/create");
   if (player.is_banned) return { error: BANNED_ERROR };
   if (await getActiveMembership(player.id)) return { error: "Вы уже состоите в команде" };
+  if (await isRateLimited(player.id, "team.create", 30)) return { error: "Слишком часто — попробуйте через несколько секунд" };
 
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -125,6 +126,7 @@ export async function updateTeam(_prev: ActionResult, formData: FormData): Promi
   const ctx = await requireCaptain();
   if (!ctx) return { error: NOT_CAPTAIN };
   const { player, team } = ctx;
+  if (await isRateLimited(player.id, "team.update", 5)) return { error: "Слишком часто — попробуйте через несколько секунд" };
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { name, tag, region, description } = parsed.data;
@@ -153,6 +155,7 @@ export async function regenerateInvite(): Promise<ActionResult> {
   const ctx = await requireCaptain();
   if (!ctx) return { error: NOT_CAPTAIN };
   const { player, team } = ctx;
+  if (await isRateLimited(player.id, "team.invite_regenerate", 10)) return { error: "Слишком часто — попробуйте через несколько секунд" };
   await db().from("teams").update({ invite_code: inviteCode(team.tag) }).eq("id", team.id);
   await audit(player.id, "team.invite_regenerate", { type: "team", id: team.id });
   revalidatePath("/team");

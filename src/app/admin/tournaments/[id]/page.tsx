@@ -19,7 +19,7 @@ import { MODES, type ModeKey } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
-import { prefetchMaps, setAutopilot } from "@/app/actions/admin-server";
+import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
@@ -33,6 +33,7 @@ import { getWorkshopMaps, getDisabledMaps, getMapImages } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
 import { requireAdmin } from "@/lib/auth";
+import { tournamentEta } from "@/lib/schedule";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
 
@@ -93,7 +94,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         }
       />
 
-      <LifecyclePanel t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />
+      <LifecyclePanel t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} eta={await tournamentEta(t.id).catch(() => null)} />
 
       <SubTabs
         active={tab}
@@ -225,7 +226,19 @@ function stepIndex(status: TournamentStatus, hasBracket: boolean) {
 type T = NonNullable<Awaited<ReturnType<typeof getTournamentById>>>;
 
 /** Шапка управления: где турнир сейчас и одна главная кнопка следующего шага */
-function LifecyclePanel({ t, approved, checkedIn, pending }: { t: T; approved: number; checkedIn: number; pending: number }) {
+function LifecyclePanel({
+  t,
+  approved,
+  checkedIn,
+  pending,
+  eta,
+}: {
+  t: T;
+  approved: number;
+  checkedIn: number;
+  pending: number;
+  eta: Awaited<ReturnType<typeof tournamentEta>>;
+}) {
   const hasBracket = !!t.bracket_published_at;
   const status = (to: TournamentStatus, label: string, confirm?: string, variant: "primary" | "danger" = "primary") => (
     <ActionForm action={setTournamentStatus}>
@@ -285,7 +298,7 @@ function LifecyclePanel({ t, approved, checkedIn, pending }: { t: T; approved: n
       }
       break;
     case "live":
-      now = "Турнир идёт: матчи играются на серверах.";
+      now = `Турнир идёт: матчи играются на серверах.${eta?.finishAt ? ` Окончание ≈ в ${formatTime(new Date(eta.finishAt).toISOString())} (карта в среднем ~${eta.mapMinutes} мин).` : ""}`;
       next = "Завершите турнир после финала";
       hint = "Несыгранные матчи отменятся, серверы освободятся, появятся итоги и награды.";
       action = status("finished", "Завершить турнир", "Завершить турнир? Несыгранные матчи будут отменены.", "danger");
@@ -369,6 +382,26 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
             <input type="hidden" name="on" value={t.autopilot ? "0" : "1"} />
             <SubmitButton size="sm" variant={t.autopilot ? "secondary" : "primary"}>
               {t.autopilot ? "Выключить автопилот" : "Включить автопилот"}
+            </SubmitButton>
+          </ActionForm>
+        </div>
+        <div className="mt-3 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 text-[13px]">
+              <Dot tone={t.auto_approve ? "ok" : "muted"} />
+              <span className="font-medium text-fg">Автоодобрение заявок</span>
+              <span className={t.auto_approve ? "text-ok" : "text-fg-3"}>{t.auto_approve ? "включено" : "выключено"}</span>
+            </div>
+            <p className="mt-1.5 text-[13px] text-fg-2 leading-relaxed">
+              Заявка с полным составом сразу становится одобренной, пока есть свободные места ({t.max_teams}). Отклонить или снять
+              её можно потом во вкладке «Регистрация».
+            </p>
+          </div>
+          <ActionForm action={setAutoApprove}>
+            <input type="hidden" name="tournamentId" value={t.id} />
+            <input type="hidden" name="on" value={t.auto_approve ? "0" : "1"} />
+            <SubmitButton size="sm" variant={t.auto_approve ? "secondary" : "primary"}>
+              {t.auto_approve ? "Выключить" : "Включить"}
             </SubmitButton>
           </ActionForm>
         </div>

@@ -13,6 +13,7 @@ import {
   getTournamentById,
   isRateLimited,
   writeRoster,
+  countApproved,
 } from "@/lib/data";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { db } from "@/lib/supabase";
@@ -109,16 +110,27 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     return { success: "Состав заявки обновлён" };
   }
 
+  // автоодобрение: состав уже проверен выше (размер, баны, двойные заявки) — одобряем, пока есть места
+  const auto = tournament.auto_approve && (await countApproved(tournament.id)) < tournament.max_teams;
+  if (auto) {
+    await db()
+      .from("tournament_registrations")
+      .update({ status: "approved", decided_at: new Date().toISOString(), decided_by: null, note: "одобрено автоматически" })
+      .eq("id", registrationId);
+  }
+
   await notify(
     chosen.filter((m) => m.player_id !== player.id).map((m) => m.player_id),
-    `${team.name} подала заявку на «${tournament.name}»`,
-    "Заявка ожидает подтверждения администратора.",
+    auto ? `${team.name} участвует в «${tournament.name}»` : `${team.name} подала заявку на «${tournament.name}»`,
+    auto ? "Заявка одобрена автоматически." : "Заявка ожидает подтверждения администратора.",
     `/tournaments/${tournament.slug}`,
   );
-  await audit(player.id, "registration.create", { type: "tournament", id: tournament.id }, { team: team.tag });
+  await audit(player.id, auto ? "registration.auto_approved" : "registration.create", { type: "tournament", id: tournament.id }, { team: team.tag });
   revalidatePath(`/tournaments/${tournament.slug}`);
   revalidatePath("/team");
-  return { success: "Заявка подана. Ожидайте подтверждения администратора." };
+  return {
+    success: auto ? "Заявка одобрена — вы в турнире! Не забудьте пройти check-in." : "Заявка подана. Ожидайте подтверждения администратора.",
+  };
 }
 
 export async function withdrawRegistration(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -130,6 +142,7 @@ export async function withdrawRegistration(_prev: ActionResult, formData: FormDa
   if ("error" in ctx) return { error: ctx.error };
   const { player, team } = ctx;
 
+  if (await isRateLimited(player.id, "registration.withdraw", 5)) return { error: "Слишком часто — попробуйте через несколько секунд" };
   const reg = await getRegistration(tournament.id, team.id);
   if (!reg || (reg.status !== "pending" && reg.status !== "approved")) return { error: "Активной заявки нет" };
   if (tournament.status !== "registration") {
@@ -153,6 +166,7 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   if ("error" in ctx) return { error: ctx.error };
   const { player, team } = ctx;
 
+  if (await isRateLimited(player.id, "registration.checkin", 3)) return { error: "Слишком часто — попробуйте через несколько секунд" };
   if (tournament.status !== "checkin") return { error: "Check-in сейчас не проводится" };
   const windowError = checkinWindowError(tournament);
   if (windowError) return { error: windowError };

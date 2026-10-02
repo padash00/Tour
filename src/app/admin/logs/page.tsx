@@ -20,6 +20,7 @@ const FILTERS = [
   { key: "team", label: "Команды" },
   { key: "player", label: "Игроки" },
   { key: "settings", label: "Настройки" },
+  { key: "site", label: "Ошибки сайта" },
 ];
 
 type Severity = "info" | "warn" | "error";

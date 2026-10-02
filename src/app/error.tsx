@@ -8,6 +8,15 @@ import { Eyebrow, WRAP, btnClass } from "@/components/primitives";
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // ошибки сервера (с digest) уже записаны в журнал на сервере — шлём только браузерные
+    if (!error.digest) {
+      fetch("/api/client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: String(error.message ?? error), path: location.pathname + location.search }),
+        keepalive: true,
+      }).catch(() => {});
+    }
   }, [error]);
 
   return (

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import {
   applyAgentReport,
+  autoMaintenanceTick,
   autopilotTick,
   checkBearer,
   closeMatchesOfEndedTournaments,
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
   await safely("cs2 version", () => checkCs2UpToDate(report.info?.cs2_patch));
   await safely("dedupe prune", pruneIngest);
   await safely("profile sync", refreshStaleProfilesTick);
+  await safely("auto maintenance", autoMaintenanceTick);
   const commands = await takePendingCommands(request.nextUrl.origin);
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
   return NextResponse.json({ commands, bundle_version: getAgentBundle().version });

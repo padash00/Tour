@@ -7,6 +7,15 @@ import { useEffect } from "react";
 export default function AdminError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    // ошибки сервера (с digest) уже записаны в журнал на сервере — шлём только браузерные
+    if (!error.digest) {
+      fetch("/api/client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: String(error.message ?? error), path: location.pathname + location.search }),
+        keepalive: true,
+      }).catch(() => {});
+    }
   }, [error]);
 
   return (

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Плагин CounterStrikeSharp: окно по центру экрана для разминки (сайт → агент → f16_hud) -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- версия как на сервере (D:\cs2server\f16\versions.json); сам API уже лежит у CounterStrikeSharp -->
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.376">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

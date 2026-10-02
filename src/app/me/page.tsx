@@ -5,10 +5,11 @@ import { markNotificationsRead, refreshProfile } from "@/app/actions/profile";
 import { isAdmin, requirePlayer } from "@/lib/auth";
 import { refreshIfStale } from "@/lib/profile-sync";
 import { getActiveMembership, getSoloTeam, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
-import { formatDateTime, registrationStatusLabel } from "@/lib/format";
+import { formatDateTime, formatTime, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
 import { getTeamMatches } from "@/lib/matches";
+import { tournamentEta } from "@/lib/schedule";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { MatchRow, MatchStatusBadge } from "@/components/match-bits";
 import { NotificationItem } from "@/components/public/notification-feed";
@@ -47,6 +48,9 @@ export default async function MePage() {
   const upcoming = teamMatches.filter((m) => m.status !== "finished").sort((a, b) => order[a.status] - order[b.status] || a.number - b.number);
   const recent = teamMatches.filter((m) => m.status === "finished").reverse().slice(0, 5);
   const next = upcoming[0];
+  // примерное время, если матч ещё не начался
+  const nextEta =
+    next && ["upcoming", "pending"].includes(next.status) ? ((await tournamentEta(next.tournament_id).catch(() => null))?.matchStart.get(next.id) ?? null) : null;
   const notifications = (notificationsRes.data ?? []) as Notification[];
   const unread = notifications.filter((n) => !n.read_at).length;
   const activeRegs = regs.filter((r) => isActiveRegistration(r) && !["finished", "cancelled"].includes(r.tournament.status));
@@ -201,7 +205,7 @@ export default async function MePage() {
               <div className="text-fg-3 font-semibold tracking-[0.1em]">VS</div>
               <div className="mt-1 text-[12px] text-fg-3">
                 BO{next.best_of}
-                {next.scheduled_at ? ` · ${formatDateTime(next.scheduled_at)}` : ""}
+                {next.scheduled_at ? ` · ${formatDateTime(next.scheduled_at)}` : nextEta ? ` · ≈ в ${formatTime(new Date(nextEta).toISOString())}` : ""}
               </div>
             </div>
             <div className="flex items-center justify-end gap-4 min-w-0">

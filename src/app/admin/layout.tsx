@@ -6,6 +6,7 @@ import { BrandSymbol, ControlLogo } from "@/components/brand";
 import { Avatar, cn } from "@/components/ui";
 import { AdminCrumbs, AdminMobileNav, AdminRail, CommandPalette, type PaletteItem } from "@/components/admin/shell";
 import { serverNow } from "@/components/admin/kit";
+import { recentSiteErrors } from "@/lib/site-errors";
 
 /**
  * F16 Control — отдельный «режим пульта»: иконочная панель, командная строка с поиском (Ctrl+K)
@@ -15,7 +16,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // перенаправление на вход делает сама страница (requireAdmin с точным адресом) — так ссылка не теряется
   const admin = await getCurrentPlayer();
   if (!admin || !isAdmin(admin)) return <>{children}</>;
-  const [servers, matchesRes, tournamentsRes] = await Promise.all([
+  const [servers, matchesRes, tournamentsRes, siteErrors] = await Promise.all([
     getServerState(),
     db()
       .from("matches")
@@ -25,6 +26,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       .order("number", { ascending: false })
       .limit(300),
     db().from("tournaments").select("id, name, status").order("created_at", { ascending: false }).limit(50),
+    recentSiteErrors(15).catch(() => 0),
   ]);
   const now = serverNow();
 
@@ -69,6 +71,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       }
     }
   }
+  if (siteErrors > 0) alarms.push({ key: "site-errors", text: `Ошибки на сайте за 15 минут: ${siteErrors} — подробности в журнале`, href: "/admin/logs?f=site" });
   const lastSync = servers.host?.last_seen_at ? Math.max(0, Math.round((now - new Date(servers.host.last_seen_at).getTime()) / 1000)) : null;
 
   const palette: PaletteItem[] = [

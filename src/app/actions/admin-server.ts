@@ -85,6 +85,16 @@ export async function setAutopilot(_prev: ActionResult, formData: FormData): Pro
   return { success: on ? "Автопилот включён" : "Автопилот выключен" };
 }
 
+export async function setAutoApprove(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("tournamentId"));
+  const on = formData.get("on") === "1";
+  await db().from("tournaments").update({ auto_approve: on }).eq("id", id);
+  await audit(admin.id, on ? "tournament.auto_approve_on" : "tournament.auto_approve_off", { type: "tournament", id });
+  revalidatePath(`/admin/tournaments/${id}`);
+  return { success: on ? "Заявки будут одобряться автоматически" : "Заявки снова одобряете вы" };
+}
+
 export async function prefetchMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const id = String(formData.get("tournamentId"));

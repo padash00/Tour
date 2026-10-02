@@ -13,7 +13,8 @@
 // Запуск:  node agent.mjs   (или D:\cs2server\F16-agent.bat)
 
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -157,11 +158,72 @@ const AUTOSTART_DELAY_MS = 15_000;
 const autoStart = {}; // { [instance]: { key, since, announced, done } }
 const mapTitle = (m) => String(m ?? "").split("@")[0].replace(/^(de|cs|aim|awp)_/, "").replace(/^./, (c) => c.toUpperCase());
 
+// ───────────────────────── окно по центру экрана (плагин F16Hud)
+// Плагин лежит на сайте (/agent/F16Hud.dll). Раз в 10 минут сверяем его с установленным и при отличии
+// кладём новый и загружаем на запущенных серверах — без ручного копирования.
+const HUD_DIR = path.join(SERVER_DIR, "game", "csgo", "addons", "counterstrikesharp", "plugins", "F16Hud");
+let hudCheckedAt = 0;
+async function ensureHudPlugin() {
+  if (Date.now() - hudCheckedAt < 10 * 60_000) return;
+  hudCheckedAt = Date.now();
+  const res = await fetch(`${config.siteUrl}/agent/F16Hud.dll`, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const target = path.join(HUD_DIR, "F16Hud.dll");
+  const sha = (b) => createHash("sha256").update(b).digest("hex");
+  if (existsSync(target) && sha(readFileSync(target)) === sha(buf)) return;
+  mkdirSync(HUD_DIR, { recursive: true });
+  writeFileSync(target, buf);
+  log(`F16Hud: установлен плагин (${buf.length} байт)`);
+  for (const inst of INSTANCES) await rcon(inst.port, secrets.rcon, "css_plugins load F16Hud").catch(() => {});
+}
+
+const hudClean = (t) => String(t ?? "").replace(/[";|\u0000-\u001f\u007f]/g, "").slice(0, 60);
+const hudShown = {}; // { [instance]: true } — окно сейчас показано
+
+/** Разминка матча: карта, счёт серии, кого ждём — по центру экрана, обновляется на каждом тике */
+async function warmupHud(inst, info, get5, extra) {
+  const a = assignments[inst.name];
+  const active = a && get5 && get5.matchid === a.matchid && get5.gamestate === "warmup";
+  if (!active) {
+    if (hudShown[inst.name]) {
+      delete hudShown[inst.name];
+      await rcon(inst.port, secrets.rcon, "f16_hud_clear").catch(() => {});
+    }
+    return;
+  }
+  const cfg = readJsonSafe(path.join(STATE_DIR, "match-configs", `${a.match_id}.json`), null);
+  const mapNo = get5.map_number ?? 0;
+  const total = cfg?.num_maps ?? 1;
+  const map = cfg?.maplist?.[mapNo] ? mapTitle(cfg.maplist[mapNo]) : "";
+  const t1 = hudClean(get5.team1?.name ?? cfg?.team1?.name ?? "Команда 1");
+  const t2 = hudClean(get5.team2?.name ?? cfg?.team2?.name ?? "Команда 2");
+  const s1 = get5.team1?.series_score ?? 0;
+  const s2 = get5.team2?.series_score ?? 0;
+  const lines = [
+    `F16 ARENA · Карта ${mapNo + 1}${total > 1 ? ` из ${total}` : ""}${map ? ` — ${hudClean(map)}` : ""}`,
+    total > 1 ? `${t1}  ${s1} : ${s2}  ${t2}` : `${t1}  vs  ${t2}`,
+    extra,
+  ].filter(Boolean);
+  hudShown[inst.name] = true;
+  await rcon(inst.port, secrets.rcon, `f16_hud 8 ${lines.join("|")}`).catch(() => {});
+}
+
 async function autoStartNextMap(inst, info, get5) {
   const a = assignments[inst.name];
   const mapNo = get5?.map_number ?? 0;
-  if (!a || !get5 || get5.matchid !== a.matchid || get5.gamestate !== "warmup" || mapNo < 1) {
+  if (!a || !get5 || get5.matchid !== a.matchid || get5.gamestate !== "warmup") {
     delete autoStart[inst.name];
+    await warmupHud(inst, info, get5, null);
+    return;
+  }
+  if (mapNo < 1) {
+    // первая карта — игроки сами пишут .r
+    const cfg0 = readJsonSafe(path.join(STATE_DIR, "match-configs", `${a.match_id}.json`), null);
+    const need0 = (cfg0?.players_per_team ?? 5) * 2;
+    const humans0 = Math.max(0, (info?.players ?? 0) - 1);
+    delete autoStart[inst.name];
+    await warmupHud(inst, info, get5, humans0 < need0 ? `Ждём игроков: ${humans0} из ${need0}` : "Все на месте — напишите .r в чат");
     return;
   }
   const key = `${a.matchid}:${mapNo}`;
@@ -180,11 +242,18 @@ async function autoStartNextMap(inst, info, get5) {
   }
   if (humans < need) {
     st.since = null;
+    await warmupHud(inst, info, get5, `Ждём игроков: ${humans} из ${need} — старт сам, .r не нужен`);
     return;
   }
   st.since ??= Date.now();
-  if (Date.now() - st.since < AUTOSTART_DELAY_MS) return;
+  const left = Math.ceil((AUTOSTART_DELAY_MS - (Date.now() - st.since)) / 1000);
+  if (left > 0) {
+    await warmupHud(inst, info, get5, `Все на месте — старт через ${left} с`);
+    return;
+  }
   st.done = true;
+  delete hudShown[inst.name];
+  await rcon(inst.port, secrets.rcon, "f16_hud_clear").catch(() => {});
   await rcon(inst.port, secrets.rcon, "css_asay Все на месте — старт!").catch(() => {});
   const out = await rcon(inst.port, secrets.rcon, "css_start").catch((e) => String(e.message));
   log(`автостарт ${inst.name}: матч ${a.matchid}, карта ${mapNo + 1} (${humans}/${need}) ${String(out ?? "").trim().slice(0, 80)}`);
@@ -611,6 +680,7 @@ async function tick() {
   try {
     ensureServerLanguage();
     ensureMatchzyRu();
+    await ensureHudPlugin().catch((e) => log(`F16Hud: ${e.message}`));
   } catch (e) {
     log(`язык сервера: ${e.message}`);
   }
