@@ -285,8 +285,14 @@ export async function takePendingCommands(siteOrigin: string) {
  */
 export function modeCvars(format: string, maps: string[] = []): Record<string, number> {
   const size = modeOf(format).size;
-  const base: Record<string, number> =
-    size === 1 ? { mp_maxrounds: 24, mp_halftime_duration: 5 } : size === 2 ? { mp_maxrounds: 16 } : { mp_maxrounds: 24 };
+  const base: Record<string, number> = {
+    ...(size === 1 ? { mp_maxrounds: 24, mp_halftime_duration: 5 } : size === 2 ? { mp_maxrounds: 16 } : { mp_maxrounds: 24 }),
+    // смена карты в серии: gamemode_competitive.cfg на каждой карте ставит tv_delay 105, и MatchZy
+    // растягивает экран итогов до tv_delay + 25 = 130 с. Трансляцию с задержкой мы не ведём —
+    // держим 0, тогда экран итогов 15 с (минимум MatchZy)
+    tv_delay: 0,
+    mp_match_restart_delay: 15,
+  };
   // aim-карты (aim_map и т.п.): без фризтайма и с быстрым рестартом раунда; на обычных картах — стандарт MatchZy
   if (maps.length > 0 && maps.every(isAimMap)) return { ...base, mp_freezetime: 0, mp_round_restart_delay: 2 };
   // обычные карты: фризтайм 15 с, как в соревновательном CS2 (в live.cfg MatchZy стоит 18); Wingman — свой конфиг
