@@ -558,7 +558,7 @@ async function RegistrationTab({
   );
 }
 
-const REG_GRID = "grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_70px_80px_110px_120px_minmax(0,auto)] items-center gap-x-4 gap-y-2";
+const REG_GRID = "grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr)_64px_76px_120px_110px_120px_minmax(190px,auto)] items-center gap-x-5 gap-y-2";
 
 function RegistrationHead() {
   return (
@@ -567,7 +567,8 @@ function RegistrationHead() {
       <span className="text-right">Состав</span>
       <span className="text-right">Avg ELO</span>
       <span>Статус</span>
-      <span>Check-in / seed</span>
+      <span>Check-in</span>
+      <span>Посев</span>
       <span className="text-right">Действия</span>
     </div>
   );
@@ -610,18 +611,25 @@ function RegistrationRow({
           <span className="size-1.5 rounded-full bg-current" />
           {registrationStatusLabel[r.status]}
         </span>
-        <div className="flex items-center gap-2 max-md:hidden">
-          {r.status === "approved" ? (
+        <span className={cn("flex items-center gap-1.5 whitespace-nowrap text-[12px] max-md:hidden", r.checked_in_at ? "text-ok" : "text-fg-3")}>
+          {r.status !== "approved" ? "—" : r.checked_in_at ? (
             <>
-              <span className={cn("text-[12px]", r.checked_in_at ? "text-ok" : "text-fg-3")}>{r.checked_in_at ? "✓ check-in" : "нет"}</span>
-              <ActionForm action={setSeed} className="flex gap-1">
-                <input type="hidden" name="registrationId" value={r.id} />
-                <input name="seed" type="number" min={1} max={64} defaultValue={r.seed ?? ""} placeholder="#" aria-label="Seed" className="field !h-8 w-14 !px-2 text-[12px] num" />
-                <SubmitButton size="sm" variant="ghost">
-                  OK
-                </SubmitButton>
-              </ActionForm>
+              <span className="size-1.5 rounded-full bg-current" />
+              Прошёл
             </>
+          ) : (
+            "Не прошёл"
+          )}
+        </span>
+        <div className="max-md:hidden">
+          {r.status === "approved" ? (
+            <ActionForm action={setSeed} className="flex items-center gap-1.5">
+              <input type="hidden" name="registrationId" value={r.id} />
+              <input name="seed" type="number" min={1} max={64} defaultValue={r.seed ?? ""} placeholder="#" aria-label="Посев" title="Номер посева: 1 — самый сильный. Пусто — по ELO" className="field !h-8 w-14 !px-2 text-[12px] num" />
+              <SubmitButton size="sm" variant="secondary">
+                OK
+              </SubmitButton>
+            </ActionForm>
           ) : (
             <span className="text-[12px] text-fg-3">—</span>
           )}
