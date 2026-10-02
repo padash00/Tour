@@ -165,6 +165,8 @@ const HUD_DIR = path.join(SERVER_DIR, "game", "csgo", "addons", "counterstrikesh
 let hudCheckedAt = 0;
 async function ensureHudPlugin() {
   if (Date.now() - hudCheckedAt < 10 * 60_000) return;
+  // замена плагина на сервере с идущим матчем может уронить CS2 — обновляем только когда матчей нет
+  if (Object.keys(assignments).length > 0) return;
   hudCheckedAt = Date.now();
   const res = await fetch(`${config.siteUrl}/agent/F16Hud.dll`, { signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -175,7 +177,11 @@ async function ensureHudPlugin() {
   mkdirSync(HUD_DIR, { recursive: true });
   writeFileSync(target, buf);
   log(`F16Hud: установлен плагин (${buf.length} байт)`);
-  for (const inst of INSTANCES) await rcon(inst.port, secrets.rcon, "css_plugins load F16Hud").catch(() => {});
+  // уже загруженный плагин CounterStrikeSharp перезагрузит сам (hot reload); повторный load его роняет
+  for (const inst of INSTANCES) {
+    const list = await rcon(inst.port, secrets.rcon, "css_plugins list").catch(() => null);
+    if (list != null && !/F16 HUD/.test(list)) await rcon(inst.port, secrets.rcon, "css_plugins load F16Hud").catch(() => {});
+  }
 }
 
 const hudClean = (t) => String(t ?? "").replace(/[";|\u0000-\u001f\u007f]/g, "").slice(0, 60);
