@@ -81,7 +81,7 @@ export default async function MePage() {
             ? {
                 eyebrow: "Первый шаг",
                 title: "Создайте команду",
-                text: "Вы станете капитаном и получите ссылку-приглашение для игроков.",
+                text: "Вы станете капитаном и получите ссылку-приглашение для игроков. Или найдите команду в разделе «Поиск команды».",
                 href: "/team/create",
                 cta: "Создать команду",
               }
@@ -277,10 +277,15 @@ export default async function MePage() {
             ) : (
               <div className="py-2">
                 <div className="text-[16px] font-semibold text-fg">Вы пока не в команде</div>
-                <p className="mt-1 text-[14px] text-fg-3">Создайте свою или попросите капитана прислать приглашение.</p>
-                <Button href="/team/create" size="sm" className="mt-4">
-                  Создать команду
-                </Button>
+                <p className="mt-1 text-[14px] text-fg-3">Создайте свою, попросите капитана прислать приглашение или разместите объявление.</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button href="/team/create" size="sm">
+                    Создать команду
+                  </Button>
+                  <Button href="/find" variant="secondary" size="sm">
+                    Найти команду
+                  </Button>
+                </div>
               </div>
             )}
           </section>

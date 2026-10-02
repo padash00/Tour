@@ -13,6 +13,9 @@ import { ADMIN_CARD, AdminHeader, AlertRow, Dot } from "@/components/admin/contr
 import { humanPlayers } from "@/components/admin/instance-card";
 import { Section, Strip, StripCell, instanceState, minutesSince, serverNow, toneBar, toneText } from "@/components/admin/kit";
 import { requireAdmin } from "@/lib/auth";
+import { getCs2UpdateCheck, getSelfCheck } from "@/lib/server/ops";
+import { OpsAlerts, type OpsInfo } from "@/components/admin/ops-alerts";
+import { SelfCheckPanel } from "@/components/admin/self-check";
 
 export const metadata: Metadata = { title: "Серверы — F16 Control" };
 
@@ -26,7 +29,7 @@ const CMD_STATUS: Record<AgentCommand["status"], string> = {
 export default async function ServersPage() {
   await requireAdmin("/admin/servers"); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
-  const [{ data: matches }, { data: commands }] = await Promise.all([
+  const [{ data: matches }, { data: commands }, cs2Check, selfReport] = await Promise.all([
     db()
       .from("matches")
       .select(
@@ -35,7 +38,13 @@ export default async function ServersPage() {
       .not("server_instance", "is", null)
       .in("status", ["ready", "live"]),
     db().from("agent_commands").select("*").order("created_at", { ascending: false }).limit(25),
+    getCs2UpdateCheck(),
+    getSelfCheck(),
   ]);
+  const nowTs = serverNow();
+  const selfCheckRunning = ((commands ?? []) as AgentCommand[]).some(
+    (c) => c.type === "self_check" && (c.status === "pending" || c.status === "sent") && nowTs - new Date(c.created_at).getTime() < 15 * 60_000,
+  );
   type M = {
     id: string;
     number: number;
@@ -81,9 +90,15 @@ export default async function ServersPage() {
       )}
       {busy && (
         <AlertRow tone="warn" title="Агент занят">
-          {busy}. Серверы могут быть недоступны.
+          {busy === "self_check" ? "идёт проверка перед турниром" : busy}. Серверы могут быть недоступны.
         </AlertRow>
       )}
+      {online && <OpsAlerts info={(host?.info ?? {}) as OpsInfo} cs2={cs2Check} />}
+
+      {/* ── проверка перед турниром ── */}
+      <Section title="Проверка перед турниром">
+        <SelfCheckPanel report={selfReport} running={selfCheckRunning || busy === "self_check"} disabled={!online ? "Агент не на связи." : null} />
+      </Section>
 
       {/* ── хост ── */}
       <Strip className="grid-cols-2 md:grid-cols-4 lg:[&>*:nth-child(n+5)]:border-t lg:[&>*:nth-child(n+5)]:border-white/[0.06]">

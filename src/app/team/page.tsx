@@ -55,7 +55,7 @@ export default async function MyTeamPage() {
       >
         <div className="mt-10 flex flex-wrap gap-4">
           <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn>
-          <OutlineBtn href="/teams">Найти команду</OutlineBtn>
+          <OutlineBtn href="/find">Найти команду</OutlineBtn>
         </div>
       </PageHero>
     );
@@ -311,6 +311,12 @@ export default async function MyTeamPage() {
                   Новая ссылка
                 </SubmitButton>
               </ActionForm>
+              <Link href="/find" className="mt-4 block text-[14px] text-accent hover:text-accent-strong">
+                Игроки ищут команду — посмотреть объявления →
+              </Link>
+              <Link href="/find?tab=teams" className="mt-2 block text-[13px] text-fg-3 hover:text-fg">
+                Разместить объявление «ищем игрока»
+              </Link>
             </div>
           )}
           <Link

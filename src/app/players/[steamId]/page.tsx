@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getActiveMembership, getPlayerBySteamId } from "@/lib/data";
 import { aggregatePlayers, getPlayerMapHistory, getStatRows } from "@/lib/stats";
 import { db } from "@/lib/supabase";
+import { getPlayerAwards } from "@/lib/awards";
+import { getPlayerProgress } from "@/lib/progress";
 import { PlayerProfile } from "@/components/player-profile";
 
 export async function generateMetadata(props: PageProps<"/players/[steamId]">): Promise<Metadata> {
@@ -15,7 +17,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
   const { steamId } = await props.params;
   const player = await getPlayerBySteamId(steamId);
   if (!player) notFound();
-  const [membership, rows, history, rosters] = await Promise.all([
+  const [membership, rows, history, rosters, awards, progress] = await Promise.all([
     getActiveMembership(player.id),
     getStatRows({ playerId: player.id }),
     getPlayerMapHistory(player.id),
@@ -25,6 +27,8 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
       .eq("player_id", player.id)
       .eq("registration.status", "approved")
       .neq("tournament.status", "draft"),
+    getPlayerAwards(player.id),
+    getPlayerProgress(player.id),
   ]);
   const agg = rows.length ? aggregatePlayers(rows)[0] : null;
 
@@ -35,6 +39,8 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
       agg={agg}
       history={history}
       tournaments={new Set((rosters.data ?? []).map((r) => r.tournament_id)).size}
+      awards={awards}
+      progress={progress}
     />
   );
 }

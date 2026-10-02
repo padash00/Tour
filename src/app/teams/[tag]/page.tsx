@@ -5,6 +5,8 @@ import { MAX_MAIN, averageElo, getTeamByTag, getTeamMembers, getTeamRegistration
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
 import { getPlayerLeaderboard } from "@/lib/stats";
+import { getTeamAwards } from "@/lib/awards";
+import { AwardsRow } from "@/components/public/awards";
 import { MatchLine, TStatus } from "@/components/public/bits";
 import { FormStrip } from "@/components/public/form-strip";
 import { ratingColor } from "@/components/stats-table";
@@ -24,11 +26,12 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team) notFound();
 
-  const [members, regs, matches, board] = await Promise.all([
+  const [members, regs, matches, board, awards] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getTeamMatches(team.id),
     getPlayerLeaderboard(),
+    getTeamAwards(team.id),
   ]);
   const finished = matches.filter((m) => m.status === "finished").reverse();
   const recent = finished.slice(0, 10);
@@ -188,12 +191,18 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
             </div>
             <div>
               <SectionHead title="Трофеи" />
-              <div className={cn(CARD, "flex items-center gap-5 px-6 py-6 lg:px-8")}>
-                <svg viewBox="0 0 24 24" className="size-9 shrink-0 text-fg-3" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
-                  <path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z M7.5 6H4.5v1.2A3 3 0 0 0 7.5 10M16.5 6h3v1.2a3 3 0 0 1-3 3M12 13.5v3.5M8.5 20h7M10 17h4v3h-4z" />
-                </svg>
-                <p className="text-[14px] text-fg-3">Первые трофеи впереди — призовые места F16 Arena появятся здесь.</p>
-              </div>
+              {awards.length ? (
+                <div className={cn(CARD, "px-5 py-5 lg:px-6")}>
+                  <AwardsRow awards={awards} />
+                </div>
+              ) : (
+                <div className={cn(CARD, "flex items-center gap-5 px-6 py-6 lg:px-8")}>
+                  <svg viewBox="0 0 24 24" className="size-9 shrink-0 text-fg-3" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+                    <path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z M7.5 6H4.5v1.2A3 3 0 0 0 7.5 10M16.5 6h3v1.2a3 3 0 0 1-3 3M12 13.5v3.5M8.5 20h7M10 17h4v3h-4z" />
+                  </svg>
+                  <p className="text-[14px] text-fg-3">Первые трофеи впереди — призовые места F16 Arena появятся здесь.</p>
+                </div>
+              )}
             </div>
           </div>
         </section>

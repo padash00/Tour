@@ -16,6 +16,8 @@ import { GroupStageView, SwissView } from "@/components/stage-view";
 import { MatchRow, matchStage, visibleMatches } from "@/components/match-bits";
 
 import { MapTile } from "@/components/competition/map-tile";
+import { RecapView } from "@/components/competition/recap-view";
+import { getTournamentRecap } from "@/lib/recap";
 import { TournamentLifecycle, nextStepText } from "@/components/competition/tournament-lifecycle";
 import Image from "next/image";
 import {
@@ -38,18 +40,20 @@ export async function generateMetadata(props: PageProps<"/tournaments/[slug]">):
   return { title: t?.name ?? "Турнир" };
 }
 
-const TABS = ["overview", "teams", "bracket", "matches", "stats", "rules"] as const;
+const TABS = ["recap", "overview", "teams", "bracket", "matches", "stats", "rules"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function TournamentPage(props: PageProps<"/tournaments/[slug]">) {
   const { slug } = await props.params;
   const sp = await props.searchParams;
-  const tab: Tab = TABS.includes(sp.tab as Tab) ? (sp.tab as Tab) : "overview";
-
   const player = await getCurrentPlayer();
   // черновик видит только админ — для предпросмотра
   const t = await getTournamentBySlug(slug, isAdmin(player));
   if (!t) notFound();
+  const finished = t.status === "finished";
+  // у завершённого турнира по умолчанию открываются итоги
+  const requested = TABS.includes(sp.tab as Tab) ? (sp.tab as Tab) : null;
+  const tab: Tab = requested === "recap" && !finished ? "overview" : (requested ?? (finished ? "recap" : "overview"));
 
   const [regs, matches, mapImages] = await Promise.all([
     getTournamentRegistrations(t.id),
@@ -136,7 +140,8 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
           <Tabs
             active={tab}
             items={[
-              { key: "overview", label: "Обзор", href: base },
+              ...(finished ? [{ key: "recap", label: "Итоги", href: `${base}?tab=recap` }] : []),
+              { key: "overview", label: "Обзор", href: finished ? `${base}?tab=overview` : base },
               { key: "teams", label: solo ? "Участники" : "Команды", href: `${base}?tab=teams` },
               { key: "bracket", label: "Сетка", href: `${base}?tab=bracket` },
               { key: "matches", label: "Матчи", href: `${base}?tab=matches` },
@@ -150,6 +155,17 @@ export default async function TournamentPage(props: PageProps<"/tournaments/[slu
       <div className={`${WRAP} pt-14`}>
         <div className={wide ? "" : "grid lg:grid-cols-[minmax(0,1fr)_400px] gap-x-16 gap-y-12 items-start"}>
           <div className="min-w-0">
+            {tab === "recap" && (
+              <>
+                <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-fg-3 text-[15px]">Отдельная страница итогов — её удобно отправить в чат или соцсети.</p>
+                  <Button href={`${base}/recap`} variant="secondary" size="md" iconRight={<IconArrow />}>
+                    Страница итогов
+                  </Button>
+                </div>
+                <RecapView recap={await getTournamentRecap(t)} solo={solo} />
+              </>
+            )}
             {tab === "overview" && (
               <>
                 {["live", "finished"].includes(t.status) && <MvpBlock tournamentId={t.id} finished={t.status === "finished"} />}

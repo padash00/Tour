@@ -6,6 +6,7 @@ import { db } from "./supabase";
 import { modeOf } from "./modes";
 import { getSetting, getWorkshopMaps } from "./settings";
 import { startMapLogging, stopMapLogging } from "./swing-ingest";
+import { saveSelfCheck, type AgentEvent } from "./server/ops";
 import type { Match } from "./types";
 
 // ───────────────────────── авторизация агента и MatchZy
@@ -58,7 +59,8 @@ export type AgentCommand = {
     | "update_cs2"
     | "update_plugins"
     | "restart_all"
-    | "prefetch_maps";
+    | "prefetch_maps"
+    | "self_check";
   payload: Record<string, unknown>;
   status: "pending" | "sent" | "done" | "error";
   result: string | null;
@@ -174,6 +176,8 @@ export type AgentReport = {
     players?: number | null;
     get5?: { gamestate?: string; matchid?: number | null; map_number?: number | null } | null;
   }[];
+  /** события агента: сервер упал и поднят / не удалось поднять */
+  events?: AgentEvent[];
 };
 
 export async function applyAgentReport(report: AgentReport) {
@@ -313,6 +317,7 @@ export async function ackCommand(id: string, ok: boolean, result: string) {
     .maybeSingle();
   const cmd = data as AgentCommand | null;
   if (cmd?.type === "prefetch_maps") await saveWorkshopResults(result);
+  if (cmd?.type === "self_check" && ok) await saveSelfCheck(result);
   if (cmd?.type === "load_match" && !ok) {
     await db().from("matches").update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
   }
@@ -553,6 +558,22 @@ export async function enqueuePrefetch(tournamentId: string, actorId?: string) {
   if (!ids.length) return 0;
   await enqueueCommand(null, "prefetch_maps", { workshop_ids: ids }, actorId);
   return ids.length;
+}
+
+/**
+ * Проверка перед турниром: активные инстансы и Workshop-карты турниров, которые ещё не прошли.
+ * Агент сам запускает выключенные инстансы, проверяет и возвращает их в прежнее состояние.
+ */
+export async function enqueueSelfCheck(actorId?: string) {
+  const [{ data: insts }, { data: ts }] = await Promise.all([
+    db().from("server_instances").select("name, role").order("name"),
+    db().from("tournaments").select("map_pool").not("status", "in", "(finished,cancelled)"),
+  ]);
+  const instances = (insts ?? []).filter((i) => i.role === "active").map((i) => i.name);
+  const workshop = [
+    ...new Set(((ts ?? []) as { map_pool: string[] }[]).flatMap((t) => (t.map_pool ?? []).filter((m) => m.includes("@")).map((m) => m.split("@")[1]))),
+  ];
+  await enqueueCommand(null, "self_check", { instances, workshop_ids: workshop }, actorId);
 }
 
 // ───────────────────────── проверка карты

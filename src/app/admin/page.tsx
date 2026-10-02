@@ -15,6 +15,8 @@ import { ADMIN_CARD, AdminHeader, AlertRow } from "@/components/admin/control";
 import { InstanceCard, type InstanceMatch } from "@/components/admin/instance-card";
 import { Quiet, Section, SectionLink, Strip, StripCell, minutesSince, serverNow } from "@/components/admin/kit";
 import { requireAdmin } from "@/lib/auth";
+import { getCs2UpdateCheck } from "@/lib/server/ops";
+import { OpsAlerts, opsAlertCount, type OpsInfo } from "@/components/admin/ops-alerts";
 
 export const metadata: Metadata = { title: "F16 Control" };
 
@@ -44,7 +46,9 @@ export default async function AdminOverview() {
       .limit(10),
     db().from("disputes").select("id, match:matches(id, number)").eq("status", "open"),
   ]);
-  const servers = await getServerState();
+  const [servers, cs2Check] = await Promise.all([getServerState(), getCs2UpdateCheck()]);
+  const opsInfo = (servers.host?.info ?? {}) as OpsInfo;
+  const opsCount = servers.online ? opsAlertCount(opsInfo, cs2Check) : 0;
   const now = serverNow();
 
   const active = (activeRes.data ?? []) as unknown as (InstanceMatch & { server_instance: string | null })[];
@@ -68,7 +72,7 @@ export default async function AdminOverview() {
   const cpu = info.cpu_load != null ? Number(info.cpu_load) : null;
   const running = servers.instances.filter((s) => s.running);
   const alerts =
-    Number(!servers.online) + serverErrors.length + noShow.length + disputeMatches.length + pendingTournaments.length;
+    Number(!servers.online) + opsCount + serverErrors.length + noShow.length + disputeMatches.length + pendingTournaments.length;
 
   return (
     <div className="space-y-8">
@@ -153,6 +157,7 @@ export default async function AdminOverview() {
                   {servers.host?.last_seen_at ? ` (последний сигнал ${formatShortDateTime(servers.host.last_seen_at)})` : ""}.
                 </AlertRow>
               )}
+              {servers.online && <OpsAlerts info={opsInfo} cs2={cs2Check} />}
               {serverErrors.map((m) => (
                 <AlertRow key={m.id} tone="danger" title={`Матч #${m.number}: сервер`} action={{ href: `/admin/matches/${m.id}`, label: "Перенести" }}>
                   {m.team1?.tag} vs {m.team2?.tag} — карта не загрузилась, нужен другой сервер.

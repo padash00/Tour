@@ -6,6 +6,8 @@ import { FORMATS, type FormatKind } from "@/lib/formats";
 import { MODES, type ModeKey } from "@/lib/modes";
 import type { PrizeRow, Tournament } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
+import { ConfirmModal } from "@/components/modal";
+import { requirementsTemplate, rulesTemplate } from "@/lib/rules-templates";
 import { Field, buttonClass, cn } from "@/components/ui";
 
 const DEFAULT_RULES = `Вето проходит на странице матча до подключения к серверу.
@@ -174,6 +176,10 @@ export function TournamentForm({
   const [timeoutSec, setTimeoutSec] = useState(t?.timeout_seconds ?? 30);
   const [techPauses, setTechPauses] = useState(t?.tech_pauses ?? 2);
   const [techSec, setTechSec] = useState(t?.tech_pause_seconds ?? 300);
+  const [rulesText, setRulesText] = useState(t?.rules ?? DEFAULT_RULES);
+  const [reqText, setReqText] = useState(t?.requirements ?? "");
+  // вставка шаблона поверх своего текста — только после подтверждения
+  const [pendingTemplate, setPendingTemplate] = useState<null | "rules" | "requirements">(null);
   const [freeEntry, setFreeEntry] = useState(!t?.entry_fee || t.entry_fee === "Бесплатно");
   const [entryFee, setEntryFee] = useState(t?.entry_fee && t.entry_fee !== "Бесплатно" ? t.entry_fee : "");
   const [sponsors, setSponsors] = useState<{ name: string; url?: string }[]>(t?.sponsors ?? []);
@@ -524,12 +530,65 @@ export function TournamentForm({
                 </div>
               </div>
             </div>
-            <Field label="Требования к участникам" hint="Если пусто — показываются стандартные">
-              <textarea name="requirements" rows={3} defaultValue={t?.requirements ?? ""} className="field resize-y" />
-            </Field>
-            <Field label="Регламент">
-              <textarea name="rules" rows={8} defaultValue={t?.rules ?? DEFAULT_RULES} className="field resize-y" />
-            </Field>
+            {(() => {
+              const size = (format === "1v1" ? 1 : format === "2v2" ? 2 : 5) as 1 | 2 | 5;
+              const opts = {
+                size,
+                bracket,
+                bo,
+                finalBo,
+                knife,
+                overtime,
+                timeouts,
+                timeoutSec,
+                techPauses,
+                techSec,
+                isLan,
+                singleMap: maps.length === 1,
+                prizePool,
+              };
+              const apply = (which: "rules" | "requirements") => {
+                if (which === "rules") setRulesText(rulesTemplate(opts));
+                else setReqText(requirementsTemplate(opts));
+              };
+              const ask = (which: "rules" | "requirements") => {
+                const current = which === "rules" ? rulesText : reqText;
+                // пусто или стандартный текст — заменяем сразу, своё — спрашиваем
+                if (!current.trim() || current === DEFAULT_RULES) apply(which);
+                else setPendingTemplate(which);
+              };
+              const modeLabel = size === 1 ? "1×1" : size === 2 ? "2×2" : "5×5";
+              return (
+                <>
+                  <Field label="Требования к участникам" hint="Если пусто — показываются стандартные">
+                    <textarea name="requirements" rows={4} value={reqText} onChange={(e) => setReqText(e.target.value)} className="field resize-y" />
+                  </Field>
+                  <button type="button" onClick={() => ask("requirements")} className={buttonClass("outline", "sm", "-mt-2")}>
+                    Вставить шаблон требований · {modeLabel}
+                  </button>
+                  <Field label="Регламент" hint="Шаблон подставит формат, BO, паузы, нож и овертайм из настроек выше — потом можно править">
+                    <textarea name="rules" rows={14} value={rulesText} onChange={(e) => setRulesText(e.target.value)} className="field resize-y" />
+                  </Field>
+                  <button type="button" onClick={() => ask("rules")} className={buttonClass("outline", "sm", "-mt-2")}>
+                    Вставить шаблон регламента · {modeLabel}
+                  </button>
+                  <ConfirmModal
+                    open={pendingTemplate !== null}
+                    message={
+                      pendingTemplate === "rules"
+                        ? "Заменить текущий регламент шаблоном? Ваш текст будет потерян."
+                        : "Заменить текущие требования шаблоном? Ваш текст будет потерян."
+                    }
+                    confirmLabel="Заменить"
+                    onCancel={() => setPendingTemplate(null)}
+                    onConfirm={() => {
+                      if (pendingTemplate) apply(pendingTemplate);
+                      setPendingTemplate(null);
+                    }}
+                  />
+                </>
+              );
+            })()}
           </Section>
 
           <Section show={step === 4} title="Карты" hint="Нажмите на карту, чтобы включить или убрать её">

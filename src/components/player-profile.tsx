@@ -7,6 +7,9 @@ import { Avatar, FaceitLevel, TeamLogo, cn } from "./ui";
 import { CARD, PageHero, SectionHead, Wrap } from "./primitives";
 import { DATA_TABLE, NUM_CELL } from "./public/data-table";
 import { FormStrip } from "./public/form-strip";
+import { AwardsRow, ProgressTable } from "./public/awards";
+import type { Award } from "@/lib/awards";
+import type { ProgressItem } from "@/lib/progress";
 
 export type MapHistoryItem = {
   key: string;
@@ -42,6 +45,8 @@ export function PlayerProfile({
   agg,
   history = [],
   tournaments = 0,
+  awards = [],
+  progress = [],
 }: {
   player: Player;
   team: { name: string; tag: string; logo_url: string | null } | null;
@@ -49,6 +54,8 @@ export function PlayerProfile({
   agg?: PlayerAgg | null;
   history?: MapHistoryItem[];
   tournaments?: number;
+  awards?: Award[];
+  progress?: ProgressItem[];
 }) {
   const main = [
     { label: "F16 Rating", value: agg ? fmt.r(agg.rating) : "—", cls: agg ? ratingColor(agg.rating) : undefined },
@@ -187,6 +194,13 @@ export function PlayerProfile({
           </dl>
         )}
 
+        {progress.length > 0 && (
+          <section className={cn(CARD, "mt-14 p-6 lg:p-8 min-w-0")}>
+            <SectionHead title="Прогресс по турнирам" />
+            <ProgressTable items={progress} />
+          </section>
+        )}
+
         <div className="mt-14 grid lg:grid-cols-[1.7fr_1fr] gap-4 items-start">
           <section className={cn(CARD, "p-6 lg:p-8 min-w-0")}>
             <SectionHead title="Последние матчи" />
@@ -260,7 +274,7 @@ export function PlayerProfile({
             </section>
             <section className={cn(CARD, "p-6 lg:p-8")}>
               <SectionHead title="Достижения" />
-              <p className="text-[14px] text-fg-3">Первые трофеи впереди.</p>
+              <AwardsRow awards={awards} />
             </section>
           </div>
         </div>

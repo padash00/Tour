@@ -27,6 +27,7 @@ export const NAV_MORE = [
   { href: "/matches", label: "Матчи" },
   { href: "/stats", label: "Статистика" },
   { href: "/players", label: "Игроки" },
+  { href: "/find", label: "Поиск команды" },
 ];
 
 export async function SiteHeader() {

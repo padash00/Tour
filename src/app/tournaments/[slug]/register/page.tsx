@@ -6,6 +6,7 @@ import { requirePlayer } from "@/lib/auth";
 import { getActiveMembership, getRegistration, getSoloTeam, getTeamMembers, getTournamentBySlug } from "@/lib/data";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { RosterPicker } from "@/components/roster-picker";
+import { getPreviousRoster } from "@/lib/progress";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { RosterList } from "@/components/roster-list";
@@ -116,10 +117,15 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   const active = reg && (reg.status === "pending" || reg.status === "approved");
   const canEdit = isCaptain && t.status === "registration";
 
-  // предвыбор: текущий состав заявки, иначе основа по ролям в команде
+  // состав прошлой заявки того же режима — «подать заявку тем же составом» одной кнопкой
+  const previous = canEdit && !active ? await getPreviousRoster(team.id, t, members) : null;
+
+  // предвыбор: текущий состав заявки, иначе прошлый состав, иначе основа по ролям в команде
   const initial: Record<string, "main" | "sub" | "out"> = {};
   if (active && reg.roster.length) {
     for (const r of reg.roster) initial[r.player_id] = r.role === "sub" ? "sub" : "main";
+  } else if (previous) {
+    for (const m of members) initial[m.player_id] = previous.main.includes(m.player_id) ? "main" : previous.sub.includes(m.player_id) ? "sub" : "out";
   } else {
     const ordered = [...members.filter((m) => m.role !== "substitute"), ...members.filter((m) => m.role === "substitute")];
     ordered.forEach((m, i) => (initial[m.player_id] = i < mode.size ? "main" : i < mode.size + mode.subs ? "sub" : "out"));
@@ -171,6 +177,29 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           <Step n={3} title="Подтверждение" muted />
         </>
       ) : canEdit ? (
+        <>
+          {previous && (
+            <div className="mt-6 rounded-[12px] border border-accent/30 bg-accent/[0.05] p-5 lg:p-6">
+              <div className="text-[16px] font-semibold text-fg">Тем же составом, что на «{previous.tournamentName}»</div>
+              <p className="mt-1 text-[14px] text-fg-2">
+                Основа: {previous.names.slice(0, previous.main.length).join(", ")}
+                {previous.sub.length ? ` · запас: ${previous.names.slice(previous.main.length).join(", ")}` : ""}
+              </p>
+              <ActionForm action={registerTeam} className="mt-4">
+                <input type="hidden" name="tournamentId" value={t.id} />
+                {previous.main.map((id) => (
+                  <input key={id} type="hidden" name="main" value={id} />
+                ))}
+                {previous.sub.map((id) => (
+                  <input key={id} type="hidden" name="sub" value={id} />
+                ))}
+                <SubmitButton size="lg" className="w-full sm:w-auto" pendingText="Отправляем…">
+                  Подать заявку тем же составом
+                </SubmitButton>
+              </ActionForm>
+              <p className="mt-3 text-[12px] text-fg-3">Или выберите состав вручную ниже.</p>
+            </div>
+          )}
         <ActionForm action={registerTeam}>
           <input type="hidden" name="tournamentId" value={t.id} />
           {reg?.status === "rejected" && reg.note && (
@@ -210,6 +239,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             </SubmitButton>
           </Step>
         </ActionForm>
+        </>
       ) : (
         <Step n={2} title="Состав заявки">
           {reg?.roster.length ? (
