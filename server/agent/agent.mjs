@@ -14,7 +14,7 @@
 
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -688,6 +688,38 @@ async function syncMatchzyAdmins(siteAdmins) {
   for (const inst of INSTANCES) await rcon(inst.port, secrets.rcon, "reload_admins").catch(() => {});
 }
 
+// Чистка бэкапов раундов и демо старше срока из настроек сайта (раз в час). Файлы матчей,
+// которые сейчас на серверах, не трогаем — по ним может понадобиться откат раунда.
+let cleanupAt = 0;
+function cleanupBackups(days) {
+  if (!Number.isFinite(days) || days < 1 || Date.now() - cleanupAt < 60 * 60_000) return;
+  cleanupAt = Date.now();
+  const cutoff = Date.now() - days * 86_400_000;
+  const active = new Set(Object.values(assignments).map((a) => String(a.matchid)));
+  const csgo = path.join(SERVER_DIR, "game", "csgo");
+  const targets = [
+    { dir: path.join(csgo, "MatchZyDataBackup"), re: /^matchzy_(\d+)_.*\.json$/ },
+    { dir: csgo, re: /^matchzy_(\d+)_.*\.txt$/ },
+    { dir: path.join(csgo, "MatchZy"), re: /_(\d+)_map\d+_.*\.dem$/ },
+  ];
+  let removed = 0;
+  for (const { dir, re } of targets) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) {
+      const m = re.exec(f);
+      if (!m || active.has(m[1])) continue;
+      const full = path.join(dir, f);
+      try {
+        if (statSync(full).mtimeMs < cutoff) {
+          rmSync(full, { force: true });
+          removed++;
+        }
+      } catch {}
+    }
+  }
+  if (removed) log(`очистка: удалено ${removed} бэкапов/демо старше ${days} дн.`);
+}
+
 // фразы, которые в ru.json MatchZy остались по-английски
 const MATCHZY_RU = {
   "matchzy.ready.readytotestorebackupinfomessage": "Не готовы: {0}. Напишите .ready, когда будете готовы восстановить раунд. {1}",
@@ -719,8 +751,13 @@ async function tick() {
   const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState };
   const events = pendingEvents.slice();
   const t0 = Date.now();
-  const { commands, bundle_version, admins } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });
+  const { commands, bundle_version, admins, backup_days } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });
   await syncMatchzyAdmins(admins).catch((e) => log(`MatchZy admins: ${e.message}`));
+  try {
+    cleanupBackups(Number(backup_days ?? 1));
+  } catch (e) {
+    log(`очистка: ${e.message}`);
+  }
   rtts.push(Date.now() - t0);
   if (rtts.length > 10) rtts.shift();
   if (events.length) {

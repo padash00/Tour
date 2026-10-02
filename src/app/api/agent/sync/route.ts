@@ -14,6 +14,7 @@ import {
 } from "@/lib/server-control";
 import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/ops";
 import { refreshStaleProfilesTick } from "@/lib/profile-sync";
+import { getSetting } from "@/lib/settings";
 import { applyDueVetoTimeouts } from "@/lib/matches";
 
 /** Фоновые задачи на каждой синхронизации: сбой одной не должен отменять остальные */
@@ -45,5 +46,8 @@ export async function POST(request: NextRequest) {
   const admins = await adminPlayers()
     .then((a) => a.map((x) => x.steam_id))
     .catch(() => null);
-  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins });
+  // срок хранения бэкапов и демо на серверном ПК (дней), по умолчанию 1
+  const days = Number((await getSetting("BACKUP_RETENTION_DAYS").catch(() => null)) ?? "");
+  const backup_days = Number.isFinite(days) && days >= 1 ? Math.min(90, Math.floor(days)) : 1;
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days });
 }
