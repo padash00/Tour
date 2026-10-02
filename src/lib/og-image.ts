@@ -7,9 +7,9 @@ import "server-only";
  */
 const cache = new Map<string, Promise<string | null>>();
 
-export function ogImage(url: string | null | undefined, width = 1080): Promise<string | null> {
+export function ogImage(url: string | null | undefined, width = 1080, quality = 82, height?: number): Promise<string | null> {
   if (!url) return Promise.resolve(null);
-  const key = `${width}:${url}`;
+  const key = `${width}x${height ?? ""}:${quality}:${url}`;
   if (!cache.has(key)) {
     cache.set(
       key,
@@ -19,7 +19,7 @@ export function ogImage(url: string | null | undefined, width = 1080): Promise<s
           if (!res.ok) return null;
           const input = Buffer.from(await res.arrayBuffer());
           const sharp = (await import("sharp")).default;
-          const out = await sharp(input).resize({ width, withoutEnlargement: true }).jpeg({ quality: 78 }).toBuffer();
+          const out = await sharp(input).resize(height ? { width, height, fit: "cover" } : { width, withoutEnlargement: true }).jpeg({ quality, mozjpeg: true }).toBuffer();
           return `data:image/jpeg;base64,${out.toString("base64")}`;
         } catch {
           return null;
@@ -39,3 +39,18 @@ export const OG_FORMATS = {
 } as const;
 export type OgFormat = keyof typeof OG_FORMATS;
 export const ogFormat = (f: string | null): OgFormat => (f === "story" || f === "wide" ? f : "post");
+
+/**
+ * Кто может получить картинку. Широкая без скачивания — превью ссылки для WhatsApp/Telegram, открыта всем
+ * (иначе мессенджер не подтянет картинку). Пост, сторис и любое скачивание — только админу,
+ * и в двойном разрешении для чёткости в соцсетях.
+ */
+export async function ogAccess(req: { nextUrl: URL }, format: OgFormat) {
+  const download = !!req.nextUrl.searchParams.get("download");
+  const publicPreview = format === "wide" && !download;
+  if (publicPreview) return { allowed: true, scale: 1, private: false };
+  const { getCurrentPlayer, isAdmin } = await import("./auth");
+  const player = await getCurrentPlayer();
+  const admin = !!player && isAdmin(player);
+  return { allowed: admin, scale: 2, private: true };
+}

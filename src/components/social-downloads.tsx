@@ -1,12 +1,21 @@
+"use client";
+
 import { CARD, btnClass } from "./primitives";
 import { cn } from "./ui";
+import { useViewer } from "./viewer";
 
-/** Кнопки скачивания картинки для соцсетей: пост Instagram, сторис, широкая для превью ссылки */
+/**
+ * Кнопки скачивания картинки для соцсетей: пост Instagram, сторис, широкая — только администратору.
+ * Страницы отдаются из кэша одинаковыми для всех, поэтому прав проверяем на клиенте; сами картинки
+ * без прав админа сервер тоже не отдаёт.
+ */
 export function SocialDownloads({ base, title, text }: { base: string; title: string; text: string }) {
+  const { player } = useViewer();
+  if (!player?.isAdmin) return null;
   const items = [
-    { f: "post", label: "Пост", hint: "1080×1350", primary: true },
-    { f: "story", label: "Сторис", hint: "1080×1920" },
-    { f: "wide", label: "Широкая", hint: "1200×630" },
+    { f: "post", label: "Пост", hint: "2160×2700", primary: true },
+    { f: "story", label: "Сторис", hint: "2160×3840" },
+    { f: "wide", label: "Широкая", hint: "2400×1260" },
   ];
   return (
     <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-4 p-5 lg:p-6")}>

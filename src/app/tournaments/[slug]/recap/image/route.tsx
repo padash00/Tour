@@ -5,7 +5,7 @@ import { getTournamentBySlug } from "@/lib/data";
 import { formatDate, plural } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import { ogFonts } from "@/lib/og-font";
-import { OG_FORMATS, ogFormat } from "@/lib/og-image";
+import { OG_FORMATS, ogAccess, ogFormat } from "@/lib/og-image";
 import { getTournamentRecap, type Placement, type StatLeader } from "@/lib/recap";
 
 /**
@@ -122,6 +122,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
   const tops = ["kills", "adr", "rating"].map((k) => recap.leaders.find((l) => l.key === k)).filter((x): x is StatLeader => !!x);
 
   const fmt = ogFormat(req.nextUrl.searchParams.get("f"));
+  const access = await ogAccess(req, fmt);
+  if (!access.allowed) return new Response("Скачивание — только для администратора", { status: 403, headers: { "Cache-Control": "private, no-store" } });
+  const scale = access.scale;
   const wide = fmt === "wide";
   const story = fmt === "story";
   const size = OG_FORMATS[fmt];
@@ -197,10 +200,15 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
 
   const image = new ImageResponse(
     (
+      <div style={{ display: "flex", position: "relative", width: "100%", height: "100%" }}>
       <div
         style={{
-          width: "100%",
-          height: "100%",
+          width: size.width,
+          height: size.height,
+          // satori масштабирует от центра: сдвигаем блок, чтобы после увеличения он ровно лёг на холст
+            ...(scale !== 1
+              ? { position: "absolute", left: (size.width * (scale - 1)) / 2, top: (size.height * (scale - 1)) / 2, transform: `scale(${scale})` }
+              : {}),
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -226,12 +234,13 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
           <span>tournament.f16-arena.kz</span>
         </div>
       </div>
+      </div>
     ),
-    { ...size, ...(fonts.length ? { fonts } : {}) },
+    { width: size.width * scale, height: size.height * scale, ...(fonts.length ? { fonts } : {}) },
   );
 
   const headers = new Headers(image.headers);
-  headers.set("Cache-Control", "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400");
+  headers.set("Cache-Control", access.private ? "private, no-store" : "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400");
   if (req.nextUrl.searchParams.get("download")) {
     headers.set("Content-Disposition", `attachment; filename="f16-${slug}-itogi-${fmt}.png"`);
   }
