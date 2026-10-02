@@ -209,6 +209,22 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   const active = ["ready", "live"].includes(m.status);
   const liveMapRow = m.maps.find((x) => x.status === "live");
   const currentRound = liveMapRow ? liveMapRow.team1_score + liveMapRow.team2_score + 1 : 1;
+  // счёт на начало каждого раунда идущей карты: round_end раунда N хранит счёт после него
+  // (после отката раунды переигрываются — берём последнее событие)
+  const startScore = new Map<number, string>([[1, "0:0"]]);
+  if (m.status === "live" && liveMapRow) {
+    const { data: ends } = await db()
+      .from("match_events")
+      .select("round_number, payload")
+      .eq("match_id", m.id)
+      .eq("event", "round_end")
+      .eq("map_number", liveMapRow.map_number - 1)
+      .order("id");
+    for (const e of (ends ?? []) as { round_number: number | null; payload: { team1?: { score?: number }; team2?: { score?: number } } }[]) {
+      if (e.round_number == null) continue;
+      startScore.set(e.round_number + 1, `${e.payload.team1?.score ?? 0}:${e.payload.team2?.score ?? 0}`);
+    }
+  }
   const scored = ["live", "finished"].includes(m.status);
   const vetoSorted = [...m.veto].sort((a, b) => a.step - b.step);
 
@@ -428,15 +444,17 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-medium">Откатить раунд</div>
                       <div className="text-[12px] text-fg-3">
-                        Сервер вернёт счёт, деньги и оружие на начало выбранного раунда и поставит паузу. Сейчас идёт раунд {currentRound} на{" "}
-                        {mapName(liveMapRow.map_name)}. В перерыве между половинами не работает.
+                        Выберите, при каком счёте начать заново: сервер вернёт счёт, деньги и оружие на начало того раунда и поставит
+                        паузу. Сейчас {liveMapRow.team1_score}:{liveMapRow.team2_score}, идёт раунд {currentRound} на {mapName(liveMapRow.map_name)}. В
+                        перерыве между половинами не работает.
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <select name="round" defaultValue={currentRound} aria-label="Раунд" className="field !h-9 !w-auto text-[13px]">
                         {Array.from({ length: currentRound }, (_, i) => currentRound - i).map((r) => (
                           <option key={r} value={r}>
-                            {r === currentRound ? `раунд ${r} — переиграть текущий` : `к началу раунда ${r}`}
+                            {r === currentRound ? `переиграть текущий раунд ${r}` : `вернуться к раунду ${r}`}
+                            {startScore.has(r) ? ` · счёт был ${startScore.get(r)}` : ""}
                           </option>
                         ))}
                       </select>
