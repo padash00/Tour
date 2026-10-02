@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { SocialDownloads } from "@/components/social-downloads";
 import { mapName } from "@/lib/format";
 import type { MapHighlight, Placement, TournamentRecap } from "@/lib/recap";
 import { fmt } from "@/components/stats-format";
-import { CARD, Eyebrow, btnClass } from "@/components/primitives";
+import { CARD, Eyebrow } from "@/components/primitives";
 import { Avatar, TeamLogo, cn } from "@/components/ui";
 
 /*
@@ -100,25 +101,6 @@ function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
 }
 
 /** Кнопки «Скачать картинку итогов» — PNG для ленты и для мессенджеров */
-function ImageDownloads({ base }: { base: string }) {
-  return (
-    <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-4 p-5 lg:p-6")}>
-      <div className="min-w-0">
-        <div className="text-[15px] font-semibold">Картинка итогов</div>
-        <div className="mt-0.5 text-[13px] text-fg-3">Пьедестал, MVP и лидеры — готово для Instagram, WhatsApp и Telegram.</div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <a href={`${base}?download=1`} className={btnClass("primary", "md")} download>
-          Скачать картинку итогов
-        </a>
-        <a href={`${base}?f=wide&download=1`} className={btnClass("secondary", "md")} download>
-          Широкая (1200×630)
-        </a>
-      </div>
-    </div>
-  );
-}
-
 export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
   const { placements, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
@@ -135,7 +117,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
 
   return (
     <div className="space-y-14">
-      {imageBase && <ImageDownloads base={imageBase} />}
+      {imageBase && <SocialDownloads base={imageBase} title="Картинка итогов" text="Пьедестал, MVP и лидеры — для поста, сторис или превью ссылки." />}
       {/* пьедестал */}
       <section>
         <Eyebrow className="mb-6">Призёры</Eyebrow>

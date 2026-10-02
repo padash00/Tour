@@ -5,6 +5,7 @@ import { getTournamentBySlug } from "@/lib/data";
 import { formatDate, plural } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import { ogFonts } from "@/lib/og-font";
+import { OG_FORMATS, ogFormat } from "@/lib/og-image";
 import { getTournamentRecap, type Placement, type StatLeader } from "@/lib/recap";
 
 /**
@@ -120,8 +121,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
   const mvp = recap.mvp;
   const tops = ["kills", "adr", "rating"].map((k) => recap.leaders.find((l) => l.key === k)).filter((x): x is StatLeader => !!x);
 
-  const wide = req.nextUrl.searchParams.get("f") === "wide";
-  const size = wide ? { width: 1200, height: 630 } : { width: 1080, height: 1350 };
+  const fmt = ogFormat(req.nextUrl.searchParams.get("f"));
+  const wide = fmt === "wide";
+  const story = fmt === "story";
+  const size = OG_FORMATS[fmt];
   const logo = new URL("/brand/f16-arena-horizontal.svg", req.nextUrl.origin).toString();
   const meta = [t.starts_at ? formatDate(t.starts_at) : null, modeOf(t.format).title, t.location].filter(Boolean).join(" · ");
 
@@ -144,8 +147,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
       {third ? <Podium p={third} size={96} name={28} /> : <div style={{ display: "flex", width: 280 }} />}
     </div>
   ) : (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 64 }}>
+    // сторис 9:16 — содержимое по центру высоты, а не прижато к шапке
+    <div style={{ display: "flex", flexDirection: "column", ...(story ? { flex: 1, justifyContent: "center", paddingBottom: 60 } : {}) }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: story ? 0 : 64 }}>
         {second ? <Podium p={second} size={124} name={30} /> : <div style={{ display: "flex", width: 280 }} />}
         <Podium p={champ} size={176} name={40} big />
         {third ? <Podium p={third} size={124} name={30} /> : <div style={{ display: "flex", width: 280 }} />}
@@ -155,7 +159,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
           style={{
             display: "flex",
             alignItems: "center",
-            marginTop: 64,
+            marginTop: story ? 110 : 64,
             padding: "28px 34px",
             borderRadius: 24,
             background: "linear-gradient(90deg, rgba(138,184,255,0.14), rgba(138,184,255,0.03))",
@@ -182,7 +186,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
         </div>
       )}
       {tops.length > 0 && (
-        <div style={{ display: "flex", gap: 18, marginTop: 24 }}>
+        <div style={{ display: "flex", gap: 18, marginTop: story ? 40 : 24 }}>
           {tops.map((l) => (
             <StatTile key={l.key} l={l} />
           ))}
@@ -200,14 +204,14 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          padding: wide ? "48px 64px" : "72px 72px 56px",
+          padding: wide ? "48px 64px" : story ? "130px 72px 100px" : "72px 72px 56px",
           background: `radial-gradient(1000px 700px at 50% ${wide ? "100%" : "34%"}, #2a2a2c 0%, #121a28 38%, #070b12 75%)`,
           color: "#f4f7fb",
           // undefined в стиле satori не принимает — ключ только когда шрифт загрузился
           ...(fonts.length ? { fontFamily: "Onest" } : {}),
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", flexDirection: "column", ...(story ? { flex: 1 } : {}) }}>
           {header}
           {body}
         </div>
@@ -229,7 +233,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
   const headers = new Headers(image.headers);
   headers.set("Cache-Control", "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400");
   if (req.nextUrl.searchParams.get("download")) {
-    headers.set("Content-Disposition", `attachment; filename="f16-${slug}-itogi${wide ? "-wide" : ""}.png"`);
+    headers.set("Content-Disposition", `attachment; filename="f16-${slug}-itogi-${fmt}.png"`);
   }
   return new Response(image.body, { status: 200, headers });
 }

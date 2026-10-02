@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SocialDownloads } from "@/components/social-downloads";
 import { getMapImages } from "@/lib/settings";
 import { notFound } from "next/navigation";
 import { openDispute } from "@/app/actions/dispute";
@@ -28,7 +29,13 @@ import { MobileStickyCta } from "@/components/public/callout";
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const m = await getMatch(id);
-  return { title: m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : "Матч" };
+  const title = m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : "Матч";
+  // сыгранный матч — превью ссылки со счётом и картами
+  if (m?.status === "finished" && m.team1 && m.team2) {
+    const image = { url: `/matches/${id}/image?f=wide`, width: 1200, height: 630 };
+    return { title, openGraph: { title: `${title} · ${m.team1_score}:${m.team2_score}`, images: [image] }, twitter: { card: "summary_large_image", images: [image.url] } };
+  }
+  return { title };
 }
 
 export default async function MatchPage(props: PageProps<"/matches/[id]">) {
@@ -94,6 +101,11 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           );
         })}
       </div>
+      {m.status === "finished" && m.team1 && m.team2 && (
+        <div className="mt-6">
+          <SocialDownloads base={`/matches/${m.id}/image`} title="Картинка матча" text="Счёт, карты и MVP — для поста, сторис или превью ссылки." />
+        </div>
+      )}
     </section>
   );
 
