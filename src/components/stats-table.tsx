@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { PlayerAgg } from "@/lib/stats";
-import { Avatar, cn } from "./ui";
+import { Avatar, TeamLogo, cn } from "./ui";
 import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar, SortedHead } from "./public/data-table";
 
 type Row = PlayerAgg & {
@@ -37,13 +37,20 @@ export function PlayerStatsTable({
   compact,
   rank = true,
   sticky,
+  solo,
 }: {
   rows: Row[];
   showTeam?: boolean;
   compact?: boolean;
   rank?: boolean;
   sticky?: boolean;
+  /** дуэль 1×1: каждый выигранный раунд MatchZy считает клатчем 1v1 — колонка бессмысленна */
+  solo?: boolean;
 }) {
+  // MatchZy присылает KAST и первые убийства не всегда — пустые колонки не показываем
+  const showKast = rows.some((p) => p.kastRounds > 0);
+  const showEntry = !compact && !solo && rows.some((p) => p.firstKills + p.firstDeaths > 0);
+  const showClutch = !compact && !solo;
   return (
     <div className={sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto"}>
       <table className={cn(DATA_TABLE, compact ? "min-w-[640px] text-[13px] [&_td]:h-12" : "min-w-[960px]")}>
@@ -58,10 +65,10 @@ export function PlayerStatsTable({
             <th className="!text-right">A</th>
             <th className="!text-right">±</th>
             <th className="!text-right">ADR</th>
-            <th className="!text-right">KAST</th>
+            {showKast && <th className="!text-right">KAST</th>}
             {!compact && <th className="!text-right">HS</th>}
-            {!compact && <th className="!text-right">Entry</th>}
-            {!compact && <th className="!text-right">Клатчи</th>}
+            {showEntry && <th className="!text-right">Entry</th>}
+            {showClutch && <th className="!text-right">Клатчи</th>}
             <th className="!text-right" title="Средний вклад в шанс победы раунда">
               Swing
             </th>
@@ -111,20 +118,107 @@ export function PlayerStatsTable({
                 <td className={NUM_CELL}>{p.assists}</td>
                 <td className={cn(NUM_CELL, diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "")}>{diff > 0 ? `+${diff}` : diff}</td>
                 <td className={NUM_CELL}>{fmt.d1(p.adr)}</td>
-                <td className={NUM_CELL}>{fmt.pct(p.kast)}</td>
+                {showKast && <td className={NUM_CELL}>{fmt.pct(p.kast)}</td>}
                 {!compact && <td className={NUM_CELL}>{fmt.pct(p.hsPct)}</td>}
-                {!compact && (
+                {showEntry && (
                   <td className={NUM_CELL}>
                     {p.firstKills}
                     <span className="text-fg-3">/{p.firstDeaths}</span>
                   </td>
                 )}
-                {!compact && <td className={NUM_CELL}>{p.clutches}</td>}
+                {showClutch && <td className={NUM_CELL}>{p.clutches}</td>}
                 <td className={cn(NUM_CELL, swingColor(p.swing))}>{fmt.swing(p.swing)}</td>
                 <td className={cn(NUM_CELL, ratingColor(p.rating))}>
                   <span className="block text-[15px] font-semibold leading-none">{fmt.r(p.rating)}</span>
                   {!compact && <RatingBar value={p.rating} className="mt-1.5" />}
                 </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export type TeamStatRow = {
+  team: { id: string; name: string; tag: string; logo_url: string | null };
+  matches: number;
+  wins: number;
+  maps: number;
+  mapWins: number;
+  roundsFor: number;
+  roundsAgainst: number;
+  kills: number;
+  deaths: number;
+  damage: number;
+  hs: number;
+  /** сколько игроков команды играли */
+  players: number;
+  /** сумма раундов, сыгранных игроками команды — ADR = урон / эти раунды */
+  rounds: number;
+};
+
+/** Статистика команд турнира: результаты серий и карт, раунды, и сумма по игрокам — K/D, ADR, HS */
+export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boolean }) {
+  const pm = (n: number) => (n > 0 ? `+${n}` : String(n));
+  return (
+    <div className="overflow-x-auto">
+      <table className={cn(DATA_TABLE, "min-w-[900px]")}>
+        <thead>
+          <tr>
+            <th className="w-14">#</th>
+            <th>{solo ? "Участник" : "Команда"}</th>
+            <th className="!text-right">Матчи</th>
+            <th className="!text-right">
+              <SortedHead title="Отсортировано по победам">В–П</SortedHead>
+            </th>
+            <th className="!text-right">Карты</th>
+            <th className="!text-right">Раунды</th>
+            <th className="!text-right" title="Доля выигранных раундов">
+              % раундов
+            </th>
+            <th className="!text-right">K</th>
+            <th className="!text-right">D</th>
+            <th className="!text-right">K/D</th>
+            <th className="!text-right" title="Средний урон за раунд">
+              ADR
+            </th>
+            <th className="!text-right">HS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((t, i) => {
+            const rounds = t.roundsFor + t.roundsAgainst;
+            const rd = t.roundsFor - t.roundsAgainst;
+            const kd = t.deaths ? t.kills / t.deaths : t.kills;
+            return (
+              <tr key={t.team.id}>
+                <td>
+                  <RankBadge n={i + 1} />
+                </td>
+                <td>
+                  <Link href={`/teams/${t.team.tag}`} className="flex items-center gap-3 hover:text-accent">
+                    <TeamLogo src={t.team.logo_url} tag={t.team.tag} size={32} />
+                    <span className="max-w-[220px] truncate font-semibold text-fg">{t.team.name}</span>
+                  </Link>
+                </td>
+                <td className={NUM_CELL}>{t.matches}</td>
+                <td className={cn(NUM_CELL, "font-semibold text-fg")}>
+                  {t.wins}–{t.matches - t.wins}
+                </td>
+                <td className={NUM_CELL}>
+                  {t.mapWins}–{t.maps - t.mapWins}
+                </td>
+                <td className={cn(NUM_CELL, rd > 0 ? "text-ok" : rd < 0 ? "text-danger" : "")}>
+                  {t.roundsFor}–{t.roundsAgainst} <span className="text-fg-3">({pm(rd)})</span>
+                </td>
+                <td className={NUM_CELL}>{rounds ? fmt.pct((100 * t.roundsFor) / rounds) : "—"}</td>
+                <td className={cn(NUM_CELL, "text-fg")}>{t.kills}</td>
+                <td className={NUM_CELL}>{t.deaths}</td>
+                <td className={cn(NUM_CELL, kd >= 1 ? "text-ok" : "text-danger")}>{kd.toFixed(2)}</td>
+                <td className={NUM_CELL}>{t.rounds ? fmt.d1(t.damage / t.rounds) : "—"}</td>
+                <td className={NUM_CELL}>{t.kills ? fmt.pct((100 * t.hs) / t.kills) : "—"}</td>
               </tr>
             );
           })}

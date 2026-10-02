@@ -180,6 +180,37 @@ export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> 
   return swing;
 }
 
+/**
+ * KAST и первый фраг раунда по событиям лога (MatchZy их не присылает).
+ * KAST — игрок убил, помог, выжил или его разменяли (убийцу добил союзник в ближайших 3 убийствах).
+ * players — состав карты на этот раунд.
+ */
+export function roundFacts(events: LogEvent[], players: Iterable<string>) {
+  const kills = events.filter(
+    (e): e is Extract<LogEvent, { type: "kill" }> => e.type === "kill" && !!e.killer.side && e.killer.side !== e.victim.side,
+  );
+  const killed = new Set<string>();
+  const kast = new Set<string>();
+  for (const e of events) {
+    if ((e.type === "kill" || e.type === "suicide") && e.victim.steamId) killed.add(e.victim.steamId);
+    if (e.type === "assist" && e.assister.steamId) kast.add(e.assister.steamId);
+  }
+  kills.forEach((k, i) => {
+    if (k.killer.steamId) kast.add(k.killer.steamId);
+    // размен: убийцу в следующих трёх убийствах убил кто-то со стороны жертвы
+    const traded = kills
+      .slice(i + 1, i + 4)
+      .some((n) => n.victim.steamId && n.victim.steamId === k.killer.steamId && n.killer.side === k.victim.side);
+    if (traded && k.victim.steamId) kast.add(k.victim.steamId);
+  });
+  for (const id of players) if (!killed.has(id)) kast.add(id);
+  return {
+    kast,
+    firstKill: kills[0]?.killer.steamId ?? null,
+    firstDeath: kills[0]?.victim.steamId ?? null,
+  };
+}
+
 /** Обновляет состав карты по событиям (сторона — по последней строке лога) */
 export function updateRoster(roster: Map<string, Side>, events: LogEvent[]) {
   const put = (a: Actor | undefined) => {

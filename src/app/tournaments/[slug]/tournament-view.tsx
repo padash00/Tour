@@ -6,8 +6,8 @@ import { bracketLabel, formatDate, formatDateTime, mapName } from "@/lib/format"
 import type { Tournament } from "@/lib/types";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
-import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
-import { PlayerStatsTable, RatingExplainer, fmt } from "@/components/stats-table";
+import { getPlayerLeaderboard, getTeamTable, getTournamentMvp } from "@/lib/stats";
+import { PlayerStatsTable, RatingExplainer, TeamStatsTable, fmt, type TeamStatRow } from "@/components/stats-table";
 import { ShareButton, StreamEmbed } from "@/components/stream";
 import { BracketView } from "@/components/bracket-view";
 import { GroupStageView, SwissView } from "@/components/stage-view";
@@ -226,7 +226,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
           <MatchesTab matches={matches} />
         </TabPanel>
         <TabPanel tab="stats" defaultKey={defaultTab}>
-          <StatsTab tournamentId={t.id} />
+          <StatsTab tournamentId={t.id} solo={solo} />
         </TabPanel>
         <TabPanel tab="rules" defaultKey={defaultTab}>
           <div className="max-w-[780px]">
@@ -454,12 +454,55 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
   );
 }
 
-async function StatsTab({ tournamentId }: { tournamentId: string }) {
-  const rows = await getPlayerLeaderboard(tournamentId);
+async function StatsTab({ tournamentId, solo }: { tournamentId: string; solo: boolean }) {
+  const [rows, table] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamTable(tournamentId)]);
+  // командные суммы по игрокам: убийства, смерти, урон, хедшоты
+  const sums = new Map<string, { kills: number; deaths: number; damage: number; hs: number; players: number; rounds: number }>();
+  for (const p of rows) {
+    if (!p.team_id) continue;
+    const s = sums.get(p.team_id) ?? { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 };
+    s.players++;
+    s.rounds += p.rounds;
+    s.kills += p.kills;
+    s.deaths += p.deaths;
+    s.damage += p.damage;
+    s.hs += p.hs;
+    sums.set(p.team_id, s);
+  }
+  const teams: TeamStatRow[] = table
+    .map((t) => ({ ...t, ...(sums.get(t.team.id) ?? { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 }) }))
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.mapWins - b.maps / 2 - (a.mapWins - a.maps / 2) ||
+        b.roundsFor - b.roundsAgainst - (a.roundsFor - a.roundsAgainst),
+    );
   return (
     <div className="space-y-10">
       {rows.length ? (
-        <PlayerStatsTable rows={rows} />
+        <div className="space-y-6">
+          <ClientTabs
+            scope="tstats"
+            param="stat"
+            defaultKey="players"
+            items={[
+              { key: "players", label: "Игроки" },
+              { key: "teams", label: solo ? "Участники" : "Команды" },
+            ]}
+          />
+          <div data-tabs-scope="tstats">
+            <TabPanel tab="players" defaultKey="players">
+              <PlayerStatsTable rows={rows} solo={solo} showTeam={!solo} />
+            </TabPanel>
+            <TabPanel tab="teams" defaultKey="players">
+              {teams.length ? (
+                <TeamStatsTable rows={teams} solo={solo} />
+              ) : (
+                <EmptyCard dashed title="Появится после первого сыгранного матча" text="Победы, карты, раунды и сумма по игрокам." />
+              )}
+            </TabPanel>
+          </div>
+        </div>
       ) : (
         <EmptyCard dashed title="Статистика появится после первого матча" text="Убийства, ADR, KAST и F16 Rating считаются с наших серверов автоматически." />
       )}

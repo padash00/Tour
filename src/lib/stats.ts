@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
+import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
 import type { Match, MatchMap, Player, Team, VetoActionRow } from "./types";
 
 export type MapStatRow = {
@@ -152,7 +153,61 @@ export async function getStatRows(filter: { tournamentId?: string; playerId?: st
   if (filter.playerId) q = q.eq("player_id", filter.playerId);
   if (filter.matchId) q = q.eq("match_id", filter.matchId);
   const { data } = await q.limit(5000);
-  return attachSwing((data ?? []) as MapStatRow[]);
+  return attachLogFacts(await attachSwing((data ?? []) as MapStatRow[]));
+}
+
+/**
+ * MatchZy присылает KAST и первые фраги нулями — считаем их сами по сохранённым событиям раундов
+ * (match_rounds из HTTP-лога сервера). Только для карт, где MatchZy их не дал.
+ */
+async function attachLogFacts(rows: MapStatRow[]) {
+  const empty = new Set<string>();
+  const byMap = new Map<string, MapStatRow[]>();
+  for (const r of rows) {
+    const k = `${r.match_id}:${r.map_number}`;
+    if (!byMap.has(k)) byMap.set(k, []);
+    byMap.get(k)!.push(r);
+  }
+  for (const [k, list] of byMap) if (list.every((r) => !r.kast && !r.first_kills && !r.first_deaths)) empty.add(k);
+  if (empty.size === 0) return rows;
+  const matchIds = [...new Set([...empty].map((k) => k.split(":")[0]))];
+  const { data } = await db()
+    .from("match_rounds")
+    .select("match_id, map_number, round_number, events")
+    .in("match_id", matchIds)
+    .order("match_id")
+    .order("map_number")
+    .order("round_number")
+    .limit(10000);
+  const facts = new Map<string, { kast: number; fk: number; fd: number }>();
+  const bump = (key: string, f: "kast" | "fk" | "fd") => {
+    const cur = facts.get(key) ?? { kast: 0, fk: 0, fd: 0 };
+    cur[f]++;
+    facts.set(key, cur);
+  };
+  let roster = new Map<string, Side>();
+  let mapKey = "";
+  for (const r of (data ?? []) as { match_id: string; map_number: number; events: LogEvent[] }[]) {
+    const k = `${r.match_id}:${r.map_number}`;
+    if (!empty.has(k)) continue;
+    if (k !== mapKey) {
+      roster = new Map();
+      mapKey = k;
+    }
+    updateRoster(roster, r.events);
+    const f = roundFacts(r.events, roster.keys());
+    for (const id of f.kast) bump(`${k}:${id}`, "kast");
+    if (f.firstKill) bump(`${k}:${f.firstKill}`, "fk");
+    if (f.firstDeath) bump(`${k}:${f.firstDeath}`, "fd");
+  }
+  for (const r of rows) {
+    const f = facts.get(`${r.match_id}:${r.map_number}:${r.steam_id}`);
+    if (!f) continue;
+    r.kast = Math.min(f.kast, r.rounds_played);
+    r.first_kills = f.fk;
+    r.first_deaths = f.fd;
+  }
+  return rows;
 }
 
 /** Подмешивает swing из player_map_swing к строкам статистики (по матчу, карте и SteamID) */
