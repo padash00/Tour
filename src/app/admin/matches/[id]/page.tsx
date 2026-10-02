@@ -12,7 +12,7 @@ import {
   setServerInfo,
   startVeto,
 } from "@/app/actions/admin-match";
-import { sendMatchToServer, serverCommand, serverRcon } from "@/app/actions/admin-server";
+import { restoreRound, sendMatchToServer, serverCommand, serverRcon } from "@/app/actions/admin-server";
 import { resolveDispute } from "@/app/actions/dispute";
 import { replaceRosterPlayer, setSchedule } from "@/app/actions/admin-match";
 import { getMatchRosters } from "@/lib/matches";
@@ -32,6 +32,21 @@ import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Матч — F16 Control" };
 
+/** этап MatchZy человеческими словами */
+function gameStage(state: string | null) {
+  const map: Record<string, string> = {
+    none: "свободен",
+    warmup: "разминка, ждём .r",
+    knife: "ножевой раунд",
+    waiting_for_knife_decision: "выбор стороны",
+    going_live: "старт",
+    live: "идёт игра",
+    pending_restore: "откат раунда",
+    post_game: "карта закончилась",
+  };
+  return map[state ?? "none"] ?? state ?? "—";
+}
+
 /**
  * «Следующий шаг» — одно главное действие оператора для текущего этапа матча.
  * Использует те же серверные действия, что и правая колонка.
@@ -47,6 +62,7 @@ function NextStep({
   liveMap,
   score,
   winner,
+  address,
 }: {
   id: string;
   status: string;
@@ -58,6 +74,7 @@ function NextStep({
   liveMap: string | null;
   score: string;
   winner: string | null;
+  address: string | null;
 }) {
   let tone: "accent" | "warn" | "danger" | "ok" | "muted" = "accent";
   let title: string;
@@ -111,7 +128,12 @@ function NextStep({
     const waited = serverReadyAt ? Math.floor((serverNow() - new Date(serverReadyAt).getTime()) / 60000) : 0;
     tone = waited >= 15 ? "danger" : waited >= 10 ? "warn" : "ok";
     title = waited >= 15 ? `Неявка: ждём ${waited} мин` : `Ждём игроков · ${waited} мин`;
-    text = `Сервер ${serverInstance} готов. Матч станет LIVE сам, когда игроки начнут.`;
+    text = (
+      <>
+        Сервер {serverInstance} готов: игроки заходят по адресу <span className="num text-fg-2">{address}</span> и пишут{" "}
+        <span className="num text-fg-2">.r</span>. Матч станет LIVE сам.
+      </>
+    );
     action = (
       <ActionForm action={setMatchLive}>
         <input type="hidden" name="matchId" value={id} />
@@ -122,17 +144,12 @@ function NextStep({
     );
   } else if (status === "live") {
     tone = "danger";
-    title = `LIVE · ${score}`;
-    text = liveMap ?? "Матч идёт на сервере.";
-    action = (
-      <a href="#maps" className="text-[13px] text-accent hover:underline">
-        Счёт карт ↓
-      </a>
-    );
+    title = `Идёт игра · серия ${score}`;
+    text = `${liveMap ?? "Матч идёт"} · сервер ${serverInstance}${address ? ` · ${address}` : ""}. Пауза и откат раунда — ниже, в «Управление игрой».`;
   } else {
     tone = "ok";
-    title = winner ? `Завершён · победа ${winner}` : "Матч завершён";
-    text = `Итог ${score}.`;
+    title = winner ? `Матч сыгран · победил ${winner} ${score}` : "Матч завершён";
+    text = "Сервер освобождён и отдан следующим матчам. Если счёт неверный — «Отменить результат» справа внизу.";
   }
 
   const bar = { accent: "before:bg-accent", warn: "before:bg-warn", danger: "before:bg-danger", ok: "before:bg-ok", muted: "before:bg-fg-3/60" }[tone];
@@ -147,7 +164,7 @@ function NextStep({
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", label)}>Следующий шаг</div>
+        <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", label)}>Сейчас</div>
         <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.01em]">{title}</div>
         {text && <div className="mt-0.5 text-[13px] text-fg-3">{text}</div>}
       </div>
@@ -187,6 +204,11 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   const inst = m.server_instance ? servers.instances.find((i) => i.name === m.server_instance) : undefined;
   const currentMap = m.maps.find((x) => x.status === "live") ?? m.maps.find((x) => x.status !== "finished");
   const openDisputes = disputes.filter((d) => d.status === "open").length;
+  // на назначенном сервере сейчас именно этот матч (после завершения там уже может идти другой)
+  const onServer = !!inst?.running && inst.match_id === m.id;
+  const active = ["ready", "live"].includes(m.status);
+  const liveMapRow = m.maps.find((x) => x.status === "live");
+  const currentRound = liveMapRow ? liveMapRow.team1_score + liveMapRow.team2_score + 1 : 1;
   const scored = ["live", "finished"].includes(m.status);
   const vetoSorted = [...m.veto].sort((a, b) => a.step - b.step);
 
@@ -235,7 +257,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
         back={{ href: "/admin/matches", label: "Матчи" }}
         eyebrow={
           <Link href={`/admin/tournaments/${m.tournament_id}`} className="hover:text-fg">
-            {m.tournament.name} · матч #{m.number} · раунд {m.round}
+            {m.tournament.name} · матч #{m.number} · тур {m.round}
           </Link>
         }
         title={
@@ -335,10 +357,12 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
             liveMap={currentMap ? `Карта ${currentMap.map_number} · ${mapName(currentMap.map_name)}` : null}
             score={`${m.team1_score}:${m.team2_score}`}
             winner={m.winner_id ? (m.winner_id === m.team1_id ? t1 : t2) : null}
+            address={m.server_address}
           />
 
-          {/* сервер */}
-          <Section title="Сервер" action={<SectionLink href="/admin/servers">Стойка</SectionLink>}>
+          {/* сервер — только пока матч на нём (у сыгранного матча там уже чужая игра) */}
+          {(active || onServer) && (
+          <Section title="Сервер этого матча" action={<SectionLink href="/admin/servers">Все серверы</SectionLink>}>
             <FactRow
               className="grid-cols-2 md:grid-cols-5"
               items={[
@@ -352,7 +376,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     </span>
                   ),
                 },
-                { label: "MatchZy", value: <span className="num">{inst ? (inst.running ? (inst.gamestate ?? "none") : "выключен") : "—"}</span> },
+                { label: "Этап в игре", value: <span>{!inst ? "—" : !inst.running ? "выключен" : gameStage(inst.gamestate)}</span> },
                 {
                   label: "Карта на сервере",
                   value: (
@@ -361,7 +385,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     </span>
                   ),
                 },
-                { label: "Игроки", value: <span className="num">{inst?.running ? `${Math.max(0, (inst.players ?? 0) - 1)}/10` : "—"}</span> },
+                { label: "Игроков на сервере", value: <span className="num">{inst?.running ? Math.max(0, (inst.players ?? 0) - 1) : "—"}</span> },
               ]}
             />
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-fg-3">
@@ -372,11 +396,78 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               {m.server_state === "error" && <span className="text-danger">ошибка загрузки — журнал команд на странице «Серверы»</span>}
             </div>
           </Section>
+          )}
+
+          {/* управление игрой: пауза, откат раунда */}
+          {onServer && m.server_instance && (
+            <Section title="Управление игрой">
+              <div className={`${ADMIN_CARD} divide-y divide-white/[0.06]`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-medium">Техническая пауза</div>
+                    <div className="text-[12px] text-fg-3">Остановить игру, если у игрока проблема. Снимите, когда все готовы.</div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[
+                      { cmd: "css_forcepause", label: "Поставить паузу", v: "secondary" as const },
+                      { cmd: "css_forceunpause", label: "Снять паузу", v: "primary" as const },
+                    ].map((c) => (
+                      <ActionForm key={c.cmd} action={serverRcon}>
+                        <input type="hidden" name="instance" value={m.server_instance!} />
+                        <input type="hidden" name="command" value={c.cmd} />
+                        <SubmitButton size="sm" variant={c.v}>
+                          {c.label}
+                        </SubmitButton>
+                      </ActionForm>
+                    ))}
+                  </div>
+                </div>
+                {m.status === "live" && liveMapRow && (
+                  <ActionForm action={restoreRound} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                    <input type="hidden" name="matchId" value={m.id} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-medium">Откатить раунд</div>
+                      <div className="text-[12px] text-fg-3">
+                        Сервер вернёт счёт, деньги и оружие на начало выбранного раунда и поставит паузу. Сейчас идёт раунд {currentRound} на{" "}
+                        {mapName(liveMapRow.map_name)}. В перерыве между половинами не работает.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <select name="round" defaultValue={currentRound} aria-label="Раунд" className="field !h-9 !w-auto text-[13px]">
+                        {Array.from({ length: currentRound }, (_, i) => currentRound - i).map((r) => (
+                          <option key={r} value={r}>
+                            {r === currentRound ? `раунд ${r} — переиграть текущий` : `к началу раунда ${r}`}
+                          </option>
+                        ))}
+                      </select>
+                      <SubmitButton size="sm" variant="secondary" confirm="Откатить раунд? Всё, что было после его начала, сотрётся.">
+                        Откатить
+                      </SubmitButton>
+                    </div>
+                  </ActionForm>
+                )}
+                <details className="group p-4">
+                  <summary className="cursor-pointer list-none text-[12px] text-fg-3 hover:text-fg-2">Команда серверу вручную (для опытных) ▾</summary>
+                  <ActionForm action={serverRcon} className="mt-3 flex gap-1.5">
+                    <input type="hidden" name="instance" value={m.server_instance} />
+                    <input name="command" placeholder="например: mp_restartgame 1" aria-label="RCON-команда" className="field !h-9 num text-[12px]" />
+                    <SubmitButton size="sm" variant="secondary">
+                      Отправить
+                    </SubmitButton>
+                  </ActionForm>
+                  <p className="mt-1.5 text-[11px] text-fg-3">Ответ сервера — в журнале команд на странице «Серверы».</p>
+                </details>
+              </div>
+            </Section>
+          )}
 
           {/* карты: ввод счёта — только для идущей карты */}
           {m.status === "live" && m.maps.some((x) => x.status === "live") && (
-            <Section title="Счёт карты" id="maps">
-              <div className={`${ADMIN_CARD} divide-y divide-white/[0.06]`}>
+            <details id="maps" className="group">
+              <summary className="cursor-pointer list-none text-[12px] text-fg-3 hover:text-fg-2">
+                Счёт не обновляется с сервера? Ввести вручную ▾
+              </summary>
+              <div className={`${ADMIN_CARD} mt-3 divide-y divide-white/[0.06]`}>
                 {m.maps
                   .filter((map) => map.status === "live")
                   .map((map) => (
@@ -400,15 +491,9 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     </ActionForm>
                   ))}
               </div>
-            </Section>
+            </details>
           )}
 
-          {m.status === "finished" && (
-            <div className="border-l-2 border-ok bg-white/[0.02] rounded-r-lg px-4 py-3 text-[13px] text-fg-2">
-              Матч завершён: {m.winner_id === m.team1_id ? t1 : t2} побеждает {m.team1_score}:{m.team2_score}
-              {m.is_walkover ? " (техническая победа)" : ""}.
-            </div>
-          )}
 
           {/* составы */}
           {(m.team1_id || m.team2_id) && (
@@ -506,7 +591,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
 
         {/* ── колонка действий ── */}
         <aside className={`${ADMIN_CARD} xl:sticky xl:top-6 overflow-hidden divide-y divide-white/[0.06]`}>
-          <RailGroup title="Основное">
+          <RailGroup title="Формат и время">
             {["pending", "upcoming"].includes(m.status) && (
               <div className="flex flex-wrap gap-1.5">
                 {[1, 3, 5].map((bo) => (
@@ -555,6 +640,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                 </SubmitButton>
               </ActionForm>
             )}
+            {m.status !== "finished" && (
             <ActionForm action={setSchedule}>
               <input type="hidden" name="matchId" value={m.id} />
               <div className="text-[11px] text-fg-3 mb-1">Время матча (Алматы)</div>
@@ -565,8 +651,10 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                 </SubmitButton>
               </div>
             </ActionForm>
+            )}
           </RailGroup>
 
+          {m.status !== "finished" && (
           <RailGroup title="Сервер">
             {["ready", "live"].includes(m.status) ? (
               <ActionForm action={sendMatchToServer}>
@@ -587,7 +675,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                 </div>
               </ActionForm>
             ) : (
-              <p className="text-[12px] text-fg-3">Сервер назначается после вето.</p>
+              <p className="text-[12px] text-fg-3">Сервер выдаётся автоматически после вето.</p>
             )}
             <details>
               <summary className="cursor-pointer text-[12px] text-fg-3 hover:text-fg-2">Адрес вручную (если агент недоступен)</summary>
@@ -605,35 +693,10 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               </ActionForm>
             </details>
           </RailGroup>
-
-          {m.server_instance && inst?.running && (
-            <RailGroup title="Пауза и RCON">
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { cmd: "css_forcepause", label: "Тех. пауза" },
-                  { cmd: "css_forceunpause", label: "Снять паузу" },
-                ].map((c) => (
-                  <ActionForm key={c.cmd} action={serverRcon}>
-                    <input type="hidden" name="instance" value={m.server_instance!} />
-                    <input type="hidden" name="command" value={c.cmd} />
-                    <SubmitButton size="sm" variant="secondary">
-                      {c.label}
-                    </SubmitButton>
-                  </ActionForm>
-                ))}
-              </div>
-              <ActionForm action={serverRcon} className="flex gap-1.5">
-                <input type="hidden" name="instance" value={m.server_instance} />
-                <input name="command" placeholder="css_restore 5" aria-label="RCON-команда" className="field !h-9 num text-[12px]" />
-                <SubmitButton size="sm" variant="secondary">
-                  ↵
-                </SubmitButton>
-              </ActionForm>
-              <p className="text-[11px] text-fg-3">Ответ — в журнале команд на странице «Серверы».</p>
-            </RailGroup>
           )}
 
-          {(m.team1_id || m.team2_id) && (
+
+          {(m.team1_id || m.team2_id) && m.status !== "finished" && (
             <RailGroup title="Замена игрока">
               <ActionForm action={replaceRosterPlayer} className="space-y-2">
                 <input type="hidden" name="matchId" value={m.id} />
@@ -661,9 +724,9 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           )}
 
           {/* опасные действия — отдельно, внизу */}
-          {(m.server_instance || (m.team1_id && m.team2_id)) && (
+          {(onServer || (m.team1_id && m.team2_id)) && (
             <RailGroup title="Опасно" tone="danger">
-              {m.server_instance && (
+              {onServer && m.server_instance && (
                 <div className="flex flex-wrap gap-1.5">
                   <ActionForm action={serverCommand}>
                     <input type="hidden" name="instance" value={m.server_instance} />

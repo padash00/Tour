@@ -125,3 +125,23 @@ export async function hostCommand(_prev: ActionResult, formData: FormData): Prom
   revalidatePath("/admin/servers");
   return { success: "Команда отправлена агенту. Прогресс — в журнале команд." };
 }
+
+/**
+ * Откат раунда: MatchZy восстанавливает бэкап «начало раунда K» (файл round{K-1}) и ставит паузу.
+ * Работает только на идущей карте; во время перерыва между половинами и после карты MatchZy откажет.
+ */
+export async function restoreRound(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const matchId = String(formData.get("matchId"));
+  const round = Number(formData.get("round"));
+  if (!Number.isInteger(round) || round < 1 || round > 60) return { error: "Укажите номер раунда" };
+  const m = await getMatch(matchId);
+  if (!m || m.status !== "live" || !m.server_instance) return { error: "Откат возможен только во время игры на сервере" };
+  const { instances } = await getServerState();
+  const inst = instances.find((i) => i.name === m.server_instance);
+  if (!inst?.running || inst.match_id !== m.id) return { error: `На ${m.server_instance} сейчас не этот матч` };
+  await enqueueCommand(m.server_instance, "rcon", { command: `css_restore ${round - 1}` }, admin.id);
+  await audit(admin.id, "match.restore_round", { type: "match", id: m.id }, { instance: m.server_instance, round });
+  revalidatePath(`/admin/matches/${m.id}`);
+  return { success: `Откат к началу раунда ${round} отправлен. MatchZy поставит паузу — снимите её, когда игроки готовы.` };
+}
