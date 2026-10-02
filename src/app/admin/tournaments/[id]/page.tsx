@@ -12,7 +12,7 @@ import {
   updateTournament,
 } from "@/app/actions/admin";
 import { averageElo, getTournamentById, getTournamentRegistrations, type RegistrationWithTeam } from "@/lib/data";
-import { formatDateTime, formatShortDateTime, registrationStatusLabel, tournamentStatusLabel } from "@/lib/format";
+import { formatTime, formatDateTime, formatShortDateTime, registrationStatusLabel, tournamentStatusLabel } from "@/lib/format";
 import { FORMATS, type FormatKind } from "@/lib/formats";
 import { MODES, type ModeKey } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
@@ -110,23 +110,6 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       />
 
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
-      {tab === "overview" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <a href={`/tournaments/${t.slug}/tv`} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm", "mr-4")}>
-            Режим ТВ ↗
-          </a>
-          <span className="mr-2 text-[12px] uppercase tracking-[0.2em] text-fg-3">Экспорт CSV</span>
-          {[
-            ["results", "Результаты матчей"],
-            ["rosters", "Составы"],
-            ["stats", "Статистика игроков"],
-          ].map(([type, label]) => (
-            <a key={type} href={`/admin/tournaments/${t.id}/export?type=${type}`} className={buttonClass("secondary", "sm")} download>
-              {label}
-            </a>
-          ))}
-        </div>
-      )}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
       {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} />}
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}
@@ -191,15 +174,31 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
 // ───────────────────────── Этапы и следующий шаг
 
-const STEPS: LifeStep[] = [
-  { key: "draft", label: "Черновик" },
-  { key: "registration", label: "Регистрация" },
-  { key: "closed", label: "Закрыта" },
-  { key: "checkin", label: "Check-in" },
-  { key: "bracket", label: "Сетка" },
-  { key: "live", label: "Идёт" },
-  { key: "finished", label: "Завершён" },
-];
+/** Этапы турнира; подсказки под этапами берут даты из настроек */
+function lifeSteps(t: T): LifeStep[] {
+  const day = (iso: string) => new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", timeZone: "Asia/Almaty" }).format(new Date(iso));
+  const d = (iso: string | null) => (iso ? `${day(iso)} ${formatTime(iso)}` : null);
+  // «2 окт. 15:46–16:31», если окно в один день
+  const range = (a: string | null, b: string | null) =>
+    a && b && day(a) === day(b) ? `${day(a)} ${formatTime(a)}–${formatTime(b)}` : `${d(a) ?? "…"} — ${d(b) ?? "…"}`;
+  return [
+    { key: "draft", label: "Черновик", hint: "виден только админам" },
+    {
+      key: "registration",
+      label: "Регистрация",
+      hint: t.registration_opens_at || t.registration_closes_at ? range(t.registration_opens_at, t.registration_closes_at) : "игроки подают заявки",
+    },
+    { key: "closed", label: "Закрыта", hint: "составы зафиксированы" },
+    {
+      key: "checkin",
+      label: "Check-in",
+      hint: t.checkin_opens_at || t.checkin_closes_at ? range(t.checkin_opens_at, t.checkin_closes_at) : "участники подтверждают, что пришли",
+    },
+    { key: "bracket", label: "Сетка", hint: "из прошедших check-in" },
+    { key: "live", label: "Идёт", hint: t.starts_at ? `старт ${d(t.starts_at)}` : "матчи на серверах" },
+    { key: "finished", label: "Завершён", hint: "итоги и награды" },
+  ];
+}
 
 function stepIndex(status: TournamentStatus, hasBracket: boolean) {
   switch (status) {
@@ -235,24 +234,34 @@ function LifecyclePanel({ t, approved, checkedIn, pending }: { t: T; approved: n
     </ActionForm>
   );
 
+  let now = "";
+  let next = "";
   let hint = "";
   let action: React.ReactNode = null;
   switch (t.status) {
     case "draft":
-      hint = "Турнир скрыт. Проверьте настройки и откройте регистрацию — страница станет публичной.";
+      now = "Турнир виден только админам — игроки его не видят и не могут записаться.";
+      next = "Откройте регистрацию";
+      hint = "Страница турнира станет публичной, игроки смогут подавать заявки. Перед этим проверьте даты и карты во вкладке «Настройки».";
       action = status("registration", "Открыть регистрацию");
       break;
     case "registration":
-      hint = `Одобрено ${approved}/${t.max_teams}${pending ? `, ждут решения ${pending}` : ""}. Закройте регистрацию, когда составы собраны.`;
+      now = `Игроки подают заявки. Одобрено ${approved} из ${t.max_teams}${pending ? `, ждут вашего решения ${pending}` : ""}.`;
+      next = "Закройте регистрацию";
+      hint = "Когда участники набраны: новые заявки перестанут приниматься, составы зафиксируются.";
       action = status("registration_closed", "Закрыть регистрацию", "Закрыть регистрацию? Составы заблокируются.");
       break;
     case "registration_closed":
-      hint = "Составы заблокированы. Откройте check-in — капитаны получат уведомление, Workshop-карты начнут прогреваться.";
+      now = "Регистрация закрыта, составы зафиксированы.";
+      next = "Откройте check-in";
+      hint = "Участники получат уведомление и должны подтвердить, что пришли. Карты из Workshop начнут скачиваться на сервер.";
       action = status("checkin", "Открыть check-in");
       break;
     case "checkin":
       if (!hasBracket) {
-        hint = `Check-in прошли ${checkedIn} из ${approved}. Создайте сетку: посев — ручной seed, затем средний ELO; только прошедшие check-in.`;
+        now = `Идёт check-in: подтвердили ${checkedIn} из ${approved} одобренных.`;
+        next = "Создайте сетку";
+        hint = `В сетку попадут только прошедшие check-in (${checkedIn}). Посев: ваш ручной номер, затем по ELO.`;
         action = (
           <ActionForm action={generateBracketAction}>
             <input type="hidden" name="tournamentId" value={t.id} />
@@ -264,29 +273,43 @@ function LifecyclePanel({ t, approved, checkedIn, pending }: { t: T; approved: n
           </ActionForm>
         );
       } else {
-        hint = "Сетка опубликована. Запустите турнир — автопилот начнёт вето и раздачу серверов.";
+        now = "Сетка опубликована, участники видят своих соперников.";
+        next = "Запустите турнир";
+        hint = t.autopilot
+          ? "Автопилот сам начнёт вето и раздаст матчи по свободным серверам."
+          : "Автопилот выключен — вето и серверы запускайте вручную в «Матчах» или включите автопилот ниже.";
         action = status("live", "Запустить турнир");
       }
       break;
     case "live":
-      hint = "Турнир идёт. Когда сыгран финал — завершите: несыгранные матчи отменятся, серверы освободятся.";
+      now = "Турнир идёт: матчи играются на серверах.";
+      next = "Завершите турнир после финала";
+      hint = "Несыгранные матчи отменятся, серверы освободятся, появятся итоги и награды.";
       action = status("finished", "Завершить турнир", "Завершить турнир? Несыгранные матчи будут отменены.", "danger");
       break;
     case "finished":
-      hint = "Турнир завершён. Итоги и статистика доступны на публичной странице.";
+      now = "Турнир завершён.";
+      next = "Готово";
+      hint = "Итоги, награды и статистика — на публичной странице турнира.";
       break;
     case "cancelled":
-      hint = "Турнир отменён.";
+      now = "Турнир отменён.";
+      next = "—";
       break;
   }
 
   return (
     <div className={`${CARD} p-5 lg:p-6`}>
-      <Lifecycle steps={STEPS} current={stepIndex(t.status, hasBracket)} cancelled={t.status === "cancelled"} />
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-5">
-        <div className="max-w-2xl">
-          <Label className="text-[10px]">Следующий шаг</Label>
-          <p className="mt-1.5 text-[14px] text-fg-2 leading-relaxed">{hint}</p>
+      <Lifecycle steps={lifeSteps(t)} current={stepIndex(t.status, hasBracket)} cancelled={t.status === "cancelled"} />
+      <div className="mt-6 grid gap-5 border-t border-white/[0.06] pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] lg:items-center">
+        <div>
+          <Label className="text-[10px]">Сейчас</Label>
+          <p className="mt-1.5 text-[14px] text-fg leading-relaxed">{now}</p>
+        </div>
+        <div className="lg:border-l lg:border-white/[0.06] lg:pl-5">
+          <Label className="text-[10px] text-accent/90">Следующий шаг</Label>
+          <div className="mt-1.5 text-[16px] font-semibold text-fg">{next}</div>
+          {hint && <p className="mt-1 text-[13px] text-fg-2 leading-relaxed">{hint}</p>}
           {t.status === "checkin" && !hasBracket && (
             <Link href={`/admin/tournaments/${t.id}?tab=bracket`} className="mt-1 inline-block text-[12px] text-accent hover:underline">
               Другой посев или все одобренные →
@@ -305,10 +328,17 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
   return (
     <div className="space-y-8">
       <div className={`${CARD} grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]`}>
-        <BarCell label="Одобрено" value={`${approved}/${t.max_teams}`} />
-        <BarCell label="Ждут решения" value={pending} tone={pending ? "warn" : undefined} />
-        <BarCell label="Check-in" value={`${checkedIn}/${approved}`} />
-        <BarCell label="Сетка" value={t.bracket_published_at ? "Есть" : "Нет"} tone={t.bracket_published_at ? "ok" : undefined} />
+        <BarCell label="Участники" value={`${approved} из ${t.max_teams}`} hint={approved >= t.max_teams ? "все места заняты" : `свободно мест: ${t.max_teams - approved}`} />
+        <Link href={`/admin/tournaments/${t.id}?tab=registration`} className="block hover:bg-white/[0.02] transition">
+          <BarCell label="Заявки ждут решения" value={pending} tone={pending ? "warn" : undefined} hint={pending ? "открыть и одобрить →" : "новых заявок нет"} />
+        </Link>
+        <BarCell label="Прошли check-in" value={`${checkedIn} из ${approved}`} hint="только они попадут в сетку" />
+        <BarCell
+          label="Сетка"
+          value={t.bracket_published_at ? "Создана" : "Не создана"}
+          tone={t.bracket_published_at ? "ok" : undefined}
+          hint={t.bracket_published_at ? "см. вкладку «Сетка»" : "создаётся после check-in"}
+        />
       </div>
 
       <Panel title="Автопилот">
@@ -318,9 +348,17 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
               <Dot tone={t.autopilot ? "ok" : "muted"} />
               <span className={t.autopilot ? "text-ok font-medium" : "text-fg-3"}>{t.autopilot ? "Включён" : "Выключен"}</span>
             </div>
-            <p className="mt-2 text-[13px] text-fg-2 leading-relaxed">
-              Сайт сам запускает вето, как только соперники известны, и отправляет готовые матчи на свободные серверы — по расписанию
-              (за 10 минут до начала) или по порядку номеров. Работает, пока турнир в статусе check-in или «идёт».
+            <ul className="mt-2 space-y-1 text-[13px] text-fg-2 leading-relaxed list-disc pl-5">
+              <li>сам начинает вето, как только оба соперника известны;</li>
+              <li>отправляет готовые матчи на свободные серверы — по расписанию или по порядку номеров;</li>
+              <li>следит, чтобы один участник не играл два матча одновременно.</li>
+            </ul>
+            <p className="mt-2 text-[12px] text-fg-3">
+              {["checkin", "live"].includes(t.status)
+                ? t.autopilot
+                  ? "Сейчас работает."
+                  : "Сейчас турнир на этапе, где автопилот мог бы работать, — включите его."
+                : "Начнёт работать, когда турнир дойдёт до check-in или запуска."}
             </p>
           </div>
           <ActionForm action={setAutopilot}>
@@ -333,9 +371,36 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
         </div>
       </Panel>
 
+      <Panel title="Инструменты">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5">
+            <div className="text-[14px] font-semibold text-fg">Режим ТВ</div>
+            <p className="mt-1 text-[13px] text-fg-3">Сетка и счёт матчей на большом экране в клубе. Откройте на ПК у телевизора и нажмите F11.</p>
+            <a href={`/tournaments/${t.slug}/tv`} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm", "mt-3")}>
+              Открыть режим ТВ ↗
+            </a>
+          </div>
+          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5">
+            <div className="text-[14px] font-semibold text-fg">Экспорт в Excel (CSV)</div>
+            <p className="mt-1 text-[13px] text-fg-3">Файлы открываются в Excel или Google Таблицах.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                ["results", "Результаты матчей"],
+                ["rosters", "Составы"],
+                ["stats", "Статистика игроков"],
+              ].map(([type, label]) => (
+                <a key={type} href={`/admin/tournaments/${t.id}/export?type=${type}`} className={buttonClass("secondary", "sm")} download>
+                  {label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <details className="group">
         <summary className="list-none cursor-pointer text-[12px] text-fg-3 hover:text-fg-2">
-          Сменить этап вручную <span className="group-open:hidden">▾</span>
+          Для экстренных случаев: сменить этап вручную <span className="group-open:hidden">▾</span>
           <span className="hidden group-open:inline">▴</span>
         </summary>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-1.5">

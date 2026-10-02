@@ -128,23 +128,42 @@ export type LifeStep = { key: string; label: string; hint?: string; at?: string 
  */
 export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; current: number; cancelled?: boolean }) {
   return (
-    <ol className="grid grid-flow-col auto-cols-[minmax(120px,1fr)] gap-1.5 overflow-x-auto [scrollbar-width:none]">
+    <ol className="grid grid-flow-col auto-cols-[minmax(118px,1fr)] overflow-x-auto [scrollbar-width:none] pb-1">
       {steps.map((s, i) => {
         const done = i < current;
         const now = i === current;
+        const last = i === steps.length - 1;
         return (
-          <li key={s.key} className="min-w-[120px]">
-            <div
+          <li key={s.key} className="relative min-w-[118px] pr-2">
+            {/* линия до следующего этапа */}
+            {!last && (
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute left-[30px] right-0 top-[13px] h-[2px] rounded-full",
+                  cancelled ? "bg-danger/25" : done ? "bg-accent/70" : "bg-white/[0.08]",
+                )}
+              />
+            )}
+            <span
               className={cn(
-                "h-1 rounded-full",
-                cancelled ? "bg-danger/30" : done ? "bg-accent" : now ? "bg-accent/60" : "bg-white/[0.08]",
+                "relative z-[1] grid size-7 place-items-center rounded-full border text-[12px] font-semibold num",
+                cancelled
+                  ? "border-danger/40 bg-[#1a0f12] text-danger/80"
+                  : done
+                    ? "border-accent bg-accent text-[#07101b]"
+                    : now
+                      ? "border-accent bg-[#0d1a2c] text-accent ring-4 ring-accent/15"
+                      : "border-white/[0.14] bg-[#0a111b] text-fg-3",
               )}
-            />
-            <div className={cn("mt-2 truncate text-[12px] font-medium", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
-              {done && <span className="mr-1 text-accent">✓</span>}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <div className={cn("mt-2.5 text-[13px] font-semibold leading-tight", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
               {s.label}
             </div>
-            {s.hint && <div className="mt-0.5 text-[11px] leading-snug text-fg-3">{s.hint}</div>}
+            {now && <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-accent">сейчас</div>}
+            {s.hint && <div className="mt-1 text-[11px] leading-snug text-fg-3">{s.hint}</div>}
           </li>
         );
       })}
