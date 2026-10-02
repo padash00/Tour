@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getTournamentBySlug } from "@/lib/data";
+import { ogFonts } from "@/lib/og-font";
 import { getTournamentRecap } from "@/lib/recap";
 
 /** Превью итогов для соцсетей: турнир, чемпион, 2–3 место, MVP */
@@ -7,34 +8,11 @@ export const alt = "Итоги турнира F16 Arena";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/**
- * Шрифт с кириллицей для ImageResponse (встроенный — только латиница).
- * Google Fonts отдаёт TTF старым браузерам; если сеть недоступна — рисуем без него (только латиница/цифры видны).
- */
-async function cyrillicFont(weight: 400 | 700): Promise<ArrayBuffer | null> {
-  try {
-    const css = await (
-      await fetch(`https://fonts.googleapis.com/css2?family=Onest:wght@${weight}&subset=cyrillic`, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/534.30 (KHTML, like Gecko) Safari/534.30" },
-        next: { revalidate: 86400 },
-      })
-    ).text();
-    const url = css.match(/src: url\((https:[^)]+)\) format\('(?:truetype|opentype)'\)/)?.[1];
-    if (!url) return null;
-    return await (await fetch(url, { next: { revalidate: 86400 } })).arrayBuffer();
-  } catch {
-    return null;
-  }
-}
-
 export default async function RecapOgImage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
-  const [regular, bold] = await Promise.all([cyrillicFont(400), cyrillicFont(700)]);
-  const fonts = [
-    ...(regular ? [{ name: "Onest", data: regular, weight: 400 as const, style: "normal" as const }] : []),
-    ...(bold ? [{ name: "Onest", data: bold, weight: 700 as const, style: "normal" as const }] : []),
-  ];
+  // Onest с кириллицей (Google Fonts теперь отдаёт woff — старый поиск TTF находил пустоту)
+  const fonts = await ogFonts();
   const recap = t && t.status === "finished" ? await getTournamentRecap(t) : null;
   const champ = recap?.placements.find((p) => p.place === "1");
   const others = recap?.placements.filter((p) => p.place !== "1").slice(0, 3) ?? [];
@@ -51,7 +29,7 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
           padding: "64px 80px",
           background: "radial-gradient(900px 520px at 85% 0%, #1b2c4a 0%, #070b12 70%)",
           color: "#f4f7fb",
-          fontFamily: fonts.length ? "Onest" : undefined,
+          ...(fonts.length ? { fontFamily: "Onest" } : {}),
         }}
       >
         <div style={{ display: "flex", fontSize: 22, letterSpacing: 8, color: "#7f93b0" }}>F16 ARENA · {fonts.length ? "ИТОГИ" : "RESULTS"}</div>
@@ -86,6 +64,6 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
         )}
       </div>
     ),
-    { ...size, fonts },
+    { ...size, ...(fonts.length ? { fonts } : {}) },
   );
 }

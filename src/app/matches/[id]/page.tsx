@@ -9,6 +9,9 @@ import { formatDateTime, mapName } from "@/lib/format";
 import { applyVetoTimeouts, getMatch, getMatchRosters, getTournamentMatches } from "@/lib/matches";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
+import { modeOf } from "@/lib/modes";
+import { getMatchRounds } from "@/lib/rounds-data";
+import { RoundTimeline } from "@/components/competition/round-timeline";
 import { PlayerStatsTable } from "@/components/stats-table";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -41,6 +44,15 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
   ]);
+  // лента раундов — только когда матч на сервере или сыгран
+  const roundMaps = ["live", "finished"].includes(m.status)
+    ? await getMatchRounds(
+        m.id,
+        { team1: rosters.team1.map((r) => r.player.steam_id), team2: rosters.team2.map((r) => r.player.steam_id) },
+        modeOf(m.tournament.format).size,
+      )
+    : [];
+  const liveMapNumber = m.maps.find((x) => x.status === "live")?.map_number ?? null;
   const { data: disputeRows } = await db().from("disputes").select("*").eq("match_id", m.id).order("created_at");
   const disputes = (disputeRows ?? []) as Dispute[];
   const myTeam = player ? (m.team1?.captain_id === player.id ? m.team1 : m.team2?.captain_id === player.id ? m.team2 : null) : null;
@@ -82,6 +94,19 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           );
         })}
       </div>
+    </section>
+  );
+
+  const roundsBlock = roundMaps.some((x) => x.rounds.length > 0) && (
+    <section>
+      <Eyebrow className="mb-6">Раунды</Eyebrow>
+      <RoundTimeline
+        maps={roundMaps}
+        mapNames={Object.fromEntries(m.maps.map((x) => [x.map_number, x.map_name]))}
+        team1={m.team1?.name ?? "Команда 1"}
+        team2={m.team2?.name ?? "Команда 2"}
+        liveMap={m.status === "live" ? liveMapNumber : null}
+      />
     </section>
   );
 
@@ -172,12 +197,14 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
         {m.status === "live" ? (
           <>
+            {roundsBlock}
             {scoreboard}
             {seriesMaps}
           </>
         ) : (
           <>
             {seriesMaps}
+            {roundsBlock}
             {scoreboard}
           </>
         )}

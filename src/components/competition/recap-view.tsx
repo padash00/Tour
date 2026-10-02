@@ -2,7 +2,7 @@ import Link from "next/link";
 import { mapName } from "@/lib/format";
 import type { MapHighlight, Placement, TournamentRecap } from "@/lib/recap";
 import { fmt } from "@/components/stats-format";
-import { CARD, Eyebrow } from "@/components/primitives";
+import { CARD, Eyebrow, btnClass } from "@/components/primitives";
 import { Avatar, TeamLogo, cn } from "@/components/ui";
 
 /*
@@ -18,28 +18,61 @@ const MEDAL: Record<string, string> = {
 };
 const PLACE_LABEL: Record<string, string> = { "1": "Чемпион", "2": "2 место", "3": "3 место", "3–4": "3–4 место" };
 
-function PlaceCard({ p, big }: { p: Placement; big?: boolean }) {
+/** одиночный участник (1×1): «команда» — это сам игрок */
+const isSoloPlacement = (p: Placement) => !!p.team.is_solo || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
+
+/**
+ * Карточка пьедестала: компактная, высота по содержимому. 1 место — крупнее и с золотым свечением,
+ * вместо пустоты — итог на турнире (серии, карты) и отметка MVP.
+ */
+function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?: string | null }) {
+  const solo = isSoloPlacement(p);
+  const player = solo ? p.roster[0] : null;
+  const href = player ? `/players/${player.steam_id}` : `/teams/${encodeURIComponent(p.team.tag)}`;
+  const size = big ? 80 : 64;
+  const r = p.record;
   return (
-    <div className={cn(CARD, "flex flex-col p-6 lg:p-8", big && "lg:p-10 border-[#e8c27a]/25")}>
-      <span className={cn("inline-flex w-fit items-center gap-2 rounded-[6px] border px-3 h-8 text-[13px] font-semibold", MEDAL[p.place])}>
-        {p.place === "1" ? "🏆" : "●"} {PLACE_LABEL[p.place] ?? `${p.place} место`}
+    <div
+      className={cn(
+        CARD,
+        "relative flex flex-col items-center overflow-hidden px-5 text-center transition-transform duration-300 hover:-translate-y-0.5",
+        big ? "pt-8 pb-7 border-[#e8c27a]/35 shadow-[0_0_80px_-28px_rgba(232,194,122,0.55)]" : "pt-6 pb-6",
+      )}
+    >
+      {big && <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#e8c27a]/[0.10] to-transparent" />}
+      <span className={cn("relative inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 h-7 text-[12px] font-semibold", MEDAL[p.place])}>
+        {p.place === "1" ? "🏆" : p.place === "2" ? "🥈" : "🥉"} {PLACE_LABEL[p.place] ?? `${p.place} место`}
       </span>
-      <Link href={`/teams/${encodeURIComponent(p.team.tag)}`} className="group mt-6 flex items-center gap-4 min-w-0">
-        <TeamLogo src={p.team.logo_url} tag={p.team.tag} size={big ? 88 : 64} />
-        <div className="min-w-0">
-          <div className={cn("font-semibold tracking-[-0.015em] break-words group-hover:text-accent-strong", big ? "text-[30px] lg:text-[40px] leading-[1.05]" : "text-[22px] lg:text-[26px]")}>
-            {p.team.name}
-          </div>
-          <div className="num mt-1 text-[13px] text-fg-3">{p.team.tag}</div>
-        </div>
+      <Link href={href} className="group relative mt-5 flex flex-col items-center gap-3 min-w-0 max-w-full">
+        <span className={cn("rounded-full p-[3px]", big ? "bg-[#e8c27a]/40" : p.place === "2" ? "bg-[#c9d3e0]/25" : "bg-[#d39a6a]/30")}>
+          {player ? (
+            <Avatar src={player.avatar_url} name={player.nickname} size={size} />
+          ) : (
+            <TeamLogo src={p.team.logo_url} tag={p.team.tag} size={size} />
+          )}
+        </span>
+        <span className={cn("max-w-full break-words font-semibold tracking-[-0.015em] group-hover:text-accent-strong", big ? "text-[24px] lg:text-[28px] leading-[1.1]" : "text-[18px] lg:text-[20px]")}>
+          {p.team.name}
+        </span>
       </Link>
-      {p.roster.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-x-4 gap-y-2.5 border-t border-white/[0.06] pt-5">
-          {p.roster.map((r) => (
-            <Link key={r.id} href={`/players/${r.steam_id}`} className="flex items-center gap-2 min-h-8 text-[14px] text-fg-2 hover:text-fg">
-              <Avatar src={r.avatar_url} name={r.nickname} size={24} />
-              <span className="max-w-[140px] truncate">{r.nickname}</span>
-              {r.role !== "main" && <span className="text-[11px] text-fg-3">запас</span>}
+      <div className="relative mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-fg-3">
+        <span>
+          серии <span className="num text-fg-2">{r.wins}–{r.losses}</span>
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          карты <span className="num text-fg-2">{r.mapWins}–{r.mapLosses}</span>
+        </span>
+        {mvpName && (
+          <span className="rounded-[5px] border border-accent/30 bg-accent/[0.08] px-1.5 text-[11px] font-semibold text-accent">MVP {solo ? "" : mvpName}</span>
+        )}
+      </div>
+      {!solo && p.roster.length > 0 && (
+        <div className="relative mt-4 flex flex-wrap justify-center gap-1.5 border-t border-white/[0.06] pt-4">
+          {p.roster.map((m) => (
+            <Link key={m.id} href={`/players/${m.steam_id}`} title={m.nickname} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] py-0.5 pl-0.5 pr-2.5 text-[12px] text-fg-2 hover:text-fg">
+              <Avatar src={m.avatar_url} name={m.nickname} size={20} />
+              <span className="max-w-[110px] truncate">{m.nickname}</span>
             </Link>
           ))}
         </div>
@@ -66,7 +99,27 @@ function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
   );
 }
 
-export function RecapView({ recap, solo }: { recap: TournamentRecap; solo?: boolean }) {
+/** Кнопки «Скачать картинку итогов» — PNG для ленты и для мессенджеров */
+function ImageDownloads({ base }: { base: string }) {
+  return (
+    <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-4 p-5 lg:p-6")}>
+      <div className="min-w-0">
+        <div className="text-[15px] font-semibold">Картинка итогов</div>
+        <div className="mt-0.5 text-[13px] text-fg-3">Пьедестал, MVP и лидеры — готово для Instagram, WhatsApp и Telegram.</div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <a href={`${base}?download=1`} className={btnClass("primary", "md")} download>
+          Скачать картинку итогов
+        </a>
+        <a href={`${base}?f=wide&download=1`} className={btnClass("secondary", "md")} download>
+          Широкая (1200×630)
+        </a>
+      </div>
+    </div>
+  );
+}
+
+export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
   const { placements, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
   const rest = placements.filter((p) => p.place !== "1");
@@ -82,16 +135,25 @@ export function RecapView({ recap, solo }: { recap: TournamentRecap; solo?: bool
 
   return (
     <div className="space-y-14">
+      {imageBase && <ImageDownloads base={imageBase} />}
       {/* пьедестал */}
       <section>
         <Eyebrow className="mb-6">Призёры</Eyebrow>
-        <div className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-          <PlaceCard p={champion} big />
-          <div className="grid gap-4">
-            {rest.map((p) => (
-              <PlaceCard key={`${p.place}-${p.team.id}`} p={p} />
-            ))}
-          </div>
+        {/* пьедестал: на десктопе 2 · 1 · 3 по нижнему краю, на телефоне — по порядку мест */}
+        <div className={cn("grid items-end gap-4", rest.length >= 3 ? "md:grid-cols-4" : rest.length === 2 ? "md:grid-cols-[1fr_1.18fr_1fr]" : "md:grid-cols-[1.18fr_1fr]")}>
+          {[champion, ...rest].map((p) => {
+            const second = p.place === "2";
+            const first = p.place === "1";
+            const mvpHere = mvp?.team_id === p.team.id ? (mvp.player?.nickname ?? mvp.name) : null;
+            return (
+              <div
+                key={`${p.place}-${p.team.id}`}
+                className={cn(rest.length >= 2 && (first ? "md:order-2" : second ? "md:order-1" : "md:order-3"))}
+              >
+                <PlaceCard p={p} big={first} mvpName={mvpHere} />
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -136,7 +198,7 @@ export function RecapView({ recap, solo }: { recap: TournamentRecap; solo?: bool
                     mvp.name
                   )}
                 </div>
-                <div className="text-[14px] text-fg-3">{mvp.team?.name ?? ""}</div>
+                <div className="text-[14px] text-fg-3">{mvp.team && mvp.team.name !== (mvp.player?.nickname ?? mvp.name) ? mvp.team.name : ""}</div>
               </div>
             </div>
             <div className="flex flex-wrap gap-x-10 gap-y-4">
@@ -176,7 +238,7 @@ export function RecapView({ recap, solo }: { recap: TournamentRecap; solo?: bool
                     ) : (
                       <span className="block truncate font-medium">{l.name}</span>
                     )}
-                    <div className="truncate text-[12px] text-fg-3">{l.team?.name ?? ""}</div>
+                    <div className="truncate text-[12px] text-fg-3">{l.team && l.team.name !== l.name ? l.team.name : ""}</div>
                   </div>
                 </div>
               </div>
