@@ -21,6 +21,7 @@ import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
 import { a2sInfo, rcon } from "./lib.mjs";
 import { applyBundle, cs2Build, localBundleVersion, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 import { createRelay } from "./relay.mjs";
+import { ensureUpnp } from "./upnp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_DIR = process.env.F16_SERVER_DIR ?? "D:\\cs2server";
@@ -519,9 +520,24 @@ async function api(pathname, body) {
 
 let failures = 0;
 
+// UPnP: игровые ПК могут быть в другой подсети (сервер за своим роутером) — пробрасываем UDP-порты
+// инстансов на роутере и сообщаем сайту его внешний адрес. Выключается в agent.json: "upnp": false
+let upnpState = null;
+let upnpAt = 0;
+async function refreshUpnp() {
+  if (config.upnp === false || !config.lanIp) return;
+  if (Date.now() - upnpAt < 10 * 60_000 && upnpState) return;
+  upnpAt = Date.now();
+  const prev = upnpState?.ip;
+  upnpState = await ensureUpnp(config.lanIp, INSTANCES.map((i) => i.port));
+  if (upnpState.error) log(`UPnP: ${upnpState.error}`);
+  else if (upnpState.ip !== prev) log(`UPnP: роутер ${upnpState.model ?? ""} внешний адрес ${upnpState.ip}, проброшены UDP ${upnpState.mapped.join(", ")}`);
+}
+
 async function tick() {
+  await refreshUpnp().catch(() => {});
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
-  const publicInfo = Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu"));
+  const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState };
   const events = pendingEvents.slice();
   const t0 = Date.now();
   const { commands, bundle_version } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });

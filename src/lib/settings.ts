@@ -6,6 +6,11 @@ import { db } from "./supabase";
 export const SETTINGS = {
   STEAM_API_KEY: { label: "Steam Web API key", secret: true, hint: "steamcommunity.com/dev/apikey — ники и аватары игроков" },
   FACEIT_API_KEY: { label: "FACEIT API key", secret: true, hint: "developers.faceit.com — Server side key, уровень и ELO" },
+  PLAYER_IP: {
+    label: "IP сервера для игроков",
+    secret: false,
+    hint: "Адрес, который получают игроки. Пусто — автоматически: внешний адрес роутера серверного ПК (UPnP), если он есть, иначе LAN-адрес агента.",
+  },
   OBSERVER_STEAM_IDS: {
     label: "SteamID observer-аккаунтов",
     secret: false,

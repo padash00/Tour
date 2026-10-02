@@ -186,7 +186,8 @@ export async function applyAgentReport(report: AgentReport) {
     .from("server_host")
     .upsert({ id: "main", lan_ip: report.lan_ip ?? null, last_seen_at: now, info: report.info ?? {} });
 
-  const lanIp = report.lan_ip;
+  const upnpIp = (report.info as { upnp?: { ip?: string | null } } | undefined)?.upnp?.ip ?? null;
+  const lanIp = ((await getSetting("PLAYER_IP")) ?? "").trim() || upnpIp || report.lan_ip;
   for (const inst of report.instances ?? []) {
     const gamestate = inst.running ? (inst.get5?.gamestate ?? null) : null;
     const matchzyId = inst.running ? (inst.get5?.matchid ?? null) : null;

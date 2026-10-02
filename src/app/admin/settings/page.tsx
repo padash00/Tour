@@ -31,6 +31,7 @@ const TAB_SETTING: Partial<Record<TabKey, SettingKey>> = {
   steam: "STEAM_API_KEY",
   faceit: "FACEIT_API_KEY",
   broadcast: "OBSERVER_STEAM_IDS",
+  servers: "PLAYER_IP",
 };
 
 type SettingRow = Awaited<ReturnType<typeof getSettingsStatus>>[number];
