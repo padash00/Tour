@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       // время хода вышло — авто-бан/пик сразу, не дожидаясь перезагрузки страницы
       if (head.veto_deadline && new Date(head.veto_deadline).getTime() <= Date.now()) await applyVetoTimeouts(id);
     }
-    const [m, maps, veto, stats] = await Promise.all([
+    const [m, maps, veto, stats, rounds] = await Promise.all([
       db()
         .from("matches")
         .select("status, team1_id, team2_id, team1_score, team2_score, winner_id, server_state, server_address, server_instance, veto_deadline, scheduled_at, under_review")
@@ -35,8 +35,16 @@ export async function GET(request: NextRequest) {
       db().from("match_maps").select("map_number, map_name, status, team1_score, team2_score").eq("match_id", id).order("map_number"),
       db().from("veto_actions").select("step").eq("match_id", id),
       db().from("player_map_stats").select("map_number", { count: "exact", head: true }).eq("match_id", id),
+      // лента раундов: раунды пишутся из лога сервера чуть позже счёта — следим и за ними
+      db()
+        .from("match_rounds")
+        .select("map_number, round_number", { count: "exact" })
+        .eq("match_id", id)
+        .order("map_number", { ascending: false })
+        .order("round_number", { ascending: false })
+        .limit(1),
     ]);
-    parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0];
+    parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0, rounds.count ?? 0, rounds.data?.[0] ?? null];
   } else if (k.startsWith("tournament:") && UUID.test(k.slice(11))) {
     // режим ТВ: всё, что видно на экране турнира — статусы, счёт серий и карт идущих матчей, этап турнира
     const id = k.slice(11);

@@ -18,6 +18,8 @@ export type Placement = {
   place: string;
   team: Team;
   roster: (RecapPlayer & { role: string })[];
+  /** итог команды на турнире: серии и карты */
+  record: { wins: number; losses: number; mapWins: number; mapLosses: number };
 };
 
 export type PathStep = { stage: string; opponent: Team | null; score: string; won: boolean; walkover: boolean; matchId: string };
@@ -102,7 +104,19 @@ export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap
       .filter((r) => r.player)
       .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
       .map((r) => ({ id: r.player!.id, nickname: r.player!.nickname, avatar_url: r.player!.avatar_url, steam_id: r.player!.steam_id, role: r.role }));
-    return { place, team, roster };
+    // серии и карты (счёт серии = выигранные карты; тех. победы — без карт)
+    const record = { wins: 0, losses: 0, mapWins: 0, mapLosses: 0 };
+    for (const m of played) {
+      if (m.team1_id !== team.id && m.team2_id !== team.id) continue;
+      const isT1 = m.team1_id === team.id;
+      if (m.winner_id === team.id) record.wins++;
+      else if (m.winner_id) record.losses++;
+      if (!m.is_walkover) {
+        record.mapWins += isT1 ? m.team1_score : m.team2_score;
+        record.mapLosses += isT1 ? m.team2_score : m.team1_score;
+      }
+    }
+    return { place, team, roster, record };
   });
 
   // ── путь чемпиона

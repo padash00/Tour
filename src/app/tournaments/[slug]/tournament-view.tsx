@@ -155,7 +155,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 Страница итогов
               </Button>
             </div>
-            <RecapView recap={recap} solo={solo} />
+            <RecapView recap={recap} solo={solo} imageBase={`${base}/recap/image`} />
           </TabPanel>
         )}
         <TabPanel tab="overview" defaultKey={defaultTab}>

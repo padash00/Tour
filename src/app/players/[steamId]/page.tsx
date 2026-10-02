@@ -6,6 +6,7 @@ import { db } from "@/lib/supabase";
 import { getPlayerAwards } from "@/lib/awards";
 import { getPlayerProgress } from "@/lib/progress";
 import { PlayerProfile } from "@/components/player-profile";
+import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
@@ -40,9 +41,11 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
   ]);
   const agg = rows.length ? aggregatePlayers(rows)[0] : null;
   const matchIds = [...new Set(rows.map((r) => r.match_id))];
-  const [weapons, h2h] = await Promise.all([
+  const [weapons, h2h, pickRes] = await Promise.all([
     getPlayerWeapons(player.steam_id, matchIds),
     getHeadToHead({ teamIds: rows.map((r) => r.team_id).filter(Boolean) as string[], matchIds }),
+    // для «Сравнить»: список игроков для поиска по нику
+    db().from("players").select("steam_id, nickname, avatar_url").eq("is_banned", false).order("nickname").limit(600),
   ]);
 
   return (
@@ -56,6 +59,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
       progress={progress}
       weapons={weapons}
       h2h={h2h}
+      actions={<ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />}
     />
   );
 }

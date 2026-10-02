@@ -64,7 +64,7 @@ export default async function RecapPage(props: PageProps<"/tournaments/[slug]/re
         </div>
       </section>
       <div className={`${WRAP} pt-14`}>
-        <RecapView recap={recap} solo={mode.size === 1} />
+        <RecapView recap={recap} solo={mode.size === 1} imageBase={`/tournaments/${t.slug}/recap/image`} />
       </div>
     </>
   );

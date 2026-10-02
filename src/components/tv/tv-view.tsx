@@ -1,6 +1,7 @@
 import type { MatchWithTeams } from "@/lib/matches";
 import type { StandingRow } from "@/lib/formats";
 import type { Team, Tournament } from "@/lib/types";
+import type { MapRounds } from "@/lib/rounds";
 import { LiveRefresh } from "../live-refresh";
 import { BracketPanel, ChampionPanel, LeadersPanel, LivePanel, StandingsPanel, TvEmpty, UpcomingPanel, type TvLeader, type TvMap, type TvPlace } from "./panels";
 import { TvShell, type TvPanel } from "./tv-shell";
@@ -13,6 +14,8 @@ export type TvData = {
   leaders: TvLeader[];
   mvp: (TvLeader & { by: "swing" | "rating"; swing: number | null }) | null;
   places: TvPlace[];
+  /** раунды идущей карты каждого live-матча (лента под счётом) */
+  liveRounds?: Record<string, MapRounds>;
 };
 
 /** Набор экранов турнира для ТВ — только то, что есть в данных */
@@ -36,7 +39,7 @@ export function TvView({ data, live = true }: { data: TvData; live?: boolean }) 
   if (t.status === "finished" && data.places.length) {
     panels.push({ key: "champion", title: "Итоги турнира", node: <ChampionPanel places={data.places} mvpName={data.mvp?.name ?? null} /> });
   }
-  if (liveMatches.length) panels.push({ key: "live", title: liveMatches.length > 1 ? "Сейчас в игре" : "Сейчас в игре · LIVE", node: <LivePanel matches={liveMatches} maps={data.liveMaps} all={visible} /> });
+  if (liveMatches.length) panels.push({ key: "live", title: liveMatches.length > 1 ? "Сейчас в игре" : "Сейчас в игре · LIVE", node: <LivePanel matches={liveMatches} maps={data.liveMaps} all={visible} rounds={data.liveRounds} /> });
   if (data.groups.some((g) => g.table.length)) {
     panels.push({ key: "standings", title: swiss ? "Швейцарская система · таблица" : "Групповая стадия", node: <StandingsPanel groups={data.groups} teams={teams} swiss={swiss} /> });
   }

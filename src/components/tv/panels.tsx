@@ -5,6 +5,8 @@ import type { MatchWithTeams } from "@/lib/matches";
 import type { StandingRow } from "@/lib/formats";
 import type { MatchStatus, Team } from "@/lib/types";
 import { matchStage } from "../match-bits";
+import type { MapRounds } from "@/lib/rounds";
+import { RoundChips } from "../competition/round-timeline";
 import { cn } from "../ui";
 
 /*
@@ -40,7 +42,17 @@ export function TvEmpty({ title, text }: { title: string; text?: string }) {
 
 // ───────────────────────── LIVE
 
-export function LivePanel({ matches, maps, all }: { matches: MatchWithTeams[]; maps: TvMap[]; all: MatchWithTeams[] }) {
+export function LivePanel({
+  matches,
+  maps,
+  all,
+  rounds,
+}: {
+  matches: MatchWithTeams[];
+  maps: TvMap[];
+  all: MatchWithTeams[];
+  rounds?: Record<string, MapRounds>;
+}) {
   const big = matches.length === 1;
   return (
     <div className={cn("h-full grid gap-[2vh]", big ? "grid-rows-1" : matches.length === 2 ? "grid-rows-2" : "grid-cols-2 auto-rows-fr")}>
@@ -83,6 +95,11 @@ export function LivePanel({ matches, maps, all }: { matches: MatchWithTeams[]; m
               </div>
               <TeamSide team={m.team2} size={big ? "9vw" : "5vw"} big={big} right />
             </div>
+            {rounds?.[m.id] && rounds[m.id].rounds.length > 0 && (
+              <div className={cn("flex justify-center", big ? "mt-[4vh]" : "mt-[1.6vh]")}>
+                <RoundChips map={rounds[m.id]} team1={m.team1?.name ?? "1"} team2={m.team2?.name ?? "2"} size="tv" />
+              </div>
+            )}
           </div>
         );
       })}
