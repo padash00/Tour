@@ -192,20 +192,40 @@ export function TournamentForm({
         ? "Стандартное вето рассчитано на 7 карт"
         : null;
 
+  const [startMoved, setStartMoved] = useState<string | null>(null);
   const autoDates = () => {
     if (!start) return;
     // «сейчас» в часовом поясе Алматы (UTC+5), формат datetime-local
     const nowLocal = new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 16);
-    const open = regOpen && regOpen < start ? regOpen : nowLocal;
-    // регистрация закрывается за сутки до старта; если до старта меньше суток — за 75 минут, но не раньше открытия
-    let close = shift(start, -24 * 60);
-    if (close <= open) close = shift(start, -75);
-    if (close <= open) close = shift(start, -30);
+    // старт уже прошёл или вот-вот — переносим на час вперёд, иначе даты не выстроить по порядку
+    let st = start;
+    if (st <= shift(nowLocal, 10)) {
+      st = shift(nowLocal, 60);
+      setStart(st);
+      setStartMoved(`Старт ${human(start)} уже прошёл или слишком близко — перенесён на ${human(st)}. Поправьте, если нужно другое время.`);
+    } else setStartMoved(null);
+    // регистрация: с сейчас (или с уже указанного открытия) до старта; если старт далеко — закрывается за сутки
+    const open = regOpen && regOpen >= nowLocal && regOpen < st ? regOpen : nowLocal;
+    let close = shift(st, -24 * 60);
+    if (close <= open) close = shift(st, -15);
+    if (close <= open) close = st;
+    // check-in: последний час перед стартом, но не раньше открытия регистрации; заканчивается за 15 минут до старта
+    let ciOpen = shift(st, -60);
+    if (ciOpen < open) ciOpen = open;
+    let ciClose = shift(st, -15);
+    if (ciClose <= ciOpen) ciClose = st;
     setRegOpen(open);
     setRegClose(close);
-    setCheckinOpen(shift(start, -60) > close ? shift(start, -60) : close);
-    setCheckinClose(shift(start, -15));
+    setCheckinOpen(ciOpen);
+    setCheckinClose(ciClose);
   };
+
+  // проверка порядка дат прямо в форме — то же правило, что на сервере
+  const dateIssues: string[] = [];
+  if (regOpen && regClose && regClose <= regOpen) dateIssues.push(`Регистрация закрывается (${human(regClose)}) раньше, чем открывается (${human(regOpen)}).`);
+  if (regClose && start && regClose > start) dateIssues.push(`Регистрация закрывается (${human(regClose)}) после старта (${human(start)}) — она должна закончиться до старта.`);
+  if (checkinOpen && checkinClose && checkinClose <= checkinOpen) dateIssues.push(`Check-in заканчивается (${human(checkinClose)}) раньше, чем начинается (${human(checkinOpen)}).`);
+  if (checkinClose && start && checkinClose > start) dateIssues.push(`Check-in заканчивается (${human(checkinClose)}) после старта (${human(start)}).`);
 
   const splitPrize = () => {
     const total = Number(prizePool.replace(/[^\d]/g, ""));
@@ -222,7 +242,7 @@ export function TournamentForm({
   // что ещё не заполнено — по шагам
   const missing: Record<number, string | null> = {
     0: name.trim() ? null : "Нет названия",
-    2: start ? null : "Нет даты старта",
+    2: !start ? "Нет даты старта" : dateIssues.length ? "Даты не по порядку" : null,
     4: mapWarning && maps.length > 1 && maps.length < Math.max(bo, finalBo) ? mapWarning : null,
   };
   const canSubmit = !!name.trim();
@@ -484,6 +504,18 @@ export function TournamentForm({
                 <input type="datetime-local" value={checkinClose} onChange={(e) => setCheckinClose(e.target.value)} className="field" />
               </Field>
             </div>
+            {startMoved && <p className="text-[13px] text-warn">{startMoved}</p>}
+            {dateIssues.length > 0 && (
+              <div className="rounded-lg border border-danger/30 bg-danger/[0.06] px-4 py-3 text-[13px] text-danger">
+                <div className="font-semibold">Даты не по порядку — турнир не сохранится:</div>
+                <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                  {dateIssues.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+                <div className="mt-1.5 text-fg-2">Проще всего: поставьте старт и нажмите «Заполнить остальное по старту».</div>
+              </div>
+            )}
           </Section>
 
           <Section
