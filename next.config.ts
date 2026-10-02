@@ -11,8 +11,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
-      // логотип команды до 1 МБ + поля формы
-      bodySizeLimit: "2mb",
+      // картинки до 3 МБ (обложка турнира, карты, логотип) + поля формы; у Vercel предел тела запроса 4,5 МБ
+      bodySizeLimit: "4mb",
     },
   },
   // файлы серверного ПК (агент, скрипты, конфиги CS2) раздаются агенту с сайта

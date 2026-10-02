@@ -34,6 +34,7 @@ export function MapCard({
   useResultToast(upState);
   useResultToast(rmState);
   useResultToast(tgState);
+  const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -56,7 +57,17 @@ export function MapCard({
           name="image"
           aria-label={`Картинка карты ${map}`}
           accept="image/png,image/jpeg,image/webp"
-          onChange={() => formRef.current?.requestSubmit()}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            // больше 3 МБ сервер не примет — сказать сразу, а не ронять страницу
+            if (f.size > 3 * 1024 * 1024) {
+              toast.error(`Картинка ${(f.size / 1024 / 1024).toFixed(1)} МБ — нужно до 3 МБ. Сожмите в JPG или WEBP.`);
+              e.target.value = "";
+              return;
+            }
+            formRef.current?.requestSubmit();
+          }}
         />
       </form>
       <div className="flex items-center justify-between gap-2 text-[12px]">
