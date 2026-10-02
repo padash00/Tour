@@ -1,0 +1,36 @@
+# Проверка каждого пуша: типы, линтер и тесты логики (сетки, форматы, награды, буфер агента).
+# Сборку и деплой делает Vercel; здесь — то, что ловит ошибки до выкладки. База не нужна.
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # заглушки: тесты логики к базе не обращаются, но модули читают переменные при импорте
+      SUPABASE_URL: http://127.0.0.1:9
+      SUPABASE_SERVICE_ROLE_KEY: ci
+      SESSION_SECRET: ci-only-session-secret-not-used-anywhere
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Типы маршрутов Next.js
+        run: npx next typegen
+      - name: TypeScript и ESLint
+        run: npm run check
+      - name: Сетки 2–16 команд (SE/DE)
+        run: npx tsx --conditions=react-server scripts/test-bracket-sizes.mts
+      - name: Швейцарка, круговая, группы
+        run: npx tsx --conditions=react-server scripts/test-stage-formats.mts
+      - name: Награды
+        run: npx tsx --conditions=react-server scripts/test-awards.mts
+      - name: Буфер событий агента
+        run: node scripts/test-agent-relay.mjs

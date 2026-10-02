@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/data";
+import { getPlayerActiveMatch } from "@/lib/matches";
 
 /**
  * Кто смотрит страницу. Публичные страницы отдаются из кэша CDN одинаковыми для всех,
@@ -18,7 +19,8 @@ export async function GET() {
           isAdmin: isAdmin(player),
         },
         unread: await getUnreadCount(player.id),
+        match: await getPlayerActiveMatch(player.id).catch(() => null),
       }
-    : { player: null, unread: 0 };
+    : { player: null, unread: 0, match: null };
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }

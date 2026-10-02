@@ -4,6 +4,9 @@ import { cn } from "@/components/ui";
 import { ADMIN_CARD } from "./control";
 import { instanceState, minutesSince, toneBar, toneText } from "./kit";
 import { ServerActions } from "./server-actions";
+import { ActionForm, SubmitButton } from "@/components/forms";
+import { restoreRound, serverRcon } from "@/app/actions/admin-server";
+import { mapName } from "@/lib/format";
 
 /** Матч, закреплённый за инстансом (поля, нужные пульту) */
 export type InstanceMatch = {
@@ -16,6 +19,8 @@ export type InstanceMatch = {
   team2_score: number;
   team1: { tag: string } | null;
   team2: { tag: string } | null;
+  /** карты серии — для счёта идущей карты и номера раунда */
+  maps?: { map_number: number; map_name: string; status: string; team1_score: number; team2_score: number }[];
 };
 
 /** Игроков на сервере без бота-наблюдателя GOTV */
@@ -45,6 +50,9 @@ export function InstanceCard({
   const live = st.text === "LIVE";
   const waited = match?.status === "ready" && match.server_state === "ready" ? minutesSince(match.server_ready_at, now) : null;
   const players = humanPlayers(i);
+  // управление игрой — только если на сервере сейчас именно этот матч и он идёт
+  const liveMap = match?.status === "live" && i.match_id === match.id ? match.maps?.find((m) => m.status === "live") : undefined;
+  const round = liveMap ? liveMap.team1_score + liveMap.team2_score + 1 : null;
 
   return (
     <div
@@ -108,6 +116,16 @@ export function InstanceCard({
             <div className={cn("h-full rounded-full", live ? "bg-danger/80" : "bg-accent/70")} style={{ width: `${Math.min(100, players * 10)}%` }} />
           </div>
         )}
+        {liveMap && (
+          <div className="flex items-center justify-between gap-2 text-[12px]">
+            <span className="truncate text-fg-2">
+              Карта {liveMap.map_number} · {mapName(liveMap.map_name)}
+            </span>
+            <span className="num shrink-0 text-fg">
+              {liveMap.team1_score}:{liveMap.team2_score} <span className="text-fg-3">· раунд {round}</span>
+            </span>
+          </div>
+        )}
         {match?.server_state === "loading" && <div className="text-[12px] text-warn">загружает матч…</div>}
         {match?.server_state === "error" && <div className="text-[12px] text-danger">карта не загрузилась</div>}
         {waited != null && (
@@ -117,6 +135,29 @@ export function InstanceCard({
         )}
       </div>
 
+      {online && liveMap && match && (
+        <div className="flex flex-wrap gap-1 border-t border-white/[0.06] px-2 py-2">
+          {[
+            { cmd: "css_forcepause", label: "Пауза" },
+            { cmd: "css_forceunpause", label: "Снять паузу" },
+          ].map((c) => (
+            <ActionForm key={c.cmd} action={serverRcon} inline>
+              <input type="hidden" name="instance" value={i.name} />
+              <input type="hidden" name="command" value={c.cmd} />
+              <SubmitButton size="sm" variant="secondary">
+                {c.label}
+              </SubmitButton>
+            </ActionForm>
+          ))}
+          <ActionForm action={restoreRound} inline>
+            <input type="hidden" name="matchId" value={match.id} />
+            <input type="hidden" name="round" value={round ?? 1} />
+            <SubmitButton size="sm" variant="ghost" confirm={`Переиграть раунд ${round} на ${i.name}? Счёт и деньги вернутся на его начало.`}>
+              Переиграть раунд
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      )}
       {online && (
         <div className="border-t border-white/[0.06] bg-black/20 px-2 py-2">
           <ServerActions instance={i.name} running={!!i.running} align="start" />

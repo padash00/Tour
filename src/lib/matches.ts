@@ -530,3 +530,68 @@ export async function getUpcomingMatches(limit = 6) {
     )
     .slice(0, limit);
 }
+
+
+export type ActiveMatch = {
+  id: string;
+  number: number;
+  status: "veto" | "ready" | "live";
+  opponent: string;
+  address: string | null;
+  password: string | null;
+};
+
+/**
+ * Матч игрока, который требует внимания сейчас: сервер готов (заходить), вето, или идёт игра.
+ * Только турниры, где игрок в одобренном составе — адрес сервера видят лишь участники.
+ */
+export async function getPlayerActiveMatch(playerId: string): Promise<ActiveMatch | null> {
+  const { data: rows } = await db()
+    .from("tournament_roster_players")
+    .select("tournament_id, registration:tournament_registrations!inner(team_id, status)")
+    .eq("player_id", playerId)
+    .eq("registration.status", "approved");
+  const pairs = ((rows ?? []) as unknown as { tournament_id: string; registration: { team_id: string } }[]).map((r) => ({
+    t: r.tournament_id,
+    team: r.registration.team_id,
+  }));
+  if (pairs.length === 0) return null;
+  const teamIds = [...new Set(pairs.map((p) => p.team))];
+  const { data } = await db()
+    .from("matches")
+    .select(
+      "id, number, status, tournament_id, team1_id, team2_id, server_state, server_address, server_password, team1:teams!matches_team1_id_fkey(name), team2:teams!matches_team2_id_fkey(name)",
+    )
+    .in("status", ["veto", "ready", "live"])
+    .or(`team1_id.in.(${teamIds.join(",")}),team2_id.in.(${teamIds.join(",")})`);
+  type Row = {
+    id: string;
+    number: number;
+    status: ActiveMatch["status"];
+    tournament_id: string;
+    team1_id: string | null;
+    team2_id: string | null;
+    server_state: string | null;
+    server_address: string | null;
+    server_password: string | null;
+    team1: { name: string } | null;
+    team2: { name: string } | null;
+  };
+  const mine = ((data ?? []) as unknown as Row[]).filter((m) =>
+    pairs.some((p) => p.t === m.tournament_id && (p.team === m.team1_id || p.team === m.team2_id)),
+  );
+  // сначала то, что требует действия: сервер готов → вето → идёт игра
+  const rank = (m: Row) => (m.status === "ready" ? 0 : m.status === "veto" ? 1 : 2);
+  const m = mine.sort((a, b) => rank(a) - rank(b))[0];
+  if (!m) return null;
+  const isTeam1 = pairs.some((p) => p.t === m.tournament_id && p.team === m.team1_id);
+  const ready = m.server_state === "ready" && !!m.server_address;
+  return {
+    id: m.id,
+    number: m.number,
+    status: m.status,
+    opponent: (isTeam1 ? m.team2?.name : m.team1?.name) ?? "соперник",
+    address: ready ? m.server_address : null,
+    password: ready ? m.server_password : null,
+  };
+}

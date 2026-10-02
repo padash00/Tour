@@ -32,7 +32,9 @@ export default async function AdminOverview() {
     db().from("audit_logs").select("*, actor:players(nickname)").order("created_at", { ascending: false }).limit(14),
     db()
       .from("matches")
-      .select("id, number, status, server_instance, server_state, server_ready_at, team1_score, team2_score, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag)")
+      .select(
+        "id, number, status, server_instance, server_state, server_ready_at, team1_score, team2_score, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag), maps:match_maps(map_number, map_name, status, team1_score, team2_score)",
+      )
       .in("status", ["live", "veto", "ready"]),
     db()
       .from("matches")

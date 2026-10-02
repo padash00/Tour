@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand";
 import { HeaderUser } from "./header-user";
+import { MyMatchBanner } from "./my-match-banner";
 import { HeaderShell, NavLinks, PublicOnly } from "./nav-links";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
@@ -39,6 +40,7 @@ export function SiteHeader() {
           <HeaderUser items={[...NAV, ...NAV_MORE]} />
         </div>
       </div>
+      <MyMatchBanner />
     </HeaderShell>
   );
 }

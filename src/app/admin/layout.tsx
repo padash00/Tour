@@ -19,7 +19,9 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     getServerState(),
     db()
       .from("matches")
-      .select("id, number, status, server_instance, server_state, server_ready_at, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag)")
+      .select(
+        "id, number, status, server_instance, server_state, server_ready_at, team1:teams!matches_team1_id_fkey(tag), team2:teams!matches_team2_id_fkey(tag), tournament:tournaments(format)",
+      )
       .order("number", { ascending: false })
       .limit(300),
     db().from("tournaments").select("id, name, status").order("created_at", { ascending: false }).limit(50),
@@ -35,6 +37,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     server_ready_at: string | null;
     team1: { tag: string } | null;
     team2: { tag: string } | null;
+    tournament: { format: string } | null;
   };
   const matches = (matchesRes.data ?? []) as unknown as M[];
   const tournaments = (tournamentsRes.data ?? []) as { id: string; name: string; status: string }[];
@@ -46,6 +49,26 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     (m) => m.status === "ready" && m.server_state === "ready" && m.server_ready_at && now - new Date(m.server_ready_at).getTime() > 10 * 60_000,
   ).length;
   const errors = matches.filter((m) => m.status === "ready" && m.server_state === "error").length;
+  // тревоги: то, что требует вмешательства прямо сейчас — видно на любой странице пульта
+  const alarms: { key: string; text: string; href: string }[] = [];
+  if (!servers.online) alarms.push({ key: "agent", text: "Агент на серверном ПК не на связи — серверы не управляются", href: "/admin/servers" });
+  else {
+    for (const m of matches) {
+      if (!["ready", "live"].includes(m.status) || !m.server_instance) continue;
+      const vs = `#${m.number} ${m.team1?.tag ?? "TBD"}–${m.team2?.tag ?? "TBD"}`;
+      const inst = servers.instances.find((i) => i.name === m.server_instance);
+      const href = `/admin/matches/${m.id}`;
+      if (m.server_state === "error") alarms.push({ key: `err-${m.id}`, text: `Матч ${vs}: карта не загрузилась на ${m.server_instance}`, href });
+      else if (inst && !inst.running) alarms.push({ key: `down-${m.id}`, text: `Матч ${vs}: сервер ${m.server_instance} выключен или упал`, href });
+      else if (m.status === "live" && inst?.running && inst.match_id === m.id) {
+        const size = m.tournament?.format === "1v1" ? 1 : m.tournament?.format === "2v2" ? 2 : 5;
+        const humans = Math.max(0, (inst.players ?? 0) - 1);
+        if (humans < size * 2) alarms.push({ key: `left-${m.id}`, text: `Матч ${vs}: на сервере ${humans} из ${size * 2} — кто-то вылетел`, href });
+      } else if (m.status === "ready" && m.server_state === "ready" && m.server_ready_at && now - new Date(m.server_ready_at).getTime() > 15 * 60_000) {
+        alarms.push({ key: `ns-${m.id}`, text: `Матч ${vs}: игроки не заходят больше 15 минут — неявка?`, href });
+      }
+    }
+  }
   const lastSync = servers.host?.last_seen_at ? Math.max(0, Math.round((now - new Date(servers.host.last_seen_at).getTime()) / 1000)) : null;
 
   const palette: PaletteItem[] = [
@@ -147,6 +170,21 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         </header>
 
         <main className="flex-1">
+          {alarms.length > 0 && (
+            <div className="border-b border-danger/30 bg-danger/[0.08]">
+              <ul className="mx-auto max-w-[1560px] space-y-1 px-4 py-2.5 sm:px-6 lg:px-8">
+                {alarms.slice(0, 5).map((a) => (
+                  <li key={a.key}>
+                    <Link href={a.href} className="flex items-center gap-2.5 text-[13px] font-medium text-danger hover:underline">
+                      <span className="size-1.5 shrink-0 rounded-full bg-current animate-pulse" />
+                      {a.text}
+                      <span className="text-danger/70">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="mx-auto max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">{children}</div>
         </main>
       </div>
