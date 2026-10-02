@@ -158,6 +158,178 @@ summary,
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/*
+ * ── движение: одна система на весь сайт ──
+ * Только transform и opacity (без анимации размеров/отступов), короткие длительности,
+ * мягкое замедление в конце. Уважаем prefers-reduced-motion (правило выше).
+ */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 150ms;
+  --dur: 220ms;
+  --dur-slow: 320ms;
+}
+
+@keyframes anim-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes anim-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* появление блока (первая загрузка страницы) */
+.anim-in {
+  animation: anim-fade var(--dur-slow) var(--ease-out) both;
+}
+
+/* вкладки ClientTabs: панель мягко поднимается, когда становится видимой (снятие hidden перезапускает анимацию) */
+[data-tabs-scope] > [data-tab]:not([hidden]) {
+  animation: anim-rise 260ms var(--ease-out) both;
+}
+
+/* карточка-ссылка: лёгкий подъём при наведении */
+.lift {
+  transition:
+    transform var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* картинка внутри .group: медленный «наезд» камеры при наведении (обёртка — overflow-hidden) */
+.media-zoom {
+  transition: transform 600ms var(--ease-out);
+}
+@media (hover: hover) {
+  .group:hover .media-zoom {
+    transform: scale(1.05);
+  }
+}
+
+/* стрелка в строке-ссылке сдвигается вправо при наведении */
+.nudge {
+  transition:
+    transform var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out);
+}
+@media (hover: hover) {
+  .group:hover .nudge {
+    transform: translateX(4px);
+  }
+}
+
+/*
+ * ── отклик на нажатие: «чувствую, что нажал» ──
+ * Кнопки, вкладки, ссылки-блоки и карточки на миг поддавливаются (scale) и темнеют.
+ * Строчные ссылки в тексте не двигаются (transform не действует на inline).
+ */
+:where(button, [role="button"], [role="tab"], summary, input[type="submit"]):not(:disabled):not([aria-disabled="true"]):active {
+  transform: scale(0.97);
+  filter: brightness(0.9);
+}
+:where(a):active {
+  transform: scale(0.985);
+  filter: brightness(0.92);
+}
+.lift:active {
+  transform: translateY(-1px) scale(0.985);
+}
+/* убрать подсветку тапа на телефонах — отклик даёт сам элемент */
+:where(a, button, [role="tab"], summary) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── полоса загрузки при переходе (components/nav-progress.tsx) ── */
+.nav-progress-run,
+.nav-progress-done {
+  height: 100%;
+  transform-origin: left;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-strong));
+  box-shadow: 0 0 10px var(--color-accent);
+}
+.nav-progress-run {
+  animation: nav-progress 6s cubic-bezier(0.05, 0.7, 0.1, 1) both;
+}
+.nav-progress-done {
+  animation: nav-progress-done 300ms var(--ease-out) both;
+}
+@keyframes nav-progress {
+  from {
+    transform: scaleX(0.04);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+@keyframes nav-progress-done {
+  from {
+    transform: scaleX(0.92);
+    opacity: 1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+/* пока грузится следующая страница — содержимое чуть гаснет (с задержкой: быстрые переходы не мигают) */
+main > * {
+  transition: opacity 200ms var(--ease-out);
+}
+html[data-navigating] main > * {
+  opacity: 0.65;
+  transition-delay: 160ms;
+}
+
+/* ── переходы между страницами (React <ViewTransition>, см. components/route-transition.tsx) ── */
+::view-transition {
+  pointer-events: none; /* клики во время перехода доходят до новой страницы */
+}
+/* шапка и подвал вне перехода: корневой снимок не анимируем, двигается только содержимое */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(.page-out) {
+  animation: 120ms ease-in both vt-out;
+}
+::view-transition-new(.page-in) {
+  animation: 240ms var(--ease-out) 60ms both vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 }
 
 @layer components {

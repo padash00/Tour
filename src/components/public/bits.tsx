@@ -34,7 +34,7 @@ function CoverImage({ url, className }: { url: string | null; className?: string
   return (
     <div className={cn("relative overflow-hidden bg-bg-2", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url ?? "/home/tournament.jpg"} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.8]" />
+      <img src={url ?? "/home/tournament.jpg"} alt="" className="media-zoom absolute inset-0 h-full w-full object-cover saturate-[0.8]" />
       <div className="absolute inset-0 bg-gradient-to-t from-bg/80 via-bg/20 to-transparent" />
     </div>
   );
