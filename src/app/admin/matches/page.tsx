@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { db } from "@/lib/supabase";
 import type { MatchWithTeams } from "@/lib/matches";
@@ -42,6 +43,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
 
   return (
     <div className="space-y-6">
+      <LiveRefresh watch="matches" intervalMs={4000} />
       <AdminHeader eyebrow="F16 Control" title="Матчи" />
       <div className="flex gap-5 border-b border-white/[0.06]">
         {FILTERS.map((f) => (

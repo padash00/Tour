@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { checkIn } from "@/app/actions/tournament";
@@ -65,6 +66,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
 
   return (
     <Flow>
+      <LiveRefresh watch={`tournament:${t.id}`} intervalMs={5000} />
       <FlowHeader back={back} title="Check-in" description={window_} />
 
       <div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-7 lg:p-9">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { approvedCounts } from "@/lib/data";
 import { formatShortDateTime } from "@/lib/format";
@@ -55,6 +56,7 @@ export default async function AdminTournamentsPage() {
 
   return (
     <div className="space-y-6">
+      <LiveRefresh watch="matches" intervalMs={8000} />
       <AdminHeader
         eyebrow="F16 Control"
         title="Турниры"

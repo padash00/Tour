@@ -1,4 +1,5 @@
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
+import { LiveRefresh } from "@/components/live-refresh";
 import { HomeView } from "@/components/public/home";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
@@ -12,11 +13,16 @@ export default async function HomePage() {
   const isFirst = !all.some((t) => t.id !== featured?.id && t.status === "finished");
 
   return (
-    <HomeView
+    <>
+      {featured && ["registration", "checkin", "live"].includes(featured.status) && (
+        <LiveRefresh watch={`tournament:${featured.id}`} intervalMs={8000} />
+      )}
+      <HomeView
       featured={featured}
       approved={featured ? (counts[featured.id] ?? 0) : 0}
       isFirst={isFirst}
       upcoming={upcoming}
     />
+    </>
   );
 }

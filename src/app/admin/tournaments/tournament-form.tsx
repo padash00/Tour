@@ -380,7 +380,7 @@ export function TournamentForm({
                       const aim = workshopMaps.filter((m) => /^aim/i.test(m));
                       setMaps(k === "1v1" && aim.length ? [aim[0]] : [...MODES[k].maps]);
                       if (k === "1v1") {
-                        setKnife(false);
+                        setKnife(!aim.length); // на aim-картах нож не нужен, на обычных — как обычно
                         setTimeouts(0);
                         setBracket("round_robin");
                         setMaxTeams(4);
@@ -523,12 +523,12 @@ export function TournamentForm({
             title="Правила матча"
             hint={
               format === "1v1"
-                ? "Дуэль: стороны фиксированные, без ножа и тактических пауз. Уходит в MatchZy при загрузке матча"
+                ? "Дуэль: без тактических пауз. Уходит в MatchZy при загрузке матча"
                 : "Уходят в MatchZy на сервер при загрузке каждого матча"
             }
           >
             <div className="grid sm:grid-cols-2 gap-6">
-              {format !== "1v1" && (
+              {(
                 <div>
                   <Label>Стороны на карте</Label>
                   <Segmented

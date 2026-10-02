@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { markNotificationsRead, refreshProfile } from "@/app/actions/profile";
 import { isAdmin, requirePlayer } from "@/lib/auth";
@@ -107,6 +108,7 @@ export default async function MePage() {
 
   return (
     <>
+      <LiveRefresh watch="matches" intervalMs={5000} />
       {/* ── профиль */}
       <PageHero
         compact

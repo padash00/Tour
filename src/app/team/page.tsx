@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import {
   disbandTeam,
@@ -82,6 +83,7 @@ export default async function MyTeamPage() {
 
   return (
     <>
+      <LiveRefresh watch="matches" intervalMs={5000} />
       {/* ── штаб команды */}
       <PageHero
         media={

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -74,6 +75,8 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
   return (
     <div className="space-y-6">
+      {/* новые заявки, check-in, счёт матчей — без перезагрузки; на вкладке настроек не мешаем вводу */}
+      {tab !== "settings" && tab !== "rules" && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={4000} />}
       <AdminHeader
         back={{ href: "/admin/tournaments", label: "Турниры" }}
         title={

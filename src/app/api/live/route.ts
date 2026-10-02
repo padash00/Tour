@@ -40,8 +40,9 @@ export async function GET(request: NextRequest) {
   } else if (k.startsWith("tournament:") && UUID.test(k.slice(11))) {
     // режим ТВ: всё, что видно на экране турнира — статусы, счёт серий и карт идущих матчей, этап турнира
     const id = k.slice(11);
-    const [t, ms] = await Promise.all([
-      db().from("tournaments").select("status").eq("id", id).maybeSingle(),
+    const [t, regs, ms] = await Promise.all([
+      db().from("tournaments").select("status, bracket_published_at, autopilot").eq("id", id).maybeSingle(),
+      db().from("tournament_registrations").select("id, status, checked_in_at, seed").eq("tournament_id", id).order("id"),
       db()
         .from("matches")
         .select("id, status, stage, team1_id, team2_id, team1_score, team2_score, winner_id, server_state, scheduled_at")
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
     const maps = liveIds.length
       ? await db().from("match_maps").select("match_id, map_number, status, team1_score, team2_score").in("match_id", liveIds)
       : { data: [] };
-    parts = [t.data, ms.data, maps.data];
+    parts = [t.data, regs.data, ms.data, maps.data];
   } else if (k === "matches") {
     const { data } = await db()
       .from("matches")

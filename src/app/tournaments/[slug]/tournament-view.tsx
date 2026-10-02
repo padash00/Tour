@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LiveRefresh } from "@/components/live-refresh";
 import { getTournamentRegistrations } from "@/lib/data";
 import { getMapImages } from "@/lib/settings";
 import { bracketLabel, formatDate, formatDateTime, mapName } from "@/lib/format";
@@ -87,6 +88,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
             </Link>
             <AdminControlLink t={lite} />
           </div>
+          {["registration", "checkin", "live"].includes(t.status) && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={5000} />}
           {t.status === "draft" && (
             <div className="mt-6 max-w-2xl">
               <Callout tone="warn" title="Черновик">
