@@ -1,13 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listPublicTournaments } from "@/lib/data";
 import { mapName } from "@/lib/format";
-import { getMapTable, getPlayerLeaderboard, getTeamTable } from "@/lib/stats";
-import { PlayerStatsTable, RatingExplainer } from "@/components/stats-table";
+import { getMapTable, getPlayerLeaderboard, getTeamStats } from "@/lib/stats";
+import { PlayerStatsTable, RatingExplainer, TeamStatsTable } from "@/components/stats-table";
+import { StatLeaders } from "@/components/stat-leaders";
 import { SelectNav } from "@/components/public/select-nav";
 import { ClientTabs, TabPanel } from "@/components/public/client-tabs";
-import { DATA_TABLE, NUM_CELL, RankBadge, SortedHead, tableBox } from "@/components/public/data-table";
-import { TeamLogo, cn } from "@/components/ui";
+import { DATA_TABLE, NUM_CELL, SortedHead, tableBox } from "@/components/public/data-table";
+import { cn } from "@/components/ui";
 import { CARD, EmptyCard, PageHero, Wrap } from "@/components/primitives";
 
 const TABS = [
@@ -85,8 +85,11 @@ const empty = (
 async function PlayersTab({ tournamentId }: { tournamentId?: string }) {
   const rows = await getPlayerLeaderboard(tournamentId);
   return rows.length ? (
-    <div className={cn(CARD, "overflow-hidden")}>
-      <PlayerStatsTable rows={rows} sticky />
+    <div className="space-y-6">
+      <StatLeaders rows={rows} />
+      <div className={cn(CARD, "overflow-hidden")}>
+        <PlayerStatsTable rows={rows} sticky />
+      </div>
     </div>
   ) : (
     empty
@@ -94,57 +97,11 @@ async function PlayersTab({ tournamentId }: { tournamentId?: string }) {
 }
 
 async function TeamsTab({ tournamentId }: { tournamentId?: string }) {
-  const rows = await getTeamTable(tournamentId);
+  const rows = await getTeamStats(tournamentId);
   if (!rows.length) return empty;
   return (
-    <div className={tableBox(true)}>
-      <table className={cn(DATA_TABLE, "min-w-[760px]")}>
-        <thead>
-          <tr>
-            <th className="w-14">#</th>
-            <th>Команда</th>
-            <th className="!text-right">Матчи</th>
-            <th className="!text-right">
-              <SortedHead>Победы</SortedHead>
-            </th>
-            <th className="!text-right">Win rate</th>
-            <th className="!text-right">Карты</th>
-            <th className="!text-right">Раунды</th>
-            <th className="!text-right">±</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => {
-            const diff = r.roundsFor - r.roundsAgainst;
-            const wr = Math.round((100 * r.wins) / Math.max(1, r.matches));
-            return (
-              <tr key={r.team.id}>
-                <td>
-                  <RankBadge n={i + 1} />
-                </td>
-                <td>
-                  <Link href={`/teams/${r.team.tag}`} className="flex items-center gap-3 text-fg transition-colors hover:text-accent">
-                    <TeamLogo src={r.team.logo_url} tag={r.team.tag} size={32} />
-                    <span className="font-semibold">{r.team.name}</span>
-                    <span className="text-[12px] uppercase tracking-[0.16em] text-fg-3">{r.team.tag}</span>
-                  </Link>
-                </td>
-                <td className={NUM_CELL}>{r.matches}</td>
-                <td className={cn(NUM_CELL, "text-fg")}>{r.wins}</td>
-                <td className={cn(NUM_CELL, wr >= 60 ? "text-ok" : wr < 40 ? "text-danger" : "")}>{wr}%</td>
-                <td className={NUM_CELL}>
-                  {r.mapWins}
-                  <span className="text-fg-3">/{r.maps}</span>
-                </td>
-                <td className={NUM_CELL}>
-                  {r.roundsFor}:{r.roundsAgainst}
-                </td>
-                <td className={cn(NUM_CELL, diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "")}>{diff > 0 ? `+${diff}` : diff}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className={cn(CARD, "overflow-hidden")}>
+      <TeamStatsTable rows={rows} />
     </div>
   );
 }

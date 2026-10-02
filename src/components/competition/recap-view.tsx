@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { mapName } from "@/lib/format";
 import type { MapHighlight, Placement, TournamentRecap } from "@/lib/recap";
-import { fmt } from "@/components/stats-table";
+import { fmt } from "@/components/stats-format";
 import { CARD, Eyebrow } from "@/components/primitives";
 import { Avatar, TeamLogo, cn } from "@/components/ui";
 

@@ -1,30 +1,86 @@
+"use client";
+
 import Link from "next/link";
-import type { PlayerAgg } from "@/lib/stats";
+import { useMemo, useState, type ReactNode } from "react";
+import type { PlayerAgg, TeamStatRow } from "@/lib/stats";
 import { Avatar, TeamLogo, cn } from "./ui";
-import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar, SortedHead } from "./public/data-table";
+import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar } from "./public/data-table";
+import { fmt, ratingColor, swingColor } from "./stats-format";
 
 type Row = PlayerAgg & {
   team?: { name: string; tag: string } | null;
   player?: { nickname: string; avatar_url: string | null; steam_id: string } | null;
 };
 
-export function ratingColor(r: number) {
-  if (r >= 1.2) return "text-ok";
-  if (r >= 1.0) return "text-fg";
-  if (r >= 0.85) return "text-fg-2";
-  return "text-danger";
+type Sort = { key: string; dir: 1 | -1 };
+
+/** Сортировка по колонке: первый клик — по убыванию, повторный — по возрастанию. Сортировка стабильная */
+function useSort<T>(rows: T[], cols: Record<string, (r: T) => number>, initial: string) {
+  const [sort, setSort] = useState<Sort>({ key: initial, dir: -1 });
+  const sorted = useMemo(() => {
+    const get = cols[sort.key];
+    if (!get) return rows;
+    return [...rows].sort((a, b) => (get(b) - get(a)) * -sort.dir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sort]);
+  const toggle = (key: string) => setSort((s) => (s.key === key ? { key, dir: s.dir === -1 ? 1 : -1 } : { key, dir: -1 }));
+  return { sorted, sort, toggle };
 }
 
-export function swingColor(s: number | null) {
-  if (s == null) return "text-fg-3";
-  return s >= 1 ? "text-ok" : s <= -1 ? "text-danger" : "text-fg-2";
+/** Заголовок колонки-кнопки: стрелка у активной колонки */
+function SortTh({
+  k,
+  sort,
+  onSort,
+  children,
+  title,
+  left,
+}: {
+  k: string;
+  sort: Sort;
+  onSort: (k: string) => void;
+  children: ReactNode;
+  title?: string;
+  left?: boolean;
+}) {
+  const active = sort.key === k;
+  return (
+    <th className={left ? undefined : "!text-right"} aria-sort={active ? (sort.dir === -1 ? "descending" : "ascending") : undefined}>
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        title={title ?? "Сортировать"}
+        className={cn(
+          "inline-flex cursor-pointer items-center gap-1.5 uppercase tracking-[inherit] transition-colors hover:text-fg",
+          active && "text-fg-2",
+        )}
+      >
+        {children}
+        <svg
+          viewBox="0 0 12 12"
+          className={cn("size-2.5 transition-transform", active ? "opacity-100" : "opacity-0", active && sort.dir === 1 && "rotate-180")}
+          aria-hidden
+        >
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </th>
+  );
 }
 
-export const fmt = {
-  swing: (s: number | null) => (s == null ? "—" : `${s > 0 ? "+" : ""}${s.toFixed(1)}%`),
-  r: (n: number) => n.toFixed(2),
-  d1: (n: number) => n.toFixed(1),
-  pct: (n: number) => `${Math.round(n)}%`,
+const PLAYER_COLS: Record<string, (p: Row) => number> = {
+  maps: (p) => p.maps,
+  kills: (p) => p.kills,
+  deaths: (p) => p.deaths,
+  assists: (p) => p.assists,
+  diff: (p) => p.kills - p.deaths,
+  adr: (p) => p.adr,
+  kast: (p) => p.kast,
+  hs: (p) => p.hsPct,
+  entry: (p) => p.firstKills - p.firstDeaths,
+  clutch: (p) => p.clutches,
+  swing: (p) => p.swing ?? -1e9,
+  rating: (p) => p.rating,
 };
 
 /**
@@ -51,6 +107,12 @@ export function PlayerStatsTable({
   const showKast = rows.some((p) => p.kastRounds > 0);
   const showEntry = !compact && !solo && rows.some((p) => p.firstKills + p.firstDeaths > 0);
   const showClutch = !compact && !solo;
+  const { sorted, sort, toggle } = useSort(rows, PLAYER_COLS, "rating");
+  const th = (k: string, label: ReactNode, title?: string) => (
+    <SortTh k={k} sort={sort} onSort={toggle} title={title}>
+      {label}
+    </SortTh>
+  );
   return (
     <div className={sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto"}>
       <table className={cn(DATA_TABLE, compact ? "min-w-[640px] text-[13px] [&_td]:h-12" : "min-w-[960px]")}>
@@ -59,24 +121,22 @@ export function PlayerStatsTable({
             {rank && <th className="w-14">#</th>}
             <th>Игрок</th>
             {showTeam && <th>Команда</th>}
-            {!compact && <th className="!text-right">Карты</th>}
-            <th className="!text-right">K</th>
-            <th className="!text-right">D</th>
-            <th className="!text-right">A</th>
-            <th className="!text-right">±</th>
-            <th className="!text-right">ADR</th>
-            {showKast && <th className="!text-right">KAST</th>}
-            {!compact && <th className="!text-right">HS</th>}
-            {showEntry && <th className="!text-right">Entry</th>}
-            {showClutch && <th className="!text-right">Клатчи</th>}
-            <th className="!text-right" title="Средний вклад в шанс победы раунда">
-              Swing
-            </th>
-            <th className="!text-right">{rank ? <SortedHead title="Отсортировано по рейтингу">Rating</SortedHead> : "Rating"}</th>
+            {!compact && th("maps", "Карты")}
+            {th("kills", "K", "Убийства")}
+            {th("deaths", "D", "Смерти")}
+            {th("assists", "A", "Ассисты")}
+            {th("diff", "±", "Убийства минус смерти")}
+            {th("adr", "ADR", "Средний урон за раунд")}
+            {showKast && th("kast", "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
+            {!compact && th("hs", "HS", "Доля убийств в голову")}
+            {showEntry && th("entry", "Entry", "Первые убийства / первые смерти раунда")}
+            {showClutch && th("clutch", "Клатчи", "Выигранные клатчи")}
+            {th("swing", "Swing", "Средний вклад в шанс победы раунда")}
+            {th("rating", "Rating", "F16 Rating")}
           </tr>
         </thead>
         <tbody>
-          {rows.map((p, i) => {
+          {sorted.map((p, i) => {
             const nick = p.player?.nickname ?? p.name;
             const diff = p.kills - p.deaths;
             const name = (
@@ -141,27 +201,29 @@ export function PlayerStatsTable({
   );
 }
 
-export type TeamStatRow = {
-  team: { id: string; name: string; tag: string; logo_url: string | null };
-  matches: number;
-  wins: number;
-  maps: number;
-  mapWins: number;
-  roundsFor: number;
-  roundsAgainst: number;
-  kills: number;
-  deaths: number;
-  damage: number;
-  hs: number;
-  /** сколько игроков команды играли */
-  players: number;
-  /** сумма раундов, сыгранных игроками команды — ADR = урон / эти раунды */
-  rounds: number;
+const TEAM_COLS: Record<string, (t: TeamStatRow) => number> = {
+  matches: (t) => t.matches,
+  wins: (t) => t.wins,
+  maps: (t) => t.mapWins - (t.maps - t.mapWins),
+  rounds: (t) => t.roundsFor - t.roundsAgainst,
+  roundPct: (t) => (t.roundsFor + t.roundsAgainst ? t.roundsFor / (t.roundsFor + t.roundsAgainst) : 0),
+  kills: (t) => t.kills,
+  deaths: (t) => t.deaths,
+  kd: (t) => (t.deaths ? t.kills / t.deaths : t.kills),
+  adr: (t) => (t.rounds ? t.damage / t.rounds : 0),
+  hs: (t) => (t.kills ? t.hs / t.kills : 0),
 };
 
 /** Статистика команд турнира: результаты серий и карт, раунды, и сумма по игрокам — K/D, ADR, HS */
 export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boolean }) {
   const pm = (n: number) => (n > 0 ? `+${n}` : String(n));
+  // по умолчанию — порядок с сервера (победы → карты → раунды); сортировка стабильная, он сохраняется при равенстве
+  const { sorted, sort, toggle } = useSort(rows, TEAM_COLS, "wins");
+  const th = (k: string, label: ReactNode, title?: string) => (
+    <SortTh k={k} sort={sort} onSort={toggle} title={title}>
+      {label}
+    </SortTh>
+  );
   return (
     <div className="overflow-x-auto">
       <table className={cn(DATA_TABLE, "min-w-[900px]")}>
@@ -169,26 +231,20 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
           <tr>
             <th className="w-14">#</th>
             <th>{solo ? "Участник" : "Команда"}</th>
-            <th className="!text-right">Матчи</th>
-            <th className="!text-right">
-              <SortedHead title="Отсортировано по победам">В–П</SortedHead>
-            </th>
-            <th className="!text-right">Карты</th>
-            <th className="!text-right">Раунды</th>
-            <th className="!text-right" title="Доля выигранных раундов">
-              % раундов
-            </th>
-            <th className="!text-right">K</th>
-            <th className="!text-right">D</th>
-            <th className="!text-right">K/D</th>
-            <th className="!text-right" title="Средний урон за раунд">
-              ADR
-            </th>
-            <th className="!text-right">HS</th>
+            {th("matches", "Матчи")}
+            {th("wins", "В–П", "Победы и поражения в матчах")}
+            {th("maps", "Карты", "Выигранные и проигранные карты")}
+            {th("rounds", "Раунды", "Выигранные и проигранные раунды")}
+            {th("roundPct", "% раундов", "Доля выигранных раундов")}
+            {th("kills", "K", "Убийства")}
+            {th("deaths", "D", "Смерти")}
+            {th("kd", "K/D")}
+            {th("adr", "ADR", "Средний урон за раунд на игрока")}
+            {th("hs", "HS", "Доля убийств в голову")}
           </tr>
         </thead>
         <tbody>
-          {rows.map((t, i) => {
+          {sorted.map((t, i) => {
             const rounds = t.roundsFor + t.roundsAgainst;
             const rd = t.roundsFor - t.roundsAgainst;
             const kd = t.deaths ? t.kills / t.deaths : t.kills;
@@ -198,7 +254,7 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
                   <RankBadge n={i + 1} />
                 </td>
                 <td>
-                  <Link href={`/teams/${t.team.tag}`} className="flex items-center gap-3 hover:text-accent">
+                  <Link href={t.href} className="flex items-center gap-3 hover:text-accent">
                     <TeamLogo src={t.team.logo_url} tag={t.team.tag} size={32} />
                     <span className="max-w-[220px] truncate font-semibold text-fg">{t.team.name}</span>
                   </Link>

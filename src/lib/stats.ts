@@ -310,6 +310,146 @@ export async function getTeamTable(tournamentId?: string): Promise<TeamAgg[]> {
   return [...table.values()].sort((a, b) => b.wins / Math.max(1, b.matches) - a.wins / Math.max(1, a.matches) || b.wins - a.wins);
 }
 
+export type TeamStatRow = TeamAgg & {
+  /** куда ведёт имя: страница команды или профиль игрока (1×1) */
+  href: string;
+  kills: number;
+  deaths: number;
+  damage: number;
+  hs: number;
+  /** сколько игроков команды играли */
+  players: number;
+  /** сумма раундов, сыгранных игроками команды — ADR = урон / эти раунды */
+  rounds: number;
+};
+
+/**
+ * Статистика команд: результаты серий/карт/раундов + сумма по игрокам (K, D, урон, хедшоты).
+ * Порядок: победы → разница карт → разница раундов.
+ */
+export async function getTeamStats(tournamentId?: string): Promise<TeamStatRow[]> {
+  const [players, table] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamTable(tournamentId)]);
+  const zero = { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 };
+  const sums = new Map<string, typeof zero>();
+  for (const p of players) {
+    if (!p.team_id) continue;
+    const s = sums.get(p.team_id) ?? { ...zero };
+    s.kills += p.kills;
+    s.deaths += p.deaths;
+    s.damage += p.damage;
+    s.hs += p.hs;
+    s.players++;
+    s.rounds += p.rounds;
+    sums.set(p.team_id, s);
+  }
+  const hrefs = await teamHrefs(table.map((t) => t.team.id));
+  return table
+    .map((t) => ({ ...t, ...(sums.get(t.team.id) ?? zero), href: hrefs.get(t.team.id) ?? `/teams/${t.team.tag}` }))
+    .sort(
+      (a, b) =>
+        b.wins - a.wins ||
+        b.mapWins - (b.maps - b.mapWins) - (a.mapWins - (a.maps - a.mapWins)) ||
+        b.roundsFor - b.roundsAgainst - (a.roundsFor - a.roundsAgainst),
+    );
+}
+
+export type WeaponStat = { weapon: string; kills: number; hs: number };
+
+/** Убийства игрока по оружию — из событий раундов (лог сервера); только убийства соперников */
+export async function getPlayerWeapons(steamId: string, matchIds: string[]): Promise<WeaponStat[]> {
+  if (!matchIds.length) return [];
+  const { data } = await db().from("match_rounds").select("events").in("match_id", matchIds).limit(10000);
+  const by = new Map<string, WeaponStat>();
+  for (const r of (data ?? []) as { events: LogEvent[] }[]) {
+    for (const e of r.events ?? []) {
+      if (e.type !== "kill" || e.killer.steamId !== steamId || !e.killer.side || e.killer.side === e.victim.side) continue;
+      const w = (e.weapon || "unknown").replace(/^weapon_/, "");
+      const cur = by.get(w) ?? { weapon: w, kills: 0, hs: 0 };
+      cur.kills++;
+      if (e.headshot) cur.hs++;
+      by.set(w, cur);
+    }
+  }
+  return [...by.values()].sort((a, b) => b.kills - a.kills);
+}
+
+export type HeadToHead = {
+  opponent: Pick<Team, "id" | "name" | "tag" | "logo_url">;
+  href: string;
+  matches: number;
+  wins: number;
+  maps: number;
+  mapWins: number;
+  roundsFor: number;
+  roundsAgainst: number;
+};
+
+/** Личные встречи: соперники команд(ы) по сыгранным (не техническим) матчам опубликованных турниров */
+/** matchIds — только эти матчи (для игрока: те, где он сам играл) */
+export async function getHeadToHead({ teamIds, matchIds }: { teamIds: string[]; matchIds?: string[] }): Promise<HeadToHead[]> {
+  const ids = [...new Set(teamIds.filter(Boolean))];
+  if (!ids.length) return [];
+  if (matchIds && !matchIds.length) return [];
+  const list = ids.join(",");
+  let q = db()
+    .from("matches")
+    .select(
+      "id, team1_id, team2_id, winner_id, maps:match_maps(team1_score, team2_score, winner_id, status), team1:teams!matches_team1_id_fkey(id, name, tag, logo_url), team2:teams!matches_team2_id_fkey(id, name, tag, logo_url), tournament:tournaments!inner(status)",
+    )
+    .eq("status", "finished")
+    .eq("is_walkover", false)
+    .neq("tournament.status", "draft")
+    .or(`team1_id.in.(${list}),team2_id.in.(${list})`);
+  if (matchIds) q = q.in("id", matchIds);
+  const { data } = await q;
+  type Row = Pick<Match, "id" | "team1_id" | "team2_id" | "winner_id"> & {
+    maps: Pick<MatchMap, "team1_score" | "team2_score" | "winner_id" | "status">[];
+    team1: HeadToHead["opponent"] | null;
+    team2: HeadToHead["opponent"] | null;
+  };
+  const by = new Map<string, HeadToHead>();
+  for (const m of (data ?? []) as unknown as Row[]) {
+    const mine = ids.includes(m.team1_id ?? "") ? 1 : 2;
+    const me = mine === 1 ? m.team1_id : m.team2_id;
+    const opp = mine === 1 ? m.team2 : m.team1;
+    if (!opp || !me || ids.includes(opp.id)) continue;
+    const h = by.get(opp.id) ?? { opponent: opp, href: "", matches: 0, wins: 0, maps: 0, mapWins: 0, roundsFor: 0, roundsAgainst: 0 };
+    h.matches++;
+    if (m.winner_id === me) h.wins++;
+    for (const map of m.maps.filter((x) => x.status === "finished")) {
+      h.maps++;
+      if (map.winner_id === me) h.mapWins++;
+      h.roundsFor += mine === 1 ? map.team1_score : map.team2_score;
+      h.roundsAgainst += mine === 1 ? map.team2_score : map.team1_score;
+    }
+    by.set(opp.id, h);
+  }
+  const hrefs = await teamHrefs([...by.keys()]);
+  for (const h of by.values()) h.href = hrefs.get(h.opponent.id) ?? `/teams/${h.opponent.tag}`;
+  return [...by.values()].sort((a, b) => b.matches - a.matches || b.wins - a.wins);
+}
+
+/**
+ * Ссылка на команду: у «одиночной» команды (дуэли 1×1) своей страницы нет — ведём в профиль игрока.
+ * id команды → href
+ */
+export async function teamHrefs(teamIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(teamIds)];
+  const out = new Map<string, string>();
+  if (!ids.length) return out;
+  const { data: teams } = await db().from("teams").select("id, tag, is_solo, captain_id").in("id", ids);
+  const solo = (teams ?? []).filter((t) => t.is_solo && t.captain_id);
+  const { data: caps } = solo.length
+    ? await db().from("players").select("id, steam_id").in("id", solo.map((t) => t.captain_id))
+    : { data: [] };
+  const steam = new Map((caps ?? []).map((p) => [p.id, p.steam_id as string]));
+  for (const t of teams ?? []) {
+    const sid = t.is_solo ? steam.get(t.captain_id) : undefined;
+    out.set(t.id, sid ? `/players/${sid}` : `/teams/${encodeURIComponent(t.tag)}`);
+  }
+  return out;
+}
+
 export type MapAgg = { map: string; played: number; picked: number; banned: number; avgRounds: number };
 
 export async function getMapTable(tournamentId?: string): Promise<MapAgg[]> {
