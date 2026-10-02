@@ -170,7 +170,6 @@ export function TournamentForm({
     t?.prize_distribution?.length ? t.prize_distribution : [{ place: "1 место", prize: "" }, { place: "2 место", prize: "" }, { place: "3 место", prize: "" }],
   );
   const [cover, setCover] = useState<string | null>(t?.cover_url ?? null);
-  const [coverWarn, setCoverWarn] = useState<string | null>(null);
   const [overtime, setOvertime] = useState(t?.overtime ?? true);
   const [knife, setKnife] = useState(t?.knife_round ?? true);
   const [timeouts, setTimeouts] = useState(t?.timeouts_per_team ?? 3);
@@ -310,30 +309,17 @@ export function TournamentForm({
             </div>
             <label className="block cursor-pointer">
               <Label>Обложка</Label>
-              <div className="relative grid place-items-center overflow-hidden rounded-lg border border-dashed border-line-strong bg-bg-2 aspect-video transition hover:border-accent">
+              <div className="relative grid place-items-center overflow-hidden rounded-lg border border-dashed border-line-strong bg-bg-2 aspect-[3/1] transition hover:border-accent">
                 {cover ? (
-                  <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                    {/* что останется видно в широкой шапке страницы турнира (центральная полоса ≈ 2.4:1) */}
-                    <span className="pointer-events-none absolute inset-x-0 top-[13%] bottom-[13%] border-y border-dashed border-white/60" />
-                    <span className="pointer-events-none absolute right-2 top-[13%] mt-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white/80">
-                      видно в шапке турнира
-                    </span>
-                    {/* здесь сайт напишет название турнира — держите угол свободным */}
-                    <span className="pointer-events-none absolute left-[4%] bottom-[6%] w-[46%] h-[22%] rounded border border-dashed border-accent/80 bg-accent/10 grid place-items-center text-[10px] text-white/90">
-                      место для названия
-                    </span>
-                  </>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
-                  <div className="text-center text-[13px] text-fg-3 px-4">
+                  <div className="text-center text-[13px] text-fg-3">
                     <div className="text-fg-2 font-medium">Загрузить обложку</div>
-                    <div className="mt-1 text-xs">1920×1080 (16:9) · JPG или WEBP до 3 МБ</div>
-                    <div className="mt-0.5 text-xs">Тёмная, главное — по центру, левый нижний угол свободен под название</div>
+                    <div className="mt-1 text-xs">PNG, JPG или WEBP до 3 МБ · широкая и тёмная</div>
                   </div>
                 )}
               </div>
-              {coverWarn && <p className="mt-2 text-[12px] text-danger">{coverWarn}</p>}
               <input
                 name="cover"
                 type="file"
@@ -342,21 +328,7 @@ export function TournamentForm({
                 className="sr-only"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (!f) return;
-                  setCover(URL.createObjectURL(f));
-                  // сразу подсказать, если файл не пройдёт на сервере или будет мыльным
-                  if (f.size > 3 * 1024 * 1024) {
-                    setCoverWarn(`Файл ${(f.size / 1024 / 1024).toFixed(1)} МБ — больше 3 МБ, сохранить не получится. Сожмите в JPG/WEBP.`);
-                    return;
-                  }
-                  const img = new Image();
-                  img.onload = () =>
-                    setCoverWarn(
-                      img.naturalWidth < 1600
-                        ? `Ширина ${img.naturalWidth} px — на больших экранах будет мыльно. Лучше 1920×1080.`
-                        : null,
-                    );
-                  img.src = URL.createObjectURL(f);
+                  if (f) setCover(URL.createObjectURL(f));
                 }}
               />
             </label>
