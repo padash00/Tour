@@ -106,7 +106,9 @@ export function PlayerStatsTable({
   // MatchZy присылает KAST и первые убийства не всегда — пустые колонки не показываем
   const showKast = rows.some((p) => p.kastRounds > 0);
   const showEntry = !compact && !solo && rows.some((p) => p.firstKills + p.firstDeaths > 0);
-  const showClutch = !compact && !solo;
+  const showClutch = !compact && !solo && rows.some((p) => p.clutches > 0);
+  // в дуэлях «команда» — это сам игрок: колонку с повтором ника не показываем
+  const teamCol = showTeam && rows.some((p) => p.team && p.team.name !== (p.player?.nickname ?? p.name));
   const { sorted, sort, toggle } = useSort(rows, PLAYER_COLS, "rating");
   const th = (k: string, label: ReactNode, title?: string) => (
     <SortTh k={k} sort={sort} onSort={toggle} title={title}>
@@ -120,7 +122,7 @@ export function PlayerStatsTable({
           <tr>
             {rank && <th className="w-14">#</th>}
             <th>Игрок</th>
-            {showTeam && <th>Команда</th>}
+            {teamCol && <th>Команда</th>}
             {!compact && th("maps", "Карты")}
             {th("kills", "K", "Убийства")}
             {th("deaths", "D", "Смерти")}
@@ -161,7 +163,7 @@ export function PlayerStatsTable({
                     name
                   )}
                 </td>
-                {showTeam && (
+                {teamCol && (
                   <td className="text-[13px]">
                     {p.team ? (
                       <Link href={`/teams/${p.team.tag}`} className="hover:text-fg">

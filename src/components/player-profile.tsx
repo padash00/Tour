@@ -216,8 +216,9 @@ export function PlayerProfile({
               ["Убийства", agg.kills],
               ["Смерти", agg.deaths],
               ["Ассисты", agg.assists],
-              ["Entry", `${agg.firstKills}/${agg.firstDeaths}`],
-              ["Клатчи", agg.clutches],
+              // только командные матчи: в дуэлях эти цифры повторяют убийства — тогда «—»
+              ["Entry", agg.firstKills + agg.firstDeaths ? `${agg.firstKills}/${agg.firstDeaths}` : "—"],
+              ["Клатчи", agg.firstKills + agg.firstDeaths ? agg.clutches : "—"],
               ["Трейды", agg.trades],
               ["3K+", agg.k3 + agg.k4 + agg.k5],
               ["Ace", agg.k5],

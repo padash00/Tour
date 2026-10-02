@@ -101,6 +101,9 @@ function rate(a: Omit<PlayerAgg, "kd" | "adr" | "kast" | "hsPct" | "kpr" | "rati
   };
 }
 
+const isDuel = (r: MapStatRow) =>
+  (r as MapStatRow & { match?: { tournament?: { format?: string } } }).match?.tournament?.format === "1v1";
+
 export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
   const by = new Map<string, MapStatRow[]>();
   for (const r of rows) {
@@ -109,6 +112,8 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
   }
   return [...by.values()].map((list) => {
     const sum = (f: (r: MapStatRow) => number) => list.reduce((acc, r) => acc + (f(r) || 0), 0);
+    // в дуэли 1×1 каждое убийство — и первое в раунде, и «клатч 1 на 1»: эти цифры берём только из командных матчей
+    const team = (f: (r: MapStatRow) => number) => (r: MapStatRow) => (isDuel(r) ? 0 : f(r));
     const last = list[list.length - 1];
     const base = {
       steam_id: last.steam_id,
@@ -124,10 +129,10 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
       damage: sum((r) => r.damage),
       hs: sum((r) => r.headshot_kills),
       kastRounds: sum((r) => r.kast),
-      firstKills: sum((r) => r.first_kills),
-      firstDeaths: sum((r) => r.first_deaths),
+      firstKills: sum(team((r) => r.first_kills)),
+      firstDeaths: sum(team((r) => r.first_deaths)),
       trades: sum((r) => r.trade_kills),
-      clutches: sum((r) => r.clutch_wins),
+      clutches: sum(team((r) => r.clutch_wins)),
       k2: sum((r) => r.multi_kills?.["2k"] ?? 0),
       k3: sum((r) => r.multi_kills?.["3k"] ?? 0),
       k4: sum((r) => r.multi_kills?.["4k"] ?? 0),
@@ -146,7 +151,7 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
 export async function getStatRows(filter: { tournamentId?: string; playerId?: string; matchId?: string } = {}) {
   let q = db()
     .from("player_map_stats")
-    .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status))")
+    .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status, format))")
     .neq("match.tournament.status", "draft")
     .gt("rounds_played", 0);
   if (filter.tournamentId) q = q.eq("match.tournament_id", filter.tournamentId);
