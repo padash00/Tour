@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ChatBox } from "@/components/admin/chat-box";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -464,6 +465,11 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     </div>
                   </ActionForm>
                 )}
+                <div className="p-4">
+                  <div className="mb-2 text-[14px] font-medium">Сообщение в чат</div>
+                  <ChatBox fixed={m.server_instance} />
+                  <p className="mt-1.5 text-[11px] text-fg-3">Игроки увидят «[F16 ADMIN] ваш текст».</p>
+                </div>
                 <details className="group p-4">
                   <summary className="cursor-pointer list-none text-[12px] text-fg-3 hover:text-fg-2">Команда серверу вручную (для опытных) ▾</summary>
                   <ActionForm action={serverRcon} className="mt-3 flex gap-1.5">

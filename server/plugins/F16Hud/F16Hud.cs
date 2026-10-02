@@ -15,12 +15,11 @@ namespace F16Hud;
 public class F16Hud : BasePlugin
 {
     public override string ModuleName => "F16 HUD";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleVersion => "1.1.0";
     public override string ModuleAuthor => "F16 Arena";
 
     private string? _html;
     private DateTime _until;
-    private int _tick;
 
     public override void Load(bool hotReload)
     {
@@ -32,8 +31,7 @@ public class F16Hud : BasePlugin
                 _html = null;
                 return;
             }
-            // центр экрана гаснет сам — обновляем примерно 8 раз в секунду
-            if (++_tick % 8 != 0) return;
+            // центр экрана гаснет между обновлениями — шлём на каждом тике, иначе окно мерцает
             foreach (var p in Utilities.GetPlayers())
             {
                 if (p is { IsValid: true, IsBot: false, IsHLTV: false }) p.PrintToCenterHtml(_html);
@@ -51,8 +49,9 @@ public class F16Hud : BasePlugin
         text = space >= 0 ? text[(space + 1)..].Trim().Trim('"') : "";
         var lines = text.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(l => WebUtility.HtmlEncode(l.Trim())).ToList();
         if (lines.Count == 0) return;
-        var html = $"<font class='fontSize-l' color='#7fb2ff'>{lines[0]}</font>";
-        foreach (var l in lines.Skip(1)) html += $"<br><font class='fontSize-m' color='#ffffff'>{l}</font>";
+        // окно в CS2 узкое: заголовок — средним, остальное — мелким, чтобы строки не переносились
+        var html = $"<font class='fontSize-m' color='#7fb2ff'>{lines[0]}</font>";
+        foreach (var l in lines.Skip(1)) html += $"<br><font class='fontSize-s' color='#ffffff'>{l}</font>";
         _html = html;
         _until = DateTime.UtcNow.AddSeconds(Math.Clamp(seconds, 1, 120));
     }

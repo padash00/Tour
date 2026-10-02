@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import {
+  adminPlayers,
   applyAgentReport,
   autoMaintenanceTick,
   autopilotTick,
@@ -41,5 +42,8 @@ export async function POST(request: NextRequest) {
   await safely("auto maintenance", autoMaintenanceTick);
   const commands = await takePendingCommands(request.nextUrl.origin);
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
-  return NextResponse.json({ commands, bundle_version: getAgentBundle().version });
+  const admins = await adminPlayers()
+    .then((a) => a.map((x) => x.steam_id))
+    .catch(() => null);
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins });
 }

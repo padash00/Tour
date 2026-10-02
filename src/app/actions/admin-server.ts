@@ -155,3 +155,28 @@ export async function restoreRound(_prev: ActionResult, formData: FormData): Pro
   revalidatePath(`/admin/matches/${m.id}`);
   return { success: `Откат к началу раунда ${round} отправлен. MatchZy поставит паузу — снимите её, когда игроки готовы.` };
 }
+
+/**
+ * Сообщение в чат игры от имени админа (css_asay → «[F16 ADMIN] текст» у всех на сервере).
+ * instance = "all" — на все запущенные серверы.
+ */
+export async function sendChat(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const instance = String(formData.get("instance") ?? "");
+  // консоль CS2 режет команду на ; и кавычках — убираем их и управляющие символы
+  const text = String(formData.get("text") ?? "")
+    .replace(/["\;\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+  if (!text) return { error: "Напишите сообщение" };
+  const { online, instances } = await getServerState();
+  if (!online) return { error: "Агент не на связи" };
+  const targets = instance === "all" ? instances.filter((i) => i.running).map((i) => i.name) : [instance];
+  if (!targets.length || targets.some((t) => !instances.some((i) => i.name === t && i.running))) {
+    return { error: instance === "all" ? "Нет запущенных серверов" : `${instance} не запущен` };
+  }
+  for (const t of targets) await enqueueCommand(t, "rcon", { command: `css_asay ${text}` }, admin.id);
+  await audit(admin.id, "server.chat", undefined, { instance, text });
+  return { success: targets.length > 1 ? `Отправлено на ${targets.length} сервера` : `Отправлено на ${targets[0]}` };
+}

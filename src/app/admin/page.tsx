@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ChatBox } from "@/components/admin/chat-box";
 import Link from "next/link";
 import { startVeto } from "@/app/actions/admin-match";
 import { sendMatchToServer } from "@/app/actions/admin-server";
@@ -132,6 +133,13 @@ export default async function AdminOverview() {
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,1fr)]">
         <div className="min-w-0">
         {/* ── живая сетка серверов ── */}
+        {running.length > 0 && servers.online && (
+          <Section title="Сообщение в чат игры">
+            <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-4">
+              <ChatBox instances={running.map((i) => i.name)} />
+            </div>
+          </Section>
+        )}
         <Section title="Серверы" action={<SectionLink href="/admin/servers">Стойка</SectionLink>}>
           {servers.instances.length === 0 ? (
             <Quiet>Инстансы появятся, когда агент на серверном ПК выйдет на связь.</Quiet>

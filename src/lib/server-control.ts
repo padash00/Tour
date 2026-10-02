@@ -117,7 +117,15 @@ export async function buildMatchzyConfig(matchId: string) {
     min_players_to_ready: modeOf(m.tournament.format).size * 2,
     wingman: modeOf(m.tournament.format).wingman,
     min_spectators_to_ready: 0,
-    spectators: { players: Object.fromEntries(observers.map((id, i) => [id, `F16 Observer ${i + 1}`])) },
+    // зрители: наблюдатели из настроек и все админы сайта — админ заходит на любой матч сверх состава
+    spectators: {
+      players: Object.fromEntries([
+        ...observers.map((id, i) => [id, `F16 Observer ${i + 1}`] as const),
+        ...(await adminPlayers())
+          .filter((a) => !rosters.team1.some((r) => r.player.steam_id === a.steam_id) && !rosters.team2.some((r) => r.player.steam_id === a.steam_id))
+          .map((a) => [a.steam_id, a.nickname] as const),
+      ]),
+    },
     // только числовые cvars: MatchZy выполняет их без кавычек.
     // Адрес отправки событий агент выставляет отдельно через RCON.
     cvars: {
@@ -625,6 +633,15 @@ export async function enqueueSelfCheck(actorId?: string) {
 // ───────────────────────── проверка карты
 
 const MAP_LOAD_TIMEOUT_MS = 2 * 60_000;
+
+/** Админы сайта (SteamID + ник) — им в игре права MatchZy и вход на любой матч зрителем */
+export async function adminPlayers() {
+  const { data } = await db().from("players").select("steam_id, nickname, is_admin");
+  const envAdmins = (process.env.ADMIN_STEAM_IDS ?? "").split(",").map((s) => s.trim());
+  return (data ?? [])
+    .filter((p) => (p.is_admin || envAdmins.includes(p.steam_id)) && /^\d{17}$/.test(p.steam_id))
+    .map((p) => ({ steam_id: p.steam_id as string, nickname: (p.nickname as string) ?? "Admin" }));
+}
 
 async function adminIds() {
   const { data } = await db().from("players").select("id, steam_id, is_admin");

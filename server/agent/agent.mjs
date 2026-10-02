@@ -201,8 +201,9 @@ async function warmupHud(inst, info, get5, extra) {
   const s1 = get5.team1?.series_score ?? 0;
   const s2 = get5.team2?.series_score ?? 0;
   const lines = [
-    `F16 ARENA · Карта ${mapNo + 1}${total > 1 ? ` из ${total}` : ""}${map ? ` — ${hudClean(map)}` : ""}`,
-    total > 1 ? `${t1}  ${s1} : ${s2}  ${t2}` : `${t1}  vs  ${t2}`,
+    // окно в CS2 узкое — короткие строки, иначе переносятся
+    `F16 · КАРТА ${mapNo + 1}${total > 1 ? `/${total}` : ""}${map ? ` · ${hudClean(map).toUpperCase()}` : ""}`,
+    total > 1 ? `${t1} ${s1} : ${s2} ${t2}` : `${t1} vs ${t2}`,
     extra,
   ].filter(Boolean);
   hudShown[inst.name] = true;
@@ -223,7 +224,7 @@ async function autoStartNextMap(inst, info, get5) {
     const need0 = (cfg0?.players_per_team ?? 5) * 2;
     const humans0 = Math.max(0, (info?.players ?? 0) - 1);
     delete autoStart[inst.name];
-    await warmupHud(inst, info, get5, humans0 < need0 ? `Ждём игроков: ${humans0} из ${need0}` : "Все на месте — напишите .r в чат");
+    await warmupHud(inst, info, get5, humans0 < need0 ? `Ждём игроков ${humans0}/${need0}` : "Все на месте · напишите .r");
     return;
   }
   const key = `${a.matchid}:${mapNo}`;
@@ -242,13 +243,13 @@ async function autoStartNextMap(inst, info, get5) {
   }
   if (humans < need) {
     st.since = null;
-    await warmupHud(inst, info, get5, `Ждём игроков: ${humans} из ${need} — старт сам, .r не нужен`);
+    await warmupHud(inst, info, get5, `Ждём игроков ${humans}/${need} · старт сам`);
     return;
   }
   st.since ??= Date.now();
   const left = Math.ceil((AUTOSTART_DELAY_MS - (Date.now() - st.since)) / 1000);
   if (left > 0) {
-    await warmupHud(inst, info, get5, `Все на месте — старт через ${left} с`);
+    await warmupHud(inst, info, get5, `Все на месте · старт через ${left} с`);
     return;
   }
   st.done = true;
@@ -658,6 +659,21 @@ function ensureServerLanguage() {
   log(`язык сервера: ${m[1]} → ru (сообщения MatchZy на русском со следующего запуска серверов)`);
 }
 
+// Админы сайта → админы MatchZy (cfg/MatchZy/admins.json): .asay, пауза, откат раунда прямо из игры.
+// Свои записи помечаем значением "f16" и меняем только их — добавленные вручную не трогаем.
+const MATCHZY_ADMINS = path.join(SERVER_DIR, "game", "csgo", "cfg", "MatchZy", "admins.json");
+async function syncMatchzyAdmins(siteAdmins) {
+  if (!Array.isArray(siteAdmins)) return;
+  const current = readJsonSafe(MATCHZY_ADMINS, {});
+  const next = Object.fromEntries(Object.entries(current).filter(([, v]) => v !== "f16"));
+  for (const id of siteAdmins) if (/^\d{17}$/.test(id) && !(id in next)) next[id] = "f16";
+  if (JSON.stringify(next) === JSON.stringify(current)) return;
+  mkdirSync(path.dirname(MATCHZY_ADMINS), { recursive: true });
+  writeFileSync(MATCHZY_ADMINS, JSON.stringify(next, null, 2));
+  log(`MatchZy admins: ${Object.keys(next).length} (с сайта: ${siteAdmins.length})`);
+  for (const inst of INSTANCES) await rcon(inst.port, secrets.rcon, "reload_admins").catch(() => {});
+}
+
 // фразы, которые в ru.json MatchZy остались по-английски
 const MATCHZY_RU = {
   "matchzy.ready.readytotestorebackupinfomessage": "Не готовы: {0}. Напишите .ready, когда будете готовы восстановить раунд. {1}",
@@ -689,7 +705,8 @@ async function tick() {
   const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState };
   const events = pendingEvents.slice();
   const t0 = Date.now();
-  const { commands, bundle_version } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });
+  const { commands, bundle_version, admins } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });
+  await syncMatchzyAdmins(admins).catch((e) => log(`MatchZy admins: ${e.message}`));
   rtts.push(Date.now() - t0);
   if (rtts.length > 10) rtts.shift();
   if (events.length) {
