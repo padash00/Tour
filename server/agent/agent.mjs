@@ -534,7 +534,25 @@ async function refreshUpnp() {
   else if (upnpState.ip !== prev) log(`UPnP: роутер ${upnpState.model ?? ""} внешний адрес ${upnpState.ip}, проброшены UDP ${upnpState.mapped.join(", ")}`);
 }
 
+// Язык сообщений сервера: CounterStrikeSharp берёт его из core.json, MatchZy переведён (lang/ru.json).
+// По умолчанию там "en" — ставим "ru" (и возвращаем, если обновление плагинов перезапишет файл).
+// Движок читает файл при старте, поэтому язык меняется со следующего запуска сервера.
+const CSS_CORE = path.join(SERVER_DIR, "game", "csgo", "addons", "counterstrikesharp", "configs", "core.json");
+function ensureServerLanguage() {
+  if (!existsSync(CSS_CORE)) return;
+  const text = readFileSync(CSS_CORE, "utf8");
+  const m = /"ServerLanguage"\s*:\s*"([^"]*)"/.exec(text);
+  if (!m || m[1] === "ru") return;
+  writeFileSync(CSS_CORE, text.replace(m[0], '"ServerLanguage": "ru"'));
+  log(`язык сервера: ${m[1]} → ru (сообщения MatchZy на русском со следующего запуска серверов)`);
+}
+
 async function tick() {
+  try {
+    ensureServerLanguage();
+  } catch (e) {
+    log(`язык сервера: ${e.message}`);
+  }
   await refreshUpnp().catch(() => {});
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
   const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState };
