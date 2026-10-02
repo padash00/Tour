@@ -39,6 +39,10 @@ foreach ($i in $targets) {
     "+exec", "f16/$($i.name.ToLower()).cfg"
   )
   if ($secrets.gslt) { $argList += @("+sv_setsteamaccount", $secrets.gslt) }
-  $p = Start-Process -FilePath $exe -ArgumentList $argList -WorkingDirectory (Split-Path $exe) -PassThru
-  Write-Host "START $($i.name) :$port pid $($p.Id)"
+  # Через WMI, а не Start-Process: процесс создаёт сама Windows, он не входит в задание (job) агента
+  # и не умирает, когда агент перезапускается или обновляется.
+  $cmd = "`"$exe`" " + ($argList -join " ")
+  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmd; CurrentDirectory = (Split-Path $exe) }
+  if ($r.ReturnValue -ne 0) { throw "Не удалось запустить $($i.name): код $($r.ReturnValue)" }
+  Write-Host "START $($i.name) :$port pid $($r.ProcessId)"
 }

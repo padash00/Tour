@@ -463,9 +463,8 @@ function runStartScript(name, stop) {
   return new Promise((resolve) => {
     const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", START_PS1, "-Name", name];
     if (stop) args.push("-Stop");
-    // detached: иначе Node на Windows кладёт процесс в своё задание (job) и cs2.exe погибает
-    // вместе с агентом при его перезапуске/самообновлении
-    const p = spawn("powershell", args, { windowsHide: true, stdio: "ignore", detached: true });
+    // cs2.exe start.ps1 создаёт через WMI — вне задания (job) агента, поэтому detached здесь не нужен
+    const p = spawn("powershell", args, { windowsHide: true, stdio: "ignore" });
     p.on("error", (e) => resolve({ ok: false, result: e.message }));
     p.on("exit", (code) => resolve({ ok: code === 0, result: `${stop ? "stop" : "start"} ${name}: exit ${code}` }));
   });

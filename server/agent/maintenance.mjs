@@ -6,8 +6,8 @@ import path from "node:path";
 const run = (file, args, { timeoutMs = 30 * 60_000, cwd } = {}) =>
   new Promise((resolve) => {
     // stdio: ignore — дочерние cs2.exe не должны держать наши pipe'ы
-    // detached — запущенные отсюда cs2.exe не должны умирать вместе с агентом (job object Node на Windows)
-    const p = spawn(file, args, { windowsHide: true, stdio: "ignore", cwd, detached: true });
+    // cs2.exe start.ps1 создаёт через WMI — вне задания (job) агента, поэтому detached здесь не нужен
+    const p = spawn(file, args, { windowsHide: true, stdio: "ignore", cwd });
     const t = setTimeout(() => p.kill(), timeoutMs);
     p.on("error", (e) => {
       clearTimeout(t);
