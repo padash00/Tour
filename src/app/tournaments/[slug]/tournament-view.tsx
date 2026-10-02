@@ -6,8 +6,10 @@ import { bracketLabel, formatDate, formatDateTime, mapName } from "@/lib/format"
 import type { Tournament } from "@/lib/types";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
-import { getPlayerLeaderboard, getTeamTable, getTournamentMvp } from "@/lib/stats";
-import { PlayerStatsTable, RatingExplainer, TeamStatsTable, fmt, type TeamStatRow } from "@/components/stats-table";
+import { getPlayerLeaderboard, getTeamStats, getTournamentMvp } from "@/lib/stats";
+import { PlayerStatsTable, RatingExplainer, TeamStatsTable } from "@/components/stats-table";
+import { fmt } from "@/components/stats-format";
+import { StatLeaders } from "@/components/stat-leaders";
 import { ShareButton, StreamEmbed } from "@/components/stream";
 import { BracketView } from "@/components/bracket-view";
 import { GroupStageView, SwissView } from "@/components/stage-view";
@@ -455,28 +457,7 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
 }
 
 async function StatsTab({ tournamentId, solo }: { tournamentId: string; solo: boolean }) {
-  const [rows, table] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamTable(tournamentId)]);
-  // командные суммы по игрокам: убийства, смерти, урон, хедшоты
-  const sums = new Map<string, { kills: number; deaths: number; damage: number; hs: number; players: number; rounds: number }>();
-  for (const p of rows) {
-    if (!p.team_id) continue;
-    const s = sums.get(p.team_id) ?? { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 };
-    s.players++;
-    s.rounds += p.rounds;
-    s.kills += p.kills;
-    s.deaths += p.deaths;
-    s.damage += p.damage;
-    s.hs += p.hs;
-    sums.set(p.team_id, s);
-  }
-  const teams: TeamStatRow[] = table
-    .map((t) => ({ ...t, ...(sums.get(t.team.id) ?? { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 }) }))
-    .sort(
-      (a, b) =>
-        b.wins - a.wins ||
-        b.mapWins - b.maps / 2 - (a.mapWins - a.maps / 2) ||
-        b.roundsFor - b.roundsAgainst - (a.roundsFor - a.roundsAgainst),
-    );
+  const [rows, teams] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId)]);
   return (
     <div className="space-y-10">
       {rows.length ? (
@@ -491,7 +472,8 @@ async function StatsTab({ tournamentId, solo }: { tournamentId: string; solo: bo
             ]}
           />
           <div data-tabs-scope="tstats">
-            <TabPanel tab="players" defaultKey="players">
+            <TabPanel tab="players" defaultKey="players" className="space-y-6">
+              <StatLeaders rows={rows} />
               <PlayerStatsTable rows={rows} solo={solo} showTeam={!solo} />
             </TabPanel>
             <TabPanel tab="teams" defaultKey="players">

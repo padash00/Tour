@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { formatDate, mapName } from "@/lib/format";
-import type { PlayerAgg } from "@/lib/stats";
+import type { HeadToHead, PlayerAgg, WeaponStat } from "@/lib/stats";
 import type { Player } from "@/lib/types";
-import { fmt, ratingColor, swingColor } from "./stats-table";
+import { fmt, ratingColor, swingColor, weaponName } from "./stats-format";
+import { HeadToHeadList } from "./head-to-head";
 import { Avatar, FaceitLevel, TeamLogo, cn } from "./ui";
 import { CARD, PageHero, SectionHead, Wrap } from "./primitives";
 import { DATA_TABLE, NUM_CELL } from "./public/data-table";
@@ -38,6 +39,40 @@ function bestMaps(history: MapHistoryItem[]) {
     .slice(0, 5);
 }
 
+/** Убийства по оружию: доля от всех убийств и процент в голову, топ-8 */
+function WeaponList({ weapons }: { weapons: WeaponStat[] }) {
+  if (!weapons.length) return <p className="text-[14px] text-fg-3">Появится после первых убийств на наших серверах.</p>;
+  // ножи разных скинов и варианты одного ствола сводим под одно имя
+  const merged = new Map<string, WeaponStat>();
+  for (const w of weapons) {
+    const name = weaponName(w.weapon);
+    const cur = merged.get(name) ?? { weapon: name, kills: 0, hs: 0 };
+    cur.kills += w.kills;
+    cur.hs += w.hs;
+    merged.set(name, cur);
+  }
+  const list = [...merged.values()].sort((a, b) => b.kills - a.kills);
+  const total = list.reduce((s, w) => s + w.kills, 0);
+  return (
+    <div>
+      {list.slice(0, 8).map((w) => (
+        <div key={w.weapon} className="border-b border-white/[0.06] py-3 last:border-0">
+          <div className="flex items-center gap-3">
+            <span className="flex-1 truncate font-semibold text-fg">{w.weapon}</span>
+            <span className="num text-[12px] text-fg-3">HS {fmt.pct((100 * w.hs) / w.kills)}</span>
+            <span className="num w-20 text-right text-[13px] text-fg-2">
+              {w.kills} <span className="text-fg-3">· {fmt.pct((100 * w.kills) / total)}</span>
+            </span>
+          </div>
+          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full rounded-full bg-accent/70" style={{ width: `${(100 * w.kills) / list[0].kills}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PlayerProfile({
   player,
   team,
@@ -47,6 +82,8 @@ export function PlayerProfile({
   tournaments = 0,
   awards = [],
   progress = [],
+  weapons = [],
+  h2h = [],
 }: {
   player: Player;
   team: { name: string; tag: string; logo_url: string | null } | null;
@@ -56,6 +93,8 @@ export function PlayerProfile({
   tournaments?: number;
   awards?: Award[];
   progress?: ProgressItem[];
+  weapons?: WeaponStat[];
+  h2h?: HeadToHead[];
 }) {
   const main = [
     { label: "F16 Rating", value: agg ? fmt.r(agg.rating) : "—", cls: agg ? ratingColor(agg.rating) : undefined },
@@ -278,6 +317,19 @@ export function PlayerProfile({
             </section>
           </div>
         </div>
+
+        {(weapons.length > 0 || h2h.length > 0) && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2 items-start">
+            <section className={cn(CARD, "p-6 lg:p-8 min-w-0")}>
+              <SectionHead title="Оружие" />
+              <WeaponList weapons={weapons} />
+            </section>
+            <section className={cn(CARD, "p-6 lg:p-8 min-w-0")}>
+              <SectionHead title="Личные встречи" />
+              <HeadToHeadList items={h2h} />
+            </section>
+          </div>
+        )}
       </Wrap>
     </>
   );

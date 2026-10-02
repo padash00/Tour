@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { MAX_MAIN, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
-import { getPlayerLeaderboard } from "@/lib/stats";
+import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
+import { HeadToHeadList } from "@/components/head-to-head";
 import { getTeamAwards } from "@/lib/awards";
 import { AwardsRow } from "@/components/public/awards";
 import { MatchLine, TStatus } from "@/components/public/bits";
 import { FormStrip } from "@/components/public/form-strip";
-import { ratingColor } from "@/components/stats-table";
+import { ratingColor } from "@/components/stats-format";
 import { Avatar, FaceitLevel, TeamLogo, cn } from "@/components/ui";
 import { CARD, EmptyCard, Eyebrow, HeroNumber, SectionHead, StatusChip, WRAP, Wrap } from "@/components/primitives";
 
@@ -34,12 +35,13 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team) notFound();
 
-  const [members, regs, matches, board, awards] = await Promise.all([
+  const [members, regs, matches, board, awards, h2h] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getTeamMatches(team.id),
     getPlayerLeaderboard(),
     getTeamAwards(team.id),
+    getHeadToHead({ teamIds: [team.id] }),
   ]);
   const finished = matches.filter((m) => m.status === "finished").reverse();
   const recent = finished.slice(0, 10);
@@ -176,6 +178,14 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           </div>
 
           <div className="space-y-4">
+            {h2h.length > 0 && (
+              <div>
+                <SectionHead title="Личные встречи" />
+                <div className={cn(CARD, "px-6 py-2 lg:px-8")}>
+                  <HeadToHeadList items={h2h} />
+                </div>
+              </div>
+            )}
             <div>
               <SectionHead title="Турниры" />
               <div className={cn(CARD, "px-6 py-2 lg:px-8")}>

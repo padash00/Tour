@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listPlayers } from "@/lib/data";
 import { getPlayerLeaderboard } from "@/lib/stats";
-import { ratingColor } from "@/components/stats-table";
+import { ratingColor } from "@/components/stats-format";
 import { DATA_TABLE, NUM_CELL, tableBox } from "@/components/public/data-table";
 import { Avatar, FaceitLevel, cn } from "@/components/ui";
 import { EmptyCard, PageHero, Wrap } from "@/components/primitives";

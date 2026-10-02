@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getActiveMembership, getPlayerBySteamId } from "@/lib/data";
-import { aggregatePlayers, getPlayerMapHistory, getStatRows } from "@/lib/stats";
+import { aggregatePlayers, getHeadToHead, getPlayerMapHistory, getPlayerWeapons, getStatRows } from "@/lib/stats";
 import { db } from "@/lib/supabase";
 import { getPlayerAwards } from "@/lib/awards";
 import { getPlayerProgress } from "@/lib/progress";
@@ -39,6 +39,11 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
     getPlayerProgress(player.id),
   ]);
   const agg = rows.length ? aggregatePlayers(rows)[0] : null;
+  const matchIds = [...new Set(rows.map((r) => r.match_id))];
+  const [weapons, h2h] = await Promise.all([
+    getPlayerWeapons(player.steam_id, matchIds),
+    getHeadToHead({ teamIds: rows.map((r) => r.team_id).filter(Boolean) as string[], matchIds }),
+  ]);
 
   return (
     <PlayerProfile
@@ -49,6 +54,8 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
       tournaments={new Set((rosters.data ?? []).map((r) => r.tournament_id)).size}
       awards={awards}
       progress={progress}
+      weapons={weapons}
+      h2h={h2h}
     />
   );
 }
