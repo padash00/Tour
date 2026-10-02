@@ -146,14 +146,14 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
           : null;
 
   return (
-    <div className="grid overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 lg:grid-cols-[44%_1fr]">
-      <div className="relative min-h-[240px] lg:min-h-[350px]">
+    <div className="group grid overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 lg:grid-cols-[44%_1fr]">
+      <div className="relative min-h-[240px] overflow-hidden lg:min-h-[350px]">
         <Image
           src={t.cover_url ?? "/home/tournament.jpg"}
           alt=""
           fill
           sizes="(min-width: 1024px) 600px, 100vw"
-          className="object-cover"
+          className="media-zoom object-cover"
           unoptimized={!!t.cover_url}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#070b12] via-[#070b12]/55 to-transparent" />
@@ -248,7 +248,7 @@ function NextTournaments({ list }: { list: Tournament[] }) {
           <Link
             key={t.id}
             href={`/tournaments/${t.slug}`}
-            className={cn("flex items-center gap-6 px-8 py-6 transition-colors hover:bg-white/[0.02]", i > 0 && "border-t border-white/[0.06]")}
+            className={cn("group flex items-center gap-6 px-8 py-6 transition-colors hover:bg-white/[0.02]", i > 0 && "border-t border-white/[0.06]")}
           >
             <span className="text-fg-2">{Icon.calendar("size-7")}</span>
             <div className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ function NextTournaments({ list }: { list: Tournament[] }) {
                 {formatDate(t.starts_at)} · {tournamentStatusLabel[t.status]}
               </div>
             </div>
-            <IconArrow className="size-4 text-fg-3" />
+            <IconArrow className="nudge size-4 text-fg-3 group-hover:text-fg" />
           </Link>
         ))}
       </div>

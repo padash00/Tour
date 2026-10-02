@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Onest } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { ToastProvider } from "@/components/toast";
+import { RouteTransition } from "@/components/route-transition";
+import { NavProgress } from "@/components/nav-progress";
+import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -38,8 +41,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ru" className={`${onest.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <ToastProvider>
+          <Suspense fallback={null}>
+            <NavProgress />
+          </Suspense>
           <SiteHeader />
-          <main className="flex-1">{children}</main>
+          {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
+          <main className="flex-1 anim-in">
+            <RouteTransition>{children}</RouteTransition>
+          </main>
           <SiteFooter />
         </ToastProvider>
       </body>

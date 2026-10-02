@@ -14,7 +14,8 @@ const TINT: Record<string, [string, string]> = {
   de_vertigo: ["#2a2f3a", "#12151b"],
 };
 
-function tint(map: string): [string, string] {
+/** Фирменный оттенок карты (фон без картинки) */
+export function tint(map: string): [string, string] {
   const key = map.split("@")[0];
   if (TINT[key]) return TINT[key];
   let h = 0;

@@ -182,27 +182,8 @@ export function Metric({ label, value, tone, hint }: { label: ReactNode; value: 
 }
 
 /** Внутренние вкладки страницы (через ?tab=) */
-export function SubTabs({ items, active }: { items: { key: string; label: ReactNode; href: string }[]; active: string }) {
-  return (
-    <div className="flex gap-6 border-b border-white/[0.06] overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
-      {items.map((t) => (
-        <Link
-          key={t.key}
-          href={t.href}
-          scroll={false}
-          aria-current={t.key === active ? "page" : undefined}
-          className={cn(
-            "relative h-11 inline-flex items-center rounded-sm text-[13px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-            t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
-          )}
-        >
-          {t.label}
-          {t.key === active && <span className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent" />}
-        </Link>
-      ))}
-    </div>
-  );
-}
+// вкладки — клиентские: подчёркивание переезжает сразу по клику
+export { SubTabs } from "./sub-tabs";
 
 export function TableSkeleton({ rows = 8, cols = 6 }: { rows?: number; cols?: number }) {
   return (

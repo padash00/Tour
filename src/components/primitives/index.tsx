@@ -189,7 +189,7 @@ export const CARD = "rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80";
 
 /** Карточка-ссылка: мягкая реакция на наведение */
 export const CARD_LINK =
-  "transition-[border-color,background-color] duration-200 hover:border-white/[0.16] hover:bg-[#0d1726] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
+  "lift hover:border-white/[0.16] hover:bg-[#0d1726] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
 
 export function cardClass(extra?: string, interactive?: boolean) {
   return cn(CARD, interactive && CARD_LINK, extra);

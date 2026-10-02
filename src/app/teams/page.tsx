@@ -70,7 +70,7 @@ export default async function TeamsPage() {
                   <span className="sm:hidden text-fg-3"> игр.</span>
                 </span>
                 <span className="hidden sm:block num text-[15px] text-right text-fg-2">{t.avg_elo ?? "—"}</span>
-                <IconArrow className="hidden sm:block size-4 text-fg-3 group-hover:text-fg transition-colors" />
+                <IconArrow className="nudge hidden sm:block size-4 text-fg-3 group-hover:text-fg" />
               </Link>
             ))}
           </div>

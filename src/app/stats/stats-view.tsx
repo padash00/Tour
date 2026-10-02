@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { listPublicTournaments } from "@/lib/data";
 import { mapName } from "@/lib/format";
-import { getMapTable, getPlayerLeaderboard, getTeamStats } from "@/lib/stats";
+import { getMapTable, getPlayerLeaderboard, getTeamStats, type MapAgg } from "@/lib/stats";
+import { getMapImages } from "@/lib/settings";
+import { tint } from "@/components/competition/map-tile";
 import { PlayerStatsTable, RatingExplainer, TeamStatsTable } from "@/components/stats-table";
 import { StatLeaders } from "@/components/stat-leaders";
 import { SelectNav } from "@/components/public/select-nav";
 import { ClientTabs, TabPanel } from "@/components/public/client-tabs";
-import { DATA_TABLE, NUM_CELL, SortedHead, tableBox } from "@/components/public/data-table";
 import { cn } from "@/components/ui";
 import { CARD, EmptyCard, PageHero, Wrap } from "@/components/primitives";
 
@@ -107,40 +108,105 @@ async function TeamsTab({ tournamentId }: { tournamentId?: string }) {
 }
 
 async function MapsTab({ tournamentId }: { tournamentId?: string }) {
-  const rows = await getMapTable(tournamentId);
+  const [rows, images] = await Promise.all([getMapTable(tournamentId), getMapImages()]);
   if (!rows.length) return empty;
   const maxPlayed = Math.max(1, ...rows.map((r) => r.played));
+  // самые сыгранные — первыми; при равенстве — чаще пикают, реже банят; несыгранные — в конце
+  const sorted = [...rows].sort((a, b) => b.played - a.played || b.picked - a.picked || a.banned - b.banned);
   return (
-    <div className={tableBox(true)}>
-      <table className={cn(DATA_TABLE, "min-w-[620px]")}>
-        <thead>
-          <tr>
-            <th>Карта</th>
-            <th className="!text-right">
-              <SortedHead>Сыграно</SortedHead>
-            </th>
-            <th className="!text-right">Пики</th>
-            <th className="!text-right">Баны</th>
-            <th className="!text-right">Ср. раундов</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.map}>
-              <td>
-                <div className="text-[16px] font-semibold text-fg">{mapName(r.map)}</div>
-                <div className="mt-1.5 h-[3px] w-40 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div className="h-full rounded-full bg-accent/70" style={{ width: `${(r.played / maxPlayed) * 100}%` }} />
-                </div>
-              </td>
-              <td className={cn(NUM_CELL, "text-fg")}>{r.played}</td>
-              <td className={NUM_CELL}>{r.picked}</td>
-              <td className={NUM_CELL}>{r.banned}</td>
-              <td className={NUM_CELL}>{r.avgRounds ? r.avgRounds.toFixed(1) : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {sorted.map((r, i) => (
+        <MapStatCard key={r.map} r={r} rank={i + 1} image={images[r.map] ?? null} maxPlayed={maxPlayed} />
+      ))}
     </div>
+  );
+}
+
+/** Карточка карты: обложка, место по популярности, цифры, соотношение пиков и банов */
+function MapStatCard({ r, rank, image, maxPlayed }: { r: MapAgg; rank: number; image: string | null; maxPlayed: number }) {
+  const [a, b] = tint(r.map);
+  const unplayed = r.played === 0;
+  const votes = r.picked + r.banned;
+  const pickShare = votes ? (100 * r.picked) / votes : 0;
+  const stats = [
+    { label: "Сыграно", value: r.played },
+    { label: "Пики", value: r.picked },
+    { label: "Баны", value: r.banned },
+    { label: "≈ раундов", value: r.avgRounds ? r.avgRounds.toFixed(1) : "—" },
+  ];
+  return (
+    <article
+      className={cn(
+        "lift group relative overflow-hidden rounded-[14px] border border-white/[0.08] bg-[#0b1420]/90 hover:border-white/[0.18]",
+        unplayed && "opacity-60 hover:opacity-100",
+      )}
+    >
+      {/* обложка */}
+      <div className="relative h-40 overflow-hidden sm:h-44" style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}>
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            className={cn("media-zoom absolute inset-0 h-full w-full object-cover brightness-[0.72] saturate-[0.75]", unplayed && "grayscale")}
+          />
+        ) : (
+          <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff14,transparent_60%)]" />
+        )}
+        <span className="absolute inset-0 bg-gradient-to-t from-[#0b1420] via-[#0b1420]/40 to-transparent" />
+        <span
+          className={cn(
+            "num absolute left-3 top-3 grid h-7 min-w-7 place-items-center rounded-[7px] px-1.5 text-[12px] font-semibold backdrop-blur-sm",
+            rank === 1 && !unplayed ? "bg-accent text-accent-ink" : "bg-black/45 text-fg-2",
+          )}
+        >
+          {rank}
+        </span>
+        {unplayed && (
+          <span className="absolute right-3 top-3 rounded-[6px] bg-black/45 px-2 py-1 text-[11px] text-fg-3 backdrop-blur-sm">ещё не играли</span>
+        )}
+        <div className="absolute inset-x-4 bottom-3">
+          <div className="text-[24px] font-semibold leading-none tracking-[-0.02em] text-fg drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">{mapName(r.map)}</div>
+        </div>
+      </div>
+
+      {/* цифры */}
+      <div className="grid grid-cols-4 border-t border-white/[0.06]">
+        {stats.map((s, j) => (
+          <div key={s.label} className={cn("px-2 py-3 text-center", j > 0 && "border-l border-white/[0.06]")}>
+            <div className="num text-[18px] font-semibold leading-none text-fg">{s.value}</div>
+            <div className="mt-1.5 whitespace-nowrap text-[10px] uppercase tracking-[0.08em] text-fg-3">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* пики против банов и популярность */}
+      <div className="space-y-3 border-t border-white/[0.06] px-4 py-3.5">
+        <div>
+          <div className="mb-1.5 flex justify-between text-[11px] text-fg-3">
+            <span className="text-ok/90">пики {votes ? `${Math.round(pickShare)}%` : "—"}</span>
+            <span className="text-danger/80">баны {votes ? `${Math.round(100 - pickShare)}%` : "—"}</span>
+          </div>
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            {votes > 0 && (
+              <>
+                <span className="h-full bg-ok/70" style={{ width: `${pickShare}%` }} />
+                <span className="h-full bg-danger/60" style={{ width: `${100 - pickShare}%` }} />
+              </>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="mb-1.5 flex justify-between text-[11px] text-fg-3">
+            <span>популярность</span>
+            <span className="num">{Math.round((100 * r.played) / maxPlayed)}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <span className="block h-full rounded-full bg-accent/75" style={{ width: `${(100 * r.played) / maxPlayed}%` }} />
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
