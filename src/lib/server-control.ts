@@ -402,6 +402,35 @@ async function upsertPlayerStats(match: Match, mapNumber: number, ev: MatchzyEve
   await db().from("player_map_stats").upsert(rows, { onConflict: "match_id,map_number,steam_id" });
 }
 
+/** Текст для чата CS2 через консоль: без разделителей команд, кавычек и управляющих символов */
+function chatSafe(text: string) {
+  return text.replace(/["\\;\u0000-\u001f\u007f]/g, "").slice(0, 200);
+}
+const mapTitle = (m: string) =>
+  m.split("@")[0].replace(/^(de|cs|aim|awp)_/, "").replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * Итог карты в чат игры: счёт карты, счёт серии и следующая карта — или итог матча.
+ * Отправляется агенту обычной RCON-командой (css_asay — сообщение от имени админа сервера).
+ */
+async function announceMapResult(matchId: string, mapNumber: number) {
+  const m = await getMatch(matchId);
+  if (!m?.server_instance) return;
+  const t1 = m.team1?.name ?? "Команда 1";
+  const t2 = m.team2?.name ?? "Команда 2";
+  const map = m.maps.find((x) => x.map_number === mapNumber);
+  const lines: string[] = [];
+  if (map) lines.push(`Карта ${mapNumber} (${mapTitle(map.map_name)}): ${t1} ${map.team1_score}:${map.team2_score} ${t2}`);
+  if (m.status === "finished") {
+    const winner = m.winner_id === m.team1_id ? t1 : t2;
+    lines.push(`Матч окончен — победил ${winner}, ${m.team1_score}:${m.team2_score}. Спасибо за игру!`);
+  } else {
+    const next = m.maps.find((x) => x.map_number === mapNumber + 1);
+    lines.push(`Серия ${t1} ${m.team1_score}:${m.team2_score} ${t2}${next ? ` · следующая карта — ${mapTitle(next.map_name)}` : ""}`);
+  }
+  for (const line of lines) await enqueueCommand(m.server_instance, "rcon", { command: `css_asay ${chatSafe(line)}` });
+}
+
 export async function handleMatchzyEvent(ev: MatchzyEvent) {
   const { data } = ev.matchid != null
     ? await db().from("matches").select("*").eq("matchzy_id", ev.matchid).maybeSingle()
@@ -452,6 +481,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       await stopMapLogging(match.id);
       if (match.status === "ready") await db().from("matches").update({ status: "live" }).eq("id", match.id);
       await recomputeSeries(match.id);
+      await announceMapResult(match.id, mapNumber).catch(() => {});
       break;
     }
     case "series_end": {

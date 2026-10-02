@@ -149,6 +149,47 @@ function trackAssignment(inst, running, get5) {
   if (changed) saveAssignments();
 }
 
+// ───────────────────────── автостарт карт серии
+// Перед первой картой игроки пишут .r сами. На следующих картах серии ждать .r не нужно: как только
+// весь состав зашёл на новую карту, через 15 с сервер стартует сам (css_start — дальше нож, если он
+// включён, или сразу игра). Если кто-то вышел за эти 15 с — отсчёт начинается заново.
+const AUTOSTART_DELAY_MS = 15_000;
+const autoStart = {}; // { [instance]: { key, since, announced, done } }
+const mapTitle = (m) => String(m ?? "").split("@")[0].replace(/^(de|cs|aim|awp)_/, "").replace(/^./, (c) => c.toUpperCase());
+
+async function autoStartNextMap(inst, info, get5) {
+  const a = assignments[inst.name];
+  const mapNo = get5?.map_number ?? 0;
+  if (!a || !get5 || get5.matchid !== a.matchid || get5.gamestate !== "warmup" || mapNo < 1) {
+    delete autoStart[inst.name];
+    return;
+  }
+  const key = `${a.matchid}:${mapNo}`;
+  let st = autoStart[inst.name];
+  if (!st || st.key !== key) st = autoStart[inst.name] = { key, since: null, announced: false, done: false };
+  if (st.done) return;
+  const cfg = readJsonSafe(path.join(STATE_DIR, "match-configs", `${a.match_id}.json`), null);
+  const need = (cfg?.players_per_team ?? 5) * 2;
+  // A2S считает и GOTV — он всегда включён
+  const humans = Math.max(0, (info?.players ?? 0) - 1);
+  if (!st.announced) {
+    st.announced = true;
+    const total = cfg?.num_maps ? ` из ${cfg.num_maps}` : "";
+    const name = cfg?.maplist?.[mapNo] ? ` — ${mapTitle(cfg.maplist[mapNo])}` : "";
+    await rcon(inst.port, secrets.rcon, `css_asay Карта ${mapNo + 1}${total}${name}. Писать .r не нужно: старт сам, когда все зайдут`).catch(() => {});
+  }
+  if (humans < need) {
+    st.since = null;
+    return;
+  }
+  st.since ??= Date.now();
+  if (Date.now() - st.since < AUTOSTART_DELAY_MS) return;
+  st.done = true;
+  await rcon(inst.port, secrets.rcon, "css_asay Все на месте — старт!").catch(() => {});
+  const out = await rcon(inst.port, secrets.rcon, "css_start").catch((e) => String(e.message));
+  log(`автостарт ${inst.name}: матч ${a.matchid}, карта ${mapNo + 1} (${humans}/${need}) ${String(out ?? "").trim().slice(0, 80)}`);
+}
+
 /** Последний бэкап раунда MatchZy для матча и карты: matchzy_<matchid>_<map>_round<N>.json */
 function latestBackup(matchid, mapNumber) {
   const dir = path.join(SERVER_DIR, "game", "csgo", "MatchZyDataBackup");
@@ -326,6 +367,7 @@ async function collectInstances() {
       } catch {}
       await enforceCvars(inst, get5).catch(() => {});
       trackAssignment(inst, true, get5);
+      await autoStartNextMap(inst, info, get5).catch((e) => log(`автостарт ${inst.name}: ${e.message}`));
       return {
         name: inst.name,
         running: true,
@@ -547,9 +589,28 @@ function ensureServerLanguage() {
   log(`язык сервера: ${m[1]} → ru (сообщения MatchZy на русском со следующего запуска серверов)`);
 }
 
+// фразы, которые в ru.json MatchZy остались по-английски
+const MATCHZY_RU = {
+  "matchzy.ready.readytotestorebackupinfomessage": "Не готовы: {0}. Напишите .ready, когда будете готовы восстановить раунд. {1}",
+  "matchzy.restore.loadedsuccessfully": "Бэкап раунда загружен: {0}",
+  "matchzy.restore.stopcommandrequiresnodamage": "Переиграть раунд нельзя: кто-то уже нанёс урон сопернику.",
+};
+const MATCHZY_RU_FILE = path.join(SERVER_DIR, "game", "csgo", "addons", "counterstrikesharp", "plugins", "MatchZy", "lang", "ru.json");
+function ensureMatchzyRu() {
+  if (!existsSync(MATCHZY_RU_FILE)) return;
+  const raw = readFileSync(MATCHZY_RU_FILE, "utf8").replace(/^\uFEFF/, "");
+  const json = JSON.parse(raw);
+  const fix = Object.entries(MATCHZY_RU).filter(([k, v]) => k in json && json[k] !== v);
+  if (!fix.length) return;
+  for (const [k, v] of fix) json[k] = v;
+  writeFileSync(MATCHZY_RU_FILE, JSON.stringify(json, null, 2));
+  log(`MatchZy ru.json: переведено ${fix.length} фраз`);
+}
+
 async function tick() {
   try {
     ensureServerLanguage();
+    ensureMatchzyRu();
   } catch (e) {
     log(`язык сервера: ${e.message}`);
   }
