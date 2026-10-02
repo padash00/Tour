@@ -7,6 +7,11 @@ import { Avatar, cn } from "./ui";
 
 type Item = { href: string; label: string };
 
+/** Без шапки и подвала сайта: F16 Control и режим ТВ */
+function noChrome(pathname: string) {
+  return pathname.startsWith("/admin") || pathname === "/tv" || pathname.startsWith("/tv/") || pathname.endsWith("/tv");
+}
+
 function isActive(pathname: string, href: string) {
   const path = href.split("#")[0];
   return pathname === path || pathname.startsWith(path + "/");
@@ -15,7 +20,7 @@ function isActive(pathname: string, href: string) {
 /** Публичная обёртка не нужна в F16 Control — там своя оболочка */
 export function PublicOnly({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname.startsWith("/admin")) return null;
+  if (noChrome(pathname)) return null;
   return <>{children}</>;
 }
 
@@ -29,7 +34,7 @@ export function HeaderShell({ children }: { children: ReactNode }) {
     window.addEventListener("scroll", on, { passive: true });
     return () => window.removeEventListener("scroll", on);
   }, []);
-  if (pathname.startsWith("/admin")) return null;
+  if (noChrome(pathname)) return null;
   // на главной шапка лежит поверх фото hero
   const overHero = pathname === "/" && !scrolled;
   return (

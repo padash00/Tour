@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getActiveMembership, getPlayerBySteamId } from "@/lib/data";
+import { refreshIfStale } from "@/lib/profile-sync";
 import { aggregatePlayers, getPlayerMapHistory, getStatRows } from "@/lib/stats";
 import { db } from "@/lib/supabase";
 import { getPlayerAwards } from "@/lib/awards";
@@ -17,6 +18,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
   const { steamId } = await props.params;
   const player = await getPlayerBySteamId(steamId);
   if (!player) notFound();
+  refreshIfStale(player); // профиль Steam/FACEIT обновится после ответа, если старше 6 ч
   const [membership, rows, history, rosters, awards, progress] = await Promise.all([
     getActiveMembership(player.id),
     getStatRows({ playerId: player.id }),

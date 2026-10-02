@@ -7,6 +7,7 @@ import { isRateLimited } from "@/lib/data";
 import { fetchFaceitBySteamId } from "@/lib/faceit";
 import { fetchSteamProfile } from "@/lib/steam";
 import { db } from "@/lib/supabase";
+import { markLoginRefreshed } from "@/lib/profile-sync";
 import type { ActionResult } from "@/components/forms";
 
 export async function refreshProfile(): Promise<ActionResult> {
@@ -32,7 +33,9 @@ export async function refreshProfile(): Promise<ActionResult> {
       }),
     })
     .eq("id", player.id);
+  if (profile.ok || faceit) await markLoginRefreshed(player.id);
   revalidatePath("/me");
+  revalidatePath(`/players/${player.steam_id}`);
   if (!profile.ok) return { error: "Steam не ответил — попробуйте позже" };
   return faceit ? { success: "Профиль и FACEIT обновлены" } : { success: "Профиль Steam обновлён. FACEIT-профиль не найден." };
 }

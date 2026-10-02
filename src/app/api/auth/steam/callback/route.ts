@@ -4,6 +4,7 @@ import { fetchFaceitBySteamId } from "@/lib/faceit";
 import { createSession } from "@/lib/session";
 import { safeNext } from "@/lib/redirect";
 import { db } from "@/lib/supabase";
+import { markLoginRefreshed } from "@/lib/profile-sync";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=db", url.origin));
   }
 
+  if (profile.ok) await markLoginRefreshed(player.id);
   await createSession({ playerId: player.id, steamId: player.steam_id });
   const next = safeNext(url.searchParams.get("next"));
   return NextResponse.redirect(new URL(next, url.origin));

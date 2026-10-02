@@ -70,7 +70,7 @@ export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> 
     if (key) {
       const res = await fetch(
         `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${key}&steamids=${steamId}`,
-        { cache: "no-store" },
+        { cache: "no-store", signal: AbortSignal.timeout(3500) },
       );
       const data = await res.json();
       const p = data?.response?.players?.[0];
@@ -85,7 +85,7 @@ export async function fetchSteamProfile(steamId: string): Promise<SteamProfile> 
       }
     }
     // без ключа — публичный XML профиля
-    const res = await fetch(`${fallback.profileUrl}?xml=1`, { cache: "no-store" });
+    const res = await fetch(`${fallback.profileUrl}?xml=1`, { cache: "no-store", signal: AbortSignal.timeout(3500) });
     const xml = await res.text();
     const pick = (tag: string) =>
       new RegExp(`<${tag}><!\[CDATA\[([\s\S]*?)\]\]></${tag}>`).exec(xml)?.[1] ?? null;

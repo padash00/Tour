@@ -11,6 +11,7 @@ import {
   type AgentReport,
 } from "@/lib/server-control";
 import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/ops";
+import { refreshStaleProfilesTick } from "@/lib/profile-sync";
 
 /** Фоновые задачи на каждой синхронизации: сбой одной не должен отменять остальные */
 async function safely(name: string, job: () => Promise<unknown>) {
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
   await safely("close ended", () => closeMatchesOfEndedTournaments());
   await safely("cs2 version", () => checkCs2UpToDate(report.info?.cs2_patch));
   await safely("dedupe prune", pruneIngest);
+  await safely("profile sync", refreshStaleProfilesTick);
   const commands = await takePendingCommands(request.nextUrl.origin);
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
   return NextResponse.json({ commands, bundle_version: getAgentBundle().version });

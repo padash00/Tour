@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { markNotificationsRead, refreshProfile } from "@/app/actions/profile";
 import { isAdmin, requirePlayer } from "@/lib/auth";
+import { refreshIfStale } from "@/lib/profile-sync";
 import { getActiveMembership, getSoloTeam, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
 import { formatDateTime, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
@@ -29,6 +30,7 @@ export const metadata: Metadata = { title: "Профиль" };
 
 export default async function MePage() {
   const player = await requirePlayer("/me");
+  refreshIfStale(player); // профиль Steam/FACEIT обновится после ответа, если старше 6 ч
   const membership = await getActiveMembership(player.id);
   const [members, teamRegs, solo, notificationsRes, ownMatches] = await Promise.all([
     membership ? getTeamMembers(membership.team.id) : Promise.resolve([]),

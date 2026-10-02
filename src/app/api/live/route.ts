@@ -8,6 +8,7 @@ import { db } from "@/lib/supabase";
  * база получает не больше запроса раз в 2 секунды на каждый матч.
  *   ?k=match:<uuid>  — матч: статус, счёт, сервер, вето, карты, раунды
  *   ?k=matches       — список матчей: live / ready / veto
+ *   ?k=tournament:<uuid> — режим ТВ турнира: матчи, счёт идущих карт, этап
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,6 +29,22 @@ export async function GET(request: NextRequest) {
       db().from("player_map_stats").select("map_number", { count: "exact", head: true }).eq("match_id", id),
     ]);
     parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0];
+  } else if (k.startsWith("tournament:") && UUID.test(k.slice(11))) {
+    // режим ТВ: всё, что видно на экране турнира — статусы, счёт серий и карт идущих матчей, этап турнира
+    const id = k.slice(11);
+    const [t, ms] = await Promise.all([
+      db().from("tournaments").select("status").eq("id", id).maybeSingle(),
+      db()
+        .from("matches")
+        .select("id, status, stage, team1_id, team2_id, team1_score, team2_score, winner_id, server_state, scheduled_at")
+        .eq("tournament_id", id)
+        .order("number"),
+    ]);
+    const liveIds = (ms.data ?? []).filter((m) => m.status === "live").map((m) => m.id);
+    const maps = liveIds.length
+      ? await db().from("match_maps").select("match_id, map_number, status, team1_score, team2_score").in("match_id", liveIds)
+      : { data: [] };
+    parts = [t.data, ms.data, maps.data];
   } else if (k === "matches") {
     const { data } = await db()
       .from("matches")

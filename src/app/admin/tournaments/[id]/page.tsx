@@ -112,6 +112,9 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
       {tab === "overview" && (
         <div className="flex flex-wrap items-center gap-2">
+          <a href={`/tournaments/${t.slug}/tv`} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm", "mr-4")}>
+            Режим ТВ ↗
+          </a>
           <span className="mr-2 text-[12px] uppercase tracking-[0.2em] text-fg-3">Экспорт CSV</span>
           {[
             ["results", "Результаты матчей"],

@@ -15,7 +15,7 @@ export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfi
   try {
     const res = await fetch(
       `https://open.faceit.com/data/v4/players?game=cs2&game_player_id=${steamId}`,
-      { headers: { Authorization: `Bearer ${key}` }, cache: "no-store" },
+      { headers: { Authorization: `Bearer ${key}` }, cache: "no-store", signal: AbortSignal.timeout(3500) },
     );
     if (!res.ok) return null;
     const p = await res.json();
