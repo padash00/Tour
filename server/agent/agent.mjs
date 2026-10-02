@@ -213,6 +213,13 @@ async function warmupHud(inst, info, get5, extra) {
     extra,
   ].filter(Boolean);
   hudShown[inst.name] = true;
+  // состав матча для табло: плагин сам считает, кто не готов и кто не зашёл
+  const team = (t) => `${hudClean(t?.name ?? "").replace(/[#,=]/g, "")}#${Object.entries(t?.players ?? {}).map(([id, n]) => `${id}=${hudClean(n).replace(/[#,=]/g, "")}`).join(",")}`;
+  if (cfg?.team1 && cfg?.team2) {
+    await rcon(inst.port, secrets.rcon, `f16_roster ${a.matchid}-${mapNo}#${team(cfg.team1)}#${team(cfg.team2)}`).catch(() => {});
+  }
+  // «не готовы» нужно только на первой карте — дальше старт автоматический
+  await rcon(inst.port, secrets.rcon, `f16_hud_ready ${mapNo < 1 ? 1 : 0}`).catch(() => {});
   await rcon(inst.port, secrets.rcon, `f16_hud 8 ${lines.join("|")}`).catch(() => {});
 }
 
@@ -230,7 +237,7 @@ async function autoStartNextMap(inst, info, get5) {
     const need0 = (cfg0?.players_per_team ?? 5) * 2;
     const humans0 = Math.max(0, (info?.players ?? 0) - 1);
     delete autoStart[inst.name];
-    await warmupHud(inst, info, get5, humans0 < need0 ? `Ждём игроков ${humans0}/${need0}` : "Все на месте · напишите .r");
+    await warmupHud(inst, info, get5, humans0 < need0 ? "Напишите .r в чат, когда готовы" : "Все на месте · напишите .r");
     return;
   }
   const key = `${a.matchid}:${mapNo}`;
