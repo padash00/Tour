@@ -84,7 +84,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         }
         description={`${MODES[t.format as ModeKey]?.title ?? t.format} · ${FORMATS[t.bracket_type as FormatKind]?.title ?? t.bracket_type} · старт ${formatDateTime(t.starts_at)}`}
         actions={
-          <Link href={`/tournaments/${t.slug}`} className="text-[12px] text-fg-3 hover:text-fg">
+          <Link href={t.status === "draft" ? `/tournaments/${t.slug}/preview` : `/tournaments/${t.slug}`} className="text-[12px] text-fg-3 hover:text-fg">
             {t.status === "draft" ? "Предпросмотр ↗" : "Публичная страница ↗"}
           </Link>
         }

@@ -122,7 +122,7 @@ export default async function AdminTournamentsPage() {
                     )}
                   </td>
                   <td className="text-right whitespace-nowrap">
-                    <Link href={`/tournaments/${t.slug}`} className="text-[12px] text-fg-3 hover:text-fg">
+                    <Link href={t.status === "draft" ? `/tournaments/${t.slug}/preview` : `/tournaments/${t.slug}`} className="text-[12px] text-fg-3 hover:text-fg">
                       На сайте ↗
                     </Link>
                     <span className="text-fg-3 mx-2">·</span>

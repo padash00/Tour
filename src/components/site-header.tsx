@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand";
-import { getCurrentPlayer, isAdmin } from "@/lib/auth";
-import { getUnreadCount } from "@/lib/data";
-import { IconBell, IconSteam, cn } from "./ui";
-import { HeaderShell, MobileMenu, NavLinks, PublicOnly, UserMenu } from "./nav-links";
+import { HeaderUser } from "./header-user";
+import { HeaderShell, NavLinks, PublicOnly } from "./nav-links";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
 export function Logo({ height = 30 }: { height?: number }) {
@@ -30,49 +28,15 @@ export const NAV_MORE = [
   { href: "/find", label: "Поиск команды" },
 ];
 
-export async function SiteHeader() {
-  const player = await getCurrentPlayer();
-  const unread = player ? await getUnreadCount(player.id) : 0;
-  const admin = isAdmin(player);
-  const user = player ? { nickname: player.nickname, avatar: player.avatar_url, unread, admin } : null;
-
+/** Шапка одинакова для всех (страницы кэшируются CDN); профиль справа подгружается на клиенте */
+export function SiteHeader() {
   return (
     <HeaderShell>
       <div className="mx-auto flex h-[72px] w-full max-w-[1440px] items-center px-5 sm:px-8 lg:h-[96px] lg:px-16">
         <Logo height={58} />
         <NavLinks items={NAV} more={NAV_MORE} />
         <div className="ml-auto flex items-center gap-2">
-          {user ? (
-            <>
-              <Link
-                href="/notifications"
-                className="relative grid size-11 place-items-center rounded-[9px] text-fg-3 transition-colors duration-150 hover:bg-white/[0.05] hover:text-fg"
-                aria-label={unread > 0 ? `Уведомления: ${unread} новых` : "Уведомления"}
-              >
-                <IconBell className="size-[19px]" />
-                {unread > 0 && (
-                  <span
-                    className={cn(
-                      "num absolute right-1 top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink ring-2 ring-bg",
-                    )}
-                  >
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </Link>
-              <UserMenu user={user} />
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="inline-flex h-11 items-center gap-3 rounded-[8px] border border-accent/45 bg-[#0b1420]/60 px-4 text-[14px] font-medium text-fg transition-colors duration-150 hover:border-accent/80 hover:bg-accent/[0.06] sm:px-5 lg:h-[52px] lg:px-6 lg:text-[16px]"
-            >
-              <IconSteam className="size-5 lg:size-6" />
-              <span className="hidden sm:inline">Войти через Steam</span>
-              <span className="sm:hidden">Войти</span>
-            </Link>
-          )}
-          <MobileMenu items={[...NAV, ...NAV_MORE]} user={user} />
+          <HeaderUser items={[...NAV, ...NAV_MORE]} />
         </div>
       </div>
     </HeaderShell>

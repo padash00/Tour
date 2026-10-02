@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getTournamentBySlug } from "@/lib/data";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { getTournamentRecap } from "@/lib/recap";
 import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
 import { db } from "@/lib/supabase";
 import { TvView, type TvData } from "@/components/tv/tv-view";
+
+// экран ТВ — из кэша CDN раз в 5 с; счёт подтягивает LiveRefresh
+export const revalidate = 5;
+
+// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
+export async function generateStaticParams() {
+  return [];
+}
 
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]/tv">): Promise<Metadata> {
   const { slug } = await props.params;
@@ -17,8 +24,8 @@ export async function generateMetadata(props: PageProps<"/tournaments/[slug]/tv"
 /** Режим ТВ турнира: открыть на ПК у телевизора/проектора и нажать F11 */
 export default async function TournamentTvPage(props: PageProps<"/tournaments/[slug]/tv">) {
   const { slug } = await props.params;
-  const player = await getCurrentPlayer();
-  const t = await getTournamentBySlug(slug, isAdmin(player));
+  // экран ТВ публичный и кэшируется — черновики на нём не показываются
+  const t = await getTournamentBySlug(slug);
   if (!t) notFound();
 
   const matches = await getTournamentMatches(t.id);

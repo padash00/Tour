@@ -5,17 +5,19 @@ import { getPlayerLeaderboard } from "@/lib/stats";
 import { ratingColor } from "@/components/stats-table";
 import { DATA_TABLE, NUM_CELL, tableBox } from "@/components/public/data-table";
 import { Avatar, FaceitLevel, cn } from "@/components/ui";
-import { EmptyCard, PageHero, SearchField, Wrap } from "@/components/primitives";
+import { EmptyCard, PageHero, Wrap } from "@/components/primitives";
+import { ClientFilter } from "@/components/public/client-filter";
 
 export const metadata: Metadata = { title: "Игроки" };
 
+// поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
+export const revalidate = 30;
+
 const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "игрока" : "игроков");
 
-export default async function PlayersPage(props: PageProps<"/players">) {
-  const sp = await props.searchParams;
-  const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
+export default async function PlayersPage() {
   const [all, board] = await Promise.all([listPlayers(), getPlayerLeaderboard()]);
-  const players = q ? all.filter((p) => p.nickname.toLowerCase().includes(q) || p.steam_id.includes(q)) : all;
+  const players = all;
   const statsById = new Map(board.filter((b) => b.player_id).map((b) => [b.player_id!, b]));
 
   return (
@@ -23,14 +25,7 @@ export default async function PlayersPage(props: PageProps<"/players">) {
       <PageHero eyebrow="Игроки F16 Arena" title="Игроки" lead={all.length ? `${all.length} ${word(all.length)} на платформе.` : undefined} />
       <Wrap className="pt-10">
         {all.length > 0 && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <SearchField defaultValue={q} placeholder="Ник или SteamID" />
-            {q && (
-              <span className="t-meta">
-                Найдено: <span className="num text-fg-2">{players.length}</span>
-              </span>
-            )}
-          </div>
+          <ClientFilter scope="players" placeholder="Ник или SteamID" className="mb-6" />
         )}
         {players.length === 0 ? (
           <EmptyCard
@@ -39,7 +34,10 @@ export default async function PlayersPage(props: PageProps<"/players">) {
             text={all.length === 0 ? "Войдите через Steam — и вы первый в списке." : "Попробуйте другой ник или SteamID."}
           />
         ) : (
-          <div className={tableBox(true)}>
+          <div className={tableBox(true)} data-filter-scope="players">
+            <p data-filter-empty hidden className="px-6 py-10 text-[15px] text-fg-3">
+              Ничего не найдено — попробуйте другой ник или SteamID.
+            </p>
             <table className={cn(DATA_TABLE, "min-w-[760px]")}>
               <thead>
                 <tr>
@@ -55,7 +53,7 @@ export default async function PlayersPage(props: PageProps<"/players">) {
                 {players.map((p) => {
                   const s = statsById.get(p.id);
                   return (
-                    <tr key={p.id}>
+                    <tr key={p.id} data-filter={`${p.nickname} ${p.steam_id}`.toLowerCase()}>
                       <td>
                         <Link href={`/players/${p.steam_id}`} className="group flex min-h-11 items-center gap-4 text-fg">
                           <Avatar src={p.avatar_url} name={p.nickname} size={40} />

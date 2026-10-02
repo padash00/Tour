@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CARD, Eyebrow, PageHero, WRAP } from "@/components/primitives";
 
+// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "Правила" };
 
 const RULES: { title: string; items: string[] }[] = [

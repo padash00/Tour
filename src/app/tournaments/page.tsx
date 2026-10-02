@@ -6,6 +6,9 @@ import { TournamentCard } from "@/components/public/home";
 import { cn } from "@/components/ui";
 import { OutlineBtn, PageHero, SectionHead, WRAP } from "@/components/primitives";
 
+// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "Турниры" };
 
 export default async function TournamentsPage() {

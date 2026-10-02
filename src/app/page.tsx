@@ -1,9 +1,11 @@
-import { getCurrentPlayer } from "@/lib/auth";
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
 import { HomeView } from "@/components/public/home";
 
+// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
 export default async function HomePage() {
-  const [player, featured, all] = await Promise.all([getCurrentPlayer(), getFeaturedTournament(), listPublicTournaments()]);
+  const [featured, all] = await Promise.all([getFeaturedTournament(), listPublicTournaments()]);
   const counts = featured ? await approvedCounts([featured.id]) : {};
   const upcoming = all.filter((t) => t.id !== featured?.id && !["finished", "cancelled"].includes(t.status));
   // «первый турнир платформы» — только если до него не было завершённых турниров
@@ -15,7 +17,6 @@ export default async function HomePage() {
       approved={featured ? (counts[featured.id] ?? 0) : 0}
       isFirst={isFirst}
       upcoming={upcoming}
-      loggedIn={!!player}
     />
   );
 }

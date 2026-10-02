@@ -13,6 +13,14 @@ import { ratingColor } from "@/components/stats-table";
 import { Avatar, FaceitLevel, TeamLogo, cn } from "@/components/ui";
 import { CARD, EmptyCard, Eyebrow, HeroNumber, SectionHead, StatusChip, WRAP, Wrap } from "@/components/primitives";
 
+// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
+// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));

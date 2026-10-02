@@ -9,6 +9,14 @@ import { RecapView } from "@/components/competition/recap-view";
 import { ShareButton } from "@/components/stream";
 import { Eyebrow, WRAP } from "@/components/primitives";
 
+// одинакова для всех — из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
+// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
+export async function generateStaticParams() {
+  return [];
+}
+
 /** Страница итогов турнира — для отправки в чаты и соцсети (с картинкой-превью opengraph-image) */
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]/recap">): Promise<Metadata> {
   const { slug } = await props.params;

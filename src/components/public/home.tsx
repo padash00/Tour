@@ -5,6 +5,7 @@ import { modeOf } from "@/lib/modes";
 import type { Tournament, TournamentStatus } from "@/lib/types";
 import { IconArrow, cn } from "../ui";
 import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "../primitives";
+import { TeamCta } from "./team-cta";
 
 /*
  * Главная F16 Arena — по утверждённому макету (F16_Homepage_Approved_Reference.png).
@@ -17,7 +18,8 @@ export type HomeData = {
   /** турниров до этого не было — «первый турнир платформы» */
   isFirst: boolean;
   upcoming: Tournament[];
-  loggedIn: boolean;
+  /** больше не используется: кнопка команды уточняется на клиенте (TeamCta) */
+  loggedIn?: boolean;
 };
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -73,7 +75,7 @@ const Icon = {
 
 // ───────────────────────── hero
 
-function Hero({ featured, loggedIn }: Pick<HomeData, "featured" | "loggedIn">) {
+function Hero({ featured }: Pick<HomeData, "featured">) {
   return (
     <section className="relative -mt-[72px] lg:-mt-[96px] overflow-hidden">
       {/* фото из утверждённого макета — справа, растворяется в фоне */}
@@ -106,7 +108,7 @@ function Hero({ featured, loggedIn }: Pick<HomeData, "featured" | "loggedIn">) {
               Посмотреть турнир
               <IconArrow className="size-[18px]" />
             </PrimaryBtn>
-            <OutlineBtn href={loggedIn ? "/team" : "/login?next=/team/create"}>{loggedIn ? "Моя команда" : "Создать команду"}</OutlineBtn>
+            <TeamCta />
           </div>
         </div>
 
@@ -215,7 +217,7 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
 }
 
 /** Турниров ещё нет — честно, в той же композиции */
-function NoTournamentCard({ loggedIn }: { loggedIn: boolean }) {
+function NoTournamentCard() {
   return (
     <div className="grid overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 lg:grid-cols-[44%_1fr]">
       <div className="relative min-h-[240px] lg:min-h-[350px]">
@@ -231,7 +233,7 @@ function NoTournamentCard({ loggedIn }: { loggedIn: boolean }) {
           Первый турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
         </p>
         <div className="flex flex-wrap gap-4">
-          <OutlineBtn href={loggedIn ? "/team" : "/login?next=/team/create"}>{loggedIn ? "Моя команда" : "Создать команду"}</OutlineBtn>
+          <TeamCta />
         </div>
       </div>
     </div>
@@ -287,14 +289,14 @@ const WHY = [
   { title: "Развивающееся сообщество", text: "Новые турниры, возможности и поддержка команд.", icon: Icon.star },
 ];
 
-export function HomeView({ featured, approved, isFirst, upcoming, loggedIn }: HomeData) {
+export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
   return (
     <>
-      <Hero featured={featured} loggedIn={loggedIn} />
+      <Hero featured={featured} />
 
       <section className={cn(WRAP, "relative")}>
         <Eyebrow className="mb-5">{featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"}</Eyebrow>
-        {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard loggedIn={loggedIn} />}
+        {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard />}
         <NextTournaments list={upcoming} />
       </section>
 

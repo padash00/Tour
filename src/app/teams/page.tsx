@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
 import { IconArrow, TeamLogo, cn } from "@/components/ui";
-import { CARD, EmptyCard, OutlineBtn, PageHero, PrimaryBtn, SearchField, Wrap } from "@/components/primitives";
+import { CARD, EmptyCard, OutlineBtn, PageHero, PrimaryBtn, Wrap } from "@/components/primitives";
+import { ClientFilter } from "@/components/public/client-filter";
 
 export const metadata: Metadata = { title: "Команды" };
 
-export default async function TeamsPage(props: PageProps<"/teams">) {
-  const sp = await props.searchParams;
-  const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
+// поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
+export const revalidate = 30;
+
+export default async function TeamsPage() {
   const all = await listTeams();
-  const teams = q ? all.filter((t) => t.name.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q)) : all;
+  const teams = all;
 
   return (
     <>
@@ -23,14 +25,7 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
 
       <Wrap className="pt-10">
         {all.length > 0 && (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <SearchField defaultValue={q} placeholder="Поиск по названию или тегу" />
-            {q && (
-              <span className="t-meta">
-                Найдено: <span className="num text-fg-2">{teams.length}</span>
-              </span>
-            )}
-          </div>
+          <ClientFilter scope="teams" placeholder="Поиск по названию или тегу" className="mb-6" />
         )}
 
         {teams.length === 0 ? (
@@ -41,7 +36,10 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
             action={all.length === 0 ? <PrimaryBtn href="/team/create">Создать команду</PrimaryBtn> : undefined}
           />
         ) : (
-          <div className={cn(CARD, "overflow-hidden")}>
+          <div className={cn(CARD, "overflow-hidden")} data-filter-scope="teams">
+            <p data-filter-empty hidden className="px-8 py-10 text-[15px] text-fg-3">
+              Ничего не найдено — попробуйте другое название или тег.
+            </p>
             <div className="hidden sm:grid grid-cols-[1fr_180px_110px_110px_24px] gap-6 px-8 py-4 text-[12px] uppercase tracking-[0.2em] text-fg-3 border-b border-white/[0.06]">
               <span>Команда</span>
               <span>Регион</span>
@@ -53,6 +51,7 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
               <Link
                 key={t.id}
                 href={`/teams/${t.tag}`}
+                data-filter={`${t.name} ${t.tag}`.toLowerCase()}
                 className={cn(
                   "group grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_180px_110px_110px_24px] items-center gap-6 px-6 sm:px-8 py-5 transition-colors hover:bg-white/[0.025]",
                   i > 0 && "border-t border-white/[0.05]",

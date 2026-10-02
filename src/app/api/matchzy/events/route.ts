@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkBearer, handleMatchzyEvent } from "@/lib/server-control";
 import { claimIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
@@ -26,5 +27,7 @@ export async function POST(request: NextRequest) {
     console.error("matchzy event failed", event.event, e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
+  // публичные страницы (турнир, сетка, матчи, статистика) кэшируются CDN — после ключевых событий обновляем их сразу
+  if (["going_live", "map_result", "series_end"].includes(event.event)) revalidatePath("/", "layout");
   return NextResponse.json({ ok: true });
 }

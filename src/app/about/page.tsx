@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { CARD, Eyebrow, OutlineBtn, PageHero, PrimaryBtn, WRAP } from "@/components/primitives";
 
+// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
+export const revalidate = 30;
+
 export const metadata: Metadata = { title: "О платформе" };
 
 const FACTS = [
