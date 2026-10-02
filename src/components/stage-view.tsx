@@ -112,7 +112,108 @@ function StandingsTable({
   );
 }
 
-/** Группы / круговая система: таблица и матчи по турам */
+/**
+ * Шахматка круговой системы: участники по строкам и столбцам (в порядке таблицы),
+ * в клетке — счёт их встречи глазами участника строки; справа — итог.
+ */
+function CrossTable({
+  rows,
+  matches,
+  teams,
+  advance,
+  solo,
+}: {
+  rows: StandingRow[];
+  matches: StageMatchRow[];
+  teams: TeamMap;
+  advance?: number;
+  solo?: boolean;
+}) {
+  const ids = rows.map((r) => r.teamId);
+  const meet = (a: string, b: string) => matches.find((m) => (m.team1_id === a && m.team2_id === b) || (m.team1_id === b && m.team2_id === a));
+  return (
+    <div className="overflow-x-auto rounded-[12px] border border-white/[0.08] bg-[#0a111b]/80">
+      <table className="w-full min-w-[560px] border-collapse text-[13px]">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-[0.14em] text-fg-3">
+            <th className="w-8 px-3 py-3 text-left font-medium">#</th>
+            <th className="px-3 py-3 text-left font-medium">{solo ? "Участник" : "Команда"}</th>
+            {ids.map((id, j) => (
+              <th key={id} className="w-[76px] px-1 py-3 text-center font-medium" title={teams.get(id)?.name}>
+                <span className="inline-flex flex-col items-center gap-1">
+                  <TeamLogo src={teams.get(id)?.logo_url ?? null} tag={teams.get(id)?.tag ?? "?"} size={22} />
+                  <span className="num">{j + 1}</span>
+                </span>
+              </th>
+            ))}
+            <th className="px-3 py-3 text-right font-medium">В–П</th>
+            <th className="px-3 py-3 text-right font-medium">Карты</th>
+            <th className="px-3 py-3 text-right font-medium">Раунды</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const qualifies = advance != null && i < advance;
+            return (
+              <tr key={r.teamId} className="border-t border-white/[0.06]">
+                <td className="relative px-3 py-2.5 num text-fg-3">
+                  {qualifies && <span className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-ok" />}
+                  {i + 1}
+                </td>
+                <td className="px-3 py-2.5 max-w-[220px]">
+                  <TeamCell team={teams.get(r.teamId)} />
+                </td>
+                {ids.map((col) => {
+                  if (col === r.teamId) return <td key={col} className="p-1"><div className="h-10 rounded-[6px] bg-white/[0.03] [background-image:repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.03)_6px_7px)]" /></td>;
+                  const m = meet(r.teamId, col);
+                  if (!m) return <td key={col} className="p-1" />;
+                  const mine = m.team1_id === r.teamId;
+                  const a = mine ? m.team1_score : m.team2_score;
+                  const b = mine ? m.team2_score : m.team1_score;
+                  const done = m.status === "finished";
+                  const live = m.status === "live";
+                  const won = done && m.winner_id === r.teamId;
+                  const lost = done && !!m.winner_id && m.winner_id !== r.teamId;
+                  return (
+                    <td key={col} className="p-1">
+                      <Link
+                        href={`/matches/${m.id}`}
+                        title={`${teams.get(r.teamId)?.name ?? ""} — ${teams.get(col)?.name ?? ""}`}
+                        className={cn(
+                          "grid h-10 place-items-center rounded-[6px] border num text-[14px] font-semibold transition-colors",
+                          won && "border-ok/30 bg-ok/[0.10] text-ok hover:bg-ok/[0.16]",
+                          lost && "border-danger/25 bg-danger/[0.08] text-danger/90 hover:bg-danger/[0.14]",
+                          live && "border-accent/40 bg-accent/[0.10] text-accent hover:bg-accent/[0.16]",
+                          !done && !live && "border-white/[0.06] text-fg-3 hover:border-white/[0.16]",
+                        )}
+                      >
+                        {done || live ? (
+                          <span className="leading-none text-center">
+                            {a}:{b}
+                            {live && <span className="block mt-0.5 text-[9px] font-medium uppercase tracking-[0.12em]">live</span>}
+                          </span>
+                        ) : (
+                          <span className="text-[12px] font-normal">—</span>
+                        )}
+                      </Link>
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-2.5 text-right num font-semibold text-fg">
+                  {r.wins}–{r.losses}
+                </td>
+                <td className="px-3 py-2.5 text-right num text-fg-2">{diff(r.mapWins - r.mapLosses)}</td>
+                <td className="px-3 py-2.5 text-right num text-fg-2">{diff(r.roundsFor - r.roundsAgainst)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Группы / круговая система: шахматка и матчи по турам */
 export function GroupStageView({
   groups,
   teams,
@@ -130,12 +231,18 @@ export function GroupStageView({
       {groups.map((g) => {
         const rounds = [...new Set(g.matches.map((m) => m.round))].sort((a, b) => a - b);
         return (
-          <section key={g.label ?? "A"} className="space-y-4">
+          <section key={g.label ?? "A"} className="min-w-0 space-y-4">
             <div className="flex items-baseline justify-between">
-              <Eyebrow>{single ? "Таблица" : `Группа ${g.label}`}</Eyebrow>
+              <Eyebrow>{single ? "Сетка" : `Группа ${g.label}`}</Eyebrow>
               {advance != null && <span className="text-xs text-fg-3">выходят {advance} лучших</span>}
             </div>
-            <StandingsTable rows={g.table} teams={teams} advance={advance} solo={solo} />
+            <CrossTable rows={g.table} matches={g.matches} teams={teams} advance={advance} solo={solo} />
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-3">
+              <span>В клетке — счёт по картам глазами участника строки</span>
+              <span><span className="text-ok">■</span> победа</span>
+              <span><span className="text-danger">■</span> поражение</span>
+              <span><span className="text-accent">■</span> идёт</span>
+            </div>
             <div className={cn("grid gap-4", single && "md:grid-cols-2 lg:grid-cols-3")}>
               {rounds.map((r) => (
                 <div key={r}>
