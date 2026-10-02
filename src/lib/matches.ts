@@ -414,6 +414,17 @@ export async function applyVetoTimeouts(matchId: string) {
   }
 }
 
+/** Все вето, у которых истёк таймер хода, — авто-бан/пик (вызывается на каждой синхронизации агента) */
+export async function applyDueVetoTimeouts() {
+  const { data } = await db()
+    .from("matches")
+    .select("id")
+    .eq("status", "veto")
+    .lt("veto_deadline", new Date().toISOString());
+  for (const m of data ?? []) await applyVetoTimeouts(m.id);
+  return data?.length ?? 0;
+}
+
 /** Записывает шаг вето; если остался decider — дописывает его и завершает вето. */
 export async function insertVetoAction(
   m: MatchFull,

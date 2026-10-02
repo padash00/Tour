@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/supabase";
+import { applyVetoTimeouts } from "@/lib/matches";
 
 /**
  * Лёгкий «отпечаток» состояния для живых страниц. Клиент опрашивает его и перерисовывает страницу,
@@ -15,9 +16,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function GET(request: NextRequest) {
   const k = request.nextUrl.searchParams.get("k") ?? "";
   let parts: unknown[] = [];
+  let live = false; // идёт вето — ответ не кэшируем, каждая секунда на счету
 
   if (k.startsWith("match:") && UUID.test(k.slice(6))) {
     const id = k.slice(6);
+    const { data: head } = await db().from("matches").select("status, veto_deadline").eq("id", id).maybeSingle();
+    if (head?.status === "veto") {
+      live = true;
+      // время хода вышло — авто-бан/пик сразу, не дожидаясь перезагрузки страницы
+      if (head.veto_deadline && new Date(head.veto_deadline).getTime() <= Date.now()) await applyVetoTimeouts(id);
+    }
     const [m, maps, veto, stats] = await Promise.all([
       db()
         .from("matches")
@@ -59,6 +67,6 @@ export async function GET(request: NextRequest) {
   const v = createHash("sha1").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
   return NextResponse.json(
     { v },
-    { headers: { "Cache-Control": "public, max-age=0, s-maxage=2, stale-while-revalidate=4" } },
+    { headers: { "Cache-Control": live ? "no-store" : "public, max-age=0, s-maxage=2, stale-while-revalidate=4" } },
   );
 }

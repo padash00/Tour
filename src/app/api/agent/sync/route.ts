@@ -12,6 +12,7 @@ import {
 } from "@/lib/server-control";
 import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/ops";
 import { refreshStaleProfilesTick } from "@/lib/profile-sync";
+import { applyDueVetoTimeouts } from "@/lib/matches";
 
 /** Фоновые задачи на каждой синхронизации: сбой одной не должен отменять остальные */
 async function safely(name: string, job: () => Promise<unknown>) {
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
   await applyAgentReport(report);
   await safely("agent events", () => applyAgentEvents(report.events));
   await safely("watchdog", expireStaleWork);
+  await safely("veto timeouts", applyDueVetoTimeouts);
   await safely("autopilot", autopilotTick);
   await safely("workshop check", verifyWorkshopLibrary);
   await safely("close ended", () => closeMatchesOfEndedTournaments());
