@@ -37,7 +37,7 @@ export function TeamHeader({
             <span>{isCaptain ? "Вы капитан" : "Вы игрок"}</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="-mx-1 flex w-[calc(100%+8px)] items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
           {actions}
           <Button href={`/teams/${encodeURIComponent(team.tag)}`} variant="ghost" size="md" iconRight={<ExternalLink />}>
             Публичная страница
