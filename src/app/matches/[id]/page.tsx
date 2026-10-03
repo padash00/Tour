@@ -35,7 +35,6 @@ import {
   Panel,
   RowList,
   Section,
-  SectionTitle,
   Stack,
   Status,
   SubsectionTitle,
