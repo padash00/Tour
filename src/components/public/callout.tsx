@@ -80,8 +80,8 @@ export function Callout({
 export function MobileStickyCta({ children, note }: { children: ReactNode; note?: ReactNode }) {
   return (
     <>
-      <div className="h-24 lg:hidden" aria-hidden />
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-bg/90 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl lg:hidden">
+      <div className="h-24 sm:hidden" aria-hidden />
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line-subtle bg-bg/90 px-3 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:hidden">
         {note && <div className="mb-2 text-center text-[12px] text-fg-3">{note}</div>}
         <div className="flex gap-3 [&>*]:flex-1 [&>*]:min-w-0">{children}</div>
       </div>
