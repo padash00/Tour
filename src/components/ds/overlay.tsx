@@ -1,7 +1,30 @@
 "use client";
 
 import { X } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  cloneElement,
+  createContext,
+  isValidElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+
+type TriggerProps = {
+  id?: string;
+  onClick?: (e: ReactMouseEvent<HTMLElement>) => void;
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLElement>) => void;
+  "aria-haspopup"?: "menu";
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+};
 import { createPortal } from "react-dom";
 import { Button, IconButton } from "./button";
 import { cn } from "./cn";
@@ -231,11 +254,23 @@ const MenuContext = createContext<MenuCtx>({ close: () => {} });
  * Меню действий. trigger — элемент-кнопка (получит aria-атрибуты через обёртку).
  * Клавиатура: Enter/Space/↓ открывают, ↑/↓ — по пунктам, Esc закрывает и возвращает фокус.
  */
-export function Menu({ trigger, children, align = "end", label = "Действия" }: { trigger: ReactNode; children: ReactNode; align?: "start" | "end"; label?: string }) {
+export function Menu({
+  trigger,
+  children,
+  align = "end",
+  label = "Действия",
+}: {
+  /** один интерактивный элемент (кнопка): ARIA-атрибуты и обработчики ставятся прямо на него */
+  trigger: ReactElement<TriggerProps>;
+  children: ReactNode;
+  align?: "start" | "end";
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const id = useId();
+  const triggerId = `${id}-trigger`;
   const close = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
@@ -244,7 +279,7 @@ export function Menu({ trigger, children, align = "end", label = "Действи
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpen(false);
-        root.current?.querySelector<HTMLElement>("[data-menu-trigger] button, [data-menu-trigger] a")?.focus();
+        document.getElementById(triggerId)?.focus();
       }
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -261,20 +296,31 @@ export function Menu({ trigger, children, align = "end", label = "Действи
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, triggerId]);
+
+  // состояние меню — на самой кнопке, которую получает фокус и читает скринридер
+  const own = trigger.props;
+  const triggerEl = cloneElement(trigger, {
+    id: own.id ?? triggerId,
+    "aria-haspopup": "menu",
+    "aria-expanded": open,
+    "aria-controls": open ? id : undefined,
+    onClick: (e: ReactMouseEvent<HTMLElement>) => {
+      own.onClick?.(e);
+      if (!e.defaultPrevented) setOpen((x) => !x);
+    },
+    onKeyDown: (e: ReactKeyboardEvent<HTMLElement>) => {
+      own.onKeyDown?.(e);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setOpen(true);
+      }
+    },
+  });
 
   return (
     <div ref={root} className="relative inline-flex">
-      <div
-        data-menu-trigger
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={id}
-        onClick={() => setOpen((x) => !x)}
-        onKeyDown={(e) => e.key === "ArrowDown" && (e.preventDefault(), setOpen(true))}
-      >
-        {trigger}
-      </div>
+      {triggerEl}
       {open && (
         <div
           ref={list}
@@ -326,11 +372,14 @@ export function MenuSeparator() {
 // ───────────────────────── тултип
 
 /** Пояснение при наведении и фокусе. Только дополнительное — не прятать сюда обязательные инструкции */
-export function Tooltip({ text, children, side = "top" }: { text: ReactNode; children: ReactNode; side?: "top" | "bottom" }) {
+export function Tooltip({ text, children, side = "top" }: { text: ReactNode; children: ReactElement<{ "aria-describedby"?: string }>; side?: "top" | "bottom" }) {
   const id = useId();
+  // описание привязано к самому интерактивному элементу — его читают при фокусе
+  const own = children.props["aria-describedby"];
+  const child = isValidElement(children) ? cloneElement(children, { "aria-describedby": own ? `${own} ${id}` : id }) : children;
   return (
-    <span className="group/tip relative inline-flex" aria-describedby={id}>
-      {children}
+    <span className="group/tip relative inline-flex">
+      {child}
       <span
         id={id}
         role="tooltip"

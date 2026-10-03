@@ -93,20 +93,28 @@ export function Select({ state, className, children, ...props }: ComponentProps<
   );
 }
 
-/** Поиск: иконка, очистка, индикатор загрузки */
+/**
+ * Поиск: иконка, очистка, индикатор загрузки.
+ * Доступное имя гарантировано: внутри Field — через <label htmlFor> (передайте id из Field),
+ * иначе — aria-label из `label`, а без него — из placeholder.
+ */
 export function SearchInput({
   value,
   onChange,
   loading,
+  label,
   placeholder = "Поиск",
   className,
   ...props
-}: Omit<ComponentProps<"input">, "onChange" | "value"> & { value: string; onChange: (v: string) => void; loading?: boolean }) {
+}: Omit<ComponentProps<"input">, "onChange" | "value"> & { value: string; onChange: (v: string) => void; loading?: boolean; label?: string }) {
+  // связан с видимой подписью Field (есть id) — отдельный aria-label не нужен, он перебил бы подпись
+  const ariaLabel = props["aria-label"] ?? (props.id ? undefined : (label ?? placeholder));
   return (
     <div className={cn("relative", className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" aria-hidden />
       <input
         {...props}
+        aria-label={ariaLabel}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}

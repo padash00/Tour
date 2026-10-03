@@ -73,7 +73,9 @@ export function FieldsDemo() {
       <Field label="Описание" className="md:col-span-2">
         {(p) => <Textarea {...p} placeholder="Пара слов о команде" />}
       </Field>
-      <Field label="Поиск">{() => <SearchInput value={q} onChange={setQ} loading={q.length > 0 && q.length < 3} placeholder="Игроки, команды, турниры" />}</Field>
+      <Field label="Поиск" hint="Подпись связана с полем через id">
+        {(p) => <SearchInput {...p} value={q} onChange={setQ} loading={q.length > 0 && q.length < 3} placeholder="Игроки, команды, турниры" />}
+      </Field>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
           <span className="text-[14px]">Best of</span>

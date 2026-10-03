@@ -316,8 +316,9 @@ summary,
 :where(a):active {
   filter: brightness(0.92);
 }
+/* карточки (старые .lift) при нажатии не двигаются — только темнеют */
 .lift:active {
-  transform: translateY(-1px) scale(0.985);
+  filter: brightness(0.92);
 }
 /* убрать подсветку тапа на телефонах — отклик даёт сам элемент */
 :where(a, button, [role="tab"], summary) {
