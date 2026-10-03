@@ -1,13 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ArrowLeft, Settings } from "lucide-react";
 import { formatDateTime, mapName } from "@/lib/format";
 import type { MatchFull } from "@/lib/matches";
 import type { Team } from "@/lib/types";
-import { MatchStatusBadge } from "../match-bits";
-import { Pill, TeamLogo, cn } from "../ui";
-import { Eyebrow, WRAP } from "@/components/primitives";
+import { Container, Score, Status, TeamLogo, cn, matchStatus } from "@/components/ds";
 
-/** Шапка матча в стиле утверждённой главной: фото события, команды, крупный счёт серии */
+/**
+ * Компактная шапка Match Room. Это контекст матча, а не marketing hero:
+ * турнир → команды/счёт → стадия/BO/время → статус.
+ */
 export function MatchHero({
   m,
   stage,
@@ -20,6 +22,7 @@ export function MatchHero({
   const finished = m.status === "finished";
   const live = m.status === "live";
   const current = m.maps.find((x) => x.status === "live") ?? (live ? m.maps.find((x) => x.status === "pending") : undefined);
+  const info = matchStatus(m.status, m.server_state === "ready", m.under_review);
   const meta = [
     stage,
     `BO${m.best_of}`,
@@ -28,85 +31,84 @@ export function MatchHero({
   ].filter(Boolean) as string[];
 
   return (
-    <section className="relative overflow-hidden border-b border-white/[0.06]">
-      <div className="pointer-events-none absolute inset-0">
-        <Image src="/home/tournament.jpg" alt="" fill priority sizes="100vw" className="object-cover object-[60%_35%] opacity-45" />
-        <div className="absolute inset-0 bg-gradient-to-b from-bg/70 via-bg/80 to-bg" />
-        {live && <div className="absolute inset-0 bg-[radial-gradient(600px_280px_at_50%_55%,#ff5d6314,transparent_70%)]" />}
+    <section className="relative overflow-hidden border-b border-line-subtle">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <Image src="/home/tournament.jpg" alt="" fill priority sizes="100vw" className="object-cover object-[60%_35%] opacity-[0.13]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/95 to-bg/80" />
+        {live && <div className="absolute inset-0 bg-[radial-gradient(520px_220px_at_50%_55%,rgba(255,91,100,0.08),transparent_70%)]" />}
       </div>
-      <div className={cn(WRAP, "relative pt-10 pb-14 lg:pb-20")}>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <Link href={`/tournaments/${m.tournament.slug}?tab=bracket`} className="text-fg-2 hover:text-fg">
-            ← {m.tournament.name}
+
+      <Container width="wide" className="relative pb-7 pt-5 sm:pb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href={`/tournaments/${m.tournament.slug}?tab=bracket`} className="inline-flex min-h-10 items-center gap-2 text-meta text-fg-3 hover:text-fg">
+            <ArrowLeft className="size-4" aria-hidden />
+            {m.tournament.name}
           </Link>
-          <div className="flex items-center gap-4">
-            {m.under_review && <Pill tone="warn">На рассмотрении</Pill>}
-            <MatchStatusBadge status={m.status} />
+          <div className="flex items-center gap-2">
+            <Status info={info} size="sm" />
             {adminHref && (
-              <Link href={adminHref} className="text-fg-3 hover:text-fg">
-                Control →
+              <Link href={adminHref} className="inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-meta text-fg-3 hover:bg-white/[0.05] hover:text-fg">
+                <Settings className="size-3.5" aria-hidden />
+                Control
               </Link>
             )}
           </div>
         </div>
 
-        <Eyebrow className="mt-12 lg:mt-16 text-center">{meta.join("  ·  ")}</Eyebrow>
+        <div className="mt-5 flex flex-wrap justify-center gap-x-3 gap-y-1 text-meta text-fg-3">
+          {meta.map((item, i) => (
+            <span key={item} className="inline-flex items-center gap-3">
+              {i > 0 && <span className="text-fg-4" aria-hidden>·</span>}
+              {item}
+            </span>
+          ))}
+        </div>
 
-        <div className="mt-10 lg:mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-10 lg:gap-16">
-          <TeamSide team={m.team1} align="left" winner={finished && m.winner_id === m.team1_id} dim={finished && m.winner_id !== m.team1_id} />
-          <div className="text-center">
-            {live && (
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-live/40 bg-live/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-live">
-                <span className="size-1.5 rounded-full bg-live animate-pulse" />
-                Live
-              </div>
-            )}
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-8 lg:gap-12">
+          <TeamSide team={m.team1} align="left" winner={finished && m.winner_id === m.team1_id} dim={finished && !!m.winner_id && m.winner_id !== m.team1_id} />
+
+          <div className="min-w-[74px] text-center sm:min-w-[120px]">
             {finished || live ? (
-              <div className={cn("num font-semibold tracking-[-0.04em] leading-none", live ? "text-[56px] sm:text-[96px] lg:text-[136px]" : "text-[48px] sm:text-[80px] lg:text-[112px]")}>
-                <span className={cn(finished && m.winner_id !== m.team1_id && "text-fg-3")}>{m.team1_score}</span>
-                <span className="text-fg-3/50 mx-2 sm:mx-5">:</span>
-                <span className={cn(finished && m.winner_id !== m.team2_id && "text-fg-3")}>{m.team2_score}</span>
-              </div>
+              <Score
+                a={m.team1_score}
+                b={m.team2_score}
+                winner={finished ? (m.winner_id === m.team1_id ? 1 : m.winner_id === m.team2_id ? 2 : null) : null}
+                size="lg"
+                className={live ? "text-live" : undefined}
+              />
             ) : (
-              <div className="text-2xl sm:text-4xl font-semibold text-fg-3 tracking-[0.2em]">VS</div>
+              <span className="text-title font-semibold tracking-[0.16em] text-fg-3">VS</span>
             )}
             {current && live && (
-              <div className="mt-4 inline-flex items-center gap-2 text-[14px] lg:text-[16px] text-fg-2">
-                <span className="size-1.5 rounded-full bg-live animate-pulse" />
-                {mapName(current.map_name)} · <span className="num">{current.team1_score}:{current.team2_score}</span>
+              <div className="mt-2 text-micro text-fg-3">
+                {mapName(current.map_name)} · <span className="num text-fg-2">{current.team1_score}:{current.team2_score}</span>
               </div>
             )}
           </div>
-          <TeamSide team={m.team2} align="right" winner={finished && m.winner_id === m.team2_id} dim={finished && m.winner_id !== m.team2_id} />
+
+          <TeamSide team={m.team2} align="right" winner={finished && m.winner_id === m.team2_id} dim={finished && !!m.winner_id && m.winner_id !== m.team2_id} />
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 function TeamSide({ team, align, winner, dim }: { team: Team | null; align: "left" | "right"; winner: boolean; dim: boolean }) {
   return (
-    <div className={cn("flex flex-col sm:flex-row items-center gap-3 sm:gap-6 min-w-0", align === "right" && "sm:flex-row-reverse")}>
-      {team ? (
-        <TeamLogo src={team.logo_url} tag={team.tag} size={96} />
-      ) : (
-        <div className="size-16 sm:size-24 rounded-xl bg-white/[0.04]" />
-      )}
-      <div className={cn("min-w-0 text-center", align === "right" ? "sm:text-right" : "sm:text-left")}>
+    <div className={cn("flex min-w-0 items-center gap-3 sm:gap-4", align === "right" && "flex-row-reverse text-right")}>
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="lg" /> : <span className="size-14 shrink-0 rounded-surface border border-dashed border-line bg-surface-2" />}
+      <div className="min-w-0">
         {team ? (
           <Link
-            href={`/teams/${team.tag}`}
-            className={cn(
-              "block text-base sm:text-[30px] lg:text-[40px] font-semibold tracking-[-0.015em] leading-tight truncate hover:text-accent-strong",
-              dim && "text-fg-3",
-            )}
+            href={`/teams/${encodeURIComponent(team.tag)}`}
+            className={cn("block truncate text-[16px] font-semibold text-fg hover:text-accent sm:text-title", dim && "text-fg-3")}
           >
             {team.name}
           </Link>
         ) : (
-          <div className="text-base sm:text-[30px] lg:text-[40px] font-semibold text-fg-3">TBD</div>
+          <div className="text-[16px] font-semibold text-fg-3 sm:text-title">TBD</div>
         )}
-        {winner && <Eyebrow className="mt-2 text-accent">Победитель</Eyebrow>}
+        {winner && <div className="mt-1 text-micro font-semibold uppercase tracking-[0.12em] text-ok">Победитель</div>}
       </div>
     </div>
   );
