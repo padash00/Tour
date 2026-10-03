@@ -7,6 +7,8 @@ import { cn } from "./cn";
  * Обратный отсчёт до deadline: 00:24 · 12:48 · 1:02:15.
  * urgentAt — с какого остатка (секунд) цифры становятся красными. offsetMs — поправка часов сервера.
  * Пока страница не отрисована в браузере, показывает «—:—» (без расхождения разметки сервера и браузера).
+ * Тиканье только визуальное: role="timer" не озвучивается. Смену состояния объявляет тот, кто показывает таймер,
+ * один раз (см. ActivityAnnouncer) — правило для всех таймеров продукта.
  */
 export function Timer({ deadline, urgentAt = 10, offsetMs = 0, className }: { deadline: string; urgentAt?: number; offsetMs?: number; className?: string }) {
   const [now, setNow] = useState<number | null>(null);
@@ -26,7 +28,7 @@ export function Timer({ deadline, urgentAt = 10, offsetMs = 0, className }: { de
   const s = String(left % 60).padStart(2, "0");
   const text = h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${String(m).padStart(2, "0")}:${s}`;
   return (
-    <span className={cn("num tabular-nums", left <= urgentAt ? "text-danger" : "text-fg", className)} role="timer" aria-live={left <= urgentAt ? "polite" : "off"}>
+    <span className={cn("num tabular-nums", left <= urgentAt ? "text-danger" : "text-fg", className)} role="timer">
       {text}
     </span>
   );

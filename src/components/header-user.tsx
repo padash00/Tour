@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SteamMark } from "@/components/ds/icons";
-import { GlobalActivity } from "./shell/activity";
+import { ActivityAnnouncer, GlobalActivity } from "./shell/activity";
 import { SearchTrigger } from "./shell/search";
 import { MobileMenu, NotificationsBell, UserMenu } from "./nav-links";
 import { ViewerSync, useViewer } from "./viewer";
@@ -20,6 +20,7 @@ export function HeaderUser() {
   return (
     <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
       <ViewerSync />
+      <ActivityAnnouncer />
       <GlobalActivity />
       <SearchTrigger />
       {status === "loading" ? (

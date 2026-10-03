@@ -185,11 +185,15 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           {loading ? (
             <Spinner className="size-4 text-fg-3" />
           ) : q ? (
-            <button type="button" onClick={() => setQ("")} aria-label="Очистить" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-white/[0.06] hover:text-fg">
+            <button type="button" onClick={() => setQ("")} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-white/[0.06] hover:text-fg">
               <X className="size-4" />
             </button>
           ) : null}
           <kbd className="kbd hidden sm:inline-grid">Esc</kbd>
+          {/* на телефоне Esc нет: отдельное закрытие (крестик рядом — очистка запроса) */}
+          <button type="button" onClick={onClose} className="-mr-1 h-10 shrink-0 rounded-control px-2 text-[14px] font-medium text-accent hover:text-accent-strong sm:hidden">
+            Отмена
+          </button>
         </div>
 
         <div ref={list} id={listId} role="listbox" aria-label="Результаты поиска" className="min-h-0 flex-1 overflow-y-auto p-2">

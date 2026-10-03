@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Gamepad2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Timer, Tooltip, cn } from "@/components/ds";
 import { useViewer, type Activity } from "../viewer";
 
@@ -87,55 +87,123 @@ function useAlert(a: Activity | null) {
   }, [key, label]);
 }
 
-/** Плашка активности (без данных) — для шапки и витрины дизайн-системы */
-export function ActivityPill({ activity, more = 0, current }: { activity: Activity; more?: number; current?: boolean }) {
-  const pill = (
-    <Link
-      href={activity.href}
-      aria-current={current ? "page" : undefined}
+/** «Подключиться» — сервер готов: подключение в один клик с любой страницы */
+function ConnectButton({ connect, compact }: { connect: string; compact?: boolean }) {
+  return (
+    <a
+      href={`steam://connect/${connect}`}
       className={cn(
-        "inline-flex h-9 max-w-[52vw] items-center gap-2 rounded-control border px-2.5 text-meta font-semibold transition-colors duration-[var(--dur-hover)] sm:max-w-none sm:px-3",
-        TONE[activity.tone],
+        "inline-flex shrink-0 items-center gap-1.5 rounded-control bg-ok font-semibold text-ok-ink transition-opacity hover:opacity-90",
+        compact ? "h-7 px-2.5 text-micro" : "h-9 px-3 text-meta",
       )}
     >
-      <span className={cn("size-2 shrink-0 rounded-full bg-current", activity.priority <= 3 && "animate-pulse")} aria-hidden />
-      <span className="truncate">{activity.label}</span>
-      {activity.deadline && <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="text-current" />}
-      {more > 0 && (
-        <span className="num rounded-tiny bg-black/25 px-1.5 text-micro" aria-label={`и ещё ${more}`}>
-          +{more}
-        </span>
-      )}
-    </Link>
+      <Gamepad2 className="size-4" />
+      Подключиться
+    </a>
   );
+}
+
+function More({ n }: { n: number }) {
+  if (n <= 0) return null;
+  return (
+    <span className="num shrink-0 rounded-tiny bg-black/25 px-1.5 text-micro" aria-label={`и ещё ${n}`}>
+      +{n}
+    </span>
+  );
+}
+
+/** Плашка активности (без данных) — шапка на десктопе и витрина дизайн-системы */
+export function ActivityPill({ activity, more = 0, current }: { activity: Activity; more?: number; current?: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <Tooltip text={activity.detail} side="bottom">
-        {pill}
-      </Tooltip>
-      {/* сервер готов: подключение в один клик с любой страницы */}
-      {activity.connect && (
-        <a
-          href={`steam://connect/${activity.connect}`}
-          className="inline-flex h-9 items-center gap-1.5 rounded-control bg-ok px-3 text-meta font-semibold text-ok-ink transition-opacity hover:opacity-90"
+        <Link
+          href={activity.href}
+          aria-current={current ? "page" : undefined}
+          className={cn(
+            "inline-flex h-9 items-center gap-2 rounded-control border px-3 text-meta font-semibold transition-colors duration-[var(--dur-hover)]",
+            TONE[activity.tone],
+          )}
         >
-          <Gamepad2 className="size-4" />
-          <span className="hidden sm:inline">Подключиться</span>
-          <span className="sr-only sm:hidden">Подключиться к серверу</span>
-        </a>
-      )}
+          <span className={cn("size-2 shrink-0 rounded-full bg-current", activity.priority <= 3 && "animate-pulse")} aria-hidden />
+          <span className="truncate">{activity.label}</span>
+          {activity.deadline && <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="text-current" />}
+          <More n={more} />
+        </Link>
+      </Tooltip>
+      {activity.connect && <ConnectButton connect={activity.connect} />}
     </div>
   );
 }
 
+/** Полоса активности под шапкой на телефоне: одна строка 40px, вся кликабельна, таймер справа */
+export function ActivityBar({ activity, more = 0, current }: { activity: Activity; more?: number; current?: boolean }) {
+  return (
+    <div className={cn("flex h-10 items-center gap-2 border-t px-4", TONE[activity.tone])}>
+      <Link href={activity.href} aria-current={current ? "page" : undefined} className="flex h-full min-w-0 flex-1 items-center gap-2 text-meta font-semibold">
+        <span className={cn("size-2 shrink-0 rounded-full bg-current", activity.priority <= 3 && "animate-pulse")} aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{activity.label}</span>
+        {activity.deadline && <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="shrink-0 text-current" />}
+        <More n={more} />
+      </Link>
+      {activity.connect && <ConnectButton connect={activity.connect} compact />}
+    </div>
+  );
+}
+
+/** Активность в строке шапки — только от 768px (на телефоне — полоса под шапкой) */
 export function GlobalActivity() {
   const { activity, moreActivity } = useViewer();
   const pathname = usePathname();
-  useAlert(activity);
   if (!activity) return null;
   return (
-    <div className="min-w-0" aria-live="polite">
+    <div className="hidden min-w-0 md:block">
       <ActivityPill activity={activity} more={moreActivity} current={pathname === activity.href.split("?")[0]} />
     </div>
+  );
+}
+
+/** Полоса активности под шапкой — только на телефоне; нет действия — строки нет */
+export function MobileActivityBar() {
+  const { activity, moreActivity } = useViewer();
+  const pathname = usePathname();
+  if (!activity) return null;
+  return (
+    <div className="md:hidden">
+      <ActivityBar activity={activity} more={moreActivity} current={pathname === activity.href.split("?")[0]} />
+    </div>
+  );
+}
+
+function secondsText(s: number) {
+  const a = s % 100;
+  const b = s % 10;
+  const word = a > 10 && a < 20 ? "секунд" : b === 1 ? "секунда" : b > 1 && b < 5 ? "секунды" : "секунд";
+  return `${s} ${word}`;
+}
+
+/**
+ * Один раз на событие (смена activity.key): звук, мигание вкладки и объявление для скринридера
+ * «Ваш ход · бан карты. Осталось 24 секунды». Тиканье таймера не озвучивается. Ставится в шапке один раз.
+ */
+export function ActivityAnnouncer() {
+  const { activity } = useViewer();
+  const [text, setText] = useState("");
+  const last = useRef<string | null>(null);
+  useAlert(activity);
+  useEffect(() => {
+    const key = activity?.key ?? null;
+    if (key === last.current) return;
+    last.current = key;
+    if (!activity) return;
+    const left = activity.deadline ? Math.max(0, Math.ceil((new Date(activity.deadline).getTime() - Date.now()) / 1000)) : null;
+    const msg = `${activity.label}. ${activity.detail}.${left != null ? ` Осталось ${left >= 120 ? `${Math.round(left / 60)} мин` : secondsText(left)}.` : ""}`;
+    const t = setTimeout(() => setText(msg), 0);
+    return () => clearTimeout(t);
+  }, [activity]);
+  return (
+    <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {text}
+    </span>
   );
 }

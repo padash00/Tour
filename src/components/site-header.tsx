@@ -3,6 +3,7 @@ import { BrandLogo } from "./brand";
 import { HeaderUser } from "./header-user";
 import { HeaderShell, PrimaryNav, PublicOnly } from "./nav-links";
 import { PRIMARY_NAV, SECONDARY_NAV } from "./shell/nav";
+import { MobileActivityBar } from "./shell/activity";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
 export function Logo({ height = 30 }: { height?: number }) {
@@ -26,6 +27,8 @@ export function SiteHeader() {
         <PrimaryNav />
         <HeaderUser />
       </div>
+      {/* на телефоне срочное действие — отдельной строкой под шапкой (на десктопе — внутри шапки) */}
+      <MobileActivityBar />
     </HeaderShell>
   );
 }
