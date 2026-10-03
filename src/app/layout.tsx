@@ -44,9 +44,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <Suspense fallback={null}>
             <NavProgress />
           </Suspense>
+          <a
+            href="#main-content"
+            className="fixed left-3 top-3 z-[200] -translate-y-20 rounded-control bg-accent px-4 py-2 text-[14px] font-semibold text-accent-ink shadow-[var(--shadow-pop)] transition-transform focus:translate-y-0"
+          >
+            Перейти к содержимому
+          </a>
           <SiteHeader />
           {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
-          <main className="flex-1 anim-in">
+          <main id="main-content" tabIndex={-1} className="flex-1 anim-in">
             <RouteTransition>{children}</RouteTransition>
           </main>
           <SiteFooter />
