@@ -8,16 +8,16 @@ import { cn } from "@/components/ds";
 
 /** Карточка-контейнер таблицы. sticky — своя прокрутка, чтобы шапка оставалась на месте */
 export function tableBox(sticky?: boolean, extra?: string) {
-  return cn("rounded-surface border border-line-subtle bg-surface", sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto", extra);
+  return cn("rounded-surface border border-line-subtle bg-surface", sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain touch-pan-x" : "overflow-x-auto overscroll-x-contain touch-pan-x", extra);
 }
 
 /** Классы таблицы: строки 56 px, шапка закреплена при прокрутке контейнера */
 export const DATA_TABLE = cn(
   "w-full border-collapse text-[14px]",
-  "[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:h-12 [&_th]:whitespace-nowrap [&_th]:bg-surface [&_th]:px-5",
+  "[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:h-12 [&_th]:whitespace-nowrap [&_th]:bg-surface [&_th]:px-3 sm:[&_th]:px-5",
   "[&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-[0.18em] [&_th]:text-fg-3",
   "[&_th]:shadow-[inset_0_-1px_0_var(--color-line-subtle)]",
-  "[&_td]:h-14 [&_td]:px-5 [&_td]:text-fg-2 [&_td]:border-b [&_td]:border-line-subtle",
+  "[&_td]:h-14 [&_td]:px-3 sm:[&_td]:px-5 [&_td]:text-fg-2 [&_td]:border-b [&_td]:border-line-subtle",
   "[&_tbody_tr]:transition-colors [&_tbody_tr]:duration-150 [&_tbody_tr:hover]:bg-surface-2",
   "[&_tbody_tr:last-child_td]:border-b-0",
 );
