@@ -3,8 +3,9 @@ import { SocialDownloads } from "@/components/social-downloads";
 import { mapName } from "@/lib/format";
 import type { MapHighlight, Placement, TournamentRecap } from "@/lib/recap";
 import { fmt } from "@/components/stats-format";
-import { CARD, Eyebrow } from "@/components/primitives";
-import { Avatar, TeamLogo, cn } from "@/components/ui";
+import { Avatar, Eyebrow, TeamLogo, cn } from "@/components/ds";
+
+const CARD = "rounded-surface border border-line-subtle bg-surface";
 
 /*
  * Итоги турнира: пьедестал, путь чемпиона, MVP, лидеры статистики, карты-рекорды, цифры турнира.
@@ -30,7 +31,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
   const solo = isSoloPlacement(p);
   const player = solo ? p.roster[0] : null;
   const href = player ? `/players/${player.steam_id}` : `/teams/${encodeURIComponent(p.team.tag)}`;
-  const size = big ? 80 : 64;
+  const size = big ? ("xl" as const) : ("lg" as const);
   const r = p.record;
   return (
     <div
@@ -69,10 +70,10 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
         )}
       </div>
       {!solo && p.roster.length > 0 && (
-        <div className="relative mt-4 flex flex-wrap justify-center gap-1.5 border-t border-white/[0.06] pt-4">
+        <div className="relative mt-4 flex flex-wrap justify-center gap-1.5 border-t border-line-subtle pt-4">
           {p.roster.map((m) => (
             <Link key={m.id} href={`/players/${m.steam_id}`} title={m.nickname} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] py-0.5 pl-0.5 pr-2.5 text-[12px] text-fg-2 hover:text-fg">
-              <Avatar src={m.avatar_url} name={m.nickname} size={20} />
+              <Avatar src={m.avatar_url} name={m.nickname} size="xs" />
               <span className="max-w-[110px] truncate">{m.nickname}</span>
             </Link>
           ))}
@@ -85,7 +86,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
 function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
   const m = h.match;
   return (
-    <Link href={`/matches/${m.id}`} className={cn(CARD, "block p-6 hover:border-white/[0.18] transition-colors")}>
+    <Link href={`/matches/${m.id}`} className={cn(CARD, "block p-6 hover:border-line-strong transition-colors")}>
       <Eyebrow>{label}</Eyebrow>
       <div className="mt-4 flex items-baseline justify-between gap-4">
         <div className="text-[22px] font-semibold">{mapName(h.map.map_name)}</div>
@@ -146,11 +147,11 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
           <ol className={cn(CARD, "divide-y divide-white/[0.06]")}>
             {championPath.map((s) => (
               <li key={s.matchId}>
-                <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[220px_1fr_auto] items-center gap-x-6 gap-y-1 px-6 py-4 hover:bg-white/[0.02]">
+                <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[220px_1fr_auto] items-center gap-x-6 gap-y-1 px-6 py-4 hover:bg-surface-2">
                   <span className="text-[13px] text-fg-3">{s.stage}</span>
                   <span className="order-3 sm:order-none col-span-2 sm:col-span-1 flex items-center gap-3 min-w-0">
                     <span className="text-fg-3 text-[13px]">против</span>
-                    {s.opponent && <TeamLogo src={s.opponent.logo_url} tag={s.opponent.tag} size={28} />}
+                    {s.opponent && <TeamLogo src={s.opponent.logo_url} tag={s.opponent.tag} size="xs" />}
                     <span className="font-medium break-words">{s.opponent?.name ?? "—"}</span>
                   </span>
                   <span className={cn("num text-right text-[18px] font-semibold", s.won ? "text-ok" : "text-danger")}>
@@ -169,7 +170,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
           <Eyebrow>MVP турнира</Eyebrow>
           <div className="mt-5 flex flex-wrap items-center gap-x-12 gap-y-6">
             <div className="flex items-center gap-5 min-w-0">
-              <Avatar src={mvp.player?.avatar_url} name={mvp.player?.nickname ?? mvp.name} size={72} />
+              <Avatar src={mvp.player?.avatar_url} name={mvp.player?.nickname ?? mvp.name} size="lg" />
               <div className="min-w-0">
                 <div className="text-[32px] lg:text-[40px] font-semibold tracking-[-0.015em] break-words">
                   {mvp.player ? (
@@ -211,7 +212,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
                 <div className="text-[13px] text-fg-3">{l.label}</div>
                 <div className="num mt-3 text-[30px] font-semibold tracking-[-0.01em]">{l.value}</div>
                 <div className="mt-4 flex items-center gap-3 min-w-0">
-                  <Avatar src={l.player?.avatar_url} name={l.name} size={32} />
+                  <Avatar src={l.player?.avatar_url} name={l.name} size="sm" />
                   <div className="min-w-0">
                     {l.player ? (
                       <Link href={`/players/${l.player.steam_id}`} className="block truncate font-medium hover:text-accent-strong">
@@ -252,7 +253,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
             { l: "Раундов", v: totals.rounds },
             { l: "Убийств", v: totals.kills || "—" },
           ].map((x) => (
-            <div key={x.l} className="p-6 border-white/[0.06] [&:not(:first-child)]:border-l max-sm:[&:nth-child(odd)]:border-l-0 max-sm:[&:nth-child(n+3)]:border-t">
+            <div key={x.l} className="p-6 border-line-subtle [&:not(:first-child)]:border-l max-sm:[&:nth-child(odd)]:border-l-0 max-sm:[&:nth-child(n+3)]:border-t">
               <div className="num text-[30px] font-semibold">{x.v}</div>
               <div className="mt-1 text-[13px] text-fg-3">{x.l}</div>
             </div>
