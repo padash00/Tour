@@ -150,7 +150,7 @@ export default async function MyGamePage() {
     };
   } else if (activeRegs.some((r) => r.status === "pending")) {
     const r = activeRegs.find((x) => x.status === "pending")!;
-    current = { tone: "warn", eyebrow: "Заявка на рассмотрении", title: r.tournament.name, text: `Отправлена ${formatDateTime(r.created_at)}. Администратор рассмотрит её до check-in.`, cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" } };
+    current = { tone: "warn", eyebrow: "Заявка на рассмотрении", title: r.tournament.name, text: "Администратор проверит заявку — о решении придёт уведомление.", cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" } };
   } else if (rejected) {
     current = {
       tone: "danger",
