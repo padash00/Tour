@@ -1,63 +1,117 @@
 @import "tailwindcss";
 
 /*
- * F16 Arena — дизайн-система.
- * Холодная сине-чёрная палитра, один голубой акцент (#8AB8FF), оранжевый — только знак бренда.
- * Поверхности поднимаются ступенями 0→4; рамки почти невидимые; тени — только у всплывающих слоёв.
- * Шрифт — Onest (кириллица, гротеск), цифры — JetBrains Mono с табличными цифрами.
+ * F16 Arena — дизайн-система (F16 DS). Витрина: /admin/design-system.
+ * Холодная сине-чёрная палитра, один акцент (#6EA8FF) — только для действий и выбранного;
+ * смысловые цвета — только по значению. Оранжевый — знак бренда.
+ *
+ * Уровни поверхностей (каждый со своей ролью):
+ *   bg (canvas) → shell (шапка, подвал, боковые панели) → section (фон области страницы)
+ *   → surface (объект: матч, команда, карточка) → surface-2 (наведение на объект)
+ *   → elevated / surface-3 (поднятое внутри объекта, поповеры) → overlay (модальные слои).
+ * Отступы — шкала Tailwind (1 = 4px): 1·2·3·4·6·8·12·16·24 = 4·8·12·16·24·32·48·64·96.
+ *   внутри элемента 4–12 · связанные 12–24 · группы в разделе 24–32 · разделы 48–64 · области 64–96.
+ * Шрифт — Onest; JetBrains Mono (.num) — только цифры и машинные данные: счёт, ELO, время, IP.
  */
 @theme {
-  /* поверхности: 0 — фон страницы … 4 — всплывающие слои */
-  --color-bg: #070b12;
-  --color-bg-2: #09111b;
-  --color-surface: #0c1622;
-  --color-surface-2: #101b28;
-  --color-surface-3: #13202e;
-  --color-surface-4: #182739;
+  /* поверхности */
+  --color-bg: #080b10; /* canvas — фон страницы */
+  --color-bg-2: #0b0f15; /* = shell, старое имя */
+  --color-shell: #0b0f15;
+  --color-section: #0e131b;
+  --color-surface: #121925;
+  --color-surface-2: #17202e; /* наведение на surface */
+  --color-surface-3: #1b2533; /* = elevated */
+  --color-elevated: #1b2533;
+  --color-surface-4: #222d3d; /* поверх elevated: меню, тултип */
+  --color-overlay: #03060bd9; /* затемнение под модальным окном */
 
-  /* рамки */
-  --color-line: #ffffff12;
-  --color-line-strong: #ffffff1f;
-  --color-line-hover: #ffffff33;
+  /* рамки: subtle — разделители, line — обычная рамка, strong — активная / наведение */
+  --color-line-subtle: #ffffff0f;
+  --color-line: #ffffff1a;
+  --color-line-strong: #ffffff2b;
+  --color-line-hover: #ffffff38;
 
   /* текст */
   --color-fg: #f4f7fb;
-  --color-fg-2: #a8b2c2;
-  --color-fg-3: #748196; /* AA: 5.0 на фоне, 4.6 на карточках */
-  --color-fg-4: #4a5566;
+  --color-fg-2: #aeb8c7;
+  --color-fg-3: #758194; /* AA 4.6+ на canvas и surface */
+  --color-fg-4: #4a5566; /* только неактивное и декоративное */
   --color-eyebrow: #7f93b0;
 
-  /* акцент */
-  --color-accent: #8ab8ff;
-  --color-accent-strong: #a6cbff;
-  --color-accent-pressed: #79a6ee;
-  --color-accent-dim: #8ab8ff14;
-  --color-accent-ink: #07101b;
+  /* акцент — действие */
+  --color-accent: #6ea8ff;
+  --color-accent-strong: #8bbaff; /* наведение */
+  --color-accent-pressed: #5a94ec;
+  --color-accent-dim: #6ea8ff17;
+  --color-accent-ink: #06101d; /* текст на акцентной кнопке */
   --color-steel: #7fc4d8;
   --color-warm: #ff8a43;
 
-  /* смысловые */
-  --color-ok: #6fc49a;
-  --color-ok-dim: #6fc49a14;
-  --color-warn: #d6aa63;
-  --color-warn-dim: #d6aa6314;
-  --color-danger: #e66f74;
-  --color-danger-dim: #e66f7414;
-  --color-live: #ff5d63;
+  /* смысловые: успех · внимание · опасность / live */
+  --color-ok: #58c99b;
+  --color-ok-dim: #58c99b17;
+  --color-ok-ink: #04140d;
+  --color-warn: #e7b45f;
+  --color-warn-dim: #e7b45f17;
+  --color-warn-ink: #1a1203;
+  --color-danger: #ff5b64;
+  --color-danger-dim: #ff5b6417;
+  --color-live: #ff5b64;
+  /* призовые места (итоги турнира) */
+  --color-gold: #e8c27a;
+  --color-silver: #c3cad6;
+  --color-bronze: #d39a6a;
 
   --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
-  /* радиусы 6 / 8 / 12 / 16 */
+  /* шкала текста: text-display / page / heading / title / body / meta / micro */
+  --text-display: clamp(40px, 5vw, 60px);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.022em;
+  --text-display--font-weight: 600;
+  --text-page: clamp(28px, 2.6vw, 34px);
+  --text-page--line-height: 1.15;
+  --text-page--letter-spacing: -0.018em;
+  --text-page--font-weight: 600;
+  --text-heading: clamp(20px, 1.7vw, 23px);
+  --text-heading--line-height: 1.25;
+  --text-heading--letter-spacing: -0.012em;
+  --text-heading--font-weight: 600;
+  --text-title: 17px;
+  --text-title--line-height: 1.35;
+  --text-title--letter-spacing: -0.006em;
+  --text-title--font-weight: 600;
+  --text-body: 15px;
+  --text-body--line-height: 1.55;
+  --text-meta: 13px;
+  --text-meta--line-height: 1.45;
+  --text-micro: 11px;
+  --text-micro--line-height: 1.35;
+
+  /* радиусы: rounded-tiny 4 · chip 6 · control 8 · popover 10 · surface 12 · feature 16 · full */
+  --radius-tiny: 4px;
+  --radius-chip: 6px;
+  --radius-control: 8px;
+  --radius-popover: 10px;
+  --radius-surface: 12px;
+  --radius-feature: 16px;
+  /* старые имена — пока на них ссылаются экраны */
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-card: 12px;
   --radius-section: 16px;
 
-  /* тени — только для поднятых слоёв */
-  --shadow-soft: 0 1px 0 0 #ffffff08 inset, 0 8px 24px -16px #000000b3;
+  /* тени — только у всплывающих слоёв: меню, поповер, тултип, модальное окно, панель */
   --shadow-pop: 0 1px 0 0 #ffffff0d inset, 0 18px 48px -18px #000000e6, 0 0 0 1px #00000040;
+  --shadow-soft: 0 1px 0 0 #ffffff08 inset, 0 8px 24px -16px #000000b3;
+
+  /* ширина: продукт 1360, экраны с плотными данными (матч, сетка, лобби, статистика) — до 1500, текст — 740 */
+  --container-product: 1360px;
+  --container-wide: 1500px;
+  --container-read: 740px;
 
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -65,7 +119,13 @@
 :root {
   color-scheme: dark;
   --header-h: 72px;
-  --focus-ring: #8ab8ffb3;
+  --focus-ring: #6ea8ffb3;
+  /* длительности: наведение · нажатие · поповер · модальное окно · смена состояния */
+  --dur-hover: 140ms;
+  --dur-press: 100ms;
+  --dur-pop: 160ms;
+  --dur-modal: 200ms;
+  --dur-state: 240ms;
 }
 @media (min-width: 1024px) {
   :root {
@@ -102,7 +162,7 @@ p {
 }
 
 ::selection {
-  background: #8ab8ff47;
+  background: #6ea8ff47;
   color: #fff;
 }
 
@@ -249,11 +309,11 @@ summary,
  * Строчные ссылки в тексте не двигаются (transform не действует на inline).
  */
 :where(button, [role="button"], [role="tab"], summary, input[type="submit"]):not(:disabled):not([aria-disabled="true"]):active {
-  transform: scale(0.97);
-  filter: brightness(0.9);
+  transform: scale(0.98);
+  filter: brightness(0.92);
 }
+/* ссылки-строки и карточки не «прыгают» — только темнеют */
 :where(a):active {
-  transform: scale(0.985);
   filter: brightness(0.92);
 }
 .lift:active {
@@ -465,7 +525,7 @@ html[data-navigating] main > * {
   .field:focus-visible {
     border-color: var(--color-accent);
     background-color: #0a1320;
-    box-shadow: 0 0 0 3px #8ab8ff1f;
+    box-shadow: 0 0 0 3px var(--color-accent-dim);
     outline: none;
   }
   .field:disabled {
@@ -473,7 +533,7 @@ html[data-navigating] main > * {
     cursor: not-allowed;
   }
   .field[aria-invalid="true"] {
-    border-color: #e66f7499;
+    border-color: color-mix(in srgb, var(--color-danger) 60%, transparent);
   }
 
   .prose-f16 {
@@ -617,8 +677,40 @@ html[data-navigating] main > * {
   --color-line: #ffffff10;
   background-color: #05090f;
   background-image:
-    linear-gradient(to right, #8ab8ff07 1px, transparent 1px),
-    linear-gradient(to bottom, #8ab8ff07 1px, transparent 1px);
+    linear-gradient(to right, #6ea8ff07 1px, transparent 1px),
+    linear-gradient(to bottom, #6ea8ff07 1px, transparent 1px);
   background-size: 32px 32px;
   background-attachment: fixed;
+}
+
+/* Публичная палитра внутри F16 Control — для витрины дизайн-системы (/admin/design-system) */
+.ds-public {
+  --color-bg: #080b10;
+  --color-bg-2: #0b0f15;
+  --color-surface: #121925;
+  --color-surface-2: #17202e;
+  --color-surface-3: #1b2533;
+  --color-line: #ffffff1a;
+  background: var(--color-bg);
+}
+
+/* иконки F16 DS (lucide-react и свои через createLucideIcon): одна толщина линии на весь сайт,
+   размер задаётся классом size-3.5 / size-4 / size-5 / size-6 (14 / 16 / 20 / 24) */
+svg.lucide {
+  stroke-width: 1.75;
+  flex-shrink: 0;
+}
+
+/* боковая панель F16 DS: снизу на телефоне, справа на десктопе */
+@keyframes sheet-in-y {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes sheet-in-x {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
 }
