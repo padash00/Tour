@@ -109,6 +109,7 @@ export function Dialog({
   children,
   footer,
   size = "md",
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -117,13 +118,17 @@ export function Dialog({
   children?: ReactNode;
   footer?: ReactNode;
   size?: "sm" | "md" | "lg";
+  /** false для обязательного действия: нет ложного крестика/закрытия по Esc или backdrop */
+  dismissible?: boolean;
 }) {
-  const panel = useModal(open, onClose);
+  const blockedClose = useCallback(() => {}, []);
+  const close = dismissible ? onClose : blockedClose;
+  const panel = useModal(open, close);
   const titleId = useId();
   if (!open || typeof document === "undefined") return null;
   const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]" }[size];
   return (
-    <ModalLayer onClose={onClose} align="center">
+    <ModalLayer onClose={close} align="center">
       <div
         ref={panel}
         role="dialog"
@@ -142,9 +147,11 @@ export function Dialog({
             </h2>
             {description && <p className="mt-1.5 text-[14px] leading-relaxed text-fg-2">{description}</p>}
           </div>
-          <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5 -mt-1">
-            <X />
-          </IconButton>
+          {dismissible && (
+            <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5 -mt-1">
+              <X />
+            </IconButton>
+          )}
         </div>
         {children && <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-5 sm:px-6">{children}</div>}
         {footer && <div className="flex flex-col-reverse gap-2 border-t border-line-subtle px-5 py-4 sm:flex-row sm:justify-end sm:px-6">{footer}</div>}
