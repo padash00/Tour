@@ -217,7 +217,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             winner: game.winner,
             server_state: game.server_state,
             server_address: seesAddress && game.server_state === "ready" ? game.server_address : null,
-            gotv_address: game.server_state === "ready" ? gotv : null,
+            // GOTV раскрывает адрес сервера — только участникам лобби и админам
+            gotv_address: game.server_state === "ready" && (!!mine || opts.admin) ? gotv : null,
             note: game.note,
             network: game.settings.network,
             finished_at: game.finished_at,

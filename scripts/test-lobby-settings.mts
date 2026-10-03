@@ -48,5 +48,18 @@ for (let i = 0; i < 20; i++) {
 }
 check(acts.filter((a) => a.action !== "ban").length === 3, "вето BO3: 2 пика + десайдер");
 
+// вето BO5: при любом пуле от 5 карт — ровно 5 карт серии (раньше пул 6 или 8 давал 6 карт)
+for (const size of [5, 6, 7, 8, 9]) {
+  const p = Array.from({ length: size }, (_, i) => `m${i}`);
+  const list: typeof acts = [];
+  for (let i = 0; i < 20; i++) {
+    const st = vetoState(5, p, list);
+    if (!st.current) break;
+    list.push({ step: st.current.step, team_id: String(st.current.team), action: st.current.action, map_name: st.remaining[0] });
+  }
+  const bans = list.filter((a) => a.action === "ban").length;
+  check(list.length - bans === 5 && (size !== 7 || bans === 2), `вето BO5 из ${size} карт: 5 карт серии`);
+}
+
 console.log(failed ? `\n${failed} ошибок` : "\nвсё верно");
 process.exit(failed ? 1 : 0);

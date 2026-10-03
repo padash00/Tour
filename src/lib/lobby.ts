@@ -194,8 +194,14 @@ export async function passHost(lobby: Lobby, leavingId: string | null) {
     await closeLobby(lobby, "Лобби закрыто — в нём никого не осталось");
     return null;
   }
-  await touch(lobby.id, { host_id: next.player_id });
-  await systemMessage(lobby.id, `Новый хост — ${next.player.nickname}`);
+  // условное обновление: несколько одновременных опросов страницы передадут хоста один раз
+  const { data } = await db()
+    .from("lobbies")
+    .update({ host_id: next.player_id, updated_at: new Date().toISOString() })
+    .eq("id", lobby.id)
+    .eq("host_id", lobby.host_id)
+    .select("id");
+  if (data?.length) await systemMessage(lobby.id, `Новый хост — ${next.player.nickname}`);
   return next.player_id;
 }
 const rankSlot = (s: Slot) => (s === "team1" || s === "team2" ? 0 : s === "wait" ? 1 : 2);
@@ -218,7 +224,8 @@ export async function closeLobby(lobby: Lobby, reason: string) {
 
 /** Хост давно не открывал лобби — передаём хоста тому, кто на месте */
 export async function checkHostAway(lobby: Lobby, members: LobbyMember[]) {
-  if (lobby.status === "closed") return;
+  // во время игры хост в CS2, а не на странице — не передаём
+  if (lobby.status !== "waiting") return;
   const host = members.find((m) => m.player_id === lobby.host_id);
   if (host && Date.now() - new Date(host.last_seen_at).getTime() < HOST_AWAY_MS) return;
   if (!members.some((m) => m.player_id !== lobby.host_id && isOnline(m))) return;
@@ -300,6 +307,16 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false) {
   const members = await getMembers(lobby.id);
   const picked = members.find((m) => m.player_id === pickedId && m.slot === "wait");
   if (!picked) return "Этого игрока нельзя выбрать";
+  if (!auto) {
+    // забираем ход условным обновлением: двойной клик или авто-пик в ту же секунду не возьмут двух игроков
+    const { data } = await db()
+      .from("lobbies")
+      .update({ draft: { ...lobby.draft, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } })
+      .eq("id", lobby.id)
+      .eq("draft->>deadline", lobby.draft.deadline)
+      .select("id");
+    if (!data?.length) return "Ход уже сделан — обновите страницу";
+  }
   const team = lobby.draft.turn === 1 ? "team1" : "team2";
   await setSlot(lobby.id, pickedId, team);
   await systemMessage(lobby.id, `${auto ? "Время вышло — " : ""}${team === "team1" ? lobby.team1_name : lobby.team2_name} берёт ${picked.player.nickname}`);
@@ -443,6 +460,7 @@ export async function lobbyTick() {
     .neq("status", "closed")
     .or(`draft.not.is.null,ready_check_until.lt.${new Date(now).toISOString()}`);
   for (const row of due ?? []) await lobbyTimeouts(parseLobby(row)!);
+  await lobbyGameWatchdog();
 }
 
 /**
@@ -515,7 +533,14 @@ export async function maybeStartOnReady(lobbyId: string) {
   // защита от двойного старта
   const { data } = await db().from("lobbies").update({ status: "playing" }).eq("id", lobby.id).eq("status", "waiting").select("id");
   if (!data?.length) return false;
-  await createGame({ ...lobby, status: "waiting" });
+  try {
+    await createGame({ ...lobby, status: "waiting" });
+  } catch (e) {
+    // игра не создалась — лобби не должно зависнуть в «идёт игра»
+    await touch(lobby.id, { status: "waiting", ready_check_until: null });
+    await systemMessage(lobby.id, "Не удалось создать игру — попробуйте ещё раз");
+    throw e;
+  }
   return true;
 }
 
@@ -547,6 +572,16 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
     .order("created_at");
   for (const row of data ?? []) {
     const g = row as LobbyGame;
+    if (g.server_instance && g.server_state === "error") {
+      // прошлый сервер не справился — снимаем матч с него (иначе он так и останется занят) и ищем другой
+      await db().from("agent_commands").insert({ instance: g.server_instance, type: "end_match", payload: {} });
+      await db()
+        .from("lobby_games")
+        .update({ server_instance: null, server_state: null, server_address: null, note: g.note ?? "ищем другой сервер" })
+        .eq("id", g.id)
+        .eq("server_state", "error");
+      return; // новый сервер — на следующем тике, когда старый освободится
+    }
     if (await opts.workshopBusy(g.maps.map((m) => m.map), g.id)) {
       await setNote(g, "карта из мастерской прогревается на сервере…");
       continue;
@@ -573,12 +608,13 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
       .from("lobby_games")
       .update({ server_instance: inst, server_state: "loading", server_address: null, server_assigned_at: new Date().toISOString(), server_ready_at: null, note: `загружаем матч на ${inst}…` })
       .eq("id", g.id);
-    const humans = g.team1.players.length + g.team2.players.length;
+    // первая карта — по .r в игре: A2S считает и зрителей, и ботов, по числу игроков старт мог бы уйти без кого-то из состава.
+    // MatchZy сам знает состав и стартует, когда готовы все игроки матча
     const bots = g.team1.bots.length + g.team2.bots.length;
     await db().from("agent_commands").insert({
       instance: inst,
       type: "load_match",
-      payload: { match_id: g.id, matchzy_id: g.matchzy_id, lobby: true, autostart_first: true, autostart_need: humans, autostart_off: bots > 0 },
+      payload: { match_id: g.id, matchzy_id: g.matchzy_id, lobby: true, autostart_off: bots > 0 },
     });
     return;
   }
@@ -590,7 +626,7 @@ async function setNote(g: LobbyGame, note: string) {
 
 /** Адрес для игроков: LAN-лобби — локальный адрес сервера, интернет — внешний (настройка или UPnP) */
 export async function lobbyAddress(g: LobbyGame, lanIp: string | null, upnpIp: string | null) {
-  if (g.settings.network === "lan") return lanIp;
+  if (g.settings.network === "lan" && lanIp) return lanIp;
   return ((await getSetting("PLAYER_IP")) ?? "").trim() || upnpIp || lanIp;
 }
 
@@ -717,9 +753,9 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
   };
 
   switch (ev.event) {
-    case "series_start":
     case "going_live": {
-      if (ev.event === "going_live") setMap({ status: "live" });
+      // series_start приходит сразу при загрузке конфига, ещё до игроков — «идёт» только с началом карты
+      setMap({ status: "live" });
       await db()
         .from("lobby_games")
         .update({ status: g.status === "waiting" ? "live" : g.status, started_at: g.started_at ?? new Date().toISOString(), maps, note: null })
@@ -791,6 +827,47 @@ export async function finishGame(gameId: string) {
 }
 
 /** Отменить игру (хост, пока она не началась на сервере, или админ) */
+const NO_START_MS = 20 * 60_000;
+
+/**
+ * Сторож игр лобби (на каждой синхронизации агента):
+ *  - сервер готов, но за 20 минут матч так и не начался — отменяем, сервер освобождается;
+ *  - сервер явно говорит, что этого матча на нём больше нет (сняли из админки, MatchZy закончил без series_end) —
+ *    засчитываем сыгранное или отменяем. Пустой ответ сервера (RCON не ответил) за «нет матча» не считаем.
+ */
+export async function lobbyGameWatchdog() {
+  const { data } = await db()
+    .from("lobby_games")
+    .select("*")
+    .in("status", ["waiting", "live"])
+    .eq("server_state", "ready")
+    .not("server_instance", "is", null);
+  if (!data?.length) return;
+  const { data: insts } = await db().from("server_instances").select("name, running, gamestate, matchzy_match_id, last_seen_at");
+  const byName = new Map((insts ?? []).map((i) => [i.name, i]));
+  const now = Date.now();
+  for (const row of data) {
+    const g = row as LobbyGame;
+    const readyFor = g.server_ready_at ? now - new Date(g.server_ready_at).getTime() : 0;
+    const inst = byName.get(g.server_instance!);
+    const fresh = inst?.last_seen_at && now - new Date(inst.last_seen_at).getTime() < 30_000;
+    const gone =
+      fresh && inst.running && readyFor > 60_000 && (inst.gamestate === "none" || (inst.matchzy_match_id != null && Number(inst.matchzy_match_id) !== Number(g.matchzy_id)));
+    if (gone) {
+      if (g.maps.some((m) => m.status === "finished")) {
+        const s1 = g.maps.filter((m) => m.winner === 1).length;
+        const s2 = g.maps.filter((m) => m.winner === 2).length;
+        await db().from("lobby_games").update({ team1_score: s1, team2_score: s2, winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }).eq("id", g.id);
+        await finishGame(g.id);
+      } else {
+        await cancelGame(g, "матч снят с сервера");
+      }
+    } else if (g.status === "waiting" && readyFor > NO_START_MS) {
+      await cancelGame(g, "за 20 минут матч так и не начался");
+    }
+  }
+}
+
 export async function cancelGame(g: LobbyGame, reason: string) {
   if (g.server_instance) await db().from("agent_commands").insert({ instance: g.server_instance, type: "end_match", payload: {} });
   await db().from("lobby_games").update({ status: "cancelled", note: reason, server_instance: null, server_state: null, server_address: null }).eq("id", g.id);
@@ -868,4 +945,17 @@ export async function listOpenLobbies(): Promise<LobbyListItem[]> {
       };
     })
     .filter((l) => l.online > 0 || l.status === "playing");
+}
+
+/** Карты, которые нельзя поставить в лобби: не официальные CS2 (или скрытые админом) и карты мастерской, которые не загрузились на сервере */
+export async function badMaps(maps: string[]) {
+  const { CS2_MAPS } = await import("./maps");
+  const { getDisabledMaps } = await import("./settings");
+  const [disabled, { data: info }] = await Promise.all([getDisabledMaps(), db().from("app_settings").select("value").eq("key", "WORKSHOP_MAP_INFO").maybeSingle()]);
+  let checked: Record<string, { ok?: boolean }> = {};
+  try {
+    checked = info?.value ? JSON.parse(info.value) : {};
+  } catch {}
+  const official = new Set(CS2_MAPS.map((m) => m.id as string).filter((id) => !disabled.includes(id)));
+  return maps.filter((m) => (m.includes("@") ? checked[m.split("@")[1]]?.ok === false : !official.has(m)));
 }

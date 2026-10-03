@@ -6,6 +6,7 @@ import { audit } from "@/lib/audit";
 import { BANNED_ERROR } from "@/lib/data";
 import { db } from "@/lib/supabase";
 import {
+  badMaps,
   captainsOf,
   cancelGame,
   checkInvite,
@@ -134,13 +135,15 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
 
   // куда встать: просили слот — туда, иначе в команду, где меньше (если можно), иначе в ожидание
   let slot: Slot = opts.slot && SLOTS.includes(opts.slot) ? opts.slot : "wait";
-  if (!opts.slot && lobby.settings.allow_join_team && !lobby.draft) {
+  // в команду сам — только если хост разрешил, нет драфта / пика капитанов и не идёт проверка готовности
+  const teamsOpen = lobby.settings.allow_join_team && lobby.settings.player_pick !== "captains" && !lobby.draft && !lobby.ready_check_until;
+  if (!opts.slot && teamsOpen) {
     const c1 = teamCount(lobby, members, "team1");
     const c2 = teamCount(lobby, members, "team2");
     const size = lobby.settings.team_size;
     if (c1 < size || c2 < size) slot = c1 <= c2 && c1 < size ? "team1" : "team2";
   }
-  if ((slot === "team1" || slot === "team2") && (!lobby.settings.allow_join_team || lobby.draft)) slot = "wait";
+  if ((slot === "team1" || slot === "team2") && !teamsOpen) slot = "wait";
   let problem = slotProblem(lobby, members, slot, player.id);
   if (problem && slot !== "spec") {
     slot = "wait";
@@ -150,6 +153,11 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
 
   const { error } = await db().from("lobby_members").insert({ lobby_id: lobby.id, player_id: player.id, slot });
   if (error) return { error: "Не удалось войти — обновите страницу" };
+  if (slot === "team1" || slot === "team2") {
+    // двое зашли в одну секунду — места проверяем ещё раз уже после записи
+    const after = await getMembers(lobby.id);
+    if (teamCount(lobby, after, slot) > lobby.settings.team_size) await setSlot(lobby.id, player.id, "wait");
+  }
   await touch(lobby.id);
   await systemMessage(lobby.id, `${player.nickname} зашёл в лобби`);
   return { ok: true, code: lobby.code };
@@ -167,6 +175,8 @@ export async function leaveLobby(code: string): Promise<LobbyResult> {
   }
   if (lobby.host_id === player.id) await passHost(lobby, player.id);
   else await touch(lobby.id);
+  // шла проверка готовности — остальные могли быть уже готовы
+  if (lobby.ready_check_until) await maybeStartOnReady(lobby.id);
   return { ok: true };
 }
 
@@ -215,6 +225,7 @@ export async function kickPlayer(code: string, playerId: string, ban: boolean): 
   if (ban) await db().from("lobby_bans").upsert({ lobby_id: lobby.id, player_id: playerId });
   await touch(lobby.id, lobby.draft?.captains.includes(playerId) ? { draft: null } : {});
   if (target) await systemMessage(lobby.id, `${player.nickname} ${ban ? "забанил" : "выгнал"} ${target.player.nickname}`);
+  if (lobby.ready_check_until) await maybeStartOnReady(lobby.id);
   return { ok: true };
 }
 
@@ -325,6 +336,10 @@ export async function updateSettings(code: string, patch: Partial<LobbySettings>
   const { lobby } = ctx;
   if (lobby.status !== "waiting") return { error: "Настройки меняются между играми" };
   const next = normalizeSettings({ ...lobby.settings, ...patch });
+  if (patch.maps) {
+    const bad = await badMaps(next.maps);
+    if (bad.length) return { error: `Эту карту поставить нельзя: ${bad.join(", ")}` };
+  }
   await touch(lobby.id, { settings: next, ready_check_until: null });
   if (next.team_size < lobby.settings.team_size) await fitTeams({ ...lobby, settings: next });
   return { ok: true };

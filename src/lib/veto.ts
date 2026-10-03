@@ -2,7 +2,7 @@
  * Вето карт. Команда 1 (выше по посеву) начинает.
  * BO1: баны по очереди, пока не останется одна карта.
  * BO3: бан, бан, пик, пик, дальше баны по очереди, последняя карта — decider.
- * BO5: бан, бан, дальше пики по очереди, последняя карта — decider.
+ * BO5: баны, пока не останется 5 карт (из 7 — бан, бан), дальше пики по очереди, последняя карта — decider.
  */
 
 export type VetoStepKind = "ban" | "pick" | "decider";
@@ -32,10 +32,8 @@ export function vetoPlan(bestOf: number, poolSize: number): VetoStep[] {
     push("pick");
     while (left > 1) push("ban");
   } else {
-    if (left >= 7) {
-      push("ban");
-      push("ban");
-    }
+    // баны, пока не останется 5 карт (из 7 — ровно два бана), дальше пики, последняя — decider
+    while (left > 5) push("ban");
     while (left > 1) push("pick");
   }
   steps.push({ step: steps.length + 1, team: null, action: "decider" });

@@ -863,7 +863,7 @@ function GamePanel({ view, now, isHost, busy, run, code }: { view: LobbyView; no
         </a>
       )}
       {g.server_state === "ready" && g.status !== "live" && me?.inGame && (
-        <p className="mt-2 text-[12px] text-fg-3">{g.team1.bots.length + g.team2.bots.length > 0 ? "Зайдите на сервер и напишите .r в чат" : "Матч начнётся сам, когда все зайдут на сервер"}</p>
+        <p className="mt-2 text-[12px] text-fg-3">Зайдите на сервер и напишите .r в чат — матч начнётся, когда будут готовы все игроки</p>
       )}
     </div>
   );
