@@ -12,7 +12,7 @@ import { MODES } from "@/lib/modes";
 import { useToast } from "../toast";
 import { Avatar, FaceitLevel } from "../ui";
 import { AdvancedSettings, MapThumb, QuickSettings, type MapOption, type Template } from "./settings";
-import { Button, CriticalSurface, Dialog, Facts, FeatureSurface, Status, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
+import { Button, CriticalSurface, Dialog, Facts, FeatureSurface, Menu, MenuItem as DsMenuItem, MenuSeparator, Status, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
 import { Icon } from "./ui";
 
 type Slot = ViewMember["slot"];
@@ -562,7 +562,6 @@ function PlayerLine({
   captain?: boolean;
   children?: ReactNode;
 }) {
-  const [menu, setMenu] = useState(false);
   const host = view.lobby.host_id === m.id;
   const self = view.me?.id === m.id;
   const inTeam = m.slot === "team1" || m.slot === "team2";
@@ -613,41 +612,35 @@ function PlayerLine({
         ))}
       {children}
       {isHost && !self && (
-        <div className="relative">
-          <button type="button" onClick={() => setMenu((x) => !x)} className="grid size-8 place-items-center rounded-[7px] text-fg-3 hover:bg-white/[0.06] hover:text-fg" aria-label="Действия">
-            {Icon.more("size-5")}
-          </button>
-          {menu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 top-9 z-50 w-56 overflow-hidden rounded-control border border-white/[0.1] bg-surface-3 py-1 shadow-[var(--shadow-pop)]">
-                {!view.lobby.draft &&
-                  moves.map((x) => (
-                    <MenuItem key={x.slot} onClick={() => (setMenu(false), run(() => A.movePlayer(code, m.id, x.slot)))}>
-                      {x.label}
-                    </MenuItem>
-                  ))}
-                <MenuItem onClick={() => (setMenu(false), run(() => A.transferHost(code, m.id), `${m.nickname} теперь хост`))}>Сделать хостом</MenuItem>
-                <MenuItem danger onClick={() => (setMenu(false), run(() => A.kickPlayer(code, m.id, false)))}>
-                  Выгнать
-                </MenuItem>
-                <MenuItem danger onClick={() => (setMenu(false), run(() => A.kickPlayer(code, m.id, true)))}>
-                  Забанить в лобби
-                </MenuItem>
-              </div>
-            </>
-          )}
-        </div>
+        <Menu
+          label={`Действия с игроком ${m.nickname}`}
+          trigger={
+            <button type="button" className="grid size-9 place-items-center rounded-control text-fg-3 hover:bg-white/[0.06] hover:text-fg" aria-label={`Действия с игроком ${m.nickname}`}>
+              {Icon.more("size-5")}
+            </button>
+          }
+        >
+          {!view.lobby.draft &&
+            moves.map((move) => (
+              <DsMenuItem key={move.slot} onSelect={() => run(() => A.movePlayer(code, m.id, move.slot))}>
+                {move.label}
+              </DsMenuItem>
+            ))}
+          <DsMenuItem onSelect={() => run(() => A.transferHost(code, m.id), `${m.nickname} теперь хост`)}>
+            Сделать хостом
+          </DsMenuItem>
+          <MenuSeparator />
+          <DsMenuItem danger onSelect={() => run(() => A.kickPlayer(code, m.id, false))}>
+            Выгнать
+          </DsMenuItem>
+          <DsMenuItem danger onSelect={() => run(() => A.kickPlayer(code, m.id, true))}>
+            Забанить в лобби
+          </DsMenuItem>
+        </Menu>
       )}
     </div>
   );
 }
-
-const MenuItem = ({ children, onClick, danger }: { children: ReactNode; onClick: () => void; danger?: boolean }) => (
-  <button type="button" onClick={onClick} className={cn("block w-full px-3.5 py-2 text-left text-[13px] hover:bg-white/[0.06]", danger ? "text-danger" : "text-fg")}>
-    {children}
-  </button>
-);
 
 const EmptySlot = ({ onClick }: { onClick: () => void }) => (
   <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-white/[0.03] hover:text-fg-2" aria-label="Занять место">
