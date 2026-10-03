@@ -121,13 +121,6 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
   const items = useMemo(() => (result ? toItems(result) : []), [result]);
   const list = useRef<HTMLDivElement>(null);
 
-  // новые результаты — подсветка с первого
-  const [seen, setSeen] = useState(items);
-  if (seen !== items) {
-    setSeen(items);
-    setActive(0);
-  }
-
   const go = useCallback(
     (href: string) => {
       onClose();
@@ -166,7 +159,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-autocomplete="list"
             aria-label="Поиск игроков, команд и турниров"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -185,7 +178,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           {loading ? (
             <Spinner className="size-4 text-fg-3" />
           ) : q ? (
-            <button type="button" onClick={() => setQ("")} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-white/[0.06] hover:text-fg">
+            <button type="button" onClick={() => { setQ(""); setActive(0); }} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-white/[0.06] hover:text-fg">
               <X className="size-4" />
             </button>
           ) : null}
