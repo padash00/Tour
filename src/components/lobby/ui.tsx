@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../ui";
 
@@ -63,30 +63,41 @@ export function Sheet({
   );
 }
 
-/** Строка настройки: иконка, название, управление справа */
+type RowA11y = { labelId: string; hintId?: string };
+const RowA11yContext = createContext<RowA11y | null>(null);
+
+/** Строка настройки: видимая подпись программно связана с control справа. */
 export function Row({ icon, label, badge, children, hint }: { icon?: ReactNode; label: ReactNode; badge?: ReactNode; children: ReactNode; hint?: ReactNode }) {
+  const id = useId();
+  const labelId = `${id}-label`;
+  const hintId = hint ? `${id}-hint` : undefined;
   return (
-    <div className="flex min-h-[52px] items-center gap-3 rounded-[10px] bg-white/[0.03] px-4 py-2">
-      {icon && <span className="grid size-6 shrink-0 place-items-center text-fg-3">{icon}</span>}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-[14px] text-fg">
-          {label}
-          {badge}
+    <RowA11yContext.Provider value={{ labelId, hintId }}>
+      <div className="flex min-h-[52px] items-center gap-3 rounded-[10px] bg-white/[0.03] px-4 py-2">
+        {icon && <span className="grid size-6 shrink-0 place-items-center text-fg-3" aria-hidden>{icon}</span>}
+        <div className="min-w-0 flex-1">
+          <div id={labelId} className="flex items-center gap-2 text-[14px] text-fg">
+            {label}
+            {badge}
+          </div>
+          {hint && <div id={hintId} className="text-[12px] text-fg-3">{hint}</div>}
         </div>
-        {hint && <div className="text-[12px] text-fg-3">{hint}</div>}
+        <div className="flex shrink-0 items-center gap-2">{children}</div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
-    </div>
+    </RowA11yContext.Provider>
   );
 }
 
 export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange?: (v: boolean) => void; disabled?: boolean; label?: string }) {
+  const a11y = useContext(RowA11yContext);
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-labelledby={label ? undefined : a11y?.labelId}
+      aria-describedby={a11y?.hintId}
       disabled={disabled || !onChange}
       onClick={() => onChange?.(!on)}
       className={cn(
@@ -112,12 +123,15 @@ export function Segments<T extends string | number>({
   onChange?: (v: T) => void;
   disabled?: boolean;
 }) {
+  const a11y = useContext(RowA11yContext);
   return (
-    <div className="flex rounded-[8px] bg-black/30 p-1">
+    <div role="radiogroup" aria-labelledby={a11y?.labelId} aria-describedby={a11y?.hintId} className="flex rounded-[8px] bg-black/30 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
           type="button"
+          role="radio"
+          aria-checked={o.value === value}
           disabled={disabled || !onChange}
           onClick={() => onChange?.(o.value)}
           className={cn(
@@ -143,8 +157,11 @@ export function Choice<T extends string | number>({
   onChange?: (v: T) => void;
   disabled?: boolean;
 }) {
+  const a11y = useContext(RowA11yContext);
   return (
     <select
+      aria-labelledby={a11y?.labelId}
+      aria-describedby={a11y?.hintId}
       value={String(value)}
       disabled={disabled || !onChange}
       onChange={(e) => {
@@ -181,10 +198,13 @@ export function Slider({
   prefix?: string;
 }) {
   const ro = disabled || !onChange;
+  const a11y = useContext(RowA11yContext);
   return (
     <div className="flex items-center gap-3">
       <input
         type="range"
+        aria-labelledby={a11y?.labelId}
+        aria-describedby={a11y?.hintId}
         min={min}
         max={max}
         step={step}
@@ -199,6 +219,8 @@ export function Slider({
         {prefix && <span className="text-[13px] text-fg-3">{prefix}</span>}
         <input
           type="number"
+          aria-labelledby={a11y?.labelId}
+          aria-describedby={a11y?.hintId}
           min={min}
           max={max}
           defaultValue={value}
