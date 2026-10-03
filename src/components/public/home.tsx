@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
-import { bracketLabel, formatDate, tournamentStatusLabel } from "@/lib/format";
+import { ArrowRight } from "lucide-react";
+import { bracketLabel, formatDate } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
-import type { Tournament, TournamentStatus } from "@/lib/types";
-import { IconArrow, cn } from "../ui";
-import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "../primitives";
+import type { Tournament } from "@/lib/types";
+import { Button, Container, Eyebrow, Status, cn, tournamentStatus } from "@/components/ds";
 import { TeamCta } from "./team-cta";
 
 /*
@@ -87,7 +87,7 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
         <div className="absolute inset-0 bg-bg/55 md:bg-transparent" />
       </div>
 
-      <div className={cn(WRAP, "relative pt-[132px] pb-20 md:pt-[168px] md:pb-28 lg:pt-[170px] lg:pb-[96px] lg:min-h-[660px]")}>
+      <Container className="relative pt-[132px] pb-20 md:pt-[168px] md:pb-28 lg:pt-[170px] lg:pb-[96px] lg:min-h-[660px]">
         <div className="max-w-[640px] lg:max-w-[820px]">
           <Eyebrow className="leading-[1.9]">
             Киберспортивная платформа
@@ -104,10 +104,9 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
             развивайтесь и становитесь частью сообщества.
           </p>
           <div className="mt-11 lg:mt-14 flex flex-wrap gap-4 lg:gap-5">
-            <PrimaryBtn href={featured ? `/tournaments/${featured.slug}` : "/tournaments"}>
+            <Button href={featured ? `/tournaments/${featured.slug}` : "/tournaments"} size="lg" iconRight={<ArrowRight />}>
               Посмотреть турнир
-              <IconArrow className="size-[18px]" />
-            </PrimaryBtn>
+            </Button>
             <TeamCta size="lg" />
           </div>
         </div>
@@ -120,18 +119,12 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
           <span>Tournaments</span>
           <span>Community</span>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
 
 // ───────────────────────── ближайший турнир
-
-const statusTone: Partial<Record<TournamentStatus, string>> = {
-  registration: "text-ok border-ok/40 bg-ok/[0.08]",
-  checkin: "text-warn border-warn/40 bg-warn/[0.08]",
-  live: "text-danger border-danger/40 bg-danger/[0.08]",
-};
 
 export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
   const mode = modeOf(t.format);
@@ -173,15 +166,7 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
               </span>
             ))}
           </div>
-          <span
-            className={cn(
-              "inline-flex h-8 lg:h-10 items-center gap-2 rounded-[6px] border px-3 lg:px-4 text-[13px] lg:text-[15px]",
-              statusTone[t.status] ?? "text-fg-2 border-white/15 bg-white/[0.03]",
-            )}
-          >
-            <span className="size-1.5 rounded-full bg-current" />
-            {tournamentStatusLabel[t.status]}
-          </span>
+          <Status info={tournamentStatus[t.status]} />
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2">
@@ -205,11 +190,10 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
         </div>
 
         <div className="flex flex-wrap gap-4">
-          <PrimaryBtn href={`/tournaments/${t.slug}`}>
+          <Button href={`/tournaments/${t.slug}`} size="lg" iconRight={<ArrowRight />}>
             Подробнее о турнире
-            <IconArrow className="size-[18px]" />
-          </PrimaryBtn>
-          {second && <OutlineBtn href={second.href}>{second.label}</OutlineBtn>}
+          </Button>
+          {second && <Button href={second.href} variant="secondary" size="lg">{second.label}</Button>}
         </div>
       </div>
     </div>
@@ -254,10 +238,10 @@ function NextTournaments({ list }: { list: Tournament[] }) {
             <div className="min-w-0 flex-1">
               <div className="text-[15px] font-semibold text-fg truncate">{t.name}</div>
               <div className="mt-1 text-[13px] text-fg-3">
-                {formatDate(t.starts_at)} · {tournamentStatusLabel[t.status]}
+                {formatDate(t.starts_at)} · {tournamentStatus[t.status].label}
               </div>
             </div>
-            <IconArrow className="nudge size-4 text-fg-3 group-hover:text-fg" />
+            <ArrowRight className="size-4 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-fg" aria-hidden />
           </Link>
         ))}
       </div>
@@ -294,13 +278,13 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
     <>
       <Hero featured={featured} />
 
-      <section className={cn(WRAP, "relative")}>
+      <section><Container className="relative">
         <Eyebrow className="mb-5">{featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"}</Eyebrow>
         {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard />}
         <NextTournaments list={upcoming} />
-      </section>
+      </Container></section>
 
-      <section className={cn(WRAP, "pt-16 md:pt-20")}>
+      <section><Container className="pt-16 md:pt-20">
         <Eyebrow className="mb-5 lg:mb-6">Как это работает</Eyebrow>
         <ol className="grid gap-4 md:grid-cols-3">
           {STEPS.map((s) => (
@@ -312,9 +296,9 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
             </li>
           ))}
         </ol>
-      </section>
+      </Container></section>
 
-      <section className={cn(WRAP, "pt-16 md:pt-20")}>
+      <section><Container className="pt-16 md:pt-20">
         <Eyebrow className="mb-8 lg:mb-10">Почему F16 Arena</Eyebrow>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
           {WHY.map((w, i) => (
@@ -325,7 +309,7 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
             </div>
           ))}
         </div>
-      </section>
+      </Container></section>
     </>
   );
 }
