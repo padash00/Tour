@@ -51,8 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         className="pointer-events-none fixed inset-x-4 top-4 z-[120] flex flex-col items-end gap-2.5 sm:inset-x-auto sm:right-6 sm:top-6 sm:w-[380px]"
-        aria-live="polite"
-        role="status"
+        aria-label="Уведомления"
       >
         {items.map((t) => (
           <ToastItem key={t.id} toast={t} onClose={() => dismiss(t.id)} />
@@ -102,6 +101,9 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const tone = TONE[toast.tone];
   return (
     <div
+      role={toast.tone === "error" ? "alert" : "status"}
+      aria-live={toast.tone === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
       className={cn(
         "pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-[10px] border border-white/[0.1]",
         "bg-surface-2/95 py-3.5 pl-4 pr-10 shadow-[var(--shadow-pop)] backdrop-blur-xl animate-[toast-in_.22s_cubic-bezier(.2,.8,.2,1)]",
