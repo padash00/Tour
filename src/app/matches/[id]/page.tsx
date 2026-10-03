@@ -31,7 +31,6 @@ import {
   EmptyState,
   Facts,
   FeatureSurface,
-  Field,
   Panel,
   RowList,
   Section,
@@ -345,9 +344,21 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                   <Panel>
                     <ActionForm action={openDispute}>
                       <input type="hidden" name="matchId" value={m.id} />
-                      <Field label="Что произошло" hint="Укажите раунд, время и игроков. Само обращение не меняет результат.">
-                        {(field) => <Textarea {...field} name="reason" rows={4} required minLength={10} placeholder="Например: 14-й раунд, у игрока X пропал звук…" />}
-                      </Field>
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="dispute-reason" className="text-meta font-medium text-fg-2">Что произошло</label>
+                        <Textarea
+                          id="dispute-reason"
+                          name="reason"
+                          rows={4}
+                          required
+                          minLength={10}
+                          placeholder="Например: 14-й раунд, у игрока X пропал звук…"
+                          aria-describedby="dispute-reason-hint"
+                        />
+                        <p id="dispute-reason-hint" className="text-meta text-fg-3">
+                          Укажите раунд, время и игроков. Само обращение не меняет результат.
+                        </p>
+                      </div>
                       <div className="mt-4">
                         <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
                           Открыть спор
