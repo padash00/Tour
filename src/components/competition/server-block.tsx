@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { mapName } from "@/lib/format";
 import { CopyField } from "../forms";
-import { Button, CriticalSurface, FeatureSurface, Timer, buttonClass } from "@/components/ds";
+import { CriticalSurface, FeatureSurface, Timer, buttonClass } from "@/components/ds";
 
 /** Ссылка подключения Steam — одна на всю страницу */
 export function connectHref(address: string, password: string | null) {
