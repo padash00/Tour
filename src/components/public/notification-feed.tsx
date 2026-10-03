@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Bell, ChevronRight, CircleCheck, Server, ShieldCheck, Swords, Users } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Notification } from "@/lib/types";
-import { cn } from "../ui";
+import { cn } from "@/components/ds";
 
 /*
- * Лента уведомлений: непрочитанные — с акцентной полосой и подсветкой,
- * прочитанные — тише. В полной ленте строки сгруппированы по дням.
+ * Уведомления — строками (не карточками). У строки: иконка и уровень, заголовок, контекст, время, действие, прочитано или нет.
+ * Уровни: срочно (сервер готов, вето) · внимание (check-in) · обычное (команда, заявки, решения). Не всё красное.
  */
 
 const tz = "Asia/Almaty";
@@ -18,8 +20,10 @@ function dayLabel(iso: string, now: Date) {
   return new Date(iso).toLocaleDateString("ru-RU", { timeZone: tz, day: "numeric", month: "long" });
 }
 
-/** Тип уведомления по тексту — для иконки */
-function kind(n: Notification): "server" | "veto" | "team" | "check" | "admin" | "other" {
+type Kind = "server" | "veto" | "check" | "team" | "admin" | "other";
+
+/** Тип уведомления по тексту — для иконки и уровня */
+function kind(n: Notification): Kind {
   const t = `${n.title} ${n.body ?? ""}`.toLowerCase();
   if (t.includes("сервер")) return "server";
   if (t.includes("вето") || t.includes("карт")) return "veto";
@@ -29,45 +33,50 @@ function kind(n: Notification): "server" | "veto" | "team" | "check" | "admin" |
   return "other";
 }
 
-const ICON: Record<ReturnType<typeof kind>, string> = {
-  server: "M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01",
-  veto: "M4 6h16M4 12h16M4 18h10",
-  team: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM3 20c.6-3.4 3-5.2 6-5.2s5.4 1.8 6 5.2M16 4.8a3.3 3.3 0 0 1 0 6.4M18.5 14.8c1.5.7 2.4 2.4 2.8 5",
-  check: "m5 12.5 4.5 4.5L19 7.5",
-  admin: "M12 3 5 6v5.5c0 4.4 3 8.1 7 9.5 4-1.4 7-5.1 7-9.5V6l-7-3Z",
-  other: "M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9ZM10 20a2 2 0 0 0 4 0",
+const KIND: Record<Kind, { icon: ReactNode; level: "urgent" | "attention" | "normal" }> = {
+  server: { icon: <Server />, level: "urgent" },
+  veto: { icon: <Swords />, level: "urgent" },
+  check: { icon: <CircleCheck />, level: "attention" },
+  team: { icon: <Users />, level: "normal" },
+  admin: { icon: <ShieldCheck />, level: "normal" },
+  other: { icon: <Bell />, level: "normal" },
+};
+
+const LEVEL_ICON = {
+  urgent: "bg-ok-dim text-ok border-ok/30",
+  attention: "bg-warn-dim text-warn border-warn/30",
+  normal: "bg-accent-dim text-accent border-accent/25",
 };
 
 export function NotificationItem({ n, compact }: { n: Notification; compact?: boolean }) {
   const unread = !n.read_at;
-  const k = kind(n);
+  const k = KIND[kind(n)];
   const inner = (
-    <div className={cn("relative flex items-start gap-4", compact ? "py-3.5" : "px-5 py-4 lg:px-6")}>
-      {!compact && <span className={cn("absolute inset-y-3 left-0 w-[2px] rounded-full", unread ? "bg-accent" : "bg-transparent")} />}
+    <div className={cn("flex items-start gap-3", compact ? "py-3" : "px-4 py-3.5 sm:px-5")}>
       <span
         className={cn(
-          "mt-0.5 grid size-9 shrink-0 place-items-center rounded-[8px] border",
-          unread ? "border-accent/30 bg-accent/[0.08] text-accent" : "border-white/[0.08] bg-white/[0.02] text-fg-3",
+          "mt-0.5 grid size-9 shrink-0 place-items-center rounded-control border [&>svg]:size-[18px]",
+          unread ? LEVEL_ICON[k.level] : "border-line-subtle bg-white/[0.02] text-fg-3",
         )}
+        aria-hidden
       >
-        <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d={ICON[k]} />
-        </svg>
+        {k.icon}
       </span>
       <div className="min-w-0 flex-1">
-        <div className={cn("text-[15px] leading-snug", unread ? "font-semibold text-fg" : "text-fg-2")}>{n.title}</div>
-        {n.body && <div className="mt-1 text-[14px] leading-relaxed text-fg-3">{n.body}</div>}
+        <div className={cn("text-[14px] leading-snug", unread ? "font-semibold text-fg" : "text-fg-2")}>{n.title}</div>
+        {n.body && <div className={cn("mt-0.5 text-meta leading-relaxed text-fg-3", compact && "line-clamp-2")}>{n.body}</div>}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-2 pt-0.5">
-        <span className="num text-[12px] text-fg-3">{time(n.created_at)}</span>
+      <div className="flex shrink-0 items-center gap-2 pt-0.5">
+        <span className="num text-micro text-fg-3">{time(n.created_at)}</span>
         {unread && <span className="size-2 rounded-full bg-accent" aria-label="Не прочитано" />}
+        {n.link && !compact && <ChevronRight className="size-4 text-fg-4" aria-hidden />}
       </div>
     </div>
   );
   const cls = cn(
-    "block border-b border-white/[0.05] last:border-0",
+    "block",
     !compact && unread && "bg-accent/[0.03]",
-    n.link && "transition-colors duration-150 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60",
+    n.link && "transition-colors duration-[var(--dur-hover)] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60",
   );
   return n.link ? (
     <Link href={n.link} className={cls}>
@@ -78,7 +87,7 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
   );
 }
 
-/** Полная лента с разбивкой по дням */
+/** Полная лента: группы по дням, в группе — список строк с разделителями */
 export function NotificationFeed({ items, now }: { items: Notification[]; now: Date }) {
   const groups: { label: string; items: Notification[] }[] = [];
   for (const n of items) {
@@ -90,9 +99,9 @@ export function NotificationFeed({ items, now }: { items: Notification[]; now: D
   return (
     <div className="space-y-8">
       {groups.map((g) => (
-        <section key={g.label}>
-          <div className="mb-3 text-[12px] font-medium uppercase tracking-[0.2em] text-fg-3">{g.label}</div>
-          <div className="overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80">
+        <section key={g.label} aria-label={g.label}>
+          <h2 className="mb-3 text-meta font-medium text-fg-2">{g.label}</h2>
+          <div className="divide-y divide-line-subtle overflow-hidden rounded-surface border border-line-subtle bg-surface">
             {g.items.map((n) => (
               <NotificationItem key={n.id} n={n} />
             ))}
