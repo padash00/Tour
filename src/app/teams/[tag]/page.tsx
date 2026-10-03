@@ -149,7 +149,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
         className="mt-8 border-y border-line-subtle py-6"
         items={[
           { label: "Игроков", value: <span className="num">{members.length}</span> },
-          { label: "Средний FACEIT ELO", value: <span className="num">{averageElo(members) ?? "—"}</span> },
+          { label: "Средний ELO основы", value: <span className="num">{averageElo(mains) ?? "—"}</span> },
           { label: "F16 Rating", value: <span className={cn("num", teamRating ? ratingColor(teamRating) : "text-fg-3")}>{teamRating ? teamRating.toFixed(2) : "—"}</span> },
           { label: "Турниров", value: <span className="num">{participations.length}</span> },
         ]}

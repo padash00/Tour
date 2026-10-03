@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { updateTeam } from "@/app/actions/team";
 import { requirePlayer } from "@/lib/auth";
-import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamMembers } from "@/lib/data";
+import { MAX_MAIN, MAX_SUBS, getActiveMembership, getLockingTournament, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
 import { siteOrigin } from "@/lib/origin";
-import { DangerZone } from "@/components/team/danger-zone";
+import { DangerZone, type DangerBlock } from "@/components/team/danger-zone";
 import { InviteButton } from "@/components/team/invite";
 import { TeamEditor } from "@/components/team/team-editor";
 import { TeamHeader } from "@/components/team/team-header";
@@ -18,8 +18,24 @@ export default async function TeamSettingsPage() {
   if (!membership) redirect("/team");
   const { team } = membership;
   const isCaptain = team.captain_id === player.id;
-  const [members, origin] = await Promise.all([getTeamMembers(team.id), siteOrigin()]);
+  const [members, origin, locked, regs] = await Promise.all([getTeamMembers(team.id), siteOrigin(), getLockingTournament(team.id), getTeamRegistrations(team.id)]);
   const mains = members.filter((m) => m.role !== "substitute").length;
+
+  // те же условия, что проверяют leaveTeam / disbandTeam на сервере — причина видна до клика
+  const activeReg = regs.find((r) => isActiveRegistration(r) && !["finished", "cancelled"].includes(r.tournament.status));
+  let blocked: DangerBlock | null = null;
+  if (isCaptain && activeReg) {
+    const open = activeReg.tournament.status === "registration";
+    blocked = {
+      title: `Команда участвует в «${activeReg.tournament.name}»`,
+      text: open
+        ? "Чтобы распустить команду, сначала отзовите заявку на турнир."
+        : "Регистрация уже закрыта — отозвать заявку можно только через администратора. Распустить команду можно после турнира.",
+      link: open ? { href: `/tournaments/${activeReg.tournament.slug}`, label: "Открыть турнир и отозвать заявку" } : undefined,
+    };
+  } else if (!isCaptain && locked) {
+    blocked = { title: `Состав заблокирован турниром «${locked.name}»`, text: "Покинуть команду можно после окончания блокировки." };
+  }
 
   return (
     <Container>
@@ -47,7 +63,7 @@ export default async function TeamSettingsPage() {
         ) : (
           <p className="text-[14px] text-fg-2">Название, логотип и приглашения меняет капитан команды.</p>
         )}
-        <DangerZone isCaptain={isCaptain} teamName={team.name} />
+        <DangerZone isCaptain={isCaptain} teamName={team.name} blocked={blocked} />
       </Stack>
     </Container>
   );

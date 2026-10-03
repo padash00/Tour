@@ -263,6 +263,9 @@ export async function transferCaptain(_prev: ActionResult, formData: FormData): 
   if (!ctx) return { error: NOT_CAPTAIN };
   const { player, team } = ctx;
   const memberId = String(formData.get("memberId"));
+  // капитан управляет check-in и заявками — пока состав заблокирован турниром, менять его нельзя
+  const locked = await lockedError(team.id);
+  if (locked) return { error: locked };
   const members = await getTeamMembers(team.id);
   const target = members.find((m) => m.id === memberId);
   const me = members.find((m) => m.player_id === player.id);

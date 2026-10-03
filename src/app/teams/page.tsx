@@ -14,6 +14,8 @@ export const revalidate = 30;
 
 const plural = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "команда" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "команды" : "команд");
 
+const playersWord = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "игрока" : "игроков");
+
 export default async function TeamsPage() {
   const teams = await listTeams();
 
@@ -44,7 +46,7 @@ export default async function TeamsPage() {
                 <span>Команда</span>
                 <span>Регион</span>
                 <span className="text-right">Игроки</span>
-                <span className="text-right">Avg ELO</span>
+                <span className="text-right">ELO основы</span>
                 <span />
               </div>
               <div className="divide-y divide-line-subtle">
@@ -65,7 +67,7 @@ export default async function TeamsPage() {
                     <span className="hidden truncate text-[14px] text-fg-2 sm:block">{t.region ?? "—"}</span>
                     <span className="num text-right text-[14px] text-fg-2">
                       {t.member_count}
-                      <span className="text-fg-3 sm:hidden"> игр.</span>
+                      <span className="text-fg-3 sm:hidden"> {playersWord(t.member_count)}</span>
                     </span>
                     <span className="num hidden text-right text-[14px] text-fg-2 sm:block">{t.avg_elo ?? "—"}</span>
                     <ChevronRight className="hidden size-4 text-fg-4 group-hover:text-fg-2 sm:block" aria-hidden />

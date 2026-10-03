@@ -74,14 +74,15 @@ export type TeamListItem = Team & { member_count: number; avg_elo: number | null
 export async function listTeams(): Promise<TeamListItem[]> {
   const { data } = await db()
     .from("teams")
-    .select("*, team_members(left_at, player:players(faceit_elo))")
+    .select("*, team_members(left_at, role, player:players(faceit_elo))")
     .is("disbanded_at", null)
     .eq("is_solo", false)
     .order("created_at", { ascending: false });
-  type Row = Team & { team_members: { left_at: string | null; player: { faceit_elo: number | null } }[] };
+  type Row = Team & { team_members: { left_at: string | null; role: string; player: { faceit_elo: number | null } }[] };
   return ((data ?? []) as Row[]).map(({ team_members, ...team }) => {
     const active = team_members.filter((m) => !m.left_at);
-    const elos = active.map((m) => m.player.faceit_elo).filter((e): e is number => e != null);
+    // средний ELO основы: капитан и игроки, без запасных
+    const elos = active.filter((m) => m.role !== "substitute").map((m) => m.player.faceit_elo).filter((e): e is number => e != null);
     return {
       ...team,
       member_count: active.length,

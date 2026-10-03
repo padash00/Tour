@@ -138,7 +138,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                   <StatusRow label="Основной состав" value={`${mains} из ${MAX_MAIN}`} status={ready ? { label: "Готово", tone: "ok" } : { label: `Нужно ещё ${MAX_MAIN - mains}`, tone: "warn" }} />
                   <StatusRow label="Запасные" value={`${subs} из ${MAX_SUBS}`} />
                   <StatusRow label="Капитан" value={captain?.player.nickname ?? "—"} />
-                  <StatusRow label="Средний FACEIT ELO" value={averageElo(members) ?? "—"} />
+                  <StatusRow label="Средний ELO основы" value={averageElo(members.filter((m) => m.role !== "substitute")) ?? "—"} />
                   <StatusRow
                     label="Турнир"
                     value={current ? <Link href={`/tournaments/${current.tournament.slug}`} className="hover:text-accent">{current.tournament.name}</Link> : "Нет активной заявки"}
