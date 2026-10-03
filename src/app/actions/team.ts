@@ -102,7 +102,8 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
   // если логотип не подошёл — команда всё равно создана, логотип можно загрузить в настройках
 
   await audit(player.id, "team.create", { type: "team", id: team.id }, { name, tag });
-  redirect("/team");
+  // экран успеха в штабе: «Команда создана — пригласите игроков»
+  redirect("/team?created=1");
 }
 
 const NOT_CAPTAIN = "Только капитан может это сделать";
@@ -297,4 +298,17 @@ export async function disbandTeam(): Promise<ActionResult> {
   );
   await audit(player.id, "team.disband", { type: "team", id: team.id });
   redirect("/me");
+}
+
+/**
+ * Свободен ли тег — для подсказки в форме (живая проверка при вводе). Только чтение.
+ * Главная проверка остаётся при сохранении (уникальный индекс в базе).
+ */
+export async function checkTagAvailable(raw: string, exceptTeamId?: string): Promise<{ ok: boolean; reason?: string }> {
+  const tag = raw.trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,6}$/.test(tag)) return { ok: false, reason: "Тег — 2–6 латинских букв или цифр" };
+  let q = db().from("teams").select("id").eq("tag", tag).is("disbanded_at", null).limit(1);
+  if (exceptTeamId) q = q.neq("id", exceptTeamId);
+  const { data } = await q;
+  return data?.length ? { ok: false, reason: "Тег уже используется" } : { ok: true };
 }

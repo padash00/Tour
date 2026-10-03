@@ -108,7 +108,7 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
               Посмотреть турнир
               <IconArrow className="size-[18px]" />
             </PrimaryBtn>
-            <TeamCta />
+            <TeamCta size="lg" />
           </div>
         </div>
 
@@ -233,7 +233,7 @@ function NoTournamentCard() {
           Первый турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
         </p>
         <div className="flex flex-wrap gap-4">
-          <TeamCta />
+          <TeamCta size="lg" />
         </div>
       </div>
     </div>

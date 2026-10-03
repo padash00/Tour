@@ -5,7 +5,9 @@ import { getActiveMembership } from "@/lib/data";
 import { FINDER_MODES, FINDER_ROLES, getOwnPost, listFinderPosts } from "@/lib/finder";
 import { PlayerPostCard, PostForm, TeamPostCard } from "@/components/public/finder";
 import { Tabs } from "@/components/ui";
-import { Button, EmptyCard, PageHero, Wrap } from "@/components/primitives";
+import { Button, EmptyCard, Wrap } from "@/components/primitives";
+import { Container, PageTitle } from "@/components/ds";
+import { TeamsNav } from "@/components/team/teams-nav";
 
 export const metadata: Metadata = { title: "Поиск команды" };
 
@@ -44,18 +46,24 @@ export default async function FindPage(props: PageProps<"/find">) {
 
   return (
     <>
-      <PageHero
-        eyebrow="Сообщество F16 Arena"
-        title="Поиск команды"
-        lead="Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, отклик и приглашение приходят уведомлением."
-        actions={
-          !player ? (
-            <Button href={`/login?next=${encodeURIComponent(base(tab))}`} size="lg">
+      <Container className="pt-8 sm:pt-10">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <PageTitle>Поиск команды</PageTitle>
+            <p className="mt-1 max-w-read text-meta text-fg-3">
+              Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, отклик и приглашение приходят уведомлением.
+            </p>
+          </div>
+          {!player && (
+            <Button href={`/login?next=${encodeURIComponent(base(tab))}`} size="md">
               Войти, чтобы разместить объявление
             </Button>
-          ) : undefined
-        }
-      />
+          )}
+        </header>
+        <div className="mt-6">
+          <TeamsNav />
+        </div>
+      </Container>
       <Wrap className="pt-8">
         <Tabs
           active={tab}
@@ -149,7 +157,7 @@ export default async function FindPage(props: PageProps<"/find">) {
             )}
           </div>
 
-          <aside className="lg:sticky lg:top-28">
+          <aside className="lg:sticky lg:top-[calc(var(--shell-h)+24px)]">
             {form ?? (
               <EmptyCard
                 title={tab === "players" ? (player ? "Вы уже в команде" : "Ищете команду?") : isCaptain ? "Команда не подходит" : "Ищете игроков?"}
