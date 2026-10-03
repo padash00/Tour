@@ -363,7 +363,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     { key: "veto", node: vetoHistory },
     { key: "rosters", node: rostersBlock },
     { key: "dispute", node: disputeBlock },
-  ].filter((band): band is { key: string; node: ReactNode } => Boolean(band.node));
+  ].filter((band) => Boolean(band.node));
 
   return (
     <>
