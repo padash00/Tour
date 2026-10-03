@@ -22,7 +22,7 @@ export function ListSkeleton({ rows = 8, title = true }: { rows?: number; title?
     <>
       {title && <HeroSkeleton />}
       <Container className="pt-8 sm:pt-10">
-        <Panel padded={false} className="divide-y divide-line-subtle" aria-busy="true">
+        <Panel padded={false} className="divide-y divide-line-subtle">
           {Array.from({ length: rows }, (_, i) => (
             <div key={i} className="flex items-center gap-4 px-4 py-4 sm:px-5">
               <Skeleton className="size-9 rounded-full" />
