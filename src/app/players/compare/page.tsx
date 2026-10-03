@@ -7,8 +7,10 @@ import { db } from "@/lib/supabase";
 import type { Player } from "@/lib/types";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { fmt, weaponName } from "@/components/stats-format";
-import { CARD, EmptyCard, Eyebrow, WRAP } from "@/components/primitives";
-import { Avatar, cn } from "@/components/ui";
+import { Avatar, EmptyState, Eyebrow, cn } from "@/components/ds";
+
+const WRAP = "mx-auto w-full max-w-wide px-4 sm:px-6 lg:px-8";
+const CARD = "rounded-surface border border-line-subtle bg-surface";
 
 export const metadata: Metadata = { title: "Сравнение игроков" };
 
@@ -69,7 +71,7 @@ function Row({ m }: { m: Metric }) {
   const total = av + bv;
   const share = total > 0 && m.a != null && m.b != null ? (m.lowerBetter ? bv / total : av / total) : 0.5;
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-6 py-3.5 border-b border-white/[0.05] last:border-0">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 px-4 sm:px-6 py-3.5 border-b border-line-subtle last:border-0">
       {cell(m.a, aWins)}
       <div className="w-[96px] sm:w-[140px] text-center">
         <div className="text-[12px] sm:text-[13px] text-fg-3">{m.label}</div>
@@ -88,7 +90,7 @@ function Head({ s, align, picker }: { s: Side; align: "left" | "right"; picker: 
     <div className={cn("flex min-w-0 flex-col gap-3", align === "right" ? "items-start text-left" : "items-end text-right")}>
       <Link href={`/players/${s.player.steam_id}`} className={cn("group flex min-w-0 items-center gap-3", align === "left" && "flex-row-reverse")}>
         <span className={cn("rounded-full p-[3px]", align === "left" ? "bg-accent/40" : "bg-warn/40")}>
-          <Avatar src={s.player.avatar_url} name={s.player.nickname} size={64} />
+          <Avatar src={s.player.avatar_url} name={s.player.nickname} size="lg" />
         </span>
         <span className="min-w-0 break-words text-[18px] sm:text-[26px] font-semibold leading-tight group-hover:text-accent-strong">{s.player.nickname}</span>
       </Link>
@@ -121,7 +123,7 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
             <ComparePicker self={base.player.steam_id} players={players} label="Выбрать игрока" />
           </div>
         ) : (
-          <EmptyCard dashed title="Выберите двух игроков" text="Откройте профиль игрока и нажмите «Сравнить с игроком»." />
+          <EmptyState title="Выберите двух игроков" text="Откройте профиль игрока и нажмите «Сравнить с игроком»." />
         )}
       </div>
     );
@@ -174,7 +176,7 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
       )}
 
       {!A && !B ? (
-        <EmptyCard dashed title="Статистики пока нет" text="Она появится, когда игроки сыграют матчи на серверах F16 Arena." />
+        <EmptyState title="Статистики пока нет" text="Она появится, когда игроки сыграют матчи на серверах F16 Arena." />
       ) : (
         <div className={cn(CARD, "overflow-hidden")}>
           {metrics.map((m) => (
