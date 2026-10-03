@@ -64,10 +64,10 @@ export function MatchHero({
           ))}
         </div>
 
-        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-8 lg:gap-12">
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-8 lg:gap-12">
           <TeamSide team={m.team1} align="left" winner={finished && m.winner_id === m.team1_id} dim={finished && !!m.winner_id && m.winner_id !== m.team1_id} />
 
-          <div className="min-w-[74px] text-center sm:min-w-[120px]">
+          <div className="min-w-[58px] text-center sm:min-w-[120px]">
             {finished || live ? (
               <Score
                 a={m.team1_score}
@@ -95,13 +95,13 @@ export function MatchHero({
 
 function TeamSide({ team, align, winner, dim }: { team: Team | null; align: "left" | "right"; winner: boolean; dim: boolean }) {
   return (
-    <div className={cn("flex min-w-0 items-center gap-3 sm:gap-4", align === "right" && "flex-row-reverse text-right")}>
-      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="lg" /> : <span className="size-14 shrink-0 rounded-surface border border-dashed border-line bg-surface-2" />}
+    <div className={cn("flex min-w-0 items-center gap-2 sm:gap-4", align === "right" && "flex-row-reverse text-right")}>
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="lg" className="max-sm:!size-10" /> : <span className="size-10 shrink-0 rounded-surface border border-dashed border-line bg-surface-2 sm:size-14" />}
       <div className="min-w-0">
         {team ? (
           <Link
             href={`/teams/${encodeURIComponent(team.tag)}`}
-            className={cn("block truncate text-[16px] font-semibold text-fg hover:text-accent sm:text-title", dim && "text-fg-3")}
+            className={cn("block truncate text-[13px] font-semibold text-fg hover:text-accent min-[380px]:text-[14px] sm:text-title", dim && "text-fg-3")}
           >
             {team.name}
           </Link>
