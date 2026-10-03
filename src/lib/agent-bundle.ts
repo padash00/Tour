@@ -12,7 +12,7 @@ import path from "node:path";
  *   cfg/**                                            → D:\cs2server\f16\cfg\ и game\csgo\cfg\
  */
 const ROOT = path.join(process.cwd(), "server");
-const INCLUDE = [/^agent\/[\w-]+\.mjs$/, /^start\.ps1$/, /^install\.ps1$/, /^instances\.csv$/, /^cfg\/.+\.(cfg|json)$/];
+const INCLUDE = [/^agent\/[\w-]+\.mjs$/, /^start\.ps1$/, /^install\.ps1$/, /^service\.ps1$/, /^instances\.csv$/, /^cfg\/.+\.(cfg|json)$/];
 
 function walk(dir: string, base = ""): string[] {
   return readdirSync(dir).flatMap((name) => {
