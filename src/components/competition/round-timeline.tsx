@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { mapName } from "@/lib/format";
 import { HOW_LABEL, type KillLine, type MapRounds, type RoundHow } from "@/lib/rounds";
 import { weaponName } from "../stats-format";
-import { cn } from "../ui";
+import { cn } from "@/components/ds";
 
 /*
  * Лента раундов: фишка на каждый раунд — цвет команды-победителя, значок — как закончился.
@@ -68,13 +68,13 @@ export function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds;
     <div className={cn("flex flex-wrap items-center", tv ? "gap-[0.35vw]" : "gap-1")}>
       {map.rounds.map((r) => (
         <Fragment key={r.n}>
-          {r.switched && <span aria-hidden className={cn("self-stretch bg-white/[0.18]", tv ? "mx-[0.4vw] w-[0.15vw]" : "mx-1 w-px")} title="Смена сторон" />}
+          {r.switched && <span aria-hidden className={cn("self-stretch bg-line-strong", tv ? "mx-[0.4vw] w-[0.15vw]" : "mx-1 w-px")} title="Смена сторон" />}
           <span
             title={`Раунд ${r.n}${r.winner ? ` · ${r.winner === 1 ? team1 : team2}` : ""} · ${HOW_LABEL[r.how]}`}
             className={cn(
               "grid place-items-center rounded-[4px] num font-semibold transition-colors",
               tv ? "h-[3.2vh] w-[1.9vw] text-[0.85vw]" : "h-7 w-[26px] text-[10px]",
-              r.winner ? TEAM_BG[r.winner] : "bg-white/[0.08] text-fg-3",
+              r.winner ? TEAM_BG[r.winner] : "bg-surface-3 text-fg-3",
             )}
           >
             <HowIcon how={r.how} className={tv ? "size-[1vw]" : undefined} />
@@ -88,7 +88,7 @@ export function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds;
 function KillFeed({ kills, round }: { kills: KillLine[]; round: number | null }) {
   if (!kills.length) return null;
   return (
-    <div className="rounded-[10px] border border-white/[0.06] bg-black/20 p-4">
+    <div className="rounded-control border border-line-subtle bg-shell p-4">
       <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">Убийства раунда {round}</div>
       <ul className="space-y-1.5">
         {kills.map((k, i) => (
@@ -101,7 +101,7 @@ function KillFeed({ kills, round }: { kills: KillLine[]; round: number | null })
             ) : (
               <>
                 <span className={cn("font-medium", k.killerTeam ? TEAM_TEXT[k.killerTeam] : "text-fg")}>{k.killer}</span>
-                <span className="rounded-[4px] bg-white/[0.06] px-1.5 py-px text-[11px] text-fg-2">
+                <span className="rounded-tiny bg-surface-3 px-1.5 py-px text-[11px] text-fg-2">
                   {weaponName(k.weapon)}
                   {k.hs && <span className="ml-1 text-danger">HS</span>}
                 </span>
@@ -136,7 +136,7 @@ export function RoundTimeline({
   return (
     <div className="space-y-5">
       <Legend team1={team1} team2={team2} />
-      <div className="divide-y divide-white/[0.06] rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80">
+      <div className="divide-y divide-line-subtle rounded-surface border border-line-subtle bg-surface">
         {[...shown].reverse().map((m) => {
           const won1 = m.rounds.filter((r) => r.winner === 1).length;
           const won2 = m.rounds.filter((r) => r.winner === 2).length;
