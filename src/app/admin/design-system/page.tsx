@@ -64,7 +64,7 @@ import {
 } from "@/components/ds";
 import type { MatchStatus, RegistrationStatus, TournamentStatus } from "@/lib/types";
 import { MatchListRow } from "@/components/match-row";
-import { ActivityDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
+import { ActivityDemo, ParticipationDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
 
 export const metadata: Metadata = { title: "Дизайн-система — F16 Control" };
 
@@ -529,51 +529,8 @@ export default async function DesignSystemPage() {
             </div>
           </Section>
 
-          <Section title="Участие в турнире" description="Панель участия меняется по состоянию игрока — всегда с ответом «что дальше».">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Panel>
-                <Label>Гость</Label>
-                <p className="mt-2 text-[14px] text-fg-2">12 из 16 команд</p>
-                <Button className="mt-4" block icon={<SteamMark />}>
-                  Войти через Steam
-                </Button>
-              </Panel>
-              <Panel>
-                <Label>Нет команды</Label>
-                <p className="mt-2 text-[14px] text-fg-2">Для участия нужна команда.</p>
-                <Button className="mt-4" block>
-                  Создать команду
-                </Button>
-                <Button variant="quiet" size="sm" className="mt-3">
-                  Найти команду →
-                </Button>
-              </Panel>
-              <CriticalSurface tone="warn">
-                <Label>Состав неполный</Label>
-                <p className="mt-2 text-[14px] text-fg-2">Next Level · 3 из 5. Нужно ещё 2 игрока.</p>
-                <Button className="mt-4" variant="secondary" block>
-                  Открыть команду
-                </Button>
-              </CriticalSurface>
-              <Panel>
-                <div className="flex items-center justify-between">
-                  <Label>Заявка</Label>
-                  <Status info={registrationStatus.pending} size="sm" />
-                </div>
-                <p className="mt-2 text-[14px] text-fg-2">Отправлена 3 октября. Администратор рассмотрит её до check-in.</p>
-              </Panel>
-              <CriticalSurface tone="ok">
-                <div className="font-semibold text-fg">Вы участвуете</div>
-                <p className="mt-1 text-[14px] text-fg-2">Дальше: check-in 10 октября, 10:00–10:45.</p>
-              </CriticalSurface>
-              <CriticalSurface tone="accent">
-                <div className="font-semibold text-fg">Check-in открыт</div>
-                <p className="mt-1 text-[14px] text-fg-2">Капитан подтверждает участие команды.</p>
-                <Button className="mt-4" block>
-                  Пройти check-in
-                </Button>
-              </CriticalSurface>
-            </div>
+          <Section title="Участие в турнире" description="ParticipationPanel — живой компонент страницы турнира: статус участника отдельно от статуса турнира, одно главное действие.">
+            <ParticipationDemo />
           </Section>
 
           <Section title="Лобби: слоты" description="Человек, бот и пустое место различаются с первого взгляда, не только цветом.">

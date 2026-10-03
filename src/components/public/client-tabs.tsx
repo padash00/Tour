@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { cn } from "../ui";
+import { cn } from "@/components/ds";
 
 /**
  * Вкладки без запроса к серверу: все панели уже в HTML (страница из кэша CDN),
  * переключение мгновенное. Панели — элементы с data-tab="<key>" внутри [data-tabs-scope={scope}].
  * Активная вкладка хранится в ?tab= (ссылки на вкладки продолжают работать).
+ * Выглядит как ContextNav (F16 DS); sticky — прилипает под оболочкой сайта (--shell-h).
  */
 export function ClientTabs({
   scope,
@@ -14,12 +15,14 @@ export function ClientTabs({
   defaultKey,
   param = "tab",
   aside,
+  sticky,
 }: {
   scope: string;
   items: { key: string; label: ReactNode }[];
   defaultKey: string;
   param?: string;
   aside?: ReactNode;
+  sticky?: boolean;
 }) {
   const [active, setActive] = useState(defaultKey);
 
@@ -54,31 +57,27 @@ export function ClientTabs({
   };
 
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line">
-      <div role="tablist" className="flex gap-7 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={t.key === active}
-            onClick={() => select(t.key)}
-            className={cn(
-              "relative h-12 inline-flex items-center whitespace-nowrap text-[15px] font-medium transition-colors duration-150",
-              t.key === active ? "text-fg" : "text-fg-3 hover:text-fg-2",
-            )}
-          >
-            {t.label}
-            <span
+    <div className={cn("border-b border-line-subtle", sticky && "sticky top-[var(--shell-h)] z-30 bg-bg/90 backdrop-blur-md")}>
+      <div className="flex items-end justify-between gap-4">
+        <div role="tablist" className="-mb-px flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {items.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={t.key === active}
+              onClick={() => select(t.key)}
               className={cn(
-                "absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent transition-[opacity,transform] duration-200",
-                t.key === active ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50",
+                "inline-flex h-12 shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-[14px] font-medium transition-colors duration-[var(--dur-hover)]",
+                t.key === active ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
               )}
-            />
-          </button>
-        ))}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {aside}
       </div>
-      {aside}
     </div>
   );
 }

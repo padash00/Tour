@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/components/toast";
 import { ActivityPill } from "@/components/shell/activity";
 import type { Activity } from "@/lib/activity";
+import { ParticipationPanel, type TournamentLite, type TournamentMe } from "@/components/competition/tournament-viewer";
 
 /** Поля во всех состояниях + живая проверка тега (имитация: «F16», «NAVI» заняты) */
 export function FieldsDemo() {
@@ -288,6 +289,48 @@ export function ActivityDemo() {
         <div key={x.a.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <span className="text-meta text-fg-3">{x.note}</span>
           <ActivityPill activity={x.a} more={x.more} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Панель участия турнира — все состояния участника (без запросов) */
+export function ParticipationDemo() {
+  const t = (status: TournamentLite["status"]): TournamentLite => ({
+    id: "demo",
+    slug: "f16-open-01",
+    name: "F16 Open #01",
+    status,
+    format: "5v5",
+    max_teams: 16,
+    registration_closes_at: "2026-10-09T18:00:00Z",
+    checkin_opens_at: "2026-10-10T05:00:00Z",
+    checkin_closes_at: "2026-10-10T05:45:00Z",
+  });
+  const team = (mains: number) => ({ id: "x", name: "Next Level", captain_id: "c", mains, solo: false });
+  const reg = (status: "pending" | "approved" | "rejected", checked = false, note: string | null = null) => ({ status, checked_in_at: checked ? "2026-10-10T05:10:00Z" : null, note, created_at: "2026-10-03T12:00:00Z" });
+  const me = (o: Partial<TournamentMe>): TournamentMe => ({ loggedIn: true, isAdmin: false, team: null, isCaptain: true, reg: null, ...o });
+  const cases: { note: string; t: TournamentLite; me: TournamentMe }[] = [
+    { note: "Гость", t: t("registration"), me: { loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null } },
+    { note: "Нет команды", t: t("registration"), me: me({}) },
+    { note: "Состав неполный", t: t("registration"), me: me({ team: team(3) }) },
+    { note: "Команда готова (капитан)", t: t("registration"), me: me({ team: team(5) }) },
+    { note: "Команда готова (игрок)", t: t("registration"), me: me({ team: team(5), isCaptain: false }) },
+    { note: "Заявка на рассмотрении", t: t("registration"), me: me({ team: team(5), reg: reg("pending") }) },
+    { note: "Заявка одобрена → check-in", t: t("registration_closed"), me: me({ team: team(5), reg: reg("approved") }) },
+    { note: "Заявка отклонена", t: t("registration"), me: me({ team: team(5), reg: reg("rejected", false, "Игрок ALTX_F4 заявлен за другую команду") }) },
+    { note: "Check-in открыт", t: t("checkin"), me: me({ team: team(5), reg: reg("approved") }) },
+    { note: "Check-in пройден", t: t("checkin"), me: me({ team: team(5), reg: reg("approved", true) }) },
+    { note: "Турнир идёт (участник)", t: t("live"), me: me({ team: team(5), reg: reg("approved", true) }) },
+    { note: "Регистрация закрыта (не участник)", t: t("registration_closed"), me: me({ team: team(5) }) },
+  ];
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {cases.map((c) => (
+        <div key={c.note}>
+          <div className="mb-2 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{c.note}</div>
+          <ParticipationPanel t={c.t} approvedCount={11} preview={c.me} />
         </div>
       ))}
     </div>

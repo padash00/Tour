@@ -1,9 +1,9 @@
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { Tournament } from "@/lib/types";
-import { cn } from "../ui";
+import { cn } from "@/components/ds";
 
 /*
- * Жизненный цикл турнира: Регистрация → Check-in → Сетка → Финал.
+ * Жизненный цикл турнира (статус турнира, не участника): Регистрация → Check-in → Сетка → Финал.
  * Текущий этап подсвечен, под каждым — даты из базы.
  */
 
@@ -52,17 +52,14 @@ export function TournamentLifecycle({ t }: { t: Tournament }) {
   const steps = [
     {
       label: "Регистрация",
-      date:
-        t.registration_opens_at || t.registration_closes_at
-          ? `${formatDate(t.registration_opens_at)} — ${formatDate(t.registration_closes_at)}`
-          : "даты уточняются",
+      date: t.registration_opens_at || t.registration_closes_at ? `${formatDate(t.registration_opens_at)} — ${formatDate(t.registration_closes_at)}` : "даты уточняются",
     },
     { label: "Check-in", date: t.checkin_opens_at ? formatDateTime(t.checkin_opens_at) : "перед стартом" },
     { label: "Сетка", date: t.starts_at ? formatDateTime(t.starts_at) : "после check-in" },
     { label: "Финал", date: t.status === "finished" ? "сыгран" : "в конце турнира" },
   ];
   return (
-    <ol className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4" aria-label="Этапы турнира">
+    <ol className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4" aria-label="Этапы турнира">
       {steps.map((s, i) => {
         const done = i < idx;
         const now = i === Math.floor(idx) && idx % 1 === 0 && t.status !== "finished";
@@ -70,23 +67,14 @@ export function TournamentLifecycle({ t }: { t: Tournament }) {
         return (
           <li key={s.label} aria-current={now ? "step" : undefined} className="min-w-0">
             <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  done ? "w-full bg-accent/70" : now ? (live ? "w-1/2 animate-pulse bg-live" : "w-1/2 animate-pulse bg-accent") : "w-0",
-                )}
-              />
+              <div className={cn("h-full rounded-full", done ? "w-full bg-accent/60" : now ? (live ? "w-1/2 animate-pulse bg-live" : "w-1/2 animate-pulse bg-accent") : "w-0")} />
             </div>
-            <div
-              className={cn(
-                "mt-3 flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.2em]",
-                now ? (live ? "text-live" : "text-fg") : done ? "text-fg-2" : "text-fg-4",
-              )}
-            >
-              <span className="num normal-case tracking-normal text-fg-4">0{i + 1}</span>
+            <div className={cn("mt-2.5 flex items-center gap-2 text-meta font-medium", now ? (live ? "text-live" : "text-fg") : done ? "text-fg-2" : "text-fg-3")}>
+              <span className="num text-micro text-fg-4">0{i + 1}</span>
               {s.label}
+              {now && <span className="sr-only">— сейчас</span>}
             </div>
-            <div className={cn("mt-1 truncate text-[13px]", now ? "text-fg-2" : "text-fg-3")}>{s.date}</div>
+            <div className={cn("mt-0.5 truncate text-micro", now ? "text-fg-2" : "text-fg-3")}>{s.date}</div>
           </li>
         );
       })}

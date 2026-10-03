@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { Check, CircleAlert, Circle } from "lucide-react";
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { formatDateTime, registrationStatusLabel } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
+import { modeOf } from "@/lib/modes";
 import type { RegistrationStatus, TournamentStatus } from "@/lib/types";
-import { Button, Eyebrow, OutlineBtn, PrimaryBtn, StatusChip } from "../primitives";
-import { Callout, MobileStickyCta } from "../public/callout";
-import { IconArrow } from "../ui";
+import { Button, Skeleton, Status, cn, registrationStatus } from "@/components/ds";
+import { MobileStickyCta } from "../public/callout";
 
 /*
  * Персональные части страницы турнира. Сама страница отдаётся из кэша CDN одинаковой для всех,
- * а «моё участие» (кнопка, статус заявки, check-in) подгружается отсюда: /api/tournaments/[id]/me.
+ * а «моё участие» (панель, кнопка, требования) подгружается отсюда: /api/tournaments/[id]/me.
+ * Статус турнира и статус участника — разные вещи: панель показывает участника, шапка — турнир.
  */
 
 export type TournamentLite = {
@@ -21,33 +23,33 @@ export type TournamentLite = {
   format: string;
   max_teams: number;
   registration_closes_at: string | null;
+  checkin_opens_at: string | null;
+  checkin_closes_at: string | null;
 };
 
-type TournamentMe = {
+export type TournamentMe = {
   loggedIn: boolean;
   isAdmin: boolean;
-  team: { id: string; name: string; captain_id: string } | null;
+  team: { id: string; name: string; captain_id: string; mains: number; solo: boolean } | null;
   isCaptain: boolean;
-  reg: { status: RegistrationStatus; checked_in_at: string | null; note: string | null } | null;
+  reg: { status: RegistrationStatus; checked_in_at: string | null; note: string | null; created_at: string } | null;
 };
 
+const ANON: TournamentMe = { loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null };
 const store = new Map<string, TournamentMe | null>();
 const listeners = new Set<() => void>();
 const inflight = new Map<string, Promise<void>>();
 
 function load(id: string) {
-  if (inflight.has(id)) return;
+  if (!id || inflight.has(id)) return;
   const p = fetch(`/api/tournaments/${id}/me`, { cache: "no-store", credentials: "same-origin" })
     .then((r) => (r.ok ? r.json() : null))
-    .then((d: TournamentMe | null) => {
-      store.set(id, d ?? { loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null });
+    .then((d: TournamentMe | null) => void store.set(id, d ?? ANON))
+    .catch(() => void store.set(id, ANON))
+    .finally(() => {
+      inflight.delete(id);
       listeners.forEach((l) => l());
-    })
-    .catch(() => {
-      store.set(id, { loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null });
-      listeners.forEach((l) => l());
-    })
-    .finally(() => inflight.delete(id));
+    });
   inflight.set(id, p);
 }
 
@@ -65,57 +67,197 @@ function useTournamentMe(id: string): TournamentMe | null {
   );
 }
 
-const isActive = (me: TournamentMe | null) => !!me?.reg && (me.reg.status === "pending" || me.reg.status === "approved");
+type Tone = "neutral" | "accent" | "ok" | "warn" | "danger";
+type Participation = {
+  tone: Tone;
+  label: string;
+  title: string;
+  text?: ReactNode;
+  status?: { label: string; tone: "neutral" | "accent" | "ok" | "warn" | "danger" | "live" }[];
+  cta?: { href: string; label: string; variant?: "primary" | "secondary" };
+  extra?: { href: string; label: string };
+};
 
-/** Одна главная кнопка в шапке турнира — по состоянию участия */
-function CtaButton({ t, me, full }: { t: TournamentLite; me: TournamentMe; full?: boolean }) {
+/** Состояние участника → текст, статусы и одно главное действие (ведёт в существующие flows) */
+function participation(t: TournamentLite, me: TournamentMe, approvedCount: number): Participation {
   const base = `/tournaments/${t.slug}`;
-  const wide = full ? "w-full min-w-0 lg:min-w-0" : undefined;
+  const free = Math.max(0, t.max_teams - approvedCount);
+  const mode = modeOf(t.format);
+  const soloFormat = mode.size === 1;
   const { loggedIn, team, isCaptain, reg } = me;
-  if (t.status === "checkin" && reg?.status === "approved" && !reg.checked_in_at) {
+  const active = reg && (reg.status === "pending" || reg.status === "approved");
+  const canManage = isCaptain || soloFormat;
+  const checkin = t.checkin_opens_at ? `${formatDateTime(t.checkin_opens_at)}${t.checkin_closes_at ? `–${formatDateTime(t.checkin_closes_at).split(", ").pop()}` : ""}` : null;
+
+  if (t.status === "cancelled") return { tone: "neutral", label: "Турнир отменён", title: "Турнир отменён" };
+  if (t.status === "finished") {
+    return reg?.status === "approved"
+      ? { tone: "neutral", label: "Вы участвовали", title: team?.name ?? "Участие", text: "Итоги, сетка и статистика — во вкладках турнира.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } }
+      : { tone: "neutral", label: "Турнир завершён", title: "Турнир завершён", text: "Итоги и статистика — во вкладках турнира." };
+  }
+
+  if (active && reg) {
+    if (reg.status === "pending") {
+      return {
+        tone: "warn",
+        label: "Ваша заявка",
+        title: team?.name ?? "Заявка",
+        status: [registrationStatus.pending],
+        text: `Отправлена ${formatDateTime(reg.created_at)}. Администратор рассмотрит её до check-in.`,
+        cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
+      };
+    }
+    // одобрена
+    if (reg.checked_in_at) {
+      return {
+        tone: "ok",
+        label: "Вы участвуете",
+        title: team?.name ?? "Участие",
+        status: [registrationStatus.approved, { label: "Check-in пройден", tone: "ok" }],
+        text: t.status === "live" ? "Турнир идёт — ваши матчи во вкладке «Матчи» и в «Моей игре»." : "Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен.",
+        cta: t.status === "live" ? { href: `${base}?tab=matches`, label: "Матчи турнира", variant: "secondary" } : undefined,
+      };
+    }
+    if (t.status === "checkin") {
+      return {
+        tone: "accent",
+        label: "Check-in открыт",
+        title: team?.name ?? "Участие",
+        status: [registrationStatus.approved, { label: "Check-in не пройден", tone: "warn" }],
+        text: canManage ? `Подтвердите участие${t.checkin_closes_at ? ` до ${formatDateTime(t.checkin_closes_at)}` : ""}, иначе место займёт другая команда.` : "Check-in проходит капитан команды.",
+        cta: canManage ? { href: `${base}/checkin`, label: "Пройти check-in" } : { href: `${base}/checkin`, label: "Статус check-in", variant: "secondary" },
+      };
+    }
+    if (t.status === "live") {
+      return { tone: "neutral", label: "Турнир идёт", title: team?.name ?? "Участие", status: [registrationStatus.approved], text: "Check-in не был пройден — если это ошибка, напишите администратору." };
+    }
+    return {
+      tone: "ok",
+      label: "Вы участвуете",
+      title: team?.name ?? "Участие",
+      status: [registrationStatus.approved],
+      text: checkin ? `Дальше: check-in ${checkin}.` : "Дальше: check-in перед стартом — мы напомним.",
+      cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
+    };
+  }
+
+  if (t.status !== "registration") {
+    return t.status === "live"
+      ? { tone: "neutral", label: "Турнир идёт", title: "Регистрация закрыта", text: "Следите за сеткой и матчами во вкладках турнира." }
+      : { tone: "neutral", label: "Регистрация закрыта", title: "Регистрация закрыта", text: checkin && t.status !== "checkin" ? `Check-in для участников: ${checkin}.` : "Новые заявки не принимаются." };
+  }
+
+  // регистрация открыта, активной заявки нет
+  const rejected = reg?.status === "rejected" ? { label: "Предыдущая заявка отклонена", tone: "danger" as const } : null;
+  const rejectNote = reg?.status === "rejected" && reg.note ? `Причина: ${reg.note}` : null;
+  if (!loggedIn) {
+    return { tone: "accent", label: "Регистрация открыта", title: `${free} из ${t.max_teams} мест свободно`, text: "Войдите через Steam, чтобы подать заявку.", cta: { href: `/login?next=${encodeURIComponent(`${base}/register`)}`, label: "Войти через Steam" } };
+  }
+  if (soloFormat) {
+    return { tone: "accent", label: "Регистрация открыта", title: `${free} из ${t.max_teams} мест свободно`, status: rejected ? [rejected] : undefined, text: rejectNote ?? "Участие — сами за себя, команда не нужна.", cta: { href: `${base}/register`, label: rejected ? "Подать заявку снова" : "Участвовать" } };
+  }
+  if (!team || team.solo) {
+    return { tone: "neutral", label: "Регистрация открыта", title: "Для участия нужна команда", text: `Соберите команду: в основе ${mode.size}${mode.subs ? `, до ${mode.subs} запасных` : ""}.`, cta: { href: "/team/create", label: "Создать команду" }, extra: { href: "/find", label: "Найти команду" } };
+  }
+  if (team.mains < mode.size) {
+    return {
+      tone: "warn",
+      label: "Состав неполный",
+      title: team.name,
+      text: `Основа ${team.mains} из ${mode.size} — нужно ещё ${mode.size - team.mains}, чтобы подать заявку.`,
+      cta: { href: isCaptain ? "/team?tab=roster" : "/team", label: isCaptain ? "Пригласить игроков" : "Открыть команду", variant: "secondary" },
+    };
+  }
+  return isCaptain
+    ? { tone: rejected ? "danger" : "accent", label: rejected ? "Заявку нужно исправить" : "Команда готова", title: team.name, status: rejected ? [rejected] : [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }], text: rejectNote ?? `${free} из ${t.max_teams} мест свободно${t.registration_closes_at ? ` · заявки до ${formatDateTime(t.registration_closes_at)}` : ""}.`, cta: { href: `${base}/register`, label: rejected ? "Подать заявку снова" : "Подать заявку" } }
+    : { tone: "neutral", label: "Команда готова", title: team.name, status: [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }], text: "Заявку на турнир подаёт капитан команды." };
+}
+
+const BORDER: Record<Tone, string> = {
+  neutral: "border-line-subtle",
+  accent: "border-accent/35",
+  ok: "border-ok/35",
+  warn: "border-warn/35",
+  danger: "border-danger/40",
+};
+
+/** Панель участия — главный блок боковой колонки «Обзора» */
+export function ParticipationPanel({ t, approvedCount, preview }: { t: TournamentLite; approvedCount: number; /** для витрины дизайн-системы: состояние без запроса */ preview?: TournamentMe }) {
+  const live = useTournamentMe(preview ? "" : t.id);
+  const me = preview ?? live;
+  if (!me) {
     return (
-      <PrimaryBtn href={`${base}/checkin`} className={wide}>
-        Пройти check-in
-      </PrimaryBtn>
+      <div className="rounded-surface border border-line-subtle bg-surface p-5" aria-busy="true">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-5 w-2/3" />
+        <Skeleton className="mt-4 h-11 w-full" />
+      </div>
     );
   }
-  if (t.status !== "registration" || isActive(me)) return null;
-  const solo = t.format === "1v1";
-  const label = solo ? "Участвовать" : !team && loggedIn ? "Создать команду" : isCaptain || !loggedIn ? "Зарегистрировать команду" : "Заявку подаёт капитан";
-  const href = !loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`;
-  return !team && loggedIn && !solo ? (
-    <OutlineBtn href={href} className={wide}>
-      {label}
-    </OutlineBtn>
-  ) : (
-    <PrimaryBtn href={href} className={wide}>
-      {label}
-    </PrimaryBtn>
+  const p = participation(t, me, approvedCount);
+  const fill = Math.min(100, (approvedCount / Math.max(1, t.max_teams)) * 100);
+  return (
+    <section aria-label="Моё участие" className={cn("rounded-surface border bg-surface p-5", BORDER[p.tone])}>
+      <div className="text-meta font-medium text-fg-3">{p.label}</div>
+      <div className="mt-1 break-words text-title text-fg">{p.title}</div>
+      {p.status && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {p.status.map((s) => (
+            <Status key={s.label} info={s} size="sm" />
+          ))}
+        </div>
+      )}
+      {p.text && <p className="mt-3 text-[14px] leading-relaxed text-fg-2">{p.text}</p>}
+      {t.status === "registration" && !(me.reg && ["pending", "approved"].includes(me.reg.status)) && (
+        <div className="mt-4">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="h-full rounded-full bg-accent/70" style={{ width: `${fill}%` }} />
+          </div>
+          <div className="num mt-1.5 text-micro text-fg-3">
+            {approvedCount} / {t.max_teams} {modeOf(t.format).size === 1 ? "участников" : "команд"}
+          </div>
+        </div>
+      )}
+      {p.cta && (
+        <Button href={p.cta.href} variant={p.cta.variant ?? "primary"} block className="mt-5">
+          {p.cta.label}
+        </Button>
+      )}
+      {p.extra && (
+        <Link href={p.extra.href} className="mt-3 block text-center text-meta font-medium text-accent hover:text-accent-strong">
+          {p.extra.label} →
+        </Link>
+      )}
+    </section>
   );
 }
 
-export function HeroCta({ t }: { t: TournamentLite }) {
+/** Главная кнопка в шапке турнира — то же главное действие, что в панели участия (только действия, не пассив) */
+export function HeroCta({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
   const me = useTournamentMe(t.id);
   if (!me) {
-    // место под кнопку, пока уточняем участие — без прыжка вёрстки
-    return t.status === "registration" || t.status === "checkin" ? (
-      <span aria-hidden className="inline-block h-[52px] w-[230px] rounded-[8px] bg-white/[0.04] lg:h-[60px] lg:w-[300px]" />
-    ) : null;
+    return t.status === "registration" || t.status === "checkin" ? <span aria-hidden className="inline-block h-12 w-56 rounded-control bg-white/[0.04]" /> : null;
   }
-  return <CtaButton t={t} me={me} />;
+  const p = participation(t, me, approvedCount);
+  if (!p.cta || p.cta.variant === "secondary") return null;
+  return (
+    <Button href={p.cta.href} size="lg">
+      {p.cta.label}
+    </Button>
+  );
 }
 
-/** На телефоне главная кнопка всегда под рукой — внизу экрана */
-export function MobileCta({ t }: { t: TournamentLite }) {
+/** На телефоне главное действие всегда под рукой — внизу экрана (только когда оно есть) */
+export function MobileCta({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
   const me = useTournamentMe(t.id);
   if (!me) return null;
-  const reg = me.reg;
-  const shows =
-    (t.status === "checkin" && reg?.status === "approved" && !reg.checked_in_at) || (t.status === "registration" && !isActive(me));
-  if (!shows) return null;
+  const p = participation(t, me, approvedCount);
+  if (!p.cta || p.cta.variant === "secondary") return null;
   return (
-    <MobileStickyCta note={t.name}>
-      <CtaButton t={t} me={me} full />
+    <MobileStickyCta note={p.title}>
+      <Button href={p.cta.href} size="lg" block>
+        {p.cta.label}
+      </Button>
     </MobileStickyCta>
   );
 }
@@ -124,102 +266,36 @@ export function AdminControlLink({ t }: { t: TournamentLite }) {
   const me = useTournamentMe(t.id);
   if (!me?.isAdmin) return null;
   return (
-    <Link href={`/admin/tournaments/${t.id}`} className="text-fg-3 hover:text-fg">
-      Control →
+    <Link href={`/admin/tournaments/${t.id}`} className="text-meta text-fg-3 hover:text-fg">
+      Управление в F16 Control →
     </Link>
   );
 }
 
-export function RegistrationBox({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
+/** Требования для вашей команды — только то, что сайт знает точно */
+export function MyRequirements({ t }: { t: TournamentLite }) {
   const me = useTournamentMe(t.id);
-  const base = `/tournaments/${t.slug}`;
-  const solo = t.format === "1v1";
-  const reg = me?.reg ?? null;
-  const loggedIn = !!me?.loggedIn;
-  const team = me?.team ?? null;
-  const isCaptain = !!me?.isCaptain;
-
-  let body: ReactNode;
-  if (me && isActive(me) && reg) {
-    body = (
-      <>
-        <div className="flex items-center gap-4">
-          <StatusChip tone={reg.status === "approved" ? "ok" : "warn"} size="sm">
-            {registrationStatusLabel[reg.status]}
-          </StatusChip>
-          {reg.checked_in_at && (
-            <StatusChip tone="ok" size="sm">
-              Check-in пройден
-            </StatusChip>
-          )}
-        </div>
-        <p className="mt-3 text-sm text-fg-2">
-          {team?.name} {reg.status === "approved" ? "участвует в турнире." : "ждёт решения администратора."}
-        </p>
-        {t.status === "checkin" && reg.status === "approved" && !reg.checked_in_at && (
-          <Button href={`${base}/checkin`} size="md" className="mt-5 w-full">
-            Пройти check-in
-          </Button>
-        )}
-        {isCaptain && t.status === "registration" && (
-          <Button href={`${base}/register`} variant="secondary" size="md" className="mt-5 w-full">
-            Управлять заявкой
-          </Button>
-        )}
-      </>
-    );
-  } else if (t.status === "registration") {
-    body = (
-      <>
-        <div className="flex items-baseline gap-2">
-          <span className="num text-[26px] font-semibold">{Math.max(0, t.max_teams - approvedCount)}</span>
-          <span className="text-sm text-fg-3">из {t.max_teams} мест свободно</span>
-        </div>
-        <div className="mt-3 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-          <div className="h-full bg-ok/70" style={{ width: `${Math.min(100, (approvedCount / Math.max(1, t.max_teams)) * 100)}%` }} />
-        </div>
-        {t.registration_closes_at && <div className="mt-3 text-[13px] text-fg-3">до {formatDateTime(t.registration_closes_at)}</div>}
-        {reg?.status === "rejected" && (
-          <div className="mt-4">
-            <Callout tone="danger">Предыдущая заявка отклонена{reg.note ? `: ${reg.note}` : "."}</Callout>
-          </div>
-        )}
-        {!me ? (
-          <span aria-hidden className="mt-5 block h-11 w-full rounded-[8px] bg-white/[0.04]" />
-        ) : (
-          <Button
-            href={!loggedIn ? `/login?next=${base}/register` : !team && !solo ? "/team/create" : `${base}/register`}
-            size="md"
-            className="mt-5 w-full"
-            iconRight={<IconArrow />}
-          >
-            {solo
-              ? loggedIn
-                ? "Участвовать"
-                : "Войти и участвовать"
-              : !loggedIn
-                ? "Войти и зарегистрироваться"
-                : !team
-                  ? "Сначала создайте команду"
-                  : isCaptain
-                    ? "Зарегистрировать команду"
-                    : "Заявку подаёт капитан"}
-          </Button>
-        )}
-      </>
-    );
-  } else {
-    body = (
-      <p className="text-sm text-fg-2">
-        {t.status === "finished" ? "Турнир завершён." : t.status === "cancelled" ? "Турнир отменён." : "Регистрация закрыта."}
-      </p>
-    );
-  }
-
+  const mode = modeOf(t.format);
+  if (!me?.loggedIn || !me.team || me.team.solo || mode.size === 1) return null;
+  const items: { ok: boolean | null; text: string }[] = [
+    { ok: true, text: "Вход через Steam" },
+    { ok: me.team.mains >= mode.size, text: `Основа: ${Math.min(me.team.mains, mode.size)} из ${mode.size}` },
+    {
+      ok: me.reg?.checked_in_at ? true : null,
+      text: me.reg?.checked_in_at ? "Check-in пройден" : me.isCaptain ? "Check-in — вы, как капитан, в отведённое время" : "Check-in проходит капитан",
+    },
+  ];
   return (
-    <div>
-      <Eyebrow className="mb-4">Регистрация</Eyebrow>
-      <div className="text-[15px]">{body}</div>
+    <div className="mt-6 rounded-surface border border-line-subtle bg-surface p-4">
+      <div className="text-meta font-medium text-fg-2">Ваша команда · {me.team.name}</div>
+      <ul className="mt-3 space-y-2">
+        {items.map((it) => (
+          <li key={it.text} className="flex items-center gap-2.5 text-[14px] text-fg-2">
+            {it.ok === true ? <Check className="size-4 text-ok" aria-label="выполнено" /> : it.ok === false ? <CircleAlert className="size-4 text-warn" aria-label="не выполнено" /> : <Circle className="size-4 text-fg-4" aria-label="впереди" />}
+            {it.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
