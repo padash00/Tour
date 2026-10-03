@@ -76,7 +76,7 @@ export function ClientTabs({
             </button>
           ))}
         </div>
-        {aside}
+        {aside && <div className="hidden shrink-0 sm:block">{aside}</div>}
       </div>
     </div>
   );
