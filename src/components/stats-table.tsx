@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import type { PlayerAgg, TeamStatRow } from "@/lib/stats";
-import { Avatar, TeamLogo, cn } from "./ui";
+import { Avatar, TeamLogo, cn } from "@/components/ds";
 import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar } from "./public/data-table";
 import { fmt, ratingColor, swingColor } from "./stats-format";
 
@@ -143,7 +143,7 @@ export function PlayerStatsTable({
             const diff = p.kills - p.deaths;
             const name = (
               <span className="flex items-center gap-3">
-                <Avatar src={p.player?.avatar_url} name={nick} size={compact ? 24 : 32} />
+                <Avatar src={p.player?.avatar_url} name={nick} size={compact ? "xs" : "sm"} />
                 <span className="max-w-[180px] truncate font-semibold text-fg">{nick}</span>
               </span>
             );
@@ -257,7 +257,7 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
                 </td>
                 <td>
                   <Link href={t.href} className="flex items-center gap-3 hover:text-accent">
-                    <TeamLogo src={t.team.logo_url} tag={t.team.tag} size={32} />
+                    <TeamLogo src={t.team.logo_url} tag={t.team.tag} size="sm" />
                     <span className="max-w-[220px] truncate font-semibold text-fg">{t.team.name}</span>
                   </Link>
                 </td>
@@ -288,10 +288,10 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
 
 export function RatingExplainer() {
   return (
-    <details className="group rounded-[12px] border border-white/[0.08] bg-[#0b1420]/60 px-6 lg:px-8">
+    <details className="group rounded-surface border border-line-subtle bg-surface px-6 lg:px-8">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[15px] font-semibold text-fg-2 transition-colors hover:text-fg focus-visible:outline-none">
         Как считаются F16 Rating, Swing и MVP
-        <span className="grid size-8 place-items-center rounded-full border border-white/[0.1] text-fg-3 transition-transform duration-200 group-open:rotate-45">
+        <span className="grid size-8 place-items-center rounded-full border border-line text-fg-3 transition-transform duration-200 group-open:rotate-45">
           +
         </span>
       </summary>
@@ -300,7 +300,7 @@ export function RatingExplainer() {
           F16 Rating v1 зафиксирован до начала турниров. Основа — открытая формула в духе HLTV Rating 2.0, вклад
           в раунды расширен входами, клатчами, мультикиллами и трейдами. Средний игрок — около 1.00.
         </p>
-        <pre className="num overflow-x-auto rounded-[8px] border border-white/[0.06] bg-bg-2 p-4 text-[12px] text-fg-2">
+        <pre className="num overflow-x-auto rounded-control border border-line-subtle bg-shell p-4 text-[12px] text-fg-2">
 {`Impact = 2.13·KPR + 0.42·APR − 0.41
        + (первые убийства − первые смерти) / раунды
        + 1.5 · выигранные клатчи / раунды
