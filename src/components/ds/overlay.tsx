@@ -125,6 +125,7 @@ export function Dialog({
   const close = dismissible ? onClose : blockedClose;
   const panel = useModal(open, close);
   const titleId = useId();
+  const descriptionId = useId();
   if (!open || typeof document === "undefined") return null;
   const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]" }[size];
   return (
@@ -134,6 +135,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         className={cn(
           "relative flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-feature border border-line bg-elevated shadow-[var(--shadow-pop)] sm:rounded-feature",
           "animate-[pop_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]",
@@ -145,7 +147,7 @@ export function Dialog({
             <h2 id={titleId} className="text-title text-fg">
               {title}
             </h2>
-            {description && <p className="mt-1.5 text-[14px] leading-relaxed text-fg-2">{description}</p>}
+            {description && <p id={descriptionId} className="mt-1.5 text-[14px] leading-relaxed text-fg-2">{description}</p>}
           </div>
           {dismissible && (
             <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5 -mt-1">
@@ -184,6 +186,7 @@ export function Sheet({
 }) {
   const panel = useModal(open, onClose);
   const titleId = useId();
+  const descriptionId = useId();
   if (!open || typeof document === "undefined") return null;
   return (
     <ModalLayer onClose={onClose} align="right">
@@ -192,6 +195,7 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
         style={{ "--sheet-w": `${width}px` } as React.CSSProperties}
         className={cn(
           "relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-feature border border-line bg-elevated shadow-[var(--shadow-pop)]",
@@ -204,7 +208,7 @@ export function Sheet({
             <h2 id={titleId} className="text-title text-fg">
               {title}
             </h2>
-            {description && <p className="mt-1 text-meta text-fg-3">{description}</p>}
+            {description && <p id={descriptionId} className="mt-1 text-meta text-fg-3">{description}</p>}
           </div>
           <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5">
             <X />
