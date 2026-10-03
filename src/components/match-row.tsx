@@ -14,6 +14,11 @@ type RowMatch = Pick<Match, "id" | "status" | "best_of" | "team1_id" | "team2_id
 export function MatchListRow({ m, meta, highlight }: { m: RowMatch; meta?: string; highlight?: string | null }) {
   const played = m.status === "live" || m.status === "finished";
   const winner = m.winner_id ? (m.winner_id === m.team1_id ? 1 : 2) : null;
+  const statusInfo = matchStatus(m.status, m.server_state === "ready", m.under_review);
+  const mobileStatus = ["veto", "ready", "live"].includes(m.status) ? statusInfo : null;
+  const mobileTone = mobileStatus
+    ? { neutral: "text-fg-3", accent: "text-accent", ok: "text-ok", warn: "text-warn", danger: "text-danger", live: "text-live" }[mobileStatus.tone]
+    : "";
   const side = (t: RowMatch["team1"], id: string | null, right?: boolean) => (
     <span className={cn("flex min-w-0 items-center gap-2.5", right && "flex-row-reverse text-right")}>
       <TeamLogo src={t?.logo_url} tag={t?.tag ?? "TBD"} size="xs" />
@@ -28,16 +33,22 @@ export function MatchListRow({ m, meta, highlight }: { m: RowMatch; meta?: strin
           {played ? <Score a={m.team1_score} b={m.team2_score} winner={m.status === "finished" ? winner : null} size="sm" /> : <span className="text-micro font-semibold text-fg-3">VS</span>}
           {side(m.team2, m.team2_id, true)}
         </div>
-        {(meta || m.status === "live") && (
+        {(meta || mobileStatus) && (
           <div className="mt-1 truncate text-center text-micro text-fg-3">
-            {m.status === "live" && <span className="font-semibold text-live sm:hidden">● LIVE{meta ? " · " : ""}</span>}
+            {mobileStatus && (
+              <span className={cn("font-semibold sm:hidden", mobileTone)}>
+                {mobileStatus.pulse && <span aria-hidden>● </span>}
+                {mobileStatus.label}
+                {meta ? " · " : ""}
+              </span>
+            )}
             {meta}
           </div>
         )}
       </div>
       {/* на телефоне статус скрыт — место названиям команд (live видно по счёту) */}
       <span className="hidden shrink-0 sm:block">
-        <Status info={matchStatus(m.status, m.server_state === "ready", m.under_review)} size="sm" />
+        <Status info={statusInfo} size="sm" />
       </span>
     </Link>
   );
