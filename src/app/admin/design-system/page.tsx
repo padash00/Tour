@@ -64,7 +64,7 @@ import {
 } from "@/components/ds";
 import type { MatchStatus, RegistrationStatus, TournamentStatus } from "@/lib/types";
 import { MatchListRow } from "@/components/match-row";
-import { ActivityDemo, ParticipationDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
+import { ActivityDemo, ParticipationDemo, RegistrationDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
 
 export const metadata: Metadata = { title: "Дизайн-система — F16 Control" };
 
@@ -531,6 +531,9 @@ export default async function DesignSystemPage() {
 
           <Section title="Участие в турнире" description="ParticipationPanel — живой компонент страницы турнира: статус участника отдельно от статуса турнира, одно главное действие.">
             <ParticipationDemo />
+          </Section>
+          <Section title="Регистрация и check-in" description="Состав выбирает капитан; check-in — одна задача с окном, проверками и действием только для капитана. Отсчёт не озвучивается, смена состояния — один раз.">
+            <RegistrationDemo />
           </Section>
 
           <Section title="Лобби: слоты" description="Человек, бот и пустое место различаются с первого взгляда, не только цветом.">

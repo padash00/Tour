@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/components/toast";
 import { ActivityPill } from "@/components/shell/activity";
 import type { Activity } from "@/lib/activity";
+import { CheckinTask, RosterPicker, type CheckItem, type PickerMember } from "@/components/competition/registration";
 import { ParticipationPanel, type TournamentLite, type TournamentMe } from "@/components/competition/tournament-viewer";
 
 /** Поля во всех состояниях + живая проверка тега (имитация: «F16», «NAVI» заняты) */
@@ -338,6 +339,67 @@ export function ParticipationDemo() {
           <ParticipationPanel t={c.t} approvedCount={c.approved ?? 11} preview={c.me} />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Регистрация и check-in — живые компоненты страниц /register и /checkin на демо-данных */
+export function RegistrationDemo() {
+  const [base] = useState(() => Date.now());
+  const at = (min: number) => new Date(base + min * 60_000).toISOString();
+  const members: PickerMember[] = [
+    { player_id: "c", nickname: "kazbek", avatar_url: null, faceit_level: 9, banned: false, captain: true },
+    { player_id: "p1", nickname: "ALTX_F4", avatar_url: null, faceit_level: 7, banned: false, captain: false },
+    { player_id: "p2", nickname: "nurik", avatar_url: null, faceit_level: 6, banned: false, captain: false },
+    { player_id: "p3", nickname: "very_long_nickname_for_layout", avatar_url: null, faceit_level: 10, banned: false, captain: false },
+    { player_id: "p4", nickname: "dauka", avatar_url: null, faceit_level: 4, banned: false, captain: false },
+    { player_id: "p5", nickname: "sanzh", avatar_url: null, faceit_level: 5, banned: false, captain: false },
+    { player_id: "p6", nickname: "toxic_one", avatar_url: null, faceit_level: 8, banned: true, captain: false },
+  ];
+  const ok: CheckItem[] = [
+    { label: "Заявка одобрена", ok: true },
+    { label: "Основа: 5 игроков", ok: true, detail: "5/5" },
+    { label: "SteamID у всех игроков", ok: true },
+    { label: "Нет заблокированных игроков", ok: true },
+  ];
+  const bad: CheckItem[] = [ok[0], { ...ok[1], ok: false, detail: "4/5" }, ok[2], { ...ok[3], ok: false, detail: "toxic_one" }];
+  const common = { tournamentId: "demo", tournamentHref: "/tournaments", serverNow: base, captainName: "kazbek", checkedInAt: null as string | null };
+  const cases: { key: string; label: string; props: Parameters<typeof CheckinTask>[0] }[] = [
+    { key: "open", label: "Открыт · капитан", props: { ...common, status: "checkin", opensAt: at(-10), closesAt: at(35), isCaptain: true, checks: ok } },
+    { key: "hurry", label: "Меньше 5 минут", props: { ...common, status: "checkin", opensAt: at(-40), closesAt: at(3), isCaptain: true, checks: ok } },
+    { key: "player", label: "Открыт · игрок", props: { ...common, status: "checkin", opensAt: at(-10), closesAt: at(35), isCaptain: false, checks: ok } },
+    { key: "blocked", label: "Состав с проблемой", props: { ...common, status: "checkin", opensAt: at(-10), closesAt: at(35), isCaptain: true, checks: bad } },
+    { key: "waiting", label: "Скоро откроется", props: { ...common, status: "checkin", opensAt: at(12), closesAt: at(57), isCaptain: true, checks: ok } },
+    { key: "upcoming", label: "Не начался", props: { ...common, status: "registration_closed", opensAt: at(60 * 20), closesAt: at(60 * 20 + 45), isCaptain: true, checks: ok } },
+    { key: "closed", label: "Окно закрыто", props: { ...common, status: "checkin", opensAt: at(-60), closesAt: at(-15), isCaptain: true, checks: ok } },
+    { key: "done", label: "Пройден", props: { ...common, status: "checkin", opensAt: at(-30), closesAt: at(15), isCaptain: true, checks: ok, checkedInAt: at(-5) } },
+  ];
+  const [pick, setPick] = useState("open");
+  const current = cases.find((c) => c.key === pick)!;
+  return (
+    <div className="grid gap-8 lg:grid-cols-2">
+      <div>
+        <div className="mb-2 text-meta text-fg-3">RosterPicker · 5×5, до 2 запасных, заблокированный игрок</div>
+        <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface">
+          <RosterPicker members={members} size={5} subs={2} initial={{ c: "main", p1: "main", p2: "main", p3: "main", p4: "sub", p5: "out" }} />
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 flex flex-wrap gap-1" role="group" aria-label="Состояние check-in">
+          {cases.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={pick === c.key}
+              onClick={() => setPick(c.key)}
+              className={`h-8 rounded-control border px-2.5 text-meta ${pick === c.key ? "border-line-strong bg-white/[0.07] text-fg" : "border-transparent text-fg-3 hover:text-fg"}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <CheckinTask key={current.key} {...current.props} />
+      </div>
     </div>
   );
 }
