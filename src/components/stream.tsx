@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { btnClass } from "./primitives";
+import { buttonClass as btnClass } from "@/components/ds";
 
 /** Twitch / YouTube → адрес для встраивания; null — ссылку встроить нельзя */
 export function streamEmbed(url: string, host: string): string | null {
@@ -34,7 +34,7 @@ export function StreamEmbed({ url }: { url: string }) {
     );
   }
   return (
-    <div className="overflow-hidden rounded-2xl">
+    <div className="overflow-hidden rounded-feature">
       <div className="relative aspect-video bg-bg-2">
         <iframe src={src} allowFullScreen className="absolute inset-0 h-full w-full" title="Трансляция" />
       </div>
