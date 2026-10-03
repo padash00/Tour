@@ -170,6 +170,59 @@ const MATCH_PATH = ["Расписание", "Вето", "Сервер", "Live", 
 const pathFor = (current: number): { title: string; state: StepState }[] =>
   MATCH_PATH.map((title, i) => ({ title, state: i < current ? "done" : i === current ? "current" : "todo" }));
 
+const STATE_MATRIX = [
+  {
+    flow: "Команда",
+    rows: [
+      ["Нет команды", "Игрок", "Создать команду или найти существующую"],
+      ["Состав неполный", "Капитан", "Пригласить игроков / перевести в основу"],
+      ["Состав готов", "Капитан", "Выбрать турнир и подать заявку"],
+      ["Roster locked", "Все", "Показать причину блокировки; изменения недоступны"],
+    ],
+  },
+  {
+    flow: "Турнир",
+    rows: [
+      ["Гость", "Гость", "Войти через Steam"],
+      ["Нет команды", "Игрок", "Создать / найти команду"],
+      ["Состав неполный", "Капитан", "Дособрать основу"],
+      ["Команда готова", "Капитан", "Подать заявку"],
+      ["Pending", "Организатор", "Игрок ждёт решения"],
+      ["Approved", "Капитан", "Ждать окно check-in"],
+      ["Rejected", "Капитан", "Причина + исправить, если регистрация открыта"],
+      ["Check-in открыт", "Капитан", "Подтвердить участие"],
+      ["Checked-in", "Все", "Ждать сетку / первый матч"],
+      ["Live", "Все", "Сетка и текущие матчи"],
+      ["Finished", "Все", "Итоги и статистика"],
+    ],
+  },
+  {
+    flow: "Матч",
+    rows: [
+      ["Pending", "Все", "Ждать определения команд"],
+      ["Upcoming", "Все", "Расписание / ожидание вето"],
+      ["Veto", "Капитан текущей команды", "Выбрать карту до дедлайна"],
+      ["Server ready", "Игроки матча", "Подключиться"],
+      ["Live", "Все", "Счёт, раунды, статистика"],
+      ["Finished", "Все", "Итог серии / следующий матч"],
+      ["Cancelled", "Все", "Понятная причина без активного CTA"],
+    ],
+  },
+  {
+    flow: "Лобби",
+    rows: [
+      ["Waiting", "Хост / игроки", "Собрать команды и настроить матч"],
+      ["Draft", "Текущий капитан", "Выбрать игрока"],
+      ["Ready check", "Игроки команд", "Подтвердить готовность"],
+      ["Veto", "Текущий капитан", "Выбрать карту"],
+      ["Server", "Игроки", "Дождаться адреса / подключиться"],
+      ["Live", "Все", "Счёт / GOTV / сервер"],
+      ["Finished", "Хост", "Рематч или завершение"],
+      ["Closed", "Все", "Вернуться к списку лобби"],
+    ],
+  },
+] as const;
+
 export default async function DesignSystemPage() {
   await requireAdmin("/admin/design-system");
   return (
@@ -534,6 +587,29 @@ export default async function DesignSystemPage() {
           </Section>
           <Section title="Регистрация и check-in" description="Состав выбирает капитан; check-in — одна задача с окном, проверками и действием только для капитана. Отсчёт не озвучивается, смена состояния — один раз.">
             <RegistrationDemo />
+          </Section>
+
+          <Section
+            title="State matrix"
+            description="QA-контракт: в каждом состоянии интерфейс отвечает «что происходит, кто действует и что дальше». Это не backend state machine, а проверка представления."
+          >
+            <div className="grid gap-6 lg:grid-cols-2">
+              {STATE_MATRIX.map((group) => (
+                <div key={group.flow}>
+                  <SubsectionTitle>{group.flow}</SubsectionTitle>
+                  <RowList>
+                    {group.rows.map(([state, actor, next]) => (
+                      <DataRow
+                        key={state}
+                        title={state}
+                        meta={next}
+                        trailing={<span className="max-w-40 text-right text-meta text-fg-3">{actor}</span>}
+                      />
+                    ))}
+                  </RowList>
+                </div>
+              ))}
+            </div>
           </Section>
 
           <Section title="Лобби: слоты" description="Человек, бот и пустое место различаются с первого взгляда, не только цветом.">
