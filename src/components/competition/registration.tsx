@@ -270,17 +270,19 @@ export function CheckinTask({
 }) {
   // Держим браузерный countdown синхронизированным с временем сервера:
   // serverNow фиксируется на SSR, дальше тикаем локально с постоянной поправкой.
-  const clockOffset = useRef(serverNow - Date.now());
+  const [clockOffset, setClockOffset] = useState(0);
   const [now, setNow] = useState(serverNow);
   useEffect(() => {
-    const tick = () => setNow(Date.now() + clockOffset.current);
+    const offset = serverNow - Date.now();
+    setClockOffset(offset);
+    const tick = () => setNow(Date.now() + offset);
     const first = setTimeout(tick, 0);
     const id = setInterval(tick, 1000);
     return () => {
       clearTimeout(first);
       clearInterval(id);
     };
-  }, []);
+  }, [serverNow]);
   const [state, action, pending] = useActionState<ActionResult, FormData>(checkIn, null);
   const toast = useToast();
   useEffect(() => {
@@ -347,7 +349,7 @@ export function CheckinTask({
               <div>
                 <div className="text-meta text-fg-3">{closesAt ? "До конца check-in" : "Check-in открыт"}</div>
                 {closesAt ? (
-                  <Timer deadline={closesAt} urgentAt={60} offsetMs={clockOffset.current} className={cn("mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] sm:text-[48px]", hurry && "text-warn")} />
+                  <Timer deadline={closesAt} urgentAt={60} offsetMs={clockOffset} className={cn("mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] sm:text-[48px]", hurry && "text-warn")} />
                 ) : (
                   <div className="mt-1 text-title text-fg">Окно закроет администратор</div>
                 )}
@@ -391,7 +393,7 @@ export function CheckinTask({
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="text-meta text-fg-3">Check-in откроется через</div>
-              <Timer deadline={opensAt!} urgentAt={0} offsetMs={clockOffset.current} className="mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] text-fg-2 sm:text-[48px]" />
+              <Timer deadline={opensAt!} urgentAt={0} offsetMs={clockOffset} className="mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] text-fg-2 sm:text-[48px]" />
               <p className="mt-3 text-[14px] text-fg-2">
                 {isCaptain ? "Кнопка подтверждения появится здесь, когда окно откроется." : "Check-in пройдёт капитан команды, когда окно откроется."}
               </p>
