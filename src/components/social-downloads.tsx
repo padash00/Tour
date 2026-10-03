@@ -1,7 +1,6 @@
 "use client";
 
-import { CARD, btnClass } from "./primitives";
-import { cn } from "./ui";
+import { Panel, buttonClass as btnClass } from "@/components/ds";
 import { useViewer } from "./viewer";
 
 /**
@@ -18,7 +17,7 @@ export function SocialDownloads({ base, title, text }: { base: string; title: st
     { f: "wide", label: "Широкая", hint: "2400×1260" },
   ];
   return (
-    <div className={cn(CARD, "flex flex-wrap items-center justify-between gap-4 p-5 lg:p-6")}>
+    <Panel className="flex flex-wrap items-center justify-between gap-4 lg:p-6">
       <div className="min-w-0">
         <div className="text-[15px] font-semibold">{title}</div>
         <div className="mt-0.5 text-[13px] text-fg-3">{text}</div>
@@ -37,6 +36,6 @@ export function SocialDownloads({ base, title, text }: { base: string; title: st
           </a>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
