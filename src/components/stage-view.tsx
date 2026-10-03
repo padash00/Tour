@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { Eyebrow } from "./primitives";
 import type { StandingRow } from "@/lib/formats";
 import type { Match, Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
-import { TeamLogo, cn } from "./ui";
+import { SubsectionTitle, TeamLogo, cn } from "./ds";
 
 type StageMatchRow = Match & { maps: { team1_score: number; team2_score: number; winner_id: string | null; status: string }[] };
 type TeamMap = Map<string, Pick<Team, "id" | "name" | "tag" | "logo_url">>;
@@ -28,7 +27,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
   return (
     <Link
       href={`/matches/${m.id}`}
-      className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-[8px] border border-white/[0.08] bg-[#0b1420] px-4 h-12 text-[14px] hover:border-white/[0.18] transition-colors"
+      className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-control border border-line-subtle bg-surface px-4 text-[14px] transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-surface-2"
     >
       <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? (finished ? "Бай" : "TBD")}</span>
       <span className="text-center">
@@ -132,7 +131,7 @@ function CrossTable({
   const ids = rows.map((r) => r.teamId);
   const meet = (a: string, b: string) => matches.find((m) => (m.team1_id === a && m.team2_id === b) || (m.team1_id === b && m.team2_id === a));
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-white/[0.08] bg-[#0a111b]/80">
+    <div className="overflow-x-auto rounded-surface border border-line-subtle bg-surface">
       <table className="w-full min-w-[560px] border-collapse text-[13px]">
         <thead>
           <tr className="text-[11px] uppercase tracking-[0.14em] text-fg-3">
@@ -155,7 +154,7 @@ function CrossTable({
           {rows.map((r, i) => {
             const qualifies = advance != null && i < advance;
             return (
-              <tr key={r.teamId} className="border-t border-white/[0.06]">
+              <tr key={r.teamId} className="border-t border-line-subtle">
                 <td className="relative px-3 py-2.5 num text-fg-3">
                   {qualifies && <span className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-ok" />}
                   {i + 1}
@@ -184,7 +183,7 @@ function CrossTable({
                           won && "border-ok/30 bg-ok/[0.10] text-ok hover:bg-ok/[0.16]",
                           lost && "border-danger/25 bg-danger/[0.08] text-danger/90 hover:bg-danger/[0.14]",
                           live && "border-accent/40 bg-accent/[0.10] text-accent hover:bg-accent/[0.16]",
-                          !done && !live && "border-white/[0.06] text-fg-3 hover:border-white/[0.16]",
+                          !done && !live && "border-line-subtle text-fg-3 hover:border-line-strong",
                         )}
                       >
                         {done || live ? (
@@ -232,10 +231,9 @@ export function GroupStageView({
         const rounds = [...new Set(g.matches.map((m) => m.round))].sort((a, b) => a - b);
         return (
           <section key={g.label ?? "A"} className="min-w-0 space-y-4">
-            <div className="flex items-baseline justify-between">
-              <Eyebrow>{single ? "Сетка" : `Группа ${g.label}`}</Eyebrow>
-              {advance != null && <span className="text-xs text-fg-3">выходят {advance} лучших</span>}
-            </div>
+            <SubsectionTitle action={advance != null ? <span className="text-meta text-fg-3">выходят {advance} лучших</span> : undefined}>
+              {single ? "Матчи по турам" : `Группа ${g.label}`}
+            </SubsectionTitle>
             <CrossTable rows={g.table} matches={g.matches} teams={teams} advance={advance} solo={solo} />
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-3">
               <span>В клетке — счёт по картам глазами участника строки</span>
@@ -246,7 +244,7 @@ export function GroupStageView({
             <div className={cn("grid gap-4", single && "md:grid-cols-2 lg:grid-cols-3")}>
               {rounds.map((r) => (
                 <div key={r}>
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-fg-3 mb-2">Тур {r}</div>
+                  <div className="mb-2 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">Тур {r}</div>
                   <div className="space-y-1.5">
                     {g.matches
                       .filter((m) => m.round === r)
@@ -312,7 +310,7 @@ export function SwissView({
               <div key={r} className="w-[260px] space-y-4">
                 <div className="text-[12px] text-fg-3">Раунд {r}</div>
                 {ordered.map(([rec, ms]) => (
-                  <div key={rec} className="rounded-xl bg-white/[0.015] p-2.5">
+                  <div key={rec} className="rounded-surface border border-line-subtle bg-surface p-2.5">
                     <div className="mb-2 flex items-center justify-between text-[11px]">
                       <span className="num font-semibold text-fg-2">{rec}</span>
                       <span className="text-fg-3">
@@ -332,7 +330,7 @@ export function SwissView({
         </div>
       </div>
       <div>
-        <h3 className="mb-4 text-lg font-semibold tracking-[-0.015em]">Таблица</h3>
+        <h3 className="mb-4 text-title text-fg">Таблица</h3>
         <StandingsTable rows={table} teams={teams} swiss solo={solo} />
       </div>
     </div>
