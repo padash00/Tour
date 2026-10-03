@@ -44,7 +44,12 @@ export function ClientTabs({
 
   useEffect(() => {
     document.querySelectorAll<HTMLElement>(`[data-tabs-scope="${scope}"] > [data-tab]`).forEach((el) => {
-      el.hidden = el.dataset.tab !== active;
+      const key = el.dataset.tab ?? "";
+      el.hidden = key !== active;
+      el.id = `${scope}-panel-${key}`;
+      el.setAttribute("role", "tabpanel");
+      el.setAttribute("aria-labelledby", `${scope}-tab-${key}`);
+      el.tabIndex = 0;
     });
   }, [active, scope]);
 
@@ -63,10 +68,26 @@ export function ClientTabs({
           {items.map((t) => (
             <button
               key={t.key}
+              id={`${scope}-tab-${t.key}`}
               type="button"
               role="tab"
               aria-selected={t.key === active}
+              aria-controls={`${scope}-panel-${t.key}`}
+              tabIndex={t.key === active ? 0 : -1}
               onClick={() => select(t.key)}
+              onKeyDown={(e) => {
+                const index = items.findIndex((item) => item.key === t.key);
+                let next = index;
+                if (e.key === "ArrowRight") next = (index + 1) % items.length;
+                else if (e.key === "ArrowLeft") next = (index - 1 + items.length) % items.length;
+                else if (e.key === "Home") next = 0;
+                else if (e.key === "End") next = items.length - 1;
+                else return;
+                e.preventDefault();
+                const key = items[next].key;
+                select(key);
+                document.getElementById(`${scope}-tab-${key}`)?.focus();
+              }}
               className={cn(
                 "inline-flex h-12 shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-[14px] font-medium transition-colors duration-[var(--dur-hover)]",
                 t.key === active ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
