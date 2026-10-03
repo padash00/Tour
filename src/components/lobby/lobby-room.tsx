@@ -1046,6 +1046,7 @@ function ReadyCheck({ view, now, busy, onReady }: { view: LobbyView; now: number
     <Dialog
       open={open}
       onClose={() => {}}
+      dismissible={false}
       title="Матч готов к старту"
       description="Подтвердите, что вы на месте. Если время закончится, проверка готовности будет отменена."
       size="sm"
