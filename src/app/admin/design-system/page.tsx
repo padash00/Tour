@@ -63,7 +63,7 @@ import {
   type StepState,
 } from "@/components/ds";
 import type { MatchStatus, RegistrationStatus, TournamentStatus } from "@/lib/types";
-import { ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
+import { ActivityDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
 
 export const metadata: Metadata = { title: "Дизайн-система — F16 Control" };
 
@@ -496,6 +496,13 @@ export default async function DesignSystemPage() {
           </Section>
 
           {/* ───────── состояния продукта */}
+          <Section
+            title="Глобальная активность"
+            description="В шапке — только одно самое срочное действие (приоритет по времени на действие). Пассивное — в «Моей игре» и уведомлениях. Нет действия — места не занимает."
+          >
+            <ActivityDemo />
+          </Section>
+
           <Section title="Состояния матча" description="Путь матча меняет главный блок комнаты — пользователь не переходит на другие страницы.">
             <div className="space-y-6">
               {[

@@ -25,6 +25,8 @@ import {
   Tooltip,
 } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { ActivityPill } from "@/components/shell/activity";
+import type { Activity } from "@/lib/activity";
 
 /** Поля во всех состояниях + живая проверка тега (имитация: «F16», «NAVI» заняты) */
 export function FieldsDemo() {
@@ -263,6 +265,31 @@ export function TimerDemo() {
         <div className="text-meta text-fg-3">Check-in закроется через</div>
         <Timer deadline={long} urgentAt={120} className="text-[32px] font-semibold" />
       </div>
+    </div>
+  );
+}
+
+/** Глобальная активность шапки: все виды по приоритету (дедлайны считаются в браузере) */
+export function ActivityDemo() {
+  const [now] = useState(() => Date.now());
+  const at = (s: number) => new Date(now + s * 1000).toISOString();
+  const base = { href: "/admin/design-system", connect: null, deadline: null } as const;
+  const list: { a: Activity; more?: number; note: string }[] = [
+    { a: { ...base, kind: "veto_turn", priority: 1, label: "Ваш ход · бан карты", detail: "Вето матча #12 против F16 Wolves", tone: "accent", deadline: at(42), key: "1" }, more: 1, note: "1 · ваш ход (вето турнира / лобби, драфт) — секунды" },
+    { a: { ...base, kind: "lobby_draft_turn", priority: 1, label: "Ваш ход · драфт", detail: "Лобби #A7F2K9 — выберите игрока", tone: "accent", deadline: at(25), key: "2" }, note: "1 · драфт лобби" },
+    { a: { ...base, kind: "lobby_ready_check", priority: 2, label: "Проверка готовности", detail: "Лобби #A7F2K9 — подтвердите, что вы на месте", tone: "warn", deadline: at(28), key: "3" }, note: "2 · проверка готовности — 30 секунд" },
+    { a: { ...base, kind: "server_ready", priority: 3, label: "Сервер готов", detail: "Матч #12 против F16 Wolves", tone: "ok", connect: "192.168.0.159:27015", key: "4" }, note: "3 · сервер готов — подключение в один клик" },
+    { a: { ...base, kind: "checkin", priority: 4, label: "Check-in открыт", detail: "F16 Open #01 — подтвердите участие команды", tone: "warn", deadline: at(18 * 60 + 40), key: "5" }, note: "4 · check-in (капитан) — десятки минут" },
+    { a: { ...base, kind: "live", priority: 5, label: "Ваш матч идёт", detail: "Матч #12 против F16 Wolves", tone: "live", key: "6" }, note: "5 · ваш матч идёт" },
+  ];
+  return (
+    <div className="divide-y divide-line-subtle rounded-surface border border-line-subtle bg-shell">
+      {list.map((x) => (
+        <div key={x.a.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <span className="text-meta text-fg-3">{x.note}</span>
+          <ActivityPill activity={x.a} more={x.more} />
+        </div>
+      ))}
     </div>
   );
 }

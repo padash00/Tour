@@ -1,70 +1,70 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand";
 import { HeaderUser } from "./header-user";
-import { MyMatchBanner } from "./my-match-banner";
-import { HeaderShell, NavLinks, PublicOnly } from "./nav-links";
+import { HeaderShell, PrimaryNav, PublicOnly } from "./nav-links";
+import { PRIMARY_NAV, SECONDARY_NAV } from "./shell/nav";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
 export function Logo({ height = 30 }: { height?: number }) {
   return (
-    <Link href="/" className="flex shrink-0 items-center rounded-[8px]" aria-label="F16 Arena — главная">
+    <Link href="/" className="flex shrink-0 items-center rounded-control" aria-label="F16 Arena — главная">
       <BrandLogo height={height} priority />
     </Link>
   );
 }
 
-/** Меню как в утверждённом макете главной */
-export const NAV = [
-  { href: "/tournaments", label: "Турниры" },
-  { href: "/lobbies", label: "Лобби" },
-  { href: "/teams", label: "Команды" },
-  { href: "/about", label: "О платформе" },
-  { href: "/rules#faq", label: "FAQ" },
-];
-
-/** Второстепенные разделы — в «Ещё» на десктопе и в мобильном меню */
-export const NAV_MORE = [
-  { href: "/matches", label: "Матчи" },
-  { href: "/stats", label: "Статистика" },
-  { href: "/players", label: "Игроки" },
-  { href: "/find", label: "Поиск команды" },
-];
-
-/** Шапка одинакова для всех (страницы кэшируются CDN); профиль справа подгружается на клиенте */
+/**
+ * Шапка продукта: 56 px на телефоне, 64 px на десктопе (--header-h).
+ * Логотип · основное меню · [поиск · глобальная активность · уведомления · профиль].
+ * Одинакова для всех (страницы кэшируются CDN) — персональная правая часть подгружается на клиенте.
+ */
 export function SiteHeader() {
   return (
     <HeaderShell>
-      <div className="mx-auto flex h-[72px] w-full max-w-[1440px] items-center px-5 sm:px-8 lg:h-[96px] lg:px-16">
-        <Logo height={58} />
-        <NavLinks items={NAV} more={NAV_MORE} />
-        <div className="ml-auto flex items-center gap-2">
-          <HeaderUser items={[...NAV, ...NAV_MORE]} />
-        </div>
+      <div className="mx-auto flex h-[var(--header-h)] w-full max-w-product items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <Logo height={34} />
+        <PrimaryNav />
+        <HeaderUser />
       </div>
-      <MyMatchBanner />
     </HeaderShell>
   );
 }
 
-/** Подвал: логотип и копирайт, основное и второстепенное меню */
+/** Подвал: разделы продукта и второстепенное — о платформе, правила, FAQ */
 export function SiteFooter() {
   return (
     <PublicOnly>
-      <footer className="mt-24">
-        <div className="mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-16">
-          <div className="flex flex-col gap-8 border-t border-white/[0.08] py-10 md:flex-row md:items-center">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
-              <Logo height={46} />
-              <span className="text-[13px] text-fg-3 lg:text-[14px]">© {new Date().getFullYear()} F16 Arena. Все права защищены.</span>
-            </div>
-            <nav className="flex flex-wrap gap-x-9 gap-y-0 text-[13px] text-fg-2 md:ml-auto md:gap-y-3 lg:gap-x-12 lg:text-[14px]" aria-label="Подвал">
-              {[...NAV, ...NAV_MORE].map((i) => (
-                <Link key={i.href} href={i.href} className="inline-flex min-h-11 items-center transition-colors duration-150 hover:text-fg md:min-h-0">
-                  {i.label}
-                </Link>
-              ))}
-            </nav>
+      <footer className="mt-24 border-t border-line-subtle bg-shell">
+        <div className="mx-auto grid w-full max-w-product gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto_auto] md:gap-16 lg:px-8">
+          <div className="flex flex-col gap-4">
+            <Logo height={40} />
+            <p className="max-w-xs text-meta text-fg-3">Турниры и лобби по CS2 на серверах клуба F16 Arena.</p>
+            <span className="text-micro text-fg-4">© {new Date().getFullYear()} F16 Arena</span>
           </div>
+          <nav aria-label="Разделы">
+            <div className="mb-3 text-meta font-medium text-fg-2">Разделы</div>
+            <ul className="space-y-1">
+              {PRIMARY_NAV.map((i) => (
+                <li key={i.href}>
+                  <Link href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
+                    {i.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <nav aria-label="Помощь">
+            <div className="mb-3 text-meta font-medium text-fg-2">Ещё</div>
+            <ul className="space-y-1">
+              {SECONDARY_NAV.map((i) => (
+                <li key={i.href}>
+                  <Link href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
+                    {i.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
       </footer>
     </PublicOnly>

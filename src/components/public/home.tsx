@@ -77,7 +77,7 @@ const Icon = {
 
 function Hero({ featured }: Pick<HomeData, "featured">) {
   return (
-    <section className="relative -mt-[72px] lg:-mt-[96px] overflow-hidden">
+    <section className="relative -mt-[var(--header-h)] overflow-hidden">
       {/* фото из утверждённого макета — справа, растворяется в фоне */}
       <div className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-[64%] lg:w-[58%]">
         <Image src="/home/hero.jpg" alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover object-[30%_top]" />

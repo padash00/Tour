@@ -42,7 +42,7 @@ import { cn } from "./cn";
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Фокус внутри слоя, Esc закрывает, после закрытия фокус возвращается туда, откуда открыли */
-function useModal(open: boolean, onClose: () => void) {
+export function useModal(open: boolean, onClose: () => void) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   useEffect(() => {
@@ -84,9 +84,16 @@ function useModal(open: boolean, onClose: () => void) {
   return panel;
 }
 
-function Layer({ children, onClose, align }: { children: ReactNode; onClose: () => void; align: "center" | "right" }) {
+export function ModalLayer({ children, onClose, align }: { children: ReactNode; onClose: () => void; align: "center" | "right" | "top" }) {
   return createPortal(
-    <div className={cn("fixed inset-0 z-[100] flex", align === "center" ? "items-end justify-center sm:items-center sm:p-4" : "items-end justify-center sm:items-stretch sm:justify-end")}>
+    <div
+      className={cn(
+        "fixed inset-0 z-[100] flex",
+        align === "center" && "items-end justify-center sm:items-center sm:p-4",
+        align === "right" && "items-end justify-center sm:items-stretch sm:justify-end",
+        align === "top" && "items-start justify-center px-3 pt-3 sm:px-4 sm:pt-[12vh]",
+      )}
+    >
       <div className="absolute inset-0 bg-overlay backdrop-blur-[4px] animate-[fade_var(--dur-modal)_ease-out]" onClick={onClose} aria-hidden />
       {children}
     </div>,
@@ -116,7 +123,7 @@ export function Dialog({
   if (!open || typeof document === "undefined") return null;
   const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]" }[size];
   return (
-    <Layer onClose={onClose} align="center">
+    <ModalLayer onClose={onClose} align="center">
       <div
         ref={panel}
         role="dialog"
@@ -143,7 +150,7 @@ export function Dialog({
         {footer && <div className="flex flex-col-reverse gap-2 border-t border-line-subtle px-5 py-4 sm:flex-row sm:justify-end sm:px-6">{footer}</div>}
         {!children && !footer && <div className="pb-5" />}
       </div>
-    </Layer>
+    </ModalLayer>
   );
 }
 
@@ -172,7 +179,7 @@ export function Sheet({
   const titleId = useId();
   if (!open || typeof document === "undefined") return null;
   return (
-    <Layer onClose={onClose} align="right">
+    <ModalLayer onClose={onClose} align="right">
       <div
         ref={panel}
         role="dialog"
@@ -200,7 +207,7 @@ export function Sheet({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
         {footer && <div className="border-t border-line-subtle px-5 py-4 sm:px-6">{footer}</div>}
       </div>
-    </Layer>
+    </ModalLayer>
   );
 }
 

@@ -118,7 +118,7 @@
 
 :root {
   color-scheme: dark;
-  --header-h: 72px;
+  --header-h: 56px;
   --focus-ring: #6ea8ffb3;
   /* длительности: наведение · нажатие · поповер · модальное окно · смена состояния */
   --dur-hover: 140ms;
@@ -129,7 +129,7 @@
 }
 @media (min-width: 1024px) {
   :root {
-    --header-h: 96px;
+    --header-h: 64px;
   }
 }
 

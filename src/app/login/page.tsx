@@ -20,7 +20,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
   if (await getCurrentPlayer()) redirect(next);
 
   return (
-    <div className="relative flex min-h-[calc(100vh-96px)] items-center justify-center overflow-hidden px-5 py-16">
+    <div className="relative flex min-h-[calc(100dvh-var(--header-h))] items-center justify-center overflow-hidden px-5 py-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_480px_at_50%_0%,#16253d80,transparent_70%)]" />
       <div className="relative w-full max-w-[440px] text-center">
         <span className="inline-flex justify-center">

@@ -14,7 +14,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
   if (!team) {
     return (
-      <Wrap className="flex min-h-[calc(100vh-96px)] items-start justify-center py-10 sm:items-center sm:py-16">
+      <Wrap className="flex min-h-[calc(100dvh-var(--header-h))] items-start justify-center py-10 sm:items-center sm:py-16">
         <h1 className="sr-only">Приглашение в команду</h1>
         <EmptyCard
           className="w-full max-w-[560px]"
@@ -36,7 +36,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const captain = members.find((m) => m.role === "captain");
 
   return (
-    <Wrap className="relative flex min-h-[calc(100vh-96px)] items-start justify-center py-10 sm:items-center sm:py-16">
+    <Wrap className="relative flex min-h-[calc(100dvh-var(--header-h))] items-start justify-center py-10 sm:items-center sm:py-16">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(800px_440px_at_50%_0%,#16253d80,transparent_70%)]" />
       <div className={`${CARD} relative w-full max-w-[520px] px-6 py-12 text-center sm:px-12`}>
         <div className="flex justify-center">

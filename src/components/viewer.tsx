@@ -2,11 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
+import type { Activity } from "@/lib/activity";
 
 /**
  * «Кто смотрит» на клиенте. Публичные страницы кэшируются CDN и одинаковы для всех —
- * персональное (шапка, «Моя команда», участие в турнире) подгружается отсюда.
- * Один запрос /api/me на загрузку страницы и при каждом переходе (обновляет счётчик уведомлений).
+ * персональное (шапка, глобальная активность, «Моя команда», участие в турнире) подгружается отсюда.
+ * Запрос /api/me — при загрузке и каждом переходе, дальше опрос: чаще, когда есть срочное действие.
  */
 export type Viewer = {
   id: string;
@@ -15,18 +16,11 @@ export type Viewer = {
   steam_id: string;
   isAdmin: boolean;
 };
-/** Матч игрока, требующий внимания (из /api/me) */
-export type ViewerMatch = {
-  id: string;
-  number: number;
-  status: "veto" | "ready" | "live";
-  opponent: string;
-  address: string | null;
-  password: string | null;
-};
-type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; match: ViewerMatch | null };
+export type { Activity };
+type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; activity: Activity | null; moreActivity: number };
 
-let state: State = { status: "loading", player: null, unread: 0, match: null };
+const EMPTY: State = { status: "loading", player: null, unread: 0, activity: null, moreActivity: 0 };
+let state: State = EMPTY;
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
 
@@ -35,12 +29,14 @@ function emit(next: State) {
   listeners.forEach((l) => l());
 }
 
+type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number } };
+
 export function refreshViewer() {
   if (inflight) return inflight;
   inflight = fetch("/api/me", { cache: "no-store", credentials: "same-origin" })
-    .then((r) => (r.ok ? r.json() : { player: null, unread: 0, match: null }))
-    .then((d: { player: Viewer | null; unread: number; match?: ViewerMatch | null }) =>
-      emit({ status: "ready", player: d.player, unread: d.unread ?? 0, match: d.match ?? null }),
+    .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : { player: null, unread: 0 }))
+    .then((d: MeResponse) =>
+      emit({ status: "ready", player: d.player, unread: d.unread ?? 0, activity: d.activity?.top ?? null, moreActivity: d.activity?.more ?? 0 }),
     )
     .catch(() => emit({ ...state, status: "ready" }))
     .finally(() => {
@@ -53,13 +49,12 @@ const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
-const SERVER: State = { status: "loading", player: null, unread: 0, match: null };
 
 export function useViewer(): State {
   return useSyncExternalStore(
     subscribe,
     () => state,
-    () => SERVER,
+    () => EMPTY,
   );
 }
 
@@ -69,12 +64,23 @@ export function ViewerSync() {
   useEffect(() => {
     refreshViewer();
   }, [pathname]);
-  // вошедшему игроку — раз в 15 с: «твой матч готов» и счётчик уведомлений без перезагрузки
+  // вошедшему игроку: есть срочное действие — раз в 5 с (ход в вето, проверка готовности), иначе раз в 15 с
   useEffect(() => {
-    const id = setInterval(() => {
-      if (state.player && document.visibilityState === "visible") refreshViewer();
-    }, 15_000);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setTimeout>;
+    const loop = () => {
+      const ms = state.activity && state.activity.priority <= 3 ? 5_000 : 15_000;
+      timer = setTimeout(async () => {
+        if (state.player && document.visibilityState === "visible") await refreshViewer();
+        loop();
+      }, ms);
+    };
+    loop();
+    const onVisible = () => document.visibilityState === "visible" && state.player && refreshViewer();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   return null;
 }
