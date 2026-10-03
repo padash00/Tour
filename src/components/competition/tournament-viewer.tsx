@@ -112,8 +112,8 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
           t.status === "checkin"
             ? "Check-in уже открыт, а заявка ещё не одобрена. Обратитесь к администратору турнира."
             : t.status === "registration"
-              ? `Отправлена ${formatDateTime(reg.created_at)}. Администратор рассмотрит заявку до check-in.`
-              : `Отправлена ${formatDateTime(reg.created_at)}. Заявка ожидает решения администратора.`,
+              ? "Заявка на рассмотрении. Администратор рассмотрит её до check-in."
+              : "Заявка на рассмотрении. Она ожидает решения администратора.",
         cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
       };
     }
