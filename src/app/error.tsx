@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
-import { Eyebrow, WRAP, btnClass } from "@/components/primitives";
+import { Button, Container, Eyebrow } from "@/components/ds";
 
 /** Ошибка на странице: спокойное сообщение без технических деталей */
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
@@ -20,28 +19,21 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
   }, [error]);
 
   return (
-    <div className={`${WRAP} py-28 lg:py-40`}>
+    <Container className="py-24 sm:py-32 lg:py-40">
       <Eyebrow>Ошибка</Eyebrow>
-      <h1 className="t-h1 mt-6">Что-то пошло не так</h1>
+      <h1 className="mt-5 text-[36px] font-semibold tracking-[-0.025em] text-fg sm:text-[48px]">Что-то пошло не так</h1>
       <p className="mt-6 max-w-[560px] text-[17px] leading-relaxed text-fg-2">
         Страница не загрузилась. Попробуйте ещё раз — если ошибка повторится, сообщите администратору турнира.
       </p>
       {error.digest && <p className="mt-3 text-[13px] text-fg-3 num">Код: {error.digest}</p>}
       <div className="mt-10 flex flex-wrap gap-4">
-        <button
-          type="button"
-          onClick={() => retry()}
-          className={btnClass("primary", "lg", "min-w-[220px]")}
-        >
+        <Button onClick={() => retry()} size="lg" className="min-w-[220px]">
           Попробовать снова
-        </button>
-        <Link
-          href="/"
-          className={btnClass("outline", "lg", "min-w-[180px]")}
-        >
+        </Button>
+        <Button href="/" variant="secondary" size="lg" className="min-w-[180px]">
           На главную
-        </Link>
+        </Button>
       </div>
-    </div>
+    </Container>
   );
 }
