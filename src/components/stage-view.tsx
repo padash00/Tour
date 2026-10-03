@@ -13,7 +13,7 @@ function TeamCell({ team }: { team?: Pick<Team, "name" | "tag" | "logo_url"> }) 
   if (!team) return <span className="text-fg-3">TBD</span>;
   return (
     <span className="flex items-center gap-2.5 min-w-0">
-      <TeamLogo src={team.logo_url} tag={team.tag} size={24} />
+      <TeamLogo src={team.logo_url} tag={team.tag} size="xs" />
       <span className="truncate font-medium text-fg">{team.name}</span>
     </span>
   );
@@ -140,7 +140,7 @@ function CrossTable({
             {ids.map((id, j) => (
               <th key={id} className="w-[76px] px-1 py-3 text-center font-medium" title={teams.get(id)?.name}>
                 <span className="inline-flex flex-col items-center gap-1">
-                  <TeamLogo src={teams.get(id)?.logo_url ?? null} tag={teams.get(id)?.tag ?? "?"} size={22} />
+                  <TeamLogo src={teams.get(id)?.logo_url ?? null} tag={teams.get(id)?.tag ?? "?"} size="xs" />
                   <span className="num">{j + 1}</span>
                 </span>
               </th>
