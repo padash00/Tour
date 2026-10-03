@@ -91,9 +91,14 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
 
   if (t.status === "cancelled") return { tone: "neutral", label: "Турнир отменён", title: "Турнир отменён" };
   if (t.status === "finished") {
-    return reg?.status === "approved"
-      ? { tone: "neutral", label: "Вы участвовали", title: team?.name ?? "Участие", text: "Итоги, сетка и статистика — во вкладках турнира.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } }
-      : { tone: "neutral", label: "Турнир завершён", title: "Турнир завершён", text: "Итоги и статистика — во вкладках турнира." };
+    // участие = одобрена + check-in пройден; одобренная без check-in — не «участвовали»
+    if (reg?.status === "approved" && reg.checked_in_at) {
+      return { tone: "neutral", label: "Вы участвовали", title: team?.name ?? "Участие", text: "Итоги, сетка и статистика — во вкладках турнира.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } };
+    }
+    if (reg?.status === "approved") {
+      return { tone: "neutral", label: "Заявка была одобрена", title: team?.name ?? "Заявка", text: "Команда не прошла check-in. Турнир уже завершён.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } };
+    }
+    return { tone: "neutral", label: "Турнир завершён", title: "Турнир завершён", text: "Итоги и статистика — во вкладках турнира." };
   }
 
   if (active && reg) {
@@ -103,7 +108,12 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
         label: "Ваша заявка",
         title: team?.name ?? "Заявка",
         status: [registrationStatus.pending],
-        text: `Отправлена ${formatDateTime(reg.created_at)}. Администратор рассмотрит её до check-in.`,
+        text:
+          t.status === "checkin"
+            ? "Check-in уже открыт, а заявка ещё не одобрена. Обратитесь к администратору турнира."
+            : t.status === "registration"
+              ? `Отправлена ${formatDateTime(reg.created_at)}. Администратор рассмотрит заявку до check-in.`
+              : `Отправлена ${formatDateTime(reg.created_at)}. Заявка ожидает решения администратора.`,
         cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
       };
     }
@@ -141,20 +151,39 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
     };
   }
 
+  // отклонённая заявка важнее общего «регистрация закрыта»: причина остаётся видимой
+  if (reg?.status === "rejected") {
+    const open = t.status === "registration";
+    return {
+      tone: "danger",
+      label: "Заявка отклонена",
+      title: team?.name ?? "Заявка",
+      status: [registrationStatus.rejected],
+      text: (
+        <>
+          {reg.note ? `Причина: ${reg.note}` : "Администратор отклонил заявку."}
+          {open ? " Исправьте состав и подайте снова, пока открыта регистрация." : " Регистрация уже закрыта."}
+        </>
+      ),
+      cta: open && canManage ? { href: `${base}/register`, label: "Подать заявку снова" } : undefined,
+    };
+  }
+
   if (t.status !== "registration") {
     return t.status === "live"
       ? { tone: "neutral", label: "Турнир идёт", title: "Регистрация закрыта", text: "Следите за сеткой и матчами во вкладках турнира." }
       : { tone: "neutral", label: "Регистрация закрыта", title: "Регистрация закрыта", text: checkin && t.status !== "checkin" ? `Check-in для участников: ${checkin}.` : "Новые заявки не принимаются." };
   }
 
-  // регистрация открыта, активной заявки нет
-  const rejected = reg?.status === "rejected" ? { label: "Предыдущая заявка отклонена", tone: "danger" as const } : null;
-  const rejectNote = reg?.status === "rejected" && reg.note ? `Причина: ${reg.note}` : null;
+  // регистрация открыта, активной заявки нет (отклонённая обработана выше)
+  // мест нет: backend всё равно принимает заявку на рассмотрение, одобрят, если место освободится
+  const seats = free > 0 ? `${free} из ${t.max_teams} мест свободно` : "Свободных мест сейчас нет";
+  const fullNote = "Заявку всё ещё можно отправить; её одобрение возможно, если место освободится.";
   if (!loggedIn) {
-    return { tone: "accent", label: "Регистрация открыта", title: `${free} из ${t.max_teams} мест свободно`, text: "Войдите через Steam, чтобы подать заявку.", cta: { href: `/login?next=${encodeURIComponent(`${base}/register`)}`, label: "Войти через Steam" } };
+    return { tone: "accent", label: "Регистрация открыта", title: seats, text: free > 0 ? "Войдите через Steam, чтобы подать заявку." : `${fullNote} Войдите через Steam.`, cta: { href: `/login?next=${encodeURIComponent(`${base}/register`)}`, label: "Войти через Steam" } };
   }
   if (soloFormat) {
-    return { tone: "accent", label: "Регистрация открыта", title: `${free} из ${t.max_teams} мест свободно`, status: rejected ? [rejected] : undefined, text: rejectNote ?? "Участие — сами за себя, команда не нужна.", cta: { href: `${base}/register`, label: rejected ? "Подать заявку снова" : "Участвовать" } };
+    return { tone: "accent", label: "Регистрация открыта", title: seats, text: free > 0 ? "Участие — сами за себя, команда не нужна." : fullNote, cta: { href: `${base}/register`, label: "Участвовать" } };
   }
   if (!team || team.solo) {
     return { tone: "neutral", label: "Регистрация открыта", title: "Для участия нужна команда", text: `Соберите команду: в основе ${mode.size}${mode.subs ? `, до ${mode.subs} запасных` : ""}.`, cta: { href: "/team/create", label: "Создать команду" }, extra: { href: "/find", label: "Найти команду" } };
@@ -169,7 +198,14 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
     };
   }
   return isCaptain
-    ? { tone: rejected ? "danger" : "accent", label: rejected ? "Заявку нужно исправить" : "Команда готова", title: team.name, status: rejected ? [rejected] : [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }], text: rejectNote ?? `${free} из ${t.max_teams} мест свободно${t.registration_closes_at ? ` · заявки до ${formatDateTime(t.registration_closes_at)}` : ""}.`, cta: { href: `${base}/register`, label: rejected ? "Подать заявку снова" : "Подать заявку" } }
+    ? {
+        tone: "accent",
+        label: "Команда готова",
+        title: team.name,
+        status: [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }],
+        text: free > 0 ? `${seats}${t.registration_closes_at ? ` · заявки до ${formatDateTime(t.registration_closes_at)}` : ""}.` : `${seats}. ${fullNote}`,
+        cta: { href: `${base}/register`, label: "Подать заявку" },
+      }
     : { tone: "neutral", label: "Команда готова", title: team.name, status: [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }], text: "Заявку на турнир подаёт капитан команды." };
 }
 

@@ -311,7 +311,7 @@ export function ParticipationDemo() {
   const team = (mains: number) => ({ id: "x", name: "Next Level", captain_id: "c", mains, solo: false });
   const reg = (status: "pending" | "approved" | "rejected", checked = false, note: string | null = null) => ({ status, checked_in_at: checked ? "2026-10-10T05:10:00Z" : null, note, created_at: "2026-10-03T12:00:00Z" });
   const me = (o: Partial<TournamentMe>): TournamentMe => ({ loggedIn: true, isAdmin: false, team: null, isCaptain: true, reg: null, ...o });
-  const cases: { note: string; t: TournamentLite; me: TournamentMe }[] = [
+  const cases: { note: string; t: TournamentLite; me: TournamentMe; approved?: number }[] = [
     { note: "Гость", t: t("registration"), me: { loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null } },
     { note: "Нет команды", t: t("registration"), me: me({}) },
     { note: "Состав неполный", t: t("registration"), me: me({ team: team(3) }) },
@@ -324,13 +324,18 @@ export function ParticipationDemo() {
     { note: "Check-in пройден", t: t("checkin"), me: me({ team: team(5), reg: reg("approved", true) }) },
     { note: "Турнир идёт (участник)", t: t("live"), me: me({ team: team(5), reg: reg("approved", true) }) },
     { note: "Регистрация закрыта (не участник)", t: t("registration_closed"), me: me({ team: team(5) }) },
+    { note: "Мест нет — заявку можно отправить", t: t("registration"), me: me({ team: team(5) }), approved: 16 },
+    { note: "Заявка ждёт, а check-in уже открыт", t: t("checkin"), me: me({ team: team(5), reg: reg("pending") }) },
+    { note: "Отклонена, регистрация закрыта", t: t("live"), me: me({ team: team(5), reg: reg("rejected", false, "Не хватает игроков в основе") }) },
+    { note: "Завершён: одобрена без check-in", t: t("finished"), me: me({ team: team(5), reg: reg("approved") }) },
+    { note: "Завершён: участвовали", t: t("finished"), me: me({ team: team(5), reg: reg("approved", true) }) },
   ];
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {cases.map((c) => (
         <div key={c.note}>
           <div className="mb-2 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{c.note}</div>
-          <ParticipationPanel t={c.t} approvedCount={11} preview={c.me} />
+          <ParticipationPanel t={c.t} approvedCount={c.approved ?? 11} preview={c.me} />
         </div>
       ))}
     </div>
