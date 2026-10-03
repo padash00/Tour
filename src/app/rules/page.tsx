@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CARD, Eyebrow, PageHero, WRAP } from "@/components/primitives";
+import { Container, PageTitle, Panel, cn } from "@/components/ds";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
@@ -87,104 +87,98 @@ const FAQ = [
 export default function RulesPage() {
   return (
     <>
-      <PageHero
-        eyebrow="Регламент F16 Arena"
-        title="Правила и FAQ"
-        description="Общие правила платформы. У турнира могут быть свои дополнения — смотрите вкладку «Правила» на его странице."
-      />
+      <Container width="wide" className="pb-8 pt-8 sm:pt-10">
+        <PageTitle>Правила и FAQ</PageTitle>
+        <p className="mt-2 max-w-[760px] text-[15px] leading-relaxed text-fg-2">
+          Общие правила платформы F16 Arena. У конкретного турнира могут быть дополнительные условия — они публикуются на его странице.
+        </p>
+      </Container>
 
-      {/* мобильное оглавление — горизонтальная лента */}
-      <nav className="lg:hidden border-b border-white/[0.06]" aria-label="Разделы правил">
-        <div className={`${WRAP} flex gap-2 overflow-x-auto py-4 [scrollbar-width:none]`}>
-          {RULES.map((r, i) => (
+      <nav className="border-y border-line-subtle bg-shell lg:hidden" aria-label="Разделы правил">
+        <Container width="wide" className="flex gap-2 overflow-x-auto py-3 [scrollbar-width:none]">
+          {RULES.map((rule, i) => (
             <a
-              key={r.title}
+              key={rule.title}
               href={`#r${i + 1}`}
-              className="shrink-0 rounded-full border border-white/[0.1] px-4 h-9 inline-flex items-center text-[13px] text-fg-2"
+              className="inline-flex h-9 shrink-0 items-center rounded-chip border border-line px-4 text-meta text-fg-2"
             >
-              {r.title}
+              {rule.title}
             </a>
           ))}
-          <a href="#faq" className="shrink-0 rounded-full border border-accent/40 px-4 h-9 inline-flex items-center text-[13px] text-accent">
+          <a href="#faq" className="inline-flex h-9 shrink-0 items-center rounded-chip border border-accent/40 px-4 text-meta text-accent">
             FAQ
           </a>
-        </div>
+        </Container>
       </nav>
 
-      <div className={`${WRAP} pt-12 lg:pt-16 lg:grid lg:grid-cols-[280px_minmax(0,780px)] lg:gap-20`}>
+      <Container width="wide" className="grid gap-12 pb-16 pt-10 lg:grid-cols-[260px_minmax(0,780px)] lg:gap-16">
         <nav className="hidden lg:block" aria-label="Разделы правил">
-          <div className={`${CARD} sticky top-32 p-6`}>
-            <Eyebrow className="mb-5">Содержание</Eyebrow>
+          <Panel className="sticky top-[calc(var(--shell-h)+24px)]">
+            <div className="mb-4 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">Содержание</div>
             <ol className="space-y-1 text-[14px]">
-              {RULES.map((r, i) => (
-                <li key={r.title}>
-                  <a
-                    href={`#r${i + 1}`}
-                    className="flex gap-3 rounded-md px-2 py-2 text-fg-2 transition-colors hover:bg-white/[0.04] hover:text-fg"
-                  >
-                    <span className="num w-6 text-[12px] text-fg-3">{String(i + 1).padStart(2, "0")}</span>
-                    {r.title}
+              {RULES.map((rule, i) => (
+                <li key={rule.title}>
+                  <a href={`#r${i + 1}`} className="flex gap-3 rounded-control px-2 py-2 text-fg-2 transition-colors hover:bg-white/[0.04] hover:text-fg">
+                    <span className="num w-6 text-micro text-fg-3">{String(i + 1).padStart(2, "0")}</span>
+                    {rule.title}
                   </a>
                 </li>
               ))}
-              <li className="pt-2 mt-2 border-t border-white/[0.06]">
-                <a href="#faq" className="flex gap-3 rounded-md px-2 py-2 text-accent transition-colors hover:bg-white/[0.04]">
-                  <span className="w-6 text-[12px]">?</span>
+              <li className="mt-2 border-t border-line-subtle pt-2">
+                <a href="#faq" className="flex gap-3 rounded-control px-2 py-2 text-accent hover:bg-white/[0.04]">
+                  <span className="w-6 text-micro">?</span>
                   Частые вопросы
                 </a>
               </li>
             </ol>
-          </div>
+          </Panel>
         </nav>
 
         <article className="min-w-0">
-          {RULES.map((r, i) => (
-            <section key={r.title} id={`r${i + 1}`} className="scroll-mt-32 pb-14 lg:pb-16">
+          {RULES.map((rule, i) => (
+            <section key={rule.title} id={`r${i + 1}`} className="scroll-mt-[calc(var(--shell-h)+24px)] border-b border-line-subtle pb-12 pt-2 first:pt-0 lg:pb-14">
               <div className="flex items-baseline gap-4">
-                <span className="num text-[14px] text-accent">{String(i + 1).padStart(2, "0")}</span>
-                <h2 className="text-[24px] font-semibold tracking-[-0.015em] text-fg md:text-[30px]">{r.title}</h2>
+                <span className="num text-meta text-accent">{String(i + 1).padStart(2, "0")}</span>
+                <h2 className="text-heading text-fg">{rule.title}</h2>
               </div>
-              <ol className="mt-6 space-y-4 border-l border-white/[0.08] pl-6 sm:ml-2 sm:pl-8">
-                {r.items.map((it, j) => (
-                  <li key={it} className="text-[16px] leading-[1.75] text-fg-2 lg:text-[17px]">
-                    <span className="num mr-3 text-[12px] text-fg-3">
-                      {i + 1}.{j + 1}
-                    </span>
-                    {it}
+              <ol className="mt-5 space-y-4 border-l border-line-subtle pl-5 sm:ml-2 sm:pl-7">
+                {rule.items.map((item, j) => (
+                  <li key={item} className="text-[15px] leading-[1.75] text-fg-2">
+                    <span className="num mr-3 text-micro text-fg-3">{i + 1}.{j + 1}</span>
+                    {item}
                   </li>
                 ))}
               </ol>
             </section>
           ))}
 
-          <section id="faq" className="scroll-mt-32 pt-4">
+          <section id="faq" className="scroll-mt-[calc(var(--shell-h)+24px)] pt-12">
             <div className="flex items-baseline gap-4">
-              <span className="num text-[14px] text-accent">?</span>
-              <h2 className="text-[24px] font-semibold tracking-[-0.015em] text-fg md:text-[30px]">Частые вопросы</h2>
+              <span className="num text-meta text-accent">?</span>
+              <h2 className="text-heading text-fg">Частые вопросы</h2>
             </div>
-            <div className={`${CARD} mt-6 divide-y divide-white/[0.06]`}>
-              {FAQ.map((f) => (
-                <details key={f.q} className="group px-6 py-5 sm:px-7">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[16px] font-medium text-fg sm:text-[17px]">
-                    {f.q}
-                    <span className="grid size-7 shrink-0 place-items-center rounded-full border border-white/[0.12] text-fg-3 transition group-open:rotate-45 group-open:border-accent/50 group-open:text-accent">
+
+            <Panel padded={false} className="mt-5 divide-y divide-line-subtle overflow-hidden">
+              {FAQ.map((item) => (
+                <details key={item.q} className="group px-5 py-4 sm:px-6">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium text-fg">
+                    {item.q}
+                    <span className={cn("grid size-7 shrink-0 place-items-center rounded-full border border-line text-fg-3 transition-transform", "group-open:rotate-45 group-open:border-accent/50 group-open:text-accent")}>
                       +
                     </span>
                   </summary>
-                  <p className="mt-3 pr-10 text-[15px] leading-[1.7] text-fg-2 sm:text-[16px]">{f.a}</p>
+                  <p className="mt-3 pr-8 text-[14px] leading-[1.7] text-fg-2">{item.a}</p>
                 </details>
               ))}
-            </div>
-            <p className="mt-8 text-[14px] text-fg-3">
-              Не нашли ответ? Контакты организатора — на{" "}
-              <Link href="/tournaments" className="text-fg-2 underline underline-offset-4 hover:text-fg">
-                странице турнира
-              </Link>
-              .
+            </Panel>
+
+            <p className="mt-7 text-meta text-fg-3">
+              Не нашли ответ? Контакты организатора указаны на{" "}
+              <Link href="/tournaments" className="text-fg-2 underline underline-offset-4 hover:text-fg">странице турнира</Link>.
             </p>
           </section>
         </article>
-      </div>
+      </Container>
     </>
   );
 }
