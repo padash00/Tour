@@ -31,7 +31,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: "h-8 gap-1.5 rounded-control px-3 text-meta",
+  sm: "h-9 gap-1.5 rounded-control px-3 text-meta sm:h-8",
   md: "h-11 gap-2 rounded-control px-4 text-[14px] sm:h-10",
   lg: "h-12 gap-2.5 rounded-control px-6 text-[15px]",
 };
@@ -115,7 +115,7 @@ export function IconButton({
   className,
   ...rest
 }: { label: string; variant?: Exclude<ButtonVariant, "quiet">; size?: ButtonSize } & ComponentProps<"button">) {
-  const box = size === "sm" ? "size-8" : size === "lg" ? "size-12" : "size-11 sm:size-10";
+  const box = size === "sm" ? "size-9 sm:size-8" : size === "lg" ? "size-12" : "size-11 sm:size-10";
   return (
     <button type="button" aria-label={label} title={label} {...rest} className={cn(BASE, VARIANT[variant], box, "rounded-control [&>svg]:size-[18px]", className)}>
       {children}
