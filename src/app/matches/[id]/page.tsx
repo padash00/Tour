@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Gamepad2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { SocialDownloads } from "@/components/social-downloads";
@@ -34,7 +35,6 @@ import {
   Panel,
   RowList,
   Section,
-  Stack,
   Status,
   SubsectionTitle,
   Textarea,
@@ -250,6 +250,121 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
       <Callout tone="danger" title="Матч отменён">Этот матч больше не будет сыгран.</Callout>
     );
 
+  const vetoHistory =
+    m.status !== "veto" && m.veto.length > 0 ? (
+      <Section title="Вето карт">
+        <VetoBoard m={m} state={state} myTurn={false} compact images={mapImages} serverNow={serverNow} />
+      </Section>
+    ) : null;
+
+  const rostersBlock = (
+    <Section title="Составы" description="Основной состав и запасные, заявленные на этот турнир.">
+      <div className="grid gap-10 md:grid-cols-2 md:gap-12">
+        {[
+          { team: m.team1, roster: rosters.team1 },
+          { team: m.team2, roster: rosters.team2 },
+        ].map(({ team, roster }, i) => (
+          <div key={i}>
+            <SubsectionTitle>{team?.name ?? "TBD"}</SubsectionTitle>
+            {roster.length ? (
+              <RosterList
+                items={[...roster]
+                  .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
+                  .map((r) => ({
+                    key: r.player.id,
+                    player: r.player,
+                    role: r.player.id === team?.captain_id ? "captain" : r.role,
+                  }))}
+              />
+            ) : (
+              <EmptyState compact icon={<Gamepad2 />} title="Состав появится" text="Когда команда определится по итогам предыдущих матчей." />
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+
+  const disputeBlock =
+    disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status)) ? (
+      <Section title="Спор по матчу" description="Используйте только для проблем, которые могут повлиять на официальный результат.">
+        <div className="max-w-3xl space-y-6">
+          {disputes.length > 0 && (
+            <RowList>
+              {disputes.map((d) => {
+                const info =
+                  d.status === "open"
+                    ? { label: "Рассматривается", tone: "warn" as const }
+                    : d.status === "resolved"
+                      ? { label: "Принят", tone: "ok" as const }
+                      : { label: "Отклонён", tone: "neutral" as const };
+                return (
+                  <div key={d.id} className="px-4 py-4 sm:px-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="text-meta text-fg-3">
+                        {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} · {formatDateTime(d.created_at)}
+                      </div>
+                      <Status info={info} size="sm" />
+                    </div>
+                    <p className="mt-2 whitespace-pre-line text-[14px] text-fg">{d.reason}</p>
+                    {d.decision && <p className="mt-2 text-[14px] text-fg-2">Решение: {d.decision}</p>}
+                  </div>
+                );
+              })}
+            </RowList>
+          )}
+
+          {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
+            <Panel>
+              <ActionForm action={openDispute}>
+                <input type="hidden" name="matchId" value={m.id} />
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="dispute-reason" className="text-meta font-medium text-fg-2">Что произошло</label>
+                  <Textarea
+                    id="dispute-reason"
+                    name="reason"
+                    rows={4}
+                    required
+                    minLength={10}
+                    placeholder="Например: 14-й раунд, у игрока X пропал звук…"
+                    aria-describedby="dispute-reason-hint"
+                  />
+                  <p id="dispute-reason-hint" className="text-meta text-fg-3">
+                    Укажите раунд, время и игроков. Само обращение не меняет результат.
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
+                    Открыть спор
+                  </SubmitButton>
+                </div>
+              </ActionForm>
+            </Panel>
+          )}
+        </div>
+      </Section>
+    ) : null;
+
+  const detailBlocks =
+    m.status === "live"
+      ? [
+          { key: "rounds", node: roundsBlock },
+          { key: "stats", node: scoreboard },
+          { key: "series", node: seriesMaps },
+        ]
+      : [
+          { key: "series", node: seriesMaps },
+          { key: "rounds", node: roundsBlock },
+          { key: "stats", node: scoreboard },
+        ];
+
+  const matchBands = [
+    ...detailBlocks,
+    { key: "veto", node: vetoHistory },
+    { key: "rosters", node: rostersBlock },
+    { key: "dispute", node: disputeBlock },
+  ].filter((band): band is { key: string; node: ReactNode } => Boolean(band.node));
+
   return (
     <>
       {["upcoming", "veto", "ready", "live"].includes(m.status) && (
@@ -258,120 +373,20 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
       <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
 
-      <Container width="wide" className="pb-16 pt-6 sm:pt-8">
+      <Container width="wide" className="py-6 sm:py-8">
         <div className="mx-auto max-w-[1100px]">
           <MatchProgress status={m.status} singleMap={m.tournament.map_pool.length <= 1} />
+          <section aria-label="Текущее состояние матча" className="mt-8">
+            {currentState}
+          </section>
         </div>
-
-        <Stack className="mt-8">
-          <section aria-label="Текущее состояние матча">{currentState}</section>
-
-          {m.status === "live" ? (
-            <>
-              {roundsBlock}
-              {scoreboard}
-              {seriesMaps}
-            </>
-          ) : (
-            <>
-              {seriesMaps}
-              {roundsBlock}
-              {scoreboard}
-            </>
-          )}
-
-          {m.status !== "veto" && m.veto.length > 0 && (
-            <Section title="Вето карт">
-              <VetoBoard m={m} state={state} myTurn={false} compact images={mapImages} serverNow={serverNow} />
-            </Section>
-          )}
-
-          <Section title="Составы" description="Основной состав и запасные, заявленные на этот турнир.">
-            <div className="grid gap-10 md:grid-cols-2 md:gap-12">
-              {[
-                { team: m.team1, roster: rosters.team1 },
-                { team: m.team2, roster: rosters.team2 },
-              ].map(({ team, roster }, i) => (
-                <div key={i}>
-                  <SubsectionTitle>{team?.name ?? "TBD"}</SubsectionTitle>
-                  {roster.length ? (
-                    <RosterList
-                      items={[...roster]
-                        .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
-                        .map((r) => ({
-                          key: r.player.id,
-                          player: r.player,
-                          role: r.player.id === team?.captain_id ? "captain" : r.role,
-                        }))}
-                    />
-                  ) : (
-                    <EmptyState compact icon={<Gamepad2 />} title="Состав появится" text="Когда команда определится по итогам предыдущих матчей." />
-                  )}
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          {(disputes.length > 0 || (isCaptain && ["ready", "live", "finished"].includes(m.status))) && (
-            <Section title="Спор по матчу" description="Используйте только для проблем, которые могут повлиять на официальный результат.">
-              <div className="max-w-3xl space-y-6">
-                {disputes.length > 0 && (
-                  <RowList>
-                    {disputes.map((d) => {
-                      const info =
-                        d.status === "open"
-                          ? { label: "Рассматривается", tone: "warn" as const }
-                          : d.status === "resolved"
-                            ? { label: "Принят", tone: "ok" as const }
-                            : { label: "Отклонён", tone: "neutral" as const };
-                      return (
-                        <div key={d.id} className="px-4 py-4 sm:px-5">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="text-meta text-fg-3">
-                              {d.team_id === m.team1_id ? m.team1?.name : d.team_id === m.team2_id ? m.team2?.name : "Администратор"} · {formatDateTime(d.created_at)}
-                            </div>
-                            <Status info={info} size="sm" />
-                          </div>
-                          <p className="mt-2 whitespace-pre-line text-[14px] text-fg">{d.reason}</p>
-                          {d.decision && <p className="mt-2 text-[14px] text-fg-2">Решение: {d.decision}</p>}
-                        </div>
-                      );
-                    })}
-                  </RowList>
-                )}
-
-                {isCaptain && ["ready", "live", "finished"].includes(m.status) && (
-                  <Panel>
-                    <ActionForm action={openDispute}>
-                      <input type="hidden" name="matchId" value={m.id} />
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="dispute-reason" className="text-meta font-medium text-fg-2">Что произошло</label>
-                        <Textarea
-                          id="dispute-reason"
-                          name="reason"
-                          rows={4}
-                          required
-                          minLength={10}
-                          placeholder="Например: 14-й раунд, у игрока X пропал звук…"
-                          aria-describedby="dispute-reason-hint"
-                        />
-                        <p id="dispute-reason-hint" className="text-meta text-fg-3">
-                          Укажите раунд, время и игроков. Само обращение не меняет результат.
-                        </p>
-                      </div>
-                      <div className="mt-4">
-                        <SubmitButton variant="secondary" confirm="Открыть спор? Матч будет помечен «На рассмотрении».">
-                          Открыть спор
-                        </SubmitButton>
-                      </div>
-                    </ActionForm>
-                  </Panel>
-                )}
-              </div>
-            </Section>
-          )}
-        </Stack>
       </Container>
+
+      {matchBands.map((band, index) => (
+        <MatchBand key={band.key} tone={index % 2 === 0 ? "section" : "base"}>
+          {band.node}
+        </MatchBand>
+      ))}
 
       {serverPhase && (inRoster || admin) && m.server_address && m.status === "ready" && (
         <MobileStickyCta note="Сервер готов">
@@ -381,6 +396,27 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         </MobileStickyCta>
       )}
     </>
+  );
+}
+
+function MatchBand({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: "base" | "section";
+}) {
+  return (
+    <div
+      className={cn(
+        "border-t border-line-subtle",
+        tone === "section" ? "bg-section" : "bg-bg",
+      )}
+    >
+      <Container width="wide" className="py-10 sm:py-12 lg:py-14">
+        {children}
+      </Container>
+    </div>
   );
 }
 
