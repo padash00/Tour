@@ -438,7 +438,7 @@ export function LobbyRoom({
       />
 
       <ReadyCheck view={view} now={now} busy={busy} onReady={() => run(() => A.toggleReady(code))} />
-    </div>
+    </>
   );
 }
 
@@ -689,221 +689,354 @@ function Center({
   hostName: string;
   onInvite: () => void;
 }) {
-  const toast = useToast();
   const { lobby, game, me } = view;
-  const s = lobby.settings;
+  const settings = lobby.settings;
   const active = game && ["veto", "waiting", "live"].includes(game.status) ? game : null;
   const inTeam = me?.slot === "team1" || me?.slot === "team2";
   const meReady = view.members.find((m) => m.id === me?.id)?.ready;
   const last = !active && game?.status === "finished" ? game : null;
+  const phase = phaseOf(view);
+  const draftCaptain = lobby.draft ? view.members.find((m) => m.id === lobby.draft?.captains[lobby.draft.turn - 1]) : null;
+  const myDraftTurn = !!lobby.draft && me?.id === lobby.draft.captains[lobby.draft.turn - 1];
 
-  const info: [ReactNode, string, ReactNode][] = [
-    [Icon.map("size-5"), "Карта", s.maps.length === 1 ? mapLabel(s.maps[0]) : s.map_choice === "veto" ? `вето из ${s.maps.length}` : s.map_choice === "random" ? `случайно из ${s.maps.length}` : `${s.maps.length} карт`],
-    [Icon.swords("size-5"), "Формат", `${MODES[s.mode].label.replace(" на ", "×")} · BO${s.best_of}`],
-    [Icon.signal("size-5"), "Сеть", s.network === "lan" ? "LAN (клуб)" : "Интернет"],
-    [Icon.user("size-5"), "Хост", hostName],
+  const facts = [
+    {
+      label: "Карта",
+      value:
+        settings.maps.length === 1
+          ? mapLabel(settings.maps[0])
+          : settings.map_choice === "veto"
+            ? `Вето из ${settings.maps.length}`
+            : settings.map_choice === "random"
+              ? `Случайно из ${settings.maps.length}`
+              : `${settings.maps.length} карт`,
+    },
+    { label: "Формат", value: `${MODES[settings.mode].label.replace(" на ", "×")} · BO${settings.best_of}` },
+    { label: "Сеть", value: settings.network === "lan" ? "LAN · в клубе" : "Интернет" },
+    { label: "Хост", value: hostName },
   ];
 
-  return (
-    <div className="flex flex-col gap-3">
-      {active ? (
-        <GamePanel view={view} now={now} isHost={isHost} busy={busy} run={run} code={code} />
-      ) : (
-        <>
-          <div className="grid min-h-[60px] place-items-center rounded-[12px] border border-white/[0.12] px-4 text-center text-[15px] text-fg">
-            {lobby.status === "closed"
-              ? "Лобби закрыто"
-              : lobby.ready_check_until
-                ? `Проверка готовности · ${secondsLeft(lobby.ready_check_until, now)} с`
-                : lobby.draft
-                  ? "Капитаны выбирают игроков"
-                  : "Ожидание игроков"}
+  let state: ReactNode;
+  if (active) {
+    state = <GamePanel view={view} now={now} isHost={isHost} busy={busy} run={run} code={code} />;
+  } else if (phase === "ready_check") {
+    state = (
+      <CriticalSurface tone="warn">
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-warn">Проверка готовности</div>
+            <h2 className="mt-2 text-heading text-fg">Матч готов к старту</h2>
+            <p className="mt-2 max-w-read text-[14px] text-fg-2">
+              Команды собраны. Все игроки должны подтвердить готовность до окончания таймера.
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-micro text-fg-3">Осталось</div>
+            <div className="num mt-1 text-[36px] font-semibold leading-none text-warn">{secondsLeft(lobby.ready_check_until, now)} с</div>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {inTeam && (
+            <Button
+              size="lg"
+              loading={busy}
+              variant={meReady ? "secondary" : "primary"}
+              onClick={() => run(() => A.toggleReady(code))}
+            >
+              {meReady ? "Готовность подтверждена" : "Я готов"}
+            </Button>
+          )}
+          {isHost && (
+            <Button variant="ghost" size="lg" disabled={busy} onClick={() => run(() => A.cancelReadyCheck(code))}>
+              Отменить проверку
+            </Button>
+          )}
+        </div>
+      </CriticalSurface>
+    );
+  } else if (phase === "draft" && lobby.draft) {
+    state = (
+      <CriticalSurface tone={myDraftTurn ? "accent" : "warn"}>
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myDraftTurn ? "Ваш ход" : "Драфт капитанов"}</div>
+            <h2 className="mt-2 text-heading text-fg">
+              {myDraftTurn ? "Выберите следующего игрока" : `Выбирает ${draftCaptain?.nickname ?? "капитан"}`}
+            </h2>
+            <p className="mt-2 max-w-read text-[14px] text-fg-2">
+              Игроки из блока «В ожидании» распределяются капитанами по командам.
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-micro text-fg-3">На выбор</div>
+            <div className="num mt-1 text-[36px] font-semibold leading-none">{secondsLeft(lobby.draft.deadline, now)} с</div>
+          </div>
+        </div>
+      </CriticalSurface>
+    );
+  } else if (phase === "closed") {
+    state = (
+      <CriticalSurface tone="danger">
+        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-danger">Лобби закрыто</div>
+        <h2 className="mt-2 text-heading text-fg">Новые игры здесь больше не запускаются</h2>
+      </CriticalSurface>
+    );
+  } else {
+    state = (
+      <FeatureSurface>
+        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">Текущее действие</div>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <h2 className="text-heading text-fg">{last ? "Готовы сыграть ещё?" : "Соберите команды"}</h2>
+            <p className="mt-2 max-w-read text-[14px] text-fg-2">
+              {isHost
+                ? settings.player_pick === "captains"
+                  ? "Распределите капитанов и запустите драфт либо расставьте игроков вручную."
+                  : "Расставьте игроков, при необходимости добавьте ботов и запускайте проверку готовности."
+                : settings.start === "all_ready"
+                  ? "Займите место в команде и подтвердите готовность. Матч запустится, когда команды будут готовы."
+                  : "Займите место в команде. Когда составы будут готовы, хост запустит матч."}
+            </p>
           </div>
           {lobby.invite_token && (
-            <button type="button" onClick={onInvite} className="mx-auto inline-flex items-center gap-2 text-[14px] font-medium text-accent hover:text-accent-strong">
+            <Button variant="secondary" size="sm" onClick={onInvite}>
               {Icon.users("size-4")} Пригласить игроков
-            </button>
+            </Button>
           )}
-          {last && (
-            <Link href={`/lobbies/games/${last.id}`} className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-center hover:border-accent/40">
-              <div className="text-[12px] text-fg-3">Последний матч</div>
-              <div className="num mt-1 text-[22px] font-semibold text-fg">
-                {last.team1_score}:{last.team2_score}
-              </div>
-              <div className="text-[12px] text-fg-2">
-                {last.winner ? `победил ${last.winner === 1 ? last.team1.name : last.team2.name}` : "ничья"} · статистика →
-              </div>
-            </Link>
-          )}
-        </>
-      )}
+        </div>
 
-      <div className="divide-y divide-white/[0.05] rounded-[12px] bg-surface">
-        {info.map(([icon, label, value]) => (
-          <div key={label} className="flex items-center gap-3 px-4 py-3 text-[14px]">
-            <span className="text-fg-3">{icon}</span>
-            <span className="text-fg-2">{label}</span>
-            <span className="ml-auto truncate text-fg">{value}</span>
-          </div>
-        ))}
-      </div>
-
-      {lobby.status === "waiting" && (
-        <>
-          {isHost && !lobby.draft && (
-            <div className="grid grid-cols-4 gap-1 rounded-[12px] bg-surface p-1">
-              {(
-                [
-                  ["balance", Icon.scale("size-5"), "Баланс по ELO"],
-                  ["shuffle", Icon.shuffle("size-5"), "Перемешать"],
-                  ["swap", Icon.swap("size-5"), "Поменять команды"],
-                  ["clear", Icon.broom("size-5"), "Очистить команды"],
-                ] as const
-              ).map(([tool, icon, title]) => (
-                <button key={tool} type="button" title={title} disabled={busy} onClick={() => run(() => A.teamTool(code, tool))} className="grid h-11 place-items-center rounded-[9px] text-fg-3 hover:bg-white/[0.06] hover:text-fg">
-                  {icon}
-                </button>
-              ))}
-            </div>
-          )}
-          {isHost && s.player_pick === "captains" && !lobby.draft && (
-            <button type="button" disabled={busy} onClick={() => run(() => A.beginDraft(code))} className={btnClass("secondary", "md", "w-full")}>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {isHost && settings.player_pick === "captains" && !lobby.draft && (
+            <Button variant="secondary" disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
               Начать драфт капитанов
-            </button>
+            </Button>
           )}
           {isHost && !lobby.ready_check_until && (
-            <button
-              type="button"
-              disabled={busy || !!lobby.draft}
-              onClick={() => run(() => A.startMatch(code))}
-              className={btnClass("primary", "lg", "w-full")}
-            >
+            <Button size="lg" disabled={busy || !!lobby.draft} onClick={() => run(() => A.startMatch(code))}>
               {last ? "Сыграть ещё раз" : "Начать матч"}
-            </button>
+            </Button>
           )}
-          {isHost && lobby.ready_check_until && (
-            <button type="button" disabled={busy} onClick={() => run(() => A.cancelReadyCheck(code))} className={btnClass("ghost", "md", "w-full")}>
-              Отменить проверку
-            </button>
-          )}
-          {inTeam && (s.start === "all_ready" || lobby.ready_check_until) && (
-            <button type="button" disabled={busy} onClick={() => run(() => A.toggleReady(code))} className={btnClass(meReady ? "secondary" : "primary", "md", "w-full")}>
+          {inTeam && settings.start === "all_ready" && (
+            <Button variant={meReady ? "secondary" : "primary"} disabled={busy} onClick={() => run(() => A.toggleReady(code))}>
               {meReady ? "Не готов" : "Готов"}
+            </Button>
+          )}
+        </div>
+
+        {!isHost && settings.start === "host" && (
+          <p className="mt-4 text-meta text-fg-3">Матч запускает хост{inTeam ? " — после запуска подтвердите готовность" : ""}.</p>
+        )}
+        {settings.start === "all_ready" && <p className="mt-4 text-meta text-fg-3">Матч стартует автоматически, когда команды полные и все игроки готовы.</p>}
+      </FeatureSurface>
+    );
+  }
+
+  return (
+    <section aria-label="Текущее состояние лобби">
+      {state}
+
+      <div className="mt-4 rounded-surface border border-line-subtle bg-surface px-4 py-4 sm:px-5">
+        <Facts items={facts} columns={4} />
+      </div>
+
+      {lobby.status === "waiting" && isHost && !lobby.draft && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {(
+            [
+              ["balance", Icon.scale("size-4"), "Баланс по ELO"],
+              ["shuffle", Icon.shuffle("size-4"), "Перемешать"],
+              ["swap", Icon.swap("size-4"), "Поменять команды"],
+              ["clear", Icon.broom("size-4"), "Очистить команды"],
+            ] as const
+          ).map(([tool, icon, title]) => (
+            <button
+              key={tool}
+              type="button"
+              title={title}
+              disabled={busy}
+              onClick={() => run(() => A.teamTool(code, tool))}
+              className={btnClass("ghost", "sm")}
+            >
+              {icon} {title}
             </button>
-          )}
-          {!isHost && s.start === "host" && !lobby.ready_check_until && (
-            <p className="text-center text-[13px] text-fg-3">Матч запускает хост{inTeam ? " — когда начнёт, подтвердите готовность" : ""}</p>
-          )}
-          {s.start === "all_ready" && <p className="text-center text-[13px] text-fg-3">Матч начнётся сам, когда команды полные и все готовы</p>}
-        </>
+          ))}
+        </div>
       )}
-      {isHost && active && active.status !== "live" && (
-        <button type="button" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))} className={btnClass("ghost", "sm", "w-full text-danger")}>
-          Отменить игру
-        </button>
+
+      {last && (
+        <div className="mt-3 text-right">
+          <Link href={`/lobbies/games/${last.id}`} className={btnClass("quiet", "sm")}>
+            Последний матч · {last.team1_score}:{last.team2_score} →
+          </Link>
+        </div>
       )}
-      {active?.status === "live" && me?.isAdmin && (
-        <button type="button" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))} className={btnClass("ghost", "sm", "w-full text-danger")}>
-          Остановить матч (админ)
-        </button>
-      )}
-      {active?.server_address && (
-        <button type="button" onClick={() => navigator.clipboard.writeText(`connect ${active.server_address}`).then(() => toast.success("Команда скопирована — вставьте в консоль CS2"))} className="text-[12px] text-fg-3 hover:text-fg">
-          Скопировать «connect {active.server_address}»
-        </button>
-      )}
-    </div>
+    </section>
   );
 }
 
 function GamePanel({ view, now, isHost, busy, run, code }: { view: LobbyView; now: number; isHost: boolean; busy: boolean; run: (fn: () => Promise<A.LobbyResult>, ok?: string) => void; code: string }) {
-  const g = view.game!;
+  const game = view.game!;
   const me = view.me;
-  if (g.status === "veto") {
-    const team = g.veto_turn === 1 ? g.team1 : g.team2;
+
+  if (game.status === "veto") {
+    const team = game.veto_turn === 1 ? game.team1 : game.team2;
     const captainId = team.players[0]?.id ?? view.lobby.host_id;
     const myTurn = me?.id === captainId || (isHost && !team.players.length);
-    const used = new Map(g.veto.map((v) => [v.map, v]));
+    const used = new Map(game.veto.map((v) => [v.map, v]));
+
     return (
-      <div className="rounded-[12px] border border-white/[0.08] bg-surface p-3">
-        <div className="mb-2 text-center text-[14px]">
-          {g.veto_turn ? (
-            <>
-              <span className="font-semibold">{team.name}</span> {g.veto_action === "ban" ? "банит" : "выбирает"} карту ·{" "}
-              <span className="num text-warn">{secondsLeft(g.veto_deadline, now)} с</span>
-            </>
-          ) : (
-            "Вето завершено"
+      <CriticalSurface tone={myTurn ? "accent" : "warn"}>
+        <div className="flex flex-wrap items-end justify-between gap-5">
+          <div>
+            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myTurn ? "Ваш ход" : "Вето карт"}</div>
+            <h2 className="mt-2 text-heading text-fg">
+              {game.veto_turn ? `${team.name} · ${game.veto_action === "ban" ? "бан карты" : "пик карты"}` : "Вето завершается"}
+            </h2>
+            <p className="mt-2 text-[14px] text-fg-2">
+              {myTurn ? "Нажмите на доступную карту ниже." : "Дождитесь выбора капитана. Комната обновится автоматически."}
+            </p>
+          </div>
+          {game.veto_deadline && (
+            <div className="text-right">
+              <div className="text-micro text-fg-3">Осталось</div>
+              <div className="num mt-1 text-[36px] font-semibold leading-none">{secondsLeft(game.veto_deadline, now)} с</div>
+            </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {g.veto_pool.map((m) => {
-            const v = used.get(m);
+
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+          {game.veto_pool.map((map) => {
+            const action = used.get(map);
+            const available = myTurn && !action && !busy;
             return (
               <button
-                key={m}
+                key={map}
                 type="button"
-                disabled={!myTurn || !!v || busy}
-                onClick={() => run(() => A.lobbyVeto(code, m))}
-                className={cn("text-left disabled:cursor-default", v?.action === "ban" && "opacity-35 grayscale")}
+                disabled={!available}
+                onClick={() => run(() => A.lobbyVeto(code, map))}
+                className={cn("text-left disabled:cursor-default", action?.action === "ban" && "opacity-40 grayscale")}
               >
-                <MapThumb map={m} image={view.mapImages[m]} className={cn("h-12 rounded-[8px] border", v?.action === "pick" || v?.action === "decider" ? "border-accent" : myTurn && !v ? "border-white/20 hover:border-accent" : "border-white/[0.06]")}>
-                  <span className="absolute bottom-1 left-1.5 text-[12px] font-medium text-fg">{mapLabel(m)}</span>
-                  {v && <span className="absolute right-1.5 top-1 text-[10px] uppercase text-fg-2">{v.action === "ban" ? "бан" : v.action === "pick" ? "пик" : "десайдер"}</span>}
+                <MapThumb
+                  map={map}
+                  image={view.mapImages[map]}
+                  className={cn(
+                    "h-20 rounded-control border",
+                    action?.action === "pick" || action?.action === "decider"
+                      ? "border-accent"
+                      : available
+                        ? "border-line-strong hover:border-accent"
+                        : "border-line-subtle",
+                  )}
+                >
+                  <span className="absolute bottom-2 left-2 text-[12px] font-medium text-fg">{mapLabel(map)}</span>
+                  {action && (
+                    <span className={cn("absolute right-2 top-2 text-micro font-semibold uppercase", action.action === "ban" ? "text-danger" : "text-accent")}>
+                      {action.action === "ban" ? "бан" : action.action === "pick" ? "пик" : "decider"}
+                    </span>
+                  )}
                 </MapThumb>
               </button>
             );
           })}
         </div>
-        {myTurn && <p className="mt-2 text-center text-[12px] text-accent">Ваш ход — нажмите на карту</p>}
-      </div>
+
+        {isHost && (
+          <div className="mt-4">
+            <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
+              Отменить игру
+            </Button>
+          </div>
+        )}
+      </CriticalSurface>
     );
   }
 
-  const live = g.maps.find((m) => m.status === "live");
-  return (
-    <div className="rounded-[12px] border border-white/[0.08] bg-surface p-4 text-center">
-      {g.status === "live" ? (
-        <>
-          <div className="inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.2em] text-live">
-            <span className="size-2 animate-pulse rounded-full bg-live" /> Live
+  const liveMap = game.maps.find((m) => m.status === "live") ?? game.maps[0];
+
+  if (game.status === "live") {
+    return (
+      <FeatureSurface className="border-live/30">
+        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-live">LIVE</div>
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
+          <div className="truncate text-right text-title text-fg">{game.team1.name}</div>
+          <div className="num text-[36px] font-semibold leading-none text-fg sm:text-[44px]">
+            {liveMap?.team1_score ?? 0}:{liveMap?.team2_score ?? 0}
           </div>
-          <div className="mt-2 flex items-center justify-center gap-3">
-            <span className="min-w-0 flex-1 truncate text-right text-[14px]">{g.team1.name}</span>
-            <span className="num text-[30px] font-semibold leading-none">
-              {(live ?? g.maps[0])?.team1_score ?? 0}:{(live ?? g.maps[0])?.team2_score ?? 0}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-left text-[14px]">{g.team2.name}</span>
-          </div>
-          {g.best_of > 1 && (
-            <div className="num mt-1 text-[12px] text-fg-3">
-              серия {g.team1_score}:{g.team2_score} · {live ? mapLabel(live.map) : ""}
-            </div>
+          <div className="truncate text-title text-fg">{game.team2.name}</div>
+        </div>
+        <div className="mt-3 text-center text-meta text-fg-3">
+          {liveMap ? mapLabel(liveMap.map) : "Матч"}{game.best_of > 1 ? ` · серия ${game.team1_score}:${game.team2_score}` : ""}
+        </div>
+
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {game.server_address && (
+            <a href={`steam://connect/${game.server_address}`} className={btnClass("secondary", "md")}>
+              Подключиться
+            </a>
           )}
-        </>
-      ) : g.server_state === "ready" ? (
-        <div className="text-[15px] font-semibold text-ok">Игроки заходят на сервер</div>
-      ) : (
-        <div className="text-[14px] text-fg-2">
-          <span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-warn" />
-          {g.note ?? "Готовим сервер…"}
+          {game.gotv_address && (
+            <a href={`steam://connect/${game.gotv_address}`} className={btnClass("secondary", "md")}>
+              Смотреть GOTV
+            </a>
+          )}
+          {me?.isAdmin && (
+            <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
+              Остановить матч
+            </Button>
+          )}
+        </div>
+      </FeatureSurface>
+    );
+  }
+
+  if (game.server_state === "ready") {
+    return (
+      <CriticalSurface tone="ok">
+        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-ok">Сервер готов</div>
+        <h2 className="mt-2 text-heading text-fg">{game.server_address ? "Подключайтесь к матчу" : "Игроки подключаются"}</h2>
+        <p className="mt-2 max-w-read text-[14px] text-fg-2">
+          {game.server_address
+            ? "Откройте сервер кнопкой ниже. В разминке напишите .r — матч начнётся после готовности всех игроков."
+            : "Адрес сервера доступен только игрокам матча и наблюдателям лобби."}
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {game.server_address && (
+            <a href={`steam://connect/${game.server_address}`} className={btnClass("primary", "lg")}>
+              Подключиться
+            </a>
+          )}
+          {game.gotv_address && (
+            <a href={`steam://connect/${game.gotv_address}`} className={btnClass("secondary", "lg")}>
+              Смотреть GOTV
+            </a>
+          )}
+          {isHost && (
+            <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
+              Отменить игру
+            </Button>
+          )}
+        </div>
+      </CriticalSurface>
+    );
+  }
+
+  return (
+    <FeatureSurface>
+      <div className="text-micro font-semibold uppercase tracking-[0.14em] text-warn">Сервер</div>
+      <h2 className="mt-2 text-heading text-fg">Готовим сервер</h2>
+      <p className="mt-2 text-[14px] text-fg-2">{game.note ?? "Назначаем инстанс, загружаем карту и составы. Адрес появится здесь автоматически."}</p>
+      <div className="mt-5 flex items-center gap-2 text-meta text-fg-3">
+        <span className="size-2 animate-pulse rounded-full bg-warn" />
+        Ожидание агента
+      </div>
+      {isHost && (
+        <div className="mt-5">
+          <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
+            Отменить игру
+          </Button>
         </div>
       )}
-      {g.server_address && (
-        <a href={`steam://connect/${g.server_address}`} className={btnClass("primary", "lg", "mt-3 w-full")}>
-          Подключиться
-        </a>
-      )}
-      {!g.server_address && g.server_state === "ready" && !me?.inGame && <p className="mt-2 text-[12px] text-fg-3">Адрес видят игроки матча и наблюдатели лобби</p>}
-      {g.gotv_address && (
-        <a href={`steam://connect/${g.gotv_address}`} className={btnClass("secondary", "sm", "mt-2 w-full")}>
-          Смотреть через GOTV
-        </a>
-      )}
-      {g.server_state === "ready" && g.status !== "live" && me?.inGame && (
-        <p className="mt-2 text-[12px] text-fg-3">Зайдите на сервер и напишите .r в чат — матч начнётся, когда будут готовы все игроки</p>
-      )}
-    </div>
+    </FeatureSurface>
   );
 }
 
@@ -915,20 +1048,34 @@ function ReadyCheck({ view, now, busy, onReady }: { view: LobbyView; now: number
   const open = !!lobby.ready_check_until && !!mine && (mine.slot === "team1" || mine.slot === "team2") && !mine.ready;
   const left = secondsLeft(lobby.ready_check_until, now);
   const inTeams = view.members.filter((m) => m.slot === "team1" || m.slot === "team2");
+
   return (
-    <Sheet open={open} onClose={() => {}} width={420} title={<span className="block text-center">Матч готов к старту</span>} subtitle={<span className="block text-center">Подтвердите, что вы на месте</span>}>
-      <div className="text-center">
-        <div className="num text-[48px] font-semibold text-fg">{left}</div>
-        <div className="mb-5 flex flex-wrap justify-center gap-1.5">
-          {inTeams.map((m) => (
-            <span key={m.id} className={cn("size-3 rounded-full", m.ready ? "bg-ok" : "bg-white/15")} title={m.nickname} />
+    <Dialog
+      open={open}
+      onClose={() => {}}
+      title="Матч готов к старту"
+      description="Подтвердите, что вы на месте. Если время закончится, проверка готовности будет отменена."
+      size="sm"
+      footer={
+        <Button block size="lg" loading={busy} onClick={onReady} data-autofocus>
+          Я готов
+        </Button>
+      }
+    >
+      <div className="py-2 text-center">
+        <div className="text-micro uppercase tracking-[0.14em] text-fg-3">Осталось</div>
+        <div className={cn("num mt-2 text-[52px] font-semibold leading-none", left <= 10 ? "text-danger" : "text-fg")}>{left}</div>
+        <div className="mt-5 flex flex-wrap justify-center gap-2" aria-label="Готовность игроков">
+          {inTeams.map((member) => (
+            <span
+              key={member.id}
+              className={cn("size-3 rounded-full border border-line", member.ready ? "bg-ok" : "bg-surface-3")}
+              title={`${member.nickname}: ${member.ready ? "готов" : "ожидаем"}`}
+            />
           ))}
         </div>
-        <button type="button" data-autofocus disabled={busy} onClick={onReady} className={btnClass("primary", "lg", "w-full")}>
-          Готов
-        </button>
       </div>
-    </Sheet>
+    </Dialog>
   );
 }
 
