@@ -179,6 +179,8 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   if (mains.length !== mode.size) return { error: `В основе должно быть ${mainPlayersLabel(mode.size)}, сейчас ${mains.length}` };
   const banned = reg.roster.find((r) => r.player.is_banned);
   if (banned) return { error: `Игрок ${banned.player.nickname} заблокирован` };
+  const invalidSteam = reg.roster.find((r) => !/^\d{17}$/.test(r.player.steam_id));
+  if (invalidSteam) return { error: `У игрока ${invalidSteam.player.nickname} неверный SteamID` };
 
   await db()
     .from("tournament_registrations")
