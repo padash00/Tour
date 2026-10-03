@@ -56,7 +56,7 @@ function toItems(r: SearchResult): Item[] {
             <Trophy className="size-4" />
           </span>
           <span className="min-w-0 flex-1 truncate font-medium">{t.name}</span>
-          <Status info={tournamentStatus[t.status as TournamentStatus] ?? tournamentStatus.finished} size="sm" />
+          <span className="hidden min-[420px]:inline-flex"><Status info={tournamentStatus[t.status as TournamentStatus] ?? tournamentStatus.finished} size="sm" /></span>
         </>
       ),
     })),
@@ -78,7 +78,7 @@ function toItems(r: SearchResult): Item[] {
             </span>
           </span>
           {m.status === "finished" || m.status === "live" ? <Score a={m.team1_score} b={m.team2_score} size="sm" /> : null}
-          <Status info={matchStatus(m.status as MatchStatus)} size="sm" />
+          <span className="hidden min-[460px]:inline-flex"><Status info={matchStatus(m.status as MatchStatus)} size="sm" /></span>
         </>
       ),
     })),
@@ -153,9 +153,9 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
         role="dialog"
         aria-modal="true"
         aria-label="Поиск"
-        className="relative flex max-h-[80dvh] w-full max-w-[640px] flex-col overflow-hidden rounded-feature border border-line bg-elevated shadow-[var(--shadow-pop)] animate-[pop_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
+        className="relative flex max-h-[88dvh] w-full max-w-[640px] flex-col overflow-hidden rounded-feature border border-line bg-elevated shadow-[var(--shadow-pop)] animate-[pop_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)] sm:max-h-[80dvh]"
       >
-        <div className="flex items-center gap-3 border-b border-line-subtle px-4">
+        <div className="flex items-center gap-2 border-b border-line-subtle px-3 sm:gap-3 sm:px-4">
           <Search className="size-5 text-fg-3" aria-hidden />
           <input
             data-autofocus
