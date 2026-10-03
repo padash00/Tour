@@ -478,9 +478,9 @@ function TeamCard({
   const captain = view.captains[team === "team1" ? 0 : 1];
 
   return (
-    <div className="overflow-hidden rounded-[14px] border border-white/[0.06] bg-surface">
-      <div className="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3">
-        <span className={cn("grid size-9 shrink-0 place-items-center rounded-[9px]", team === "team1" ? "bg-warn/15 text-warn" : "bg-steel/15 text-steel")}>{Icon.crown("size-5")}</span>
+    <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface">
+      <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-control", team === "team1" ? "bg-warn/15 text-warn" : "bg-steel/15 text-steel")}>{Icon.crown("size-5")}</span>
         <div className="min-w-0 flex-1">
           {editing ? (
             <form
@@ -508,7 +508,7 @@ function TeamCard({
           {members.length + bots.length}/{size}
         </span>
       </div>
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-line-subtle">
         {members.map((m) => (
           <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} big captain={m.id === captain} />
         ))}
@@ -581,7 +581,7 @@ function PlayerLine({
     <div
       className={cn(
         "relative flex items-center gap-3 transition-[background-color,box-shadow] duration-300",
-        big ? "h-[64px] px-4" : "rounded-[10px] bg-white/[0.03] px-3 py-2",
+        big ? "h-[64px] px-4" : "rounded-control bg-white/[0.03] px-3 py-2",
         self && big && !(showReady && m.ready) && "bg-accent/[0.05]",
         showReady && m.ready && "bg-gradient-to-r from-ok/[0.28] via-ok/[0.16] to-ok/[0.08] shadow-[inset_3px_0_0_0_var(--color-ok)]",
       )}
@@ -620,7 +620,7 @@ function PlayerLine({
           {menu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 top-9 z-50 w-56 overflow-hidden rounded-[10px] border border-white/[0.1] bg-surface-3 py-1 shadow-[var(--shadow-pop)]">
+              <div className="absolute right-0 top-9 z-50 w-56 overflow-hidden rounded-control border border-white/[0.1] bg-surface-3 py-1 shadow-[var(--shadow-pop)]">
                 {!view.lobby.draft &&
                   moves.map((x) => (
                     <MenuItem key={x.slot} onClick={() => (setMenu(false), run(() => A.movePlayer(code, m.id, x.slot)))}>
@@ -650,17 +650,17 @@ const MenuItem = ({ children, onClick, danger }: { children: ReactNode; onClick:
 );
 
 const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-[10px] border border-dashed border-white/[0.08] text-fg-4 hover:border-white/20 hover:text-fg-2" aria-label="Занять место">
+  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-white/[0.03] hover:text-fg-2" aria-label="Занять место">
     {Icon.plus("size-5")}
   </button>
 );
 
 function Panel({ title, count, right, children }: { title: string; count?: ReactNode; right?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-[14px] border border-white/[0.06] bg-surface p-4">
-      <div className="mb-3 flex items-center gap-3">
-        <h2 className="text-[17px] font-semibold text-fg">{title}</h2>
-        {count != null && <span className="num rounded-[6px] bg-white/[0.06] px-2 py-0.5 text-[12px] text-fg-2">{count}</span>}
+    <section className="rounded-surface border border-line-subtle bg-surface p-4 sm:p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <h2 className="text-title text-fg">{title}</h2>
+        {count != null && <span className="num rounded-chip bg-white/[0.06] px-2 py-0.5 text-micro text-fg-2">{count}</span>}
         <span className="ml-auto">{right}</span>
       </div>
       {children}
@@ -1086,7 +1086,7 @@ function VisibilityRow({ view, run, code }: { view: LobbyView; run: (fn: () => P
   const [pw, setPw] = useState("");
   const changed = vis !== view.lobby.visibility || pw.length > 0;
   return (
-    <div className="space-y-2 rounded-[10px] bg-white/[0.03] px-4 py-3">
+    <div className="space-y-2 rounded-control bg-white/[0.03] px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-fg-3">{Icon.lock()}</span>
         <span className="flex-1 text-[14px]">Тип лобби</span>
@@ -1135,7 +1135,7 @@ function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: string;
   };
   const time = useMemo(() => new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), []);
   return (
-    <div className="flex h-[560px] flex-col overflow-hidden rounded-[14px] border border-white/[0.06] bg-surface">
+    <div className="flex h-[560px] flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface">
       <div ref={box} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4">
         {view.messages.length === 0 && <p className="pt-10 text-center text-[13px] text-fg-3">Сообщений пока нет</p>}
         {view.messages.map((m) =>
@@ -1159,19 +1159,19 @@ function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: string;
       </div>
       {canWrite ? (
         <form
-          className="flex gap-2 border-t border-white/[0.06] p-3"
+          className="flex gap-2 border-t border-line-subtle p-3"
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Сообщение…" className="h-10 min-w-0 flex-1 rounded-[9px] border border-white/[0.1] bg-surface-3 px-3 text-[14px] text-fg outline-none focus:border-accent/50" />
-          <button type="submit" disabled={pending || !text.trim()} className="grid size-10 place-items-center rounded-[9px] bg-accent text-accent-ink disabled:opacity-50" aria-label="Отправить">
+          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Сообщение…" className="h-10 min-w-0 flex-1 rounded-control border border-line bg-shell px-3 text-[14px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]" />
+          <button type="submit" disabled={pending || !text.trim()} className="grid size-10 place-items-center rounded-control bg-accent text-accent-ink transition-colors hover:bg-accent-strong disabled:opacity-50" aria-label="Отправить">
             {Icon.send("size-4")}
           </button>
         </form>
       ) : (
-        <p className="border-t border-white/[0.06] p-3 text-center text-[13px] text-fg-3">Войдите в лобби, чтобы писать в чат</p>
+        <p className="border-t border-line-subtle p-3 text-center text-[13px] text-fg-3">Войдите в лобби, чтобы писать в чат</p>
       )}
     </div>
   );
@@ -1181,10 +1181,12 @@ function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: string;
 
 function Gate({ title, text, children }: { title: string; text: string; children?: ReactNode }) {
   return (
-    <div className="mx-auto max-w-[460px] px-5 py-24 text-center">
-      <h1 className="text-[26px] font-semibold tracking-[-0.015em]">{title}</h1>
-      <p className="mt-3 text-[15px] text-fg-2">{text}</p>
-      <div className="mt-8">{children}</div>
+    <div className="mx-auto w-full max-w-read px-5 py-20 sm:py-28">
+      <FeatureSurface className="text-center">
+        <h1 className="text-heading text-fg">{title}</h1>
+        <p className="mx-auto mt-3 max-w-[520px] text-[14px] leading-relaxed text-fg-2">{text}</p>
+        {children && <div className="mt-7">{children}</div>}
+      </FeatureSurface>
     </div>
   );
 }
@@ -1194,15 +1196,17 @@ function JoinGate({ code, view, invite, onJoined }: { code: string; view: LobbyV
   const toast = useToast();
   const [pw, setPw] = useState("");
   const [pending, start] = useTransition();
+
   if (!view.me) {
     return (
-      <Gate title="Вход в лобби" text="Чтобы войти в лобби, авторизуйтесь через Steam.">
-        <Link href={`/login?next=${encodeURIComponent(`/lobby/${code}${invite ? `?t=${invite}` : ""}`)}`} className={btnClass("primary", "md")}>
+      <Gate title="Вход в лобби" text="Авторизуйтесь через Steam — после входа вернём вас в эту же комнату.">
+        <Button href={`/login?next=${encodeURIComponent(`/lobby/${code}${invite ? `?t=${invite}` : ""}`)}`} size="lg">
           Войти через Steam
-        </Link>
+        </Button>
       </Gate>
     );
   }
+
   const join = () =>
     start(async () => {
       const r = await A.joinLobby(code, { password: pw, invite: invite ?? undefined });
@@ -1213,25 +1217,33 @@ function JoinGate({ code, view, invite, onJoined }: { code: string; view: LobbyV
       }
       await onJoined();
     });
+
   return (
     <Gate
-      title={view.lobby.visibility === "private" ? "Приватное лобби" : "Закрытое лобби"}
-      text={invite ? "Вас пригласили — пароль не нужен." : `Хост ${view.lobby.host_name !== "—" ? view.lobby.host_name : ""} защитил лобби паролем.`}
+      title={view.lobby.visibility === "private" ? "Приватное лобби" : "Лобби по паролю"}
+      text={invite ? "У вас действующая ссылка-приглашение — пароль не нужен." : `Хост ${view.lobby.host_name !== "—" ? view.lobby.host_name : ""} ограничил вход в комнату.`}
     >
       <form
-        className="space-y-3"
+        className="mx-auto max-w-sm space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
           join();
         }}
       >
         {!invite && (
-          <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Пароль" autoFocus className="h-12 w-full rounded-[9px] border border-white/[0.1] bg-surface-3 px-4 text-[15px] text-fg outline-none focus:border-accent/50" />
+          <input
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            placeholder="Пароль"
+            autoFocus
+            className="h-12 w-full rounded-control border border-line bg-shell px-4 text-[15px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
+          />
         )}
-        <button type="submit" disabled={pending} className={btnClass("primary", "lg", "w-full")}>
-          {pending ? "Входим…" : "Войти в лобби"}
-        </button>
+        <Button type="submit" block size="lg" loading={pending}>
+          Войти в лобби
+        </Button>
       </form>
     </Gate>
   );
 }
+
