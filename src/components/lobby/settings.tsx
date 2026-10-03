@@ -6,10 +6,9 @@ import { mapLabel } from "@/lib/maps";
 import { MODES, type ModeKey } from "@/lib/modes";
 import { BOT_DIFFICULTY, LIMITS, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
 import { tint } from "../competition/map-tile";
-import { btnClass } from "../primitives";
 import { useToast } from "../toast";
-import { cn } from "../ui";
-import { Choice, Icon, NewBadge, Row, Section, Segments, Sheet, Slider, Toggle } from "./ui";
+import { Choice, Icon, NewBadge, Row, Section, Segments, Slider, Toggle } from "./ui";
+import { Sheet, buttonClass as btnClass, cn } from "@/components/ds";
 
 export type MapOption = { id: string; image?: string | null };
 export type Template = { id: string; name: string; settings: LobbySettings };
@@ -139,7 +138,7 @@ export function AdvancedSettings({
           {Icon.gear("size-6")} Настройки
         </span>
       }
-      subtitle={ro ? "Менять настройки может только хост лобби" : undefined}
+      description={ro ? "Менять настройки может только хост лобби" : undefined}
       footer={
         problem ? (
           <div className="flex items-center justify-center gap-2 rounded-[10px] bg-warn px-4 py-3 text-[14px] font-medium text-[#1a1203]">
