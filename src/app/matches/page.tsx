@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { Gamepad2 } from "lucide-react";
 import { getUpcomingMatches, type MatchWithTeams } from "@/lib/matches";
 import { db } from "@/lib/supabase";
 import type { Tournament } from "@/lib/types";
-import { MatchLine } from "@/components/public/bits";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { visibleMatches } from "@/components/match-bits";
 import { LiveRefresh } from "@/components/live-refresh";
-import { Button, EmptyCard, PageHero, SectionHead, WRAP } from "@/components/primitives";
+import { MatchListRow } from "@/components/match-row";
+import { Button, Container, EmptyState, PageTitle, RowList, Section, Stack } from "@/components/ds";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
@@ -27,72 +29,94 @@ async function recentFinished(limit = 20) {
   return visibleMatches((data ?? []) as ListMatch[]);
 }
 
+function stageLabel(m: MatchWithTeams) {
+  if (m.bracket === "grand_final") return "Гранд-финал";
+  if (m.bracket === "lower") return `Нижняя сетка · раунд ${m.round}`;
+  if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
+  if (m.bracket === "swiss") return `Швейцарка · раунд ${m.round}`;
+  return `Плей-офф · раунд ${m.round}`;
+}
+
+function meta(m: ListMatch, includeTime = true) {
+  const when = includeTime ? m.scheduled_at ?? m.finished_at : null;
+  return `${m.tournament.name} · ${stageLabel(m)} · BO${m.best_of}${when ? ` · ${formatDateTime(when)}` : ""}`;
+}
+
 export default async function MatchesPage() {
   const [active, finished] = await Promise.all([getUpcomingMatches(50), recentFinished()]);
-  const live = active.filter((m) => m.status === "live");
-  const next = active.filter((m) => m.status !== "live");
+  const current = active.filter((m) => ["veto", "ready", "live"].includes(m.status));
+  const upcoming = active.filter((m) => m.status === "upcoming");
+
+  const byDay = new Map<string, typeof upcoming>();
+  for (const match of upcoming) {
+    const key = match.scheduled_at ? formatDate(match.scheduled_at) : "Время не назначено";
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key)!.push(match);
+  }
 
   return (
-    <>
-      {live.length > 0 && <LiveRefresh watch="matches" intervalMs={4000} />}
-      <PageHero eyebrow="Матчи F16 Arena" title="Матчи" description="Live, ближайшие и сыгранные матчи всех турниров." />
-      <div className={`${WRAP} pt-14`}>
+    <Container className="pb-16 pt-8 sm:pt-10">
+      {current.length > 0 && <LiveRefresh watch="matches" intervalMs={4000} />}
+
+      <header>
+        <PageTitle>Матчи</PageTitle>
+        <p className="mt-1 max-w-read text-meta text-fg-3">Текущие, ближайшие и завершённые матчи всех турниров F16 Arena.</p>
+      </header>
 
       {active.length === 0 && finished.length === 0 ? (
-        <EmptyCard
-          dashed
+        <EmptyState
+          className="mt-10"
+          icon={<Gamepad2 />}
           title="Матчей пока нет"
           text="Матчи появятся, когда будет опубликована сетка турнира."
           action={
-            <Button href="/tournaments" variant="secondary" size="md">
-              Турниры
+            <Button href="/tournaments" variant="secondary" size="sm">
+              Смотреть турниры
             </Button>
           }
         />
       ) : (
-        <div className="space-y-16">
-          {live.length > 0 && (
-            <section>
-              <SectionHead>
-                <span className="inline-flex items-center gap-2.5 text-live">
-                  <span className="size-2 rounded-full bg-live animate-pulse" />
-                  Сейчас в игре
-                </span>
-              </SectionHead>
-<div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-1.5">
-                {live.map((m) => (
-                  <MatchLine key={m.id} m={m} />
+        <Stack className="mt-10">
+          {current.length > 0 && (
+            <Section title="Сейчас" description="LIVE, вето и матчи с готовым сервером.">
+              <RowList>
+                {current.map((match) => (
+                  <MatchListRow key={match.id} m={match} meta={meta(match)} />
                 ))}
-              </div>
-            </section>
+              </RowList>
+            </Section>
           )}
-          <section>
-            <SectionHead>Ближайшие</SectionHead>
-            {next.length > 0 ? (
-<div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-1.5">
-                {next.map((m) => (
-                  <MatchLine key={m.id} m={m} />
+
+          <Section title="Скоро">
+            {upcoming.length > 0 ? (
+              <div className="space-y-7">
+                {[...byDay].map(([day, items]) => (
+                  <div key={day}>
+                    <div className="mb-2 text-meta font-medium text-fg-3">{day}</div>
+                    <RowList>
+                      {items.map((match) => (
+                        <MatchListRow key={match.id} m={match} meta={meta(match)} />
+                      ))}
+                    </RowList>
+                  </div>
                 ))}
               </div>
             ) : (
-              <p className="rounded-[12px] border border-dashed border-white/[0.12] px-8 py-7 text-[15px] lg:text-[17px] text-fg-3">
-                Запланированных матчей нет.
-              </p>
+              <EmptyState compact title="Ближайших матчей нет" text="Новые матчи появятся после обновления сетки." />
             )}
-          </section>
+          </Section>
+
           {finished.length > 0 && (
-            <section>
-              <SectionHead>Завершённые</SectionHead>
-<div className="rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-1.5">
-                {finished.map((m) => (
-                  <MatchLine key={m.id} m={m} />
+            <Section title="Завершённые" description="Последние сыгранные матчи.">
+              <RowList>
+                {finished.map((match) => (
+                  <MatchListRow key={match.id} m={match} meta={meta(match)} />
                 ))}
-              </div>
-            </section>
+              </RowList>
+            </Section>
           )}
-        </div>
+        </Stack>
       )}
-      </div>
-    </>
+    </Container>
   );
 }
