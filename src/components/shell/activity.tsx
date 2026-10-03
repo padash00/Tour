@@ -92,13 +92,14 @@ function ConnectButton({ connect, compact }: { connect: string; compact?: boolea
   return (
     <a
       href={`steam://connect/${connect}`}
+      aria-label="Подключиться к серверу"
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-control bg-ok font-semibold text-ok-ink transition-opacity hover:opacity-90",
-        compact ? "h-7 px-2.5 text-micro" : "h-9 px-3 text-meta",
+        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control bg-ok font-semibold text-ok-ink transition-opacity hover:opacity-90",
+        compact ? "h-9 min-w-9 px-2 text-micro min-[370px]:px-2.5" : "h-9 px-3 text-meta",
       )}
     >
       <Gamepad2 className="size-4" />
-      Подключиться
+      <span className={compact ? "hidden min-[370px]:inline" : undefined}>Подключиться</span>
     </a>
   );
 }
@@ -139,7 +140,7 @@ export function ActivityPill({ activity, more = 0, current }: { activity: Activi
 /** Полоса активности под шапкой на телефоне: одна строка 40px, вся кликабельна, таймер справа */
 export function ActivityBar({ activity, more = 0, current }: { activity: Activity; more?: number; current?: boolean }) {
   return (
-    <div className={cn("flex h-10 items-center gap-2 border-t px-4", TONE[activity.tone])}>
+    <div className={cn("flex h-10 items-center gap-1.5 border-t px-3 sm:px-4", TONE[activity.tone])}>
       <Link href={activity.href} aria-current={current ? "page" : undefined} className="flex h-full min-w-0 flex-1 items-center gap-2 text-meta font-semibold">
         <span className={cn("size-2 shrink-0 rounded-full bg-current", activity.priority <= 3 && "animate-pulse")} aria-hidden />
         <span className="min-w-0 flex-1 truncate">{activity.label}</span>
