@@ -59,7 +59,7 @@ export function Callout({
   return (
     <div
       role={tone === "danger" || tone === "warn" ? "alert" : undefined}
-      className={cn("flex items-start gap-3.5 rounded-[10px] border px-4 py-3.5 text-[14px] leading-relaxed lg:text-[15px]", t.box, className)}
+      className={cn("flex flex-wrap items-start gap-x-3.5 gap-y-2 rounded-[10px] border px-4 py-3.5 text-[14px] leading-relaxed lg:text-[15px]", t.box, className)}
     >
       <span className={cn("mt-[3px] shrink-0", t.icon)}>
         <ToneIcon tone={tone} />
@@ -68,7 +68,7 @@ export function Callout({
         {title && <div className="font-semibold text-fg">{title}</div>}
         {children && <div className={title ? "mt-0.5" : undefined}>{children}</div>}
       </div>
-      {action && <div className="shrink-0 self-center">{action}</div>}
+      {action && <div className="w-full pl-8 pt-1 sm:w-auto sm:shrink-0 sm:self-center sm:pl-0 sm:pt-0 [&>*]:max-sm:w-full">{action}</div>}
     </div>
   );
 }
