@@ -64,7 +64,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const m = await getMatch(id);
   if (!m || m.tournament.status === "draft") notFound();
 
-  const serverNow = Date.now();
+  const serverNow = serverTime();
   const mapImages = await getMapImages();
   const [player, all, rosters, statRows] = await Promise.all([
     getCurrentPlayer(),
@@ -371,4 +371,9 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
       )}
     </>
   );
+}
+
+/** Время сервера для синхронизации countdown на момент SSR. */
+function serverTime() {
+  return Date.now();
 }
