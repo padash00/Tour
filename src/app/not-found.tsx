@@ -1,18 +1,18 @@
-import { Eyebrow, OutlineBtn, PrimaryBtn, WRAP } from "@/components/primitives";
+import { Button, Container, Eyebrow } from "@/components/ds";
 
 export default function NotFound() {
   return (
     <section className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_80%_-10%,#16253d80,transparent_70%)]" />
-      <div className={`${WRAP} relative py-32 lg:py-44`}>
+      <Container className="relative py-28 sm:py-36 lg:py-44">
         <Eyebrow>Ошибка 404</Eyebrow>
-        <h1 className="t-display mt-5">Страница не найдена</h1>
+        <h1 className="mt-5 text-[40px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[56px]">Страница не найдена</h1>
         <p className="mt-6 text-[17px] lg:text-[20px] text-fg-2">Ссылка устарела или страница удалена.</p>
         <div className="mt-12 flex flex-wrap gap-4">
-          <PrimaryBtn href="/">На главную</PrimaryBtn>
-          <OutlineBtn href="/tournaments">Турниры</OutlineBtn>
+          <Button href="/" size="lg">На главную</Button>
+          <Button href="/tournaments" variant="secondary" size="lg">Турниры</Button>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
