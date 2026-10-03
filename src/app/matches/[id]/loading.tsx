@@ -1,11 +1,10 @@
-import { Skeleton } from "@/components/ui";
-import { WRAP } from "@/components/primitives";
+import { Container, Skeleton } from "@/components/ds";
 
 export default function Loading() {
   return (
     <>
       <div className="border-b border-white/[0.06]">
-        <div className={`${WRAP} pt-10 pb-16`}>
+        <Container width="wide" className="pb-12 pt-8 sm:pb-16 sm:pt-10">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="mx-auto mt-14 h-3 w-64" />
           <div className="mt-12 grid grid-cols-[1fr_auto_1fr] items-center gap-10">
@@ -19,12 +18,12 @@ export default function Loading() {
               <Skeleton className="size-24 rounded-xl" />
             </div>
           </div>
-        </div>
+        </Container>
       </div>
-      <div className={`${WRAP} pt-16 space-y-4`}>
+      <Container width="wide" className="space-y-4 pt-12 sm:pt-16">
         <Skeleton className="h-3 w-40" />
         <Skeleton className="h-48 w-full rounded-[12px]" />
-      </div>
+      </Container>
     </>
   );
 }
