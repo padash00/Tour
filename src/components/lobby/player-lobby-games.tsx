@@ -2,8 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { mapLabel } from "@/lib/maps";
 import { formatDate } from "@/lib/format";
-import { SectionHead, WRAP } from "../primitives";
-import { cn } from "../ui";
+import { Container, RowList, Section, cn } from "@/components/ds";
 
 type Row = {
   game_id: string;
@@ -42,35 +41,35 @@ export async function PlayerLobbyGames({ playerId }: { playerId: string }) {
   if (!list.length) return null;
   const wins = list.filter((r) => r.game?.winner === r.team).length;
   return (
-    <section className={`${WRAP} pt-14`}>
-      <SectionHead action={<span className="text-[13px] text-fg-3">неофициально · в статистику турниров не идёт</span>}>
-        Матчи в лобби · {wins}/{list.length} побед
-      </SectionHead>
-      <div className="divide-y divide-white/[0.05] overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80">
-        {list.map((r) => {
-          const g = r.game!;
-          const won = g.winner === r.team;
-          const my = r.team === 1 ? g.team1 : g.team2;
-          const their = r.team === 1 ? g.team2 : g.team1;
-          return (
-            <Link key={r.game_id} href={`/lobbies/games/${g.id}`} className="flex items-center gap-4 px-4 py-3 text-[14px] hover:bg-white/[0.03]">
-              <span className={cn("w-1 self-stretch rounded-full", won ? "bg-ok" : g.winner ? "bg-danger" : "bg-fg-4")} />
-              <span className="min-w-0 flex-1 truncate">
-                {my.name} <span className="text-fg-3">vs</span> {their.name}
-              </span>
-              <span className="hidden text-[12px] text-fg-3 sm:inline">{g.maps.map((m) => mapLabel(m.map)).join(", ")}</span>
-              <span className="num w-14 text-right font-semibold">
-                {r.team === 1 ? g.team1_score : g.team2_score}:{r.team === 1 ? g.team2_score : g.team1_score}
-              </span>
-              <span className="num w-20 text-right text-fg-2">
-                {r.kills}-{r.deaths}-{r.assists}
-              </span>
-              <span className="num hidden w-16 text-right text-fg-3 md:inline">{Math.round(r.damage / Math.max(1, r.rounds_played))} ADR</span>
-              <span className="hidden w-24 text-right text-[12px] text-fg-3 lg:inline">{formatDate(g.finished_at)}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
+    <Container width="wide" className="pb-14">
+      <Section
+        title={`Матчи в лобби · ${wins}/${list.length} побед`}
+        description="Неофициальные игры — в статистику турниров не входят."
+      >
+        <RowList>
+          {list.map((r) => {
+            const g = r.game!;
+            const won = g.winner === r.team;
+            const my = r.team === 1 ? g.team1 : g.team2;
+            const their = r.team === 1 ? g.team2 : g.team1;
+            return (
+              <Link key={r.game_id} href={`/lobbies/games/${g.id}`} className="flex min-h-14 items-center gap-4 px-4 py-3 text-[14px] transition-colors hover:bg-surface-2">
+                <span className={cn("w-1 self-stretch rounded-full", won ? "bg-ok" : g.winner ? "bg-danger" : "bg-fg-4")} />
+                <span className="min-w-0 flex-1 truncate">
+                  {my.name} <span className="text-fg-3">vs</span> {their.name}
+                </span>
+                <span className="hidden text-meta text-fg-3 sm:inline">{g.maps.map((m) => mapLabel(m.map)).join(", ")}</span>
+                <span className="num w-14 text-right font-semibold">
+                  {r.team === 1 ? g.team1_score : g.team2_score}:{r.team === 1 ? g.team2_score : g.team1_score}
+                </span>
+                <span className="num w-20 text-right text-fg-2">{r.kills}-{r.deaths}-{r.assists}</span>
+                <span className="num hidden w-16 text-right text-fg-3 md:inline">{Math.round(r.damage / Math.max(1, r.rounds_played))} ADR</span>
+                <span className="hidden w-24 text-right text-meta text-fg-3 lg:inline">{formatDate(g.finished_at)}</span>
+              </Link>
+            );
+          })}
+        </RowList>
+      </Section>
+    </Container>
   );
 }
