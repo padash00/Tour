@@ -180,3 +180,15 @@ export async function sendChat(_prev: ActionResult, formData: FormData): Promise
   await audit(admin.id, "server.chat", undefined, { instance, text });
   return { success: targets.length > 1 ? `Отправлено на ${targets.length} сервера` : `Отправлено на ${targets[0]}` };
 }
+
+/** Отдать сервер под лобби игроков (турниры его не берут) или вернуть турнирам */
+export async function toggleLobbyServer(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/servers");
+  const instance = String(formData.get("instance"));
+  const on = formData.get("on") === "1";
+  const { data } = await db().from("server_instances").update({ for_lobby: on }).eq("name", instance).select("name");
+  if (!data?.length) return { error: "Инстанс не найден" };
+  await audit(admin.id, "server.for_lobby", undefined, { instance, on });
+  revalidatePath("/admin/servers");
+  return { success: on ? `${instance} отдан под лобби` : `${instance} снова для турниров` };
+}

@@ -16,6 +16,7 @@ export function Logo({ height = 30 }: { height?: number }) {
 /** Меню как в утверждённом макете главной */
 export const NAV = [
   { href: "/tournaments", label: "Турниры" },
+  { href: "/lobbies", label: "Лобби" },
   { href: "/teams", label: "Команды" },
   { href: "/about", label: "О платформе" },
   { href: "/rules#faq", label: "FAQ" },

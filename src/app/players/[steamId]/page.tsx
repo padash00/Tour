@@ -7,6 +7,7 @@ import { getPlayerAwards } from "@/lib/awards";
 import { getPlayerProgress } from "@/lib/progress";
 import { PlayerProfile } from "@/components/player-profile";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
+import { PlayerLobbyGames } from "@/components/lobby/player-lobby-games";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
@@ -49,17 +50,20 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
   ]);
 
   return (
-    <PlayerProfile
-      player={player}
-      team={membership?.team ?? null}
-      agg={agg}
-      history={history}
-      tournaments={new Set((rosters.data ?? []).map((r) => r.tournament_id)).size}
-      awards={awards}
-      progress={progress}
-      weapons={weapons}
-      h2h={h2h}
-      actions={<ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />}
-    />
+    <>
+      <PlayerProfile
+        player={player}
+        team={membership?.team ?? null}
+        agg={agg}
+        history={history}
+        tournaments={new Set((rosters.data ?? []).map((r) => r.tournament_id)).size}
+        awards={awards}
+        progress={progress}
+        weapons={weapons}
+        h2h={h2h}
+        actions={<ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />}
+      />
+      <PlayerLobbyGames playerId={player.id} />
+    </>
   );
 }

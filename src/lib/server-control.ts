@@ -8,6 +8,16 @@ import { getSetting, getWorkshopMaps } from "./settings";
 import { startMapLogging, stopMapLogging } from "./swing-ingest";
 import { getCs2UpdateCheck, saveSelfCheck, type AgentEvent } from "./server/ops";
 import type { Match } from "./types";
+import {
+  assignLobbyServers,
+  buildLobbyConfig,
+  currentLobbyMap,
+  handleLobbyEvent,
+  lobbyAddress,
+  lobbyEnforce,
+  type LobbyEvent,
+  type LobbyGame,
+} from "./lobby";
 
 // ───────────────────────── авторизация агента и MatchZy
 
@@ -34,6 +44,8 @@ export type ServerInstance = {
   name: string;
   port: number;
   role: "active" | "reserve";
+  /** отдан под лобби — турниры его не берут */
+  for_lobby?: boolean;
   running: boolean;
   gamestate: string | null;
   map: string | null;
@@ -92,7 +104,17 @@ export async function enqueueCommand(
 
 export async function buildMatchzyConfig(matchId: string) {
   const m = await getMatch(matchId);
-  if (!m || !m.team1 || !m.team2 || m.maps.length === 0 || m.matchzy_id == null) return null;
+  if (!m) {
+    // не турнирный матч — может быть игрой лобби
+    const observers = ((await getSetting("OBSERVER_STEAM_IDS")) ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^\d{17}$/.test(s))
+      .map((id, i) => [id, `F16 Observer ${i + 1}`] as [string, string]);
+    const admins = (await adminPlayers()).map((a) => [a.steam_id, a.nickname] as [string, string]);
+    return buildLobbyConfig(matchId, [...observers, ...admins]);
+  }
+  if (!m.team1 || !m.team2 || m.maps.length === 0 || m.matchzy_id == null) return null;
   const rosters = await getMatchRosters(m);
   const players = (list: typeof rosters.team1) =>
     Object.fromEntries(list.map((r) => [r.player.steam_id, r.player.nickname]));
@@ -147,13 +169,13 @@ export async function pickFreeInstance(preferRole: "active" | "reserve" = "activ
   if (!online) return null;
   // агент занят обслуживанием (прогрев карт, обновление) — серверы могут менять карту, не назначаем
   if ((host?.info as { busy?: string | null } | undefined)?.busy) return null;
-  const { data: busy } = await db()
-    .from("matches")
-    .select("server_instance")
-    .not("server_instance", "is", null)
-    .in("status", ["ready", "live"]);
-  const taken = new Set((busy ?? []).map((b) => b.server_instance));
-  const free = instances.filter((i) => i.running && (i.gamestate ?? "none") === "none" && !taken.has(i.name));
+  const [{ data: busy }, { data: lobbyBusy }] = await Promise.all([
+    db().from("matches").select("server_instance").not("server_instance", "is", null).in("status", ["ready", "live"]),
+    db().from("lobby_games").select("server_instance").not("server_instance", "is", null).in("status", ["waiting", "live"]),
+  ]);
+  const taken = new Set([...(busy ?? []), ...(lobbyBusy ?? [])].map((b) => b.server_instance));
+  // серверы лобби турнирам не отдаём
+  const free = instances.filter((i) => !i.for_lobby && i.running && (i.gamestate ?? "none") === "none" && !taken.has(i.name));
   return free.find((i) => i.role === preferRole) ?? free[0] ?? null;
 }
 
@@ -202,6 +224,9 @@ export async function applyAgentReport(report: AgentReport) {
     const { data: match } = matchzyId
       ? await db().from("matches").select("*").eq("matchzy_id", matchzyId).maybeSingle()
       : { data: null };
+    if (matchzyId && !match && gamestate && gamestate !== "none") {
+      await lobbyHealthCheck(matchzyId, inst.name, inst.map ?? null, report.lan_ip ?? null, upnpIp);
+    }
 
     await db()
       .from("server_instances")
@@ -267,6 +292,21 @@ export async function takePendingCommands(siteOrigin: string) {
     .in("id", commands.map((c) => c.id));
 
   return Promise.all(commands.map(async (c) => {
+    if (c.type === "load_match" && c.payload.lobby) {
+      // игра лобби: без HTTP-лога (раунды для Swing не нужны), cvars из настроек лобби
+      return {
+        ...c,
+        payload: {
+          ...c.payload,
+          url: `${siteOrigin}/api/matchzy/config/${c.payload.match_id}`,
+          header_key: MATCHZY_HEADER,
+          header_value: process.env.MATCHZY_TOKEN,
+          events_url: `${siteOrigin}/api/matchzy/events`,
+          post_cmds: [],
+          enforce: await lobbyEnforce(String(c.payload.match_id)),
+        },
+      };
+    }
     if (c.type === "load_match") {
       return {
         ...c,
@@ -343,7 +383,8 @@ export async function ackCommand(id: string, ok: boolean, result: string) {
   if (cmd?.type === "prefetch_maps") await saveWorkshopResults(result);
   if (cmd?.type === "self_check" && ok) await saveSelfCheck(result);
   if (cmd?.type === "load_match" && !ok) {
-    await db().from("matches").update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
+    const table = cmd.payload.lobby ? "lobby_games" : "matches";
+    await db().from(table).update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
   }
 }
 
@@ -453,7 +494,12 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
     round_number: ev.round_number ?? null,
     payload: ev,
   });
-  if (!match) return;
+  if (!match) {
+    // игра лобби: итог карты — в чат сервера
+    const out = await handleLobbyEvent(ev as LobbyEvent);
+    if (out) for (const line of out.lines) await enqueueCommand(out.instance, "rcon", { command: `css_asay ${chatSafe(line)}` });
+    return;
+  }
 
   // MatchZy нумерует карты с 0, у нас — с 1
   const mapNumber = (ev.map_number ?? 0) + 1;
@@ -731,7 +777,27 @@ export async function expireStaleWork() {
     .select("id, type, instance, payload");
   for (const c of stale ?? []) {
     if (c.type === "load_match" && c.payload?.match_id) {
-      await db().from("matches").update({ server_state: "error" }).eq("id", String(c.payload.match_id)).eq("server_state", "loading");
+      const table = c.payload.lobby ? "lobby_games" : "matches";
+      await db().from(table).update({ server_state: "error" }).eq("id", String(c.payload.match_id)).eq("server_state", "loading");
+    }
+  }
+
+  // игра лобби «загружается», но MatchZy её так и не взял → ошибка, назначим заново
+  const { data: lobbyLoading } = await db()
+    .from("lobby_games")
+    .select("id, matchzy_id, server_instance")
+    .eq("server_state", "loading")
+    .lt("server_assigned_at", new Date(Date.now() - LOAD_WATCHDOG_MS).toISOString());
+  if (lobbyLoading?.length) {
+    const { data: insts } = await db().from("server_instances").select("name, matchzy_match_id");
+    const onServer = new Map((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
+    for (const g of lobbyLoading) {
+      if (onServer.get(g.server_instance) === g.matchzy_id) continue;
+      await db()
+        .from("lobby_games")
+        .update({ server_state: "error", note: `${g.server_instance} не принял матч — ищем другой сервер` })
+        .eq("id", g.id)
+        .eq("server_state", "loading");
     }
   }
 
@@ -765,7 +831,12 @@ export async function expireStaleWork() {
  */
 async function workshopLoadBusy(matchId: string) {
   const { data: maps } = await db().from("match_maps").select("map_name").eq("match_id", matchId).order("map_number");
-  const ws = (maps ?? []).map((m) => m.map_name).filter((n) => n.includes("@"));
+  return workshopBusyFor((maps ?? []).map((m) => m.map_name), matchId);
+}
+
+/** То же для любого набора карт; selfId — матч или игра лобби, которую не считаем «другой загрузкой» */
+async function workshopBusyFor(mapNames: string[], selfId: string) {
+  const ws = mapNames.filter((n) => n.includes("@"));
   if (!ws.length) return false;
   const info = await workshopInfo();
   const unverified = ws.map((n) => n.split("@")[1]).filter((id) => !info[id]?.ok);
@@ -780,12 +851,44 @@ async function workshopLoadBusy(matchId: string) {
     if (!count) await enqueueCommand(null, "prefetch_maps", { workshop_ids: [...new Set(unverified)] });
     return true;
   }
-  const { count } = await db()
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("server_state", "loading")
-    .neq("id", matchId);
-  return !!count;
+  const [{ count }, { count: lobbyLoading }] = await Promise.all([
+    db().from("matches").select("id", { count: "exact", head: true }).eq("server_state", "loading").neq("id", selfId),
+    db().from("lobby_games").select("id", { count: "exact", head: true }).eq("server_state", "loading").neq("id", selfId),
+  ]);
+  return !!count || !!lobbyLoading;
+}
+
+/** Игры лобби, ждущие сервер, → на свободные серверы лобби (на каждой синхронизации агента) */
+export async function lobbyServersTick() {
+  await assignLobbyServers({ workshopBusy: workshopBusyFor });
+}
+
+/**
+ * Игра лобби загрузилась на назначенный сервер и на нём нужная карта → выдаём адрес игрокам.
+ * Не загрузилась за 2 минуты (Workshop-карта не работает в CS2) → ошибка, игра снова ждёт сервер.
+ */
+async function lobbyHealthCheck(matchzyId: number, instance: string, map: string | null, lanIp: string | null, upnpIp: string | null) {
+  const { data } = await db().from("lobby_games").select("*").eq("matchzy_id", matchzyId).maybeSingle();
+  const g = data as LobbyGame | null;
+  if (!g || g.server_instance !== instance || g.server_state !== "loading") return;
+  const want = currentLobbyMap(g);
+  const expected = want && want.includes("@") ? ((await workshopInfo())[want.split("@")[1]]?.map ?? null) : want;
+  if (expected && map && map !== expected) {
+    const waited = g.server_assigned_at ? Date.now() - new Date(g.server_assigned_at).getTime() : 0;
+    if (waited > MAP_LOAD_TIMEOUT_MS) {
+      await db().from("lobby_games").update({ server_state: "error", note: `карта ${expected} не загрузилась на ${instance}` }).eq("id", g.id);
+    }
+    return;
+  }
+  const ip = await lobbyAddress(g, lanIp, upnpIp);
+  if (!ip) return;
+  const { data: row } = await db().from("server_instances").select("port").eq("name", instance).single();
+  await db()
+    .from("lobby_games")
+    .update({ server_state: "ready", server_address: `${ip}:${row?.port}`, server_ready_at: new Date().toISOString(), note: null })
+    .eq("id", g.id);
+  // адрес — только в карточке игры (его видят участники), не в общем чате
+  await db().from("lobby_messages").insert({ lobby_id: g.lobby_id, player_id: null, body: "Сервер готов — нажмите «Подключиться»" });
 }
 
 // ───────────────────────── закрытие матчей завершённого турнира
@@ -835,6 +938,12 @@ async function serversIdle() {
   const { online, host, instances } = await getServerState();
   if (!online || (host?.info as { busy?: string } | undefined)?.busy) return false;
   if (instances.some((i) => i.running && (i.gamestate ?? "none") !== "none")) return false;
+  const { count: lobbyGames } = await db()
+    .from("lobby_games")
+    .select("id", { count: "exact", head: true })
+    .not("server_instance", "is", null)
+    .in("status", ["waiting", "live"]);
+  if ((lobbyGames ?? 0) > 0) return false;
   const { count } = await db()
     .from("matches")
     .select("id", { count: "exact", head: true })

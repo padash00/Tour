@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { hostCommand, serverRcon } from "@/app/actions/admin-server";
+import { hostCommand, serverRcon, toggleLobbyServer } from "@/app/actions/admin-server";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { formatShortDateTime, formatTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
@@ -29,7 +29,7 @@ const CMD_STATUS: Record<AgentCommand["status"], string> = {
 export default async function ServersPage() {
   await requireAdmin("/admin/servers"); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
-  const [{ data: matches }, { data: commands }, cs2Check, selfReport] = await Promise.all([
+  const [{ data: matches }, { data: commands }, cs2Check, selfReport, { data: lobbyGames }] = await Promise.all([
     db()
       .from("matches")
       .select(
@@ -40,7 +40,14 @@ export default async function ServersPage() {
     db().from("agent_commands").select("*").order("created_at", { ascending: false }).limit(25),
     getCs2UpdateCheck(),
     getSelfCheck(),
+    db()
+      .from("lobby_games")
+      .select("id, status, server_instance, server_state, team1, team2, lobby:lobbies!lobby_games_lobby_id_fkey(code)")
+      .not("server_instance", "is", null)
+      .in("status", ["waiting", "live"]),
   ]);
+  type LG = { id: string; status: string; server_instance: string; server_state: string | null; team1: { name: string }; team2: { name: string }; lobby: { code: string } | null };
+  const lobbyOn = new Map(((lobbyGames ?? []) as unknown as LG[]).map((g) => [g.server_instance, g]));
   const nowTs = serverNow();
   const selfCheckRunning = ((commands ?? []) as AgentCommand[]).some(
     (c) => c.type === "self_check" && (c.status === "pending" || c.status === "sent") && nowTs - new Date(c.created_at).getTime() < 15 * 60_000,
@@ -157,6 +164,20 @@ export default async function ServersPage() {
                       game :{s.port} · tv :{s.port + 5}
                       {s.role === "reserve" ? " · резерв" : ""}
                     </div>
+                    <ActionForm action={toggleLobbyServer} inline>
+                      <input type="hidden" name="instance" value={s.name} />
+                      <input type="hidden" name="on" value={s.for_lobby ? "0" : "1"} />
+                      <button
+                        type="submit"
+                        title={s.for_lobby ? "Сервер отдан под лобби игроков — турниры его не берут. Нажмите, чтобы вернуть турнирам." : "Отдать сервер под лобби игроков"}
+                        className={cn(
+                          "mt-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                          s.for_lobby ? "bg-accent/15 text-accent" : "bg-white/[0.04] text-fg-3 hover:text-fg",
+                        )}
+                      >
+                        {s.for_lobby ? "для лобби" : "турниры"}
+                      </button>
+                    </ActionForm>
                   </div>
                   <div className={cn("flex items-center gap-2 text-[13px] font-medium", toneText[st.tone])}>
                     <Dot tone={st.tone === "muted" ? "muted" : st.tone} pulse={live} />
@@ -176,6 +197,14 @@ export default async function ServersPage() {
                             ждём {waited} мин
                           </span>
                         )}
+                      </Link>
+                    ) : lobbyOn.has(s.name) ? (
+                      <Link href={`/lobby/${lobbyOn.get(s.name)!.lobby?.code ?? ""}`} className="block truncate hover:text-accent">
+                        <span className="font-medium">
+                          Лобби #{lobbyOn.get(s.name)!.lobby?.code} · {lobbyOn.get(s.name)!.team1.name} <span className="text-fg-3">vs</span>{" "}
+                          {lobbyOn.get(s.name)!.team2.name}
+                        </span>
+                        {lobbyOn.get(s.name)!.server_state === "loading" && <span className="ml-2 text-[12px] text-warn">загрузка…</span>}
                       </Link>
                     ) : (
                       <span className="text-fg-3">матча нет</span>

@@ -32,5 +32,7 @@ jobs:
         run: npx tsx --conditions=react-server scripts/test-stage-formats.mts
       - name: Награды
         run: npx tsx --conditions=react-server scripts/test-awards.mts
+      - name: Лобби — настройки, cvars, вето
+        run: npx tsx --conditions=react-server scripts/test-lobby-settings.mts
       - name: Буфер событий агента
         run: node scripts/test-agent-relay.mjs

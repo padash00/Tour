@@ -8,6 +8,7 @@ import {
   checkBearer,
   closeMatchesOfEndedTournaments,
   expireStaleWork,
+  lobbyServersTick,
   takePendingCommands,
   verifyWorkshopLibrary,
   type AgentReport,
@@ -16,6 +17,7 @@ import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/op
 import { refreshStaleProfilesTick } from "@/lib/profile-sync";
 import { getSetting } from "@/lib/settings";
 import { applyDueVetoTimeouts } from "@/lib/matches";
+import { lobbyTick } from "@/lib/lobby";
 
 /** Фоновые задачи на каждой синхронизации: сбой одной не должен отменять остальные */
 async function safely(name: string, job: () => Promise<unknown>) {
@@ -35,6 +37,8 @@ export async function POST(request: NextRequest) {
   await safely("watchdog", expireStaleWork);
   await safely("veto timeouts", applyDueVetoTimeouts);
   await safely("autopilot", autopilotTick);
+  await safely("lobby", lobbyTick);
+  await safely("lobby servers", lobbyServersTick);
   await safely("workshop check", verifyWorkshopLibrary);
   await safely("close ended", () => closeMatchesOfEndedTournaments());
   await safely("cs2 version", () => checkCs2UpToDate(report.info?.cs2_patch));

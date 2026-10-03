@@ -231,7 +231,14 @@ async function autoStartNextMap(inst, info, get5) {
     await warmupHud(inst, info, get5, null);
     return;
   }
-  if (mapNo < 1) {
+  // игра лобби с ботами: A2S считает ботов игроками — ждать «все зашли» нельзя, игроки пишут .r сами
+  if (a.payload?.lobby && a.payload?.autostart_off) {
+    delete autoStart[inst.name];
+    await warmupHud(inst, info, get5, "Напишите .r в чат, когда готовы");
+    return;
+  }
+  // лобби: готовность уже подтвердили на сайте — первая карта тоже стартует сама, когда все зашли
+  if (mapNo < 1 && !a.payload?.autostart_first) {
     // первая карта — игроки сами пишут .r
     const cfg0 = readJsonSafe(path.join(STATE_DIR, "match-configs", `${a.match_id}.json`), null);
     const need0 = (cfg0?.players_per_team ?? 5) * 2;
@@ -245,7 +252,8 @@ async function autoStartNextMap(inst, info, get5) {
   if (!st || st.key !== key) st = autoStart[inst.name] = { key, since: null, announced: false, done: false };
   if (st.done) return;
   const cfg = readJsonSafe(path.join(STATE_DIR, "match-configs", `${a.match_id}.json`), null);
-  const need = (cfg?.players_per_team ?? 5) * 2;
+  // в лобби команды бывают неполными — ждём столько людей, сколько в составе
+  const need = Number(a.payload?.autostart_need) || (cfg?.players_per_team ?? 5) * 2;
   // A2S считает и GOTV — он всегда включён
   const humans = Math.max(0, (info?.players ?? 0) - 1);
   if (!st.announced) {
