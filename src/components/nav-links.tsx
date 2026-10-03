@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, LayoutDashboard, LogOut, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Avatar, Menu, MenuItem, MenuSeparator, cn } from "@/components/ds";
+import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 import { PRIMARY_NAV, SECONDARY_NAV, isActive, noChrome } from "./shell/nav";
 
@@ -130,17 +130,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
   const pathname = usePathname();
   const { node, logout } = useLogout();
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const panel = useModal(open, () => setOpen(false));
 
   const row = "flex h-12 items-center gap-3 rounded-control px-3 text-[16px] transition-colors";
   return (
@@ -158,7 +148,11 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
       </button>
       {open && typeof document !== "undefined" && createPortal(
         <div
+          ref={panel}
           id="mobile-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Меню сайта"
           className="fixed inset-x-0 bottom-0 top-[var(--shell-h)] z-50 overflow-y-auto border-t border-line-subtle bg-bg animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
         >
           <nav className="px-3 py-3" aria-label="Мобильное меню">
