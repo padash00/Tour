@@ -1135,7 +1135,7 @@ function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: string;
   };
   const time = useMemo(() => new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), []);
   return (
-    <div className="flex h-[560px] flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface">
+    <div className="flex h-[440px] flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface sm:h-[560px]">
       <div ref={box} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4">
         {view.messages.length === 0 && <p className="pt-10 text-center text-[13px] text-fg-3">Сообщений пока нет</p>}
         {view.messages.map((m) =>
