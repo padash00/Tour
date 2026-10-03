@@ -9,11 +9,11 @@ import type { LobbySettings } from "@/lib/lobby-settings";
 import { BOT_DIFFICULTY } from "@/lib/lobby-settings";
 import { mapLabel } from "@/lib/maps";
 import { MODES } from "@/lib/modes";
-import { btnClass } from "../primitives";
 import { useToast } from "../toast";
-import { Avatar, cn, FaceitLevel } from "../ui";
+import { Avatar, FaceitLevel } from "../ui";
 import { AdvancedSettings, MapThumb, QuickSettings, type MapOption, type Template } from "./settings";
-import { Icon, Sheet } from "./ui";
+import { Button, CriticalSurface, Dialog, Facts, FeatureSurface, Status, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
+import { Icon } from "./ui";
 
 type Slot = ViewMember["slot"];
 
@@ -61,6 +61,17 @@ function useNow(offset: number) {
   return now;
 }
 const secondsLeft = (iso: string | null | undefined, now: number) => (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 1000)) : 0);
+
+function phaseOf(view: LobbyView) {
+  const { lobby, game } = view;
+  if (lobby.status === "closed") return "closed" as const;
+  if (game?.status === "live") return "live" as const;
+  if (game?.status === "veto") return "veto" as const;
+  if (game?.status === "waiting") return "server" as const;
+  if (lobby.ready_check_until) return "ready_check" as const;
+  if (lobby.draft) return "draft" as const;
+  return "waiting" as const;
+}
 
 /** Короткий сигнал (браузер пускает звук после любого клика на сайте) */
 function chime() {
@@ -165,6 +176,7 @@ export function LobbyRoom({
   const myTurnInDraft = !!draft && me?.id === draft.captains[draft.turn - 1];
   const inviteUrl = origin && lobby.invite_token ? `${origin}/lobby/${lobby.code}?t=${lobby.invite_token}` : null;
   const headMap = game?.maps.find((m) => m.status !== "finished")?.map ?? game?.maps[0]?.map ?? s.maps[0] ?? "de_mirage";
+  const phase = phaseOf(view);
 
   const join = (slot?: Slot) => run(() => A.joinLobby(code, { slot, invite: invite ?? undefined }));
   const clickEmpty = (slot: Slot) => {
@@ -174,96 +186,75 @@ export function LobbyRoom({
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] px-3 pt-4 pb-16 sm:px-6 lg:pt-6">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        {/* ───────── левая часть */}
-        <div className="min-w-0 space-y-4">
-          {/* шапка */}
-          <MapThumb map={headMap} image={view.mapImages[headMap]} className="rounded-[14px] border border-white/[0.06]">
-            <div className="relative flex min-h-[132px] flex-col justify-between p-3 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-[9px] bg-black/50 px-3 text-[14px] text-fg backdrop-blur hover:bg-black/70">
-                    {Icon.back("size-4")} <span className="hidden sm:inline">К списку лобби</span>
-                  </Link>
-                  {inviteUrl && (
-                    <button
-                      type="button"
-                      title="Скопировать ссылку-приглашение"
-                      onClick={() => navigator.clipboard.writeText(inviteUrl).then(() => toast.success(lobby.visibility === "public" ? "Ссылка скопирована" : "Ссылка скопирована — по ней пускает без пароля"))}
-                      className="grid size-10 place-items-center rounded-[9px] bg-black/50 text-fg backdrop-blur hover:bg-black/70"
-                    >
-                      {Icon.link("size-4")}
-                    </button>
-                  )}
+    <>
+      <div className="border-b border-line-subtle bg-shell">
+        <div className="mx-auto w-full max-w-wide px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/lobbies" className={btnClass("ghost", "sm", "shrink-0")}>
+                {Icon.back("size-4")}
+                <span className="hidden sm:inline">Лобби</span>
+              </Link>
+              <MapThumb map={headMap} image={view.mapImages[headMap]} className="hidden h-14 w-24 shrink-0 rounded-control border border-line-subtle sm:block">
+                <span className="absolute bottom-1.5 left-2 max-w-[80px] truncate text-[11px] font-medium text-fg">{mapLabel(headMap)}</span>
+              </MapThumb>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">Лобби #{lobby.code}</h1>
+                  <Status info={lobbyStatus[phase]} size="sm" />
                 </div>
-                <span className="num rounded-[8px] bg-black/50 px-3 py-1.5 text-[13px] text-fg backdrop-blur">
-                  Игроков {playersNow}/{s.team_size * 2}
-                </span>
-                {isMember ? (
-                  <button
-                    type="button"
-                    onClick={() => run(async () => {
+                <p className="mt-1 truncate text-meta text-fg-3">
+                  Хост {lobby.host_name} · {MODES[s.mode].label.replace(" на ", "×")} · BO{s.best_of} · {s.network === "lan" ? "LAN" : "Интернет"} · {lobby.visibility === "public" ? "публичное" : lobby.visibility === "closed" ? "по паролю" : "приватное"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className="num rounded-control border border-line-subtle bg-surface px-3 py-2 text-meta text-fg-2">
+                {playersNow}/{s.team_size * 2} игроков
+              </span>
+              {inviteUrl && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    navigator.clipboard
+                      .writeText(inviteUrl)
+                      .then(() => toast.success(lobby.visibility === "public" ? "Ссылка скопирована" : "Ссылка скопирована — по ней можно войти без пароля"))
+                  }
+                >
+                  {Icon.link("size-4")} Пригласить
+                </Button>
+              )}
+              {isMember ? (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() =>
+                    run(async () => {
                       const r = await A.leaveLobby(code);
                       if (!r?.error) router.push("/lobbies");
                       return r;
-                    })}
-                    className="inline-flex h-10 items-center gap-2 rounded-[9px] bg-danger/20 px-3 text-[14px] font-medium text-danger backdrop-blur hover:bg-danger/30"
-                  >
-                    <span className="hidden sm:inline">Покинуть лобби</span> {Icon.exit("size-4")}
-                  </button>
-                ) : (
-                  lobby.status !== "closed" && (
-                    <button type="button" onClick={() => (me ? join() : clickEmpty("wait"))} className={btnClass("primary", "sm")}>
-                      Войти в лобби
-                    </button>
-                  )
-                )}
-              </div>
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex items-center gap-2 text-[12px] text-fg-2">
-                  <span className="num rounded-[6px] bg-black/50 px-2 py-1 font-semibold tracking-wider text-fg">#{lobby.code}</span>
-                  <span className="rounded-[6px] bg-black/50 px-2 py-1">{lobby.visibility === "public" ? "Публичное" : lobby.visibility === "closed" ? "Закрытое" : "Приватное"}</span>
-                  {lobby.status === "closed" && <span className="rounded-[6px] bg-danger/30 px-2 py-1 text-danger">закрыто</span>}
-                </div>
-              </div>
+                    })
+                  }
+                >
+                  Покинуть
+                </Button>
+              ) : (
+                lobby.status !== "closed" && (
+                  <Button size="sm" onClick={() => (me ? join() : clickEmpty("wait"))}>
+                    Войти
+                  </Button>
+                )
+              )}
             </div>
-          </MapThumb>
+          </div>
+        </div>
+      </div>
 
-          {/* карты серии */}
-          {(game?.maps.length ?? 0) > 1 || (!game && s.map_choice === "host" && s.best_of > 1) ? (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {(game && game.maps.length ? game.maps.map((m) => m.map) : s.maps).map((m, i) => {
-                const gm = game?.maps[i];
-                return (
-                  <MapThumb key={`${m}-${i}`} map={m} image={view.mapImages[m]} className={cn("h-16 rounded-[10px] border", gm?.status === "live" ? "border-live/70" : "border-white/[0.06]")}>
-                    <span className="absolute bottom-1.5 left-2 text-[12px] font-medium text-fg">{mapLabel(m)}</span>
-                    {gm && gm.status !== "pending" && (
-                      <span className="num absolute right-2 top-1.5 text-[13px] font-semibold text-fg">
-                        {gm.team1_score}:{gm.team2_score}
-                      </span>
-                    )}
-                  </MapThumb>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {/* команды и центр */}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)_minmax(0,1fr)]">
-            <TeamCard
-              team="team1"
-              name={lobby.team1_name}
-              members={team1}
-              bots={lobby.bots.team1}
-              size={s.team_size}
-              view={view}
-              isHost={isHost}
-              busy={busy}
-              run={run}
-              code={code}
-              onEmpty={() => clickEmpty("team1")}
-            />
+      <div className="mx-auto w-full max-w-wide px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <main className="min-w-0 space-y-6">
             <Center
               view={view}
               now={now}
@@ -274,117 +265,164 @@ export function LobbyRoom({
               hostName={lobby.host_name}
               onInvite={() => inviteUrl && navigator.clipboard.writeText(inviteUrl).then(() => toast.success("Ссылка-приглашение скопирована"))}
             />
-            <TeamCard
-              team="team2"
-              name={lobby.team2_name}
-              members={team2}
-              bots={lobby.bots.team2}
-              size={s.team_size}
-              view={view}
-              isHost={isHost}
-              busy={busy}
-              run={run}
-              code={code}
-              onEmpty={() => clickEmpty("team2")}
-            />
-          </div>
 
-          {/* ожидание и наблюдатели */}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-            <Panel
-              title="В ожидании"
-              count={waiting.length}
-              right={
-                draft ? (
-                  <span className="text-[13px] text-accent">
-                    Драфт · выбирает {byId.get(draft.captains[draft.turn - 1])?.nickname ?? "капитан"} · {secondsLeft(draft.deadline, now)} с
-                  </span>
-                ) : (
-                  s.filter && <span className="text-[12px] text-fg-3">Фильтр игроков включён</span>
-                )
-              }
-            >
-              <div className="grid gap-2 sm:grid-cols-2">
-                {waiting.map((m) => (
-                  <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code}>
-                    {myTurnInDraft && (
-                      <button type="button" disabled={busy} onClick={() => run(() => A.pickInDraft(code, m.id))} className={btnClass("primary", "sm")}>
-                        Выбрать
-                      </button>
-                    )}
-                  </PlayerLine>
-                ))}
-                <EmptySlot onClick={() => clickEmpty("wait")} />
-              </div>
-            </Panel>
-            <Panel title="Наблюдатели" count={`${specs.length}/${s.max_spectators}`}>
-              <div className="grid gap-2">
-                {specs.map((m) => (
-                  <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} />
-                ))}
-                {specs.length < s.max_spectators && <EmptySlot onClick={() => clickEmpty("spec")} />}
-              </div>
-            </Panel>
-          </div>
-
-          {view.history.length > 0 && (
-            <Panel title="Сыгранные матчи" count={view.history.length}>
-              <div className="divide-y divide-white/[0.06]">
-                {view.history.map((h) => (
-                  <Link key={h.id} href={`/lobbies/games/${h.id}`} className="flex items-center gap-3 py-2.5 text-[14px] hover:text-accent">
-                    <span className={cn("min-w-0 flex-1 truncate text-right", h.winner === 1 && "font-semibold")}>{h.team1}</span>
-                    <span className="num shrink-0 rounded-[6px] bg-white/[0.05] px-2 py-0.5 font-semibold">
-                      {h.team1_score}:{h.team2_score}
-                    </span>
-                    <span className={cn("min-w-0 flex-1 truncate", h.winner === 2 && "font-semibold")}>{h.team2}</span>
-                    <span className="hidden shrink-0 text-[12px] text-fg-3 sm:inline">{h.maps.map(mapLabel).join(", ")}</span>
-                  </Link>
-                ))}
-              </div>
-            </Panel>
-          )}
-        </div>
-
-        {/* ───────── правая часть */}
-        <aside className="min-w-0 space-y-3 xl:sticky xl:top-[110px] xl:self-start">
-          <div className="grid grid-cols-2 gap-1 rounded-[12px] bg-surface p-1">
-            {(["chat", "settings"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn("h-10 rounded-[9px] text-[14px] font-medium transition-colors", tab === t ? "bg-accent text-accent-ink" : "text-fg-2 hover:text-fg")}
-              >
-                {t === "chat" ? "Чат" : "Настройки"}
-              </button>
-            ))}
-          </div>
-          {tab === "chat" ? (
-            <Chat view={view} code={code} onSent={load} canWrite={isMember || !!me?.isAdmin} />
-          ) : (
-            <div className="space-y-3">
-              {!editable && (
-                <div className="rounded-[10px] bg-white/[0.03] px-4 py-3 text-[13px] text-fg-3">
-                  {lobby.status !== "waiting" ? "Идёт игра — настройки меняются между матчами." : "Менять настройки может только хост лобби."}
+            {(game?.maps.length ?? 0) > 1 || (!game && s.map_choice === "host" && s.best_of > 1) ? (
+              <section aria-label="Карты серии">
+                <div className="mb-3 text-title text-fg">Карты</div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  {(game && game.maps.length ? game.maps.map((m) => m.map) : s.maps).map((m, i) => {
+                    const gm = game?.maps[i];
+                    return (
+                      <MapThumb
+                        key={`${m}-${i}`}
+                        map={m}
+                        image={view.mapImages[m]}
+                        className={cn("h-20 rounded-surface border", gm?.status === "live" ? "border-live/60" : "border-line-subtle")}
+                      >
+                        <span className="absolute bottom-2 left-2.5 text-[12px] font-medium text-fg">{mapLabel(m)}</span>
+                        {gm && gm.status !== "pending" && (
+                          <span className="num absolute right-2.5 top-2 text-[13px] font-semibold text-fg">
+                            {gm.team1_score}:{gm.team2_score}
+                          </span>
+                        )}
+                      </MapThumb>
+                    );
+                  })}
                 </div>
-              )}
-              <QuickSettings s={s} editable={editable} patch={patch} maps={maps} images={view.mapImages} onAdvanced={() => setAdvanced(true)} />
-              {editable && <VisibilityRow view={view} run={run} code={code} />}
-              <button
-                type="button"
-                onClick={() => setAdvanced(true)}
-                className="flex h-14 w-full items-center gap-3 rounded-[12px] bg-accent px-5 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong"
+              </section>
+            ) : null}
+
+            <section>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-heading text-fg">Команды</h2>
+                <span className="text-meta text-fg-3">Займите слот или дождитесь распределения хостом</span>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <TeamCard
+                  team="team1"
+                  name={lobby.team1_name}
+                  members={team1}
+                  bots={lobby.bots.team1}
+                  size={s.team_size}
+                  view={view}
+                  isHost={isHost}
+                  busy={busy}
+                  run={run}
+                  code={code}
+                  onEmpty={() => clickEmpty("team1")}
+                />
+                <TeamCard
+                  team="team2"
+                  name={lobby.team2_name}
+                  members={team2}
+                  bots={lobby.bots.team2}
+                  size={s.team_size}
+                  view={view}
+                  isHost={isHost}
+                  busy={busy}
+                  run={run}
+                  code={code}
+                  onEmpty={() => clickEmpty("team2")}
+                />
+              </div>
+            </section>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+              <Panel
+                title="В ожидании"
+                count={waiting.length}
+                right={
+                  draft ? (
+                    <span className="text-meta text-accent">
+                      выбирает {byId.get(draft.captains[draft.turn - 1])?.nickname ?? "капитан"} · {secondsLeft(draft.deadline, now)} с
+                    </span>
+                  ) : (
+                    s.filter && <span className="text-meta text-fg-3">Фильтр игроков включён</span>
+                  )
+                }
               >
-                {Icon.gear("size-5")} <span className="flex-1 text-left">Расширенные настройки</span> ↗
-              </button>
-              {isHost && lobby.status !== "closed" && (
-                <button type="button" onClick={() => run(() => A.closeLobbyAction(code))} className={btnClass("ghost", "sm", "w-full text-danger")}>
-                  Закрыть лобби
-                </button>
-              )}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {waiting.map((m) => (
+                    <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code}>
+                      {myTurnInDraft && (
+                        <Button size="sm" disabled={busy} onClick={() => run(() => A.pickInDraft(code, m.id))}>
+                          Выбрать
+                        </Button>
+                      )}
+                    </PlayerLine>
+                  ))}
+                  <EmptySlot onClick={() => clickEmpty("wait")} />
+                </div>
+              </Panel>
+
+              <Panel title="Наблюдатели" count={`${specs.length}/${s.max_spectators}`}>
+                <div className="grid gap-2">
+                  {specs.map((m) => (
+                    <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} />
+                  ))}
+                  {specs.length < s.max_spectators && <EmptySlot onClick={() => clickEmpty("spec")} />}
+                </div>
+              </Panel>
             </div>
-          )}
-        </aside>
+
+            {view.history.length > 0 && (
+              <Panel title="Сыгранные матчи" count={view.history.length}>
+                <div className="divide-y divide-line-subtle">
+                  {view.history.map((h) => (
+                    <Link key={h.id} href={`/lobbies/games/${h.id}`} className="flex min-h-14 items-center gap-3 py-2.5 text-[14px] hover:text-accent">
+                      <span className={cn("min-w-0 flex-1 truncate text-right", h.winner === 1 && "font-semibold")}>{h.team1}</span>
+                      <span className="num shrink-0 rounded-control bg-white/[0.05] px-2 py-0.5 font-semibold">
+                        {h.team1_score}:{h.team2_score}
+                      </span>
+                      <span className={cn("min-w-0 flex-1 truncate", h.winner === 2 && "font-semibold")}>{h.team2}</span>
+                      <span className="hidden shrink-0 text-meta text-fg-3 sm:inline">{h.maps.map(mapLabel).join(", ")}</span>
+                    </Link>
+                  ))}
+                </div>
+              </Panel>
+            )}
+          </main>
+
+          <aside className="min-w-0 xl:sticky xl:top-[calc(var(--shell-h)+24px)] xl:self-start">
+            <div className="mb-3 grid grid-cols-2 gap-1 rounded-control border border-line-subtle bg-shell p-1">
+              {(["chat", "settings"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={cn(
+                    "h-9 rounded-[6px] text-[14px] font-medium transition-colors",
+                    tab === t ? "bg-elevated text-fg" : "text-fg-3 hover:text-fg",
+                  )}
+                >
+                  {t === "chat" ? "Чат" : "Настройки"}
+                </button>
+              ))}
+            </div>
+
+            {tab === "chat" ? (
+              <Chat view={view} code={code} onSent={load} canWrite={isMember || !!me?.isAdmin} />
+            ) : (
+              <div className="space-y-3">
+                {!editable && (
+                  <div className="rounded-control border border-line-subtle bg-shell px-4 py-3 text-meta text-fg-3">
+                    {lobby.status !== "waiting" ? "Идёт игра — настройки меняются между матчами." : "Менять настройки может только хост лобби."}
+                  </div>
+                )}
+                <QuickSettings s={s} editable={editable} patch={patch} maps={maps} images={view.mapImages} onAdvanced={() => setAdvanced(true)} />
+                {editable && <VisibilityRow view={view} run={run} code={code} />}
+                <Button block onClick={() => setAdvanced(true)}>
+                  {Icon.gear("size-5")} Расширенные настройки
+                </Button>
+                {isHost && lobby.status !== "closed" && (
+                  <Button variant="danger" size="sm" block onClick={() => run(() => A.closeLobbyAction(code))}>
+                    Закрыть лобби
+                  </Button>
+                )}
+              </div>
+            )}
+          </aside>
+        </div>
       </div>
 
       <AdvancedSettings
