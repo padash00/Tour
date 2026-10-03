@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
-import { CARD, Eyebrow, OutlineBtn, PageHero, PrimaryBtn, WRAP } from "@/components/primitives";
+import { Button, Container, Facts, PageTitle, Panel, Region, Section, cn } from "@/components/ds";
 
-// страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
-
 export const metadata: Metadata = { title: "О платформе" };
 
 const FACTS = [
-  { k: "Игра", v: "Counter-Strike 2" },
-  { k: "Формат", v: "LAN-турниры в клубе F16" },
-  { k: "Режимы", v: "5×5, 2×2, 1×1" },
-  { k: "Вход", v: "Через Steam, без паролей" },
+  { label: "Игра", value: "Counter-Strike 2" },
+  { label: "Формат", value: "LAN-турниры в клубе F16" },
+  { label: "Режимы", value: "5×5, 2×2, 1×1" },
+  { label: "Вход", value: "Через Steam, без паролей" },
 ];
 
 const FLOW = [
@@ -23,87 +21,78 @@ const FLOW = [
 
 const PRINCIPLES = [
   { t: "Один аккаунт", d: "Steam связывает игрока с командой, турниром и статистикой. Регистрироваться отдельно не нужно." },
-  { t: "Серверы клуба", d: "Матчи идут на собственных серверах F16 в зале. На сервер заходят только игроки матча." },
-  { t: "Честная статистика", d: "Каждый раунд записывается автоматически. Рейтинг и MVP считаются одинаково для всех." },
-  { t: "Открытые решения", d: "Решения организатора по спорным ситуациям видят обе команды." },
+  { t: "Серверы клуба", d: "Матчи идут на собственных серверах F16. На сервер заходят только участники конкретного матча." },
+  { t: "Честная статистика", d: "Раунды и события записываются автоматически. Рейтинг и MVP считаются одинаково для всех." },
+  { t: "Открытые решения", d: "Решения организатора по спорным ситуациям сохраняются и видны участникам." },
 ];
 
 export default function AboutPage() {
   return (
     <>
-      <PageHero
-        eyebrow="F16 Arena"
-        title="О платформе"
-        description="Турнирная платформа клуба F16 для Counter-Strike 2. Для команд, которые хотят играть всерьёз: с регламентом, сеткой и статистикой каждого матча."
-      />
+      <Container width="wide" className="pb-12 pt-8 sm:pt-10">
+        <PageTitle>О платформе</PageTitle>
+        <p className="mt-2 max-w-[760px] text-[16px] leading-relaxed text-fg-2">
+          Турнирная платформа клуба F16 для Counter-Strike 2: команды, заявки, check-in, сетка, серверы и статистика матчей в одном месте.
+        </p>
 
-      <div className={`${WRAP} pt-14 lg:pt-20`}>
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,780px)_minmax(0,1fr)] lg:gap-20">
-          <div className="space-y-6 text-[17px] leading-[1.75] text-fg-2 lg:text-[19px]">
+        <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,760px)_minmax(0,1fr)] lg:gap-16">
+          <div className="space-y-5 text-[16px] leading-[1.75] text-fg-2">
             <p className="text-fg">
-              F16 Arena начиналась как компьютерный клуб. Теперь это ещё и место, где проходят настоящие турниры: с заявками,
-              сеткой, вето карт и разбором каждого матча.
+              F16 Arena начиналась как компьютерный клуб. Теперь это ещё и турнирная система, где локальный матч проходит с теми же понятными этапами, что и крупное соревнование.
             </p>
             <p>
-              Мы хотим, чтобы локальный турнир ощущался как большой: понятные правила, честный посев, сервер, который готов к
-              началу матча, и результат, который сразу виден на сайте.
+              Капитан собирает состав, команда проходит регистрацию и check-in, капитаны проводят вето, сервер готовится автоматически, а результат и статистика возвращаются на сайт.
             </p>
-            <p>Платформа только запускается. Начинаем с первого турнира — и растём вместе с теми, кто в нём играет.</p>
+            <p>Цель — чтобы игроку не приходилось разбираться в технической части турнира: интерфейс показывает текущее состояние и следующий шаг.</p>
           </div>
 
-          <aside className={`${CARD} h-fit p-7 lg:p-8`}>
-            <Eyebrow>Коротко</Eyebrow>
-            <dl className="mt-6 divide-y divide-white/[0.06]">
-              {FACTS.map((f) => (
-                <div key={f.k} className="flex items-baseline justify-between gap-6 py-3.5">
-                  <dt className="text-[14px] text-fg-3">{f.k}</dt>
-                  <dd className="text-right text-[15px] text-fg">{f.v}</dd>
-                </div>
-              ))}
-            </dl>
-          </aside>
+          <Panel>
+            <Facts items={FACTS} columns={2} />
+          </Panel>
         </div>
+      </Container>
 
-        <section className="pt-20 lg:pt-28">
-          <Eyebrow className="mb-8">Как проходит турнир</Eyebrow>
-          <ol className="grid gap-px overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.06] sm:grid-cols-2 lg:grid-cols-5">
-            {FLOW.map((f) => (
-              <li key={f.n} className="bg-[#0b1420] p-7 lg:p-8">
-                <span className="num text-[13px] text-accent">{f.n}</span>
-                <div className="mt-4 text-[20px] font-semibold tracking-[-0.01em] text-fg lg:text-[22px]">{f.t}</div>
-                <p className="mt-3 text-[15px] leading-[1.6] text-fg-2">{f.d}</p>
-              </li>
-            ))}
-          </ol>
-        </section>
+      <Region>
+        <Container width="wide">
+          <Section title="Как проходит турнир">
+            <ol className="grid overflow-hidden rounded-surface border border-line-subtle bg-line-subtle sm:grid-cols-2 lg:grid-cols-5">
+              {FLOW.map((item) => (
+                <li key={item.n} className="bg-surface p-5 sm:p-6">
+                  <div className="num text-meta font-semibold text-accent">{item.n}</div>
+                  <div className="mt-3 text-title text-fg">{item.t}</div>
+                  <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{item.d}</p>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        </Container>
+      </Region>
 
-        <section className="pt-20 lg:pt-28">
-          <Eyebrow className="mb-8">Принципы</Eyebrow>
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
-            {PRINCIPLES.map((p, i) => (
-              <div key={p.t} className={i > 0 ? "lg:border-l lg:border-white/[0.08] lg:pl-10" : "lg:pr-10"}>
-                <div className="text-[19px] font-semibold text-fg lg:text-[21px]">{p.t}</div>
-                <p className="mt-3 text-[15px] leading-[1.6] text-fg-3 lg:text-[16px] lg:pr-6">{p.d}</p>
+      <Container width="wide" className="py-12 sm:py-14">
+        <Section title="Принципы">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
+            {PRINCIPLES.map((item, i) => (
+              <div key={item.t} className={cn(i > 0 && "lg:border-l lg:border-line-subtle lg:pl-8", i < PRINCIPLES.length - 1 && "lg:pr-8")}>
+                <div className="text-title text-fg">{item.t}</div>
+                <p className="mt-2 text-[14px] leading-relaxed text-fg-3">{item.d}</p>
               </div>
             ))}
           </div>
-        </section>
+        </Section>
 
-        <section className="pt-20 lg:pt-28">
-          <div className={`${CARD} flex flex-col gap-8 p-8 sm:p-10 lg:flex-row lg:items-center lg:justify-between lg:p-12`}>
-            <div>
-              <div className="text-[26px] font-semibold tracking-[-0.015em] text-fg lg:text-[32px]">Провести турнир в F16</div>
-              <p className="mt-3 max-w-xl text-[16px] leading-[1.6] text-fg-2 lg:text-[17px]">
-                Хотите турнир для своей команды, компании или сообщества — или стать партнёром? Напишите клубу.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <PrimaryBtn href="/tournaments">Турниры</PrimaryBtn>
-              <OutlineBtn href="https://f16-arena.kz">f16-arena.kz ↗</OutlineBtn>
-            </div>
+        <div className="mt-14 flex flex-col gap-6 rounded-feature border border-line-subtle bg-surface p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-heading text-fg">Провести турнир в F16</div>
+            <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-fg-2">
+              Для своей команды, компании или сообщества — напишите клубу, если хотите организовать турнир или стать партнёром.
+            </p>
           </div>
-        </section>
-      </div>
+          <div className="flex flex-wrap gap-2">
+            <Button href="/tournaments">Турниры</Button>
+            <Button href="https://f16-arena.kz" external variant="secondary">f16-arena.kz ↗</Button>
+          </div>
+        </div>
+      </Container>
     </>
   );
 }
