@@ -715,3 +715,20 @@ svg.lucide {
     transform: translateX(24px);
   }
 }
+
+/*
+ * Фактическая высота оболочки (шапка + полоса активности на телефоне) — для липких элементов:
+ * top: var(--shell-h). Полоса активности есть только когда есть срочное действие и только до 768px.
+ */
+:root {
+  --activity-bar-h: 40px;
+  --shell-h: var(--header-h);
+}
+@media (max-width: 767px) {
+  :root:has([data-activity-bar]) {
+    --shell-h: calc(var(--header-h) + var(--activity-bar-h));
+  }
+}
+html {
+  scroll-padding-top: calc(var(--shell-h) + 16px);
+}

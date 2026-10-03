@@ -63,6 +63,7 @@ import {
   type StepState,
 } from "@/components/ds";
 import type { MatchStatus, RegistrationStatus, TournamentStatus } from "@/lib/types";
+import { MatchListRow } from "@/components/match-row";
 import { ActivityDemo, ButtonStatesDemo, FieldsDemo, OverlaysDemo, TimerDemo } from "./demos";
 
 export const metadata: Metadata = { title: "Дизайн-система — F16 Control" };
@@ -433,6 +434,14 @@ export default async function DesignSystemPage() {
             </div>
           </Section>
 
+          <Section title="Строка матча" description="MatchListRow — одна для списков матчей, «Моей игры», команды и турнира. Длинные названия обрезаются, статус на телефоне скрыт.">
+            <RowList className="max-w-3xl">
+              {SAMPLE_MATCHES.map((s, i) => (
+                <MatchListRow key={i} m={s.m} meta={s.meta} highlight={s.m.team1_id} />
+              ))}
+            </RowList>
+          </Section>
+
           <Section title="Строки" description="Списки — строками с разделителями, а не стопкой карточек.">
             <div className="grid gap-8 lg:grid-cols-2">
               <Demo title="Состав">
@@ -585,3 +594,28 @@ export default async function DesignSystemPage() {
     </div>
   );
 }
+
+const team = (name: string, tag: string) => ({ name, tag, logo_url: null });
+const sm = (o: Partial<Parameters<typeof MatchListRow>[0]["m"]>): Parameters<typeof MatchListRow>[0]["m"] => ({
+  id: "00000000-0000-0000-0000-000000000000",
+  status: "upcoming",
+  best_of: 1,
+  team1_id: "a",
+  team2_id: "b",
+  team1_score: 0,
+  team2_score: 0,
+  winner_id: null,
+  server_state: null,
+  under_review: false,
+  team1: team("Next Level", "NEXT"),
+  team2: team("F16 Wolves", "F16W"),
+  ...o,
+});
+const SAMPLE_MATCHES = [
+  { m: sm({ status: "live", best_of: 3, team1_score: 1, team2_score: 0 }), meta: "F16 Open #01 · Верхняя сетка · BO3" },
+  { m: sm({ team1: team("Очень длинное название команды для проверки обрезки", "LONG"), team2: team("Ещё одна команда с длинным именем", "LNG2") }), meta: "Сегодня, 13:40 · BO1" },
+  { m: sm({ status: "pending", team2_id: null, team2: null }), meta: "Ждёт победителя матча #7 · BO1" },
+  { m: sm({ status: "ready", server_state: "ready", best_of: 3 }), meta: "F16 Open #01 · Полуфинал · BO3" },
+  { m: sm({ status: "finished", team1_score: 2, team2_score: 1, winner_id: "a", best_of: 3 }), meta: "Вчера · BO3" },
+  { m: sm({ status: "finished", team1_score: 13, team2_score: 16, winner_id: "b", under_review: true }), meta: "Вчера · BO1" },
+];

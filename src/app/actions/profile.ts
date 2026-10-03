@@ -46,3 +46,11 @@ export async function markNotificationsRead(): Promise<ActionResult> {
   revalidatePath("/", "layout");
   return null;
 }
+
+/** Отметить прочитанным одно уведомление — только своё (по player_id текущего игрока) */
+export async function markNotificationRead(id: string): Promise<ActionResult> {
+  const player = await requirePlayer();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Уведомление не найдено" };
+  await db().from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("player_id", player.id).is("read_at", null);
+  return null;
+}

@@ -3,10 +3,11 @@ import Link from "next/link";
 import { ArrowRight, Gamepad2, RefreshCw, Trophy, User, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { LiveRefresh } from "@/components/live-refresh";
-import { markNotificationsRead, refreshProfile } from "@/app/actions/profile";
+import { refreshProfile } from "@/app/actions/profile";
+import { MarkAllReadButton } from "@/components/notifications/actions";
 import { requirePlayer } from "@/lib/auth";
 import { refreshIfStale } from "@/lib/profile-sync";
-import { getActiveMembership, getSoloTeam, getTeamMembers, getTeamRegistrations, isActiveRegistration, listPublicTournaments, type TeamRegistration } from "@/lib/data";
+import { getActiveMembership, getSoloTeam, getTeamMembers, getTeamRegistrations, getUnreadCount, isActiveRegistration, listPublicTournaments, type TeamRegistration } from "@/lib/data";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
@@ -87,7 +88,10 @@ export default async function MyGamePage() {
   const next = upcoming.find((m) => m.team1_id && m.team2_id) ?? null;
   const nextEta = next && next.status === "upcoming" && !next.scheduled_at ? ((await tournamentEta(next.tournament_id).catch(() => null))?.matchStart.get(next.id) ?? null) : null;
   const notifications = (notificationsRes.data ?? []) as Notification[];
-  const unread = notifications.filter((n) => !n.read_at).length;
+  // в превью — последние 6, а счётчик — все непрочитанные
+  const unread = await getUnreadCount(player.id);
+  // основной состав — капитан и игроки; запасные требование основы не закрывают
+  const mains = members.filter((m) => m.role !== "substitute").length;
   const live = (s: string) => !["finished", "cancelled"].includes(s);
   const activeRegs = regs.filter((r) => isActiveRegistration(r) && live(r.tournament.status));
   const rejected = regs.find((r) => r.status === "rejected" && r.tournament.status === "registration");
@@ -122,11 +126,21 @@ export default async function MyGamePage() {
       text: next.scheduled_at ? `Начало — ${formatDateTime(next.scheduled_at)}.` : nextEta ? `Примерно в ${formatTime(new Date(nextEta).toISOString())}.` : "Время матча появится, когда освободится сервер.",
       cta: { href: `/matches/${next.id}`, label: "Открыть матч" },
     };
-  } else if (activeRegs.some((r) => r.status === "approved" && r.checked_in_at && ["checkin", "live"].includes(r.tournament.status))) {
-    const r = activeRegs.find((x) => x.checked_in_at)!;
-    current = { tone: "ok", eyebrow: "Check-in пройден", title: r.tournament.name, text: "Ждём сетку — сообщим, когда соперник будет известен.", cta: { href: `/tournaments/${r.tournament.slug}?tab=bracket`, label: "Смотреть сетку" } };
-  } else if (activeRegs.some((r) => r.status === "approved")) {
-    const r = activeRegs.find((x) => x.status === "approved")!;
+  } else if (activeRegs.some((r) => r.status === "approved" && r.tournament.status === "live")) {
+    // турнир идёт, а следующего матча нет: команда ждёт соперника или уже закончила — не обещаем матч
+    const r = activeRegs.find((x) => x.status === "approved" && x.tournament.status === "live")!;
+    current = {
+      tone: "neutral",
+      eyebrow: "Турнир идёт",
+      title: r.tournament.name,
+      text: "Следите за сеткой. Если для вашей команды появится следующий матч, он появится здесь и в уведомлениях.",
+      cta: { href: `/tournaments/${r.tournament.slug}?tab=bracket`, label: "Открыть сетку" },
+    };
+  } else if (activeRegs.some((r) => r.status === "approved" && r.checked_in_at && r.tournament.status === "checkin")) {
+    const r = activeRegs.find((x) => x.checked_in_at && x.tournament.status === "checkin")!;
+    current = { tone: "ok", eyebrow: "Check-in пройден", title: r.tournament.name, text: "Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен.", cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" } };
+  } else if (activeRegs.some((r) => r.status === "approved" && ["registration", "registration_closed", "checkin"].includes(r.tournament.status))) {
+    const r = activeRegs.find((x) => x.status === "approved" && ["registration", "registration_closed", "checkin"].includes(x.tournament.status))!;
     current = {
       tone: "ok",
       eyebrow: "Вы участвуете",
@@ -163,12 +177,12 @@ export default async function MyGamePage() {
         { title: "Матч", state: "todo" },
       ],
     };
-  } else if (membership && isCaptain && members.length < teamSize) {
+  } else if (membership && isCaptain && mains < teamSize) {
     current = {
       tone: "warn",
       eyebrow: "Состав неполный",
-      title: `${membership.team.name} · ${members.length} из ${teamSize}`,
-      text: `Нужно ещё ${teamSize - members.length}. Отправьте игрокам ссылку-приглашение.`,
+      title: `${membership.team.name} · основной состав: ${mains} из ${teamSize}`,
+      text: `В основу нужно ещё ${teamSize - mains}. Отправьте игрокам ссылку-приглашение${members.length > mains ? " или переведите запасного в основу" : ""}.`,
       cta: { href: "/team", label: "Пригласить игроков" },
     };
   } else if (openTournament && (isCaptain || solo)) {
@@ -267,7 +281,8 @@ export default async function MyGamePage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-title text-fg">{membership.team.name}</div>
                       <div className="text-meta text-fg-3">
-                        {isCaptain ? "Вы капитан" : "Вы игрок"} · {members.length} в составе
+                        {isCaptain ? "Вы капитан" : "Вы игрок"} · основа {mains}
+                        {members.length > mains ? ` · запас ${members.length - mains}` : ""}
                       </div>
                     </div>
                     <div className="hidden -space-x-1.5 sm:flex">
@@ -314,20 +329,14 @@ export default async function MyGamePage() {
           </div>
 
           {/* ── уведомления */}
-          <aside id="notifications" className="scroll-mt-24 lg:sticky lg:top-[calc(var(--header-h)+24px)]">
+          <aside id="notifications" className="scroll-mt-24 lg:sticky lg:top-[calc(var(--shell-h)+24px)]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-heading text-fg">
                 Уведомления
                 {unread > 0 && <span className="num ml-2 rounded-chip bg-accent-dim px-1.5 align-middle text-micro text-accent">{unread}</span>}
               </h2>
               <div className="flex items-center gap-3">
-                {unread > 0 && (
-                  <ActionForm action={markNotificationsRead} inline>
-                    <SubmitButton variant="ghost" size="sm">
-                      Прочитать
-                    </SubmitButton>
-                  </ActionForm>
-                )}
+                {unread > 0 && <MarkAllReadButton size="sm" />}
                 <Link href="/notifications" className="text-meta font-medium text-accent hover:text-accent-strong">
                   Все →
                 </Link>

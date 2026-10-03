@@ -165,7 +165,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
       {open && typeof document !== "undefined" && createPortal(
         <div
           id="mobile-menu"
-          className="fixed inset-x-0 bottom-0 top-[var(--header-h)] z-50 overflow-y-auto border-t border-line-subtle bg-bg animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
+          className="fixed inset-x-0 bottom-0 top-[var(--shell-h)] z-50 overflow-y-auto border-t border-line-subtle bg-bg animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
         >
           <nav className="px-3 py-3" aria-label="Мобильное меню">
             {PRIMARY_NAV.map((item) => {

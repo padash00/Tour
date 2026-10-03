@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { markNotificationsRead } from "@/app/actions/profile";
 import { requirePlayer } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import type { Notification } from "@/lib/types";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { MarkAllReadButton } from "@/components/notifications/actions";
 import { NotificationFeed } from "@/components/public/notification-feed";
 import { Container, EmptyState, Meta, PageTitle, cn } from "@/components/ds";
 
@@ -45,13 +44,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
             <PageTitle>Уведомления</PageTitle>
             <Meta className="mt-1 block">{unread ? `Непрочитанных: ${unread}` : "Всё прочитано"}</Meta>
           </div>
-          {(unread ?? 0) > 0 && (
-            <ActionForm action={markNotificationsRead}>
-              <SubmitButton variant="secondary" size="md" pendingText="Отмечаем…">
-                Прочитать все
-              </SubmitButton>
-            </ActionForm>
-          )}
+          {(unread ?? 0) > 0 && <MarkAllReadButton />}
         </header>
 
         <nav aria-label="Фильтр уведомлений" className="mt-6 flex gap-1 border-b border-line-subtle">

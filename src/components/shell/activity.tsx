@@ -169,7 +169,7 @@ export function MobileActivityBar() {
   const pathname = usePathname();
   if (!activity) return null;
   return (
-    <div className="md:hidden">
+    <div className="md:hidden" data-activity-bar>
       <ActivityBar activity={activity} more={moreActivity} current={pathname === activity.href.split("?")[0]} />
     </div>
   );

@@ -18,7 +18,7 @@ export function ContextNav({ items, match = "path", sticky, className }: { items
   const tab = params.get("tab");
   const isActive = (it: NavItem, i: number) => (match === "tab" ? (tab ? tab === it.key : i === 0) : pathname === it.href.split("?")[0]);
   return (
-    <nav className={cn("border-b border-line-subtle", sticky && "sticky top-[var(--header-h)] z-30 bg-bg/90 backdrop-blur-md", className)}>
+    <nav className={cn("border-b border-line-subtle", sticky && "sticky top-[var(--shell-h)] z-30 bg-bg/90 backdrop-blur-md", className)}>
       <div className="-mb-px flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((it, i) => {
           const active = isActive(it, i);

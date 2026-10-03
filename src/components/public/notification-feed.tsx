@@ -3,10 +3,12 @@ import { Bell, ChevronRight, CircleCheck, Server, ShieldCheck, Swords, Users } f
 import type { ReactNode } from "react";
 import type { Notification } from "@/lib/types";
 import { cn } from "@/components/ds";
+import { UnreadNotificationLink } from "@/components/notifications/actions";
 
 /*
- * Уведомления — строками (не карточками). У строки: иконка и уровень, заголовок, контекст, время, действие, прочитано или нет.
- * Уровни: срочно (сервер готов, вето) · внимание (check-in) · обычное (команда, заявки, решения). Не всё красное.
+ * Уведомления — строками (не карточками). У строки: иконка, заголовок, контекст, время, действие, прочитано или нет.
+ * Цвет — по смыслу, а не по срочности: сервер готов — зелёный (можно подключаться), вето — акцент (ваше действие),
+ * check-in — внимание, команда / заявки / решения — нейтрально. Срочное отличается весом: обводка иконки.
  */
 
 const tz = "Asia/Almaty";
@@ -22,7 +24,7 @@ function dayLabel(iso: string, now: Date) {
 
 type Kind = "server" | "veto" | "check" | "team" | "admin" | "other";
 
-/** Тип уведомления по тексту — для иконки и уровня */
+/** Тип уведомления по тексту — для иконки и цвета */
 function kind(n: Notification): Kind {
   const t = `${n.title} ${n.body ?? ""}`.toLowerCase();
   if (t.includes("сервер")) return "server";
@@ -33,19 +35,20 @@ function kind(n: Notification): Kind {
   return "other";
 }
 
-const KIND: Record<Kind, { icon: ReactNode; level: "urgent" | "attention" | "normal" }> = {
-  server: { icon: <Server />, level: "urgent" },
-  veto: { icon: <Swords />, level: "urgent" },
-  check: { icon: <CircleCheck />, level: "attention" },
-  team: { icon: <Users />, level: "normal" },
-  admin: { icon: <ShieldCheck />, level: "normal" },
-  other: { icon: <Bell />, level: "normal" },
+const TONE_ICON = {
+  ok: "bg-ok-dim text-ok border-ok/30",
+  accent: "bg-accent-dim text-accent border-accent/30",
+  warn: "bg-warn-dim text-warn border-warn/30",
+  neutral: "bg-white/[0.05] text-fg-2 border-line",
 };
 
-const LEVEL_ICON = {
-  urgent: "bg-ok-dim text-ok border-ok/30",
-  attention: "bg-warn-dim text-warn border-warn/30",
-  normal: "bg-accent-dim text-accent border-accent/25",
+const KIND: Record<Kind, { icon: ReactNode; tone: keyof typeof TONE_ICON; urgent?: boolean }> = {
+  server: { icon: <Server />, tone: "ok", urgent: true },
+  veto: { icon: <Swords />, tone: "accent", urgent: true },
+  check: { icon: <CircleCheck />, tone: "warn" },
+  team: { icon: <Users />, tone: "neutral" },
+  admin: { icon: <ShieldCheck />, tone: "neutral" },
+  other: { icon: <Bell />, tone: "neutral" },
 };
 
 export function NotificationItem({ n, compact }: { n: Notification; compact?: boolean }) {
@@ -56,7 +59,7 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
       <span
         className={cn(
           "mt-0.5 grid size-9 shrink-0 place-items-center rounded-control border [&>svg]:size-[18px]",
-          unread ? LEVEL_ICON[k.level] : "border-line-subtle bg-white/[0.02] text-fg-3",
+          unread ? cn(TONE_ICON[k.tone], k.urgent && "ring-2 ring-current/20") : "border-line-subtle bg-white/[0.02] text-fg-3",
         )}
         aria-hidden
       >
@@ -78,6 +81,14 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
     !compact && unread && "bg-accent/[0.03]",
     n.link && "transition-colors duration-[var(--dur-hover)] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60",
   );
+  if (n.link && unread) {
+    // переход отмечает это уведомление прочитанным и сразу обновляет колокольчик
+    return (
+      <UnreadNotificationLink id={n.id} href={n.link} className={cls}>
+        {inner}
+      </UnreadNotificationLink>
+    );
+  }
   return n.link ? (
     <Link href={n.link} className={cls}>
       {inner}

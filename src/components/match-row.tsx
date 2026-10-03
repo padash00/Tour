@@ -28,9 +28,17 @@ export function MatchListRow({ m, meta, highlight }: { m: RowMatch; meta?: strin
           {played ? <Score a={m.team1_score} b={m.team2_score} winner={m.status === "finished" ? winner : null} size="sm" /> : <span className="text-micro font-semibold text-fg-3">VS</span>}
           {side(m.team2, m.team2_id, true)}
         </div>
-        {meta && <div className="mt-1 truncate text-center text-micro text-fg-3">{meta}</div>}
+        {(meta || m.status === "live") && (
+          <div className="mt-1 truncate text-center text-micro text-fg-3">
+            {m.status === "live" && <span className="font-semibold text-live sm:hidden">● LIVE{meta ? " · " : ""}</span>}
+            {meta}
+          </div>
+        )}
       </div>
-      <Status info={matchStatus(m.status, m.server_state === "ready", m.under_review)} size="sm" className="hidden sm:inline-flex" />
+      {/* на телефоне статус скрыт — место названиям команд (live видно по счёту) */}
+      <span className="hidden shrink-0 sm:block">
+        <Status info={matchStatus(m.status, m.server_state === "ready", m.under_review)} size="sm" />
+      </span>
     </Link>
   );
 }
