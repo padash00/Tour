@@ -129,12 +129,6 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { node, logout } = useLogout();
-  // переход по ссылке закрывает меню
-  const [path, setPath] = useState(pathname);
-  if (path !== pathname) {
-    setPath(pathname);
-    setOpen(false);
-  }
 
   useEffect(() => {
     if (!open) return;
@@ -171,7 +165,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
             {PRIMARY_NAV.map((item) => {
               const active = isActive(pathname, item);
               return (
-                <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn(row, "font-medium", active ? "bg-white/[0.06] text-fg" : "text-fg-2 hover:text-fg")}>
+                <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? "page" : undefined} className={cn(row, "font-medium", active ? "bg-white/[0.06] text-fg" : "text-fg-2 hover:text-fg")}>
                   {item.label}
                 </Link>
               );
@@ -187,7 +181,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
                 </div>
               </div>
               {userLinks(user).map((l) => (
-                <Link key={l.href} href={l.href} className={cn(row, "text-fg-2 hover:text-fg [&>svg]:size-5 [&>svg]:text-fg-3")}>
+                <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className={cn(row, "text-fg-2 hover:text-fg [&>svg]:size-5 [&>svg]:text-fg-3")}>
                   {l.icon}
                   {l.label}
                 </Link>
@@ -199,7 +193,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
             </div>
           ) : (
             <div className="mx-6 border-t border-line-subtle py-4">
-              <Link href={`/login?next=${encodeURIComponent(pathname)}`} className="flex h-12 items-center justify-center gap-2 rounded-control bg-accent text-[16px] font-semibold text-accent-ink">
+              <Link href={`/login?next=${encodeURIComponent(pathname)}`} onClick={() => setOpen(false)} className="flex h-12 items-center justify-center gap-2 rounded-control bg-accent text-[16px] font-semibold text-accent-ink">
                 <SteamMark className="size-5" />
                 Войти через Steam
               </Link>
@@ -207,7 +201,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
           )}
           <div className="mx-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-line-subtle px-3 py-4 text-[14px] text-fg-3">
             {SECONDARY_NAV.map((l) => (
-              <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center hover:text-fg">
+              <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center hover:text-fg">
                 {l.label}
               </Link>
             ))}
