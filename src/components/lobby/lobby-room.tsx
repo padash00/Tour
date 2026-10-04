@@ -734,6 +734,8 @@ function Center({
   const phase = phaseOf(view);
   const draftCaptain = lobby.draft ? view.members.find((m) => m.id === lobby.draft?.captains[lobby.draft.turn - 1]) : null;
   const myDraftTurn = !!lobby.draft && me?.id === lobby.draft.captains[lobby.draft.turn - 1];
+  const readyMembers = view.members.filter((m) => m.slot === "team1" || m.slot === "team2");
+  const readyCount = readyMembers.filter((m) => m.ready).length;
 
   const facts = [
     {
@@ -771,7 +773,7 @@ function Center({
             <div className="num mt-1 text-[36px] font-semibold leading-none text-warn">{secondsLeft(lobby.ready_check_until, now)} с</div>
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {inTeam && (
             <Button
               size="lg"
@@ -779,7 +781,7 @@ function Center({
               variant={meReady ? "secondary" : "primary"}
               onClick={() => run(() => A.toggleReady(code))}
             >
-              {meReady ? "Готовность подтверждена" : "Я готов"}
+              {meReady ? "Отменить готовность" : "Я готов"}
             </Button>
           )}
           {isHost && (
@@ -787,6 +789,18 @@ function Center({
               Отменить проверку
             </Button>
           )}
+          <div className="ml-auto flex items-center gap-3 text-meta text-fg-3">
+            <span>Готовы {readyCount}/{readyMembers.length}</span>
+            <span className="flex items-center gap-1.5" aria-label={`Готовы ${readyCount} из ${readyMembers.length}`}>
+              {readyMembers.map((member) => (
+                <span
+                  key={member.id}
+                  className={cn("size-2.5 rounded-full border border-line", member.ready ? "bg-ok" : "bg-surface-3")}
+                  title={`${member.nickname}: ${member.ready ? "готов" : "ожидаем"}`}
+                />
+              ))}
+            </span>
+          </div>
         </div>
       </CriticalSurface>
     );
