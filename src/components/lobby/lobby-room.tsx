@@ -23,17 +23,41 @@ type Slot = ViewMember["slot"];
 function useLobbyView(code: string, initial: LobbyView) {
   const [view, setView] = useState(initial);
   const [offset, setOffset] = useState(() => new Date(initial.now).getTime() - Date.now());
-  const load = useCallback(async () => {
-    try {
-      const r = await fetch(`/api/lobbies/${code}`, { cache: "no-store" });
-      if (!r.ok) return;
-      const v = (await r.json()) as LobbyView;
-      setView(v);
-      setOffset(new Date(v.now).getTime() - Date.now());
-    } catch {
-      // сеть моргнула — следующий опрос
-    }
-  }, [code]);
+  // Пока server action сохраняет изменение, poll может получить snapshot,
+  // который был собран ДО клика. Такой ответ нельзя применять к UI —
+  // иначе toggle/select на мгновение откатывается назад.
+  const mutations = useRef(0);
+
+  const load = useCallback(
+    async ({ force = false }: { force?: boolean } = {}) => {
+      try {
+        const r = await fetch(`/api/lobbies/${code}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const v = (await r.json()) as LobbyView;
+
+        // Проверяем после fetch: запрос мог начаться раньше пользовательского действия.
+        if (!force && mutations.current > 0) return;
+
+        setView(v);
+        setOffset(new Date(v.now).getTime() - Date.now());
+      } catch {
+        // сеть моргнула — следующий опрос
+      }
+    },
+    [code],
+  );
+
+  const beginMutation = useCallback(() => {
+    mutations.current += 1;
+  }, []);
+
+  const endMutation = useCallback(async () => {
+    mutations.current = Math.max(0, mutations.current - 1);
+    // Если пользователь быстро сделал несколько действий, ждём последнее.
+    // Только оно возвращает UI к единственному authoritative server snapshot.
+    if (mutations.current === 0) await load({ force: true });
+  }, [load]);
+
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     let stop = false;
@@ -50,7 +74,8 @@ function useLobbyView(code: string, initial: LobbyView) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
-  return { view, setView, load, offset };
+
+  return { view, setView, load, offset, beginMutation, endMutation };
 }
 
 function useNow(offset: number) {
@@ -140,7 +165,7 @@ export function LobbyRoom({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const { view, setView, load, offset } = useLobbyView(code, initial);
+  const { view, setView, load, offset, beginMutation, endMutation } = useLobbyView(code, initial);
   const now = useNow(offset);
   const [busy, start] = useTransition();
   const [tab, setTab] = useState<"chat" | "settings">(() => (initial.me?.isHost || initial.me?.isAdmin ? "settings" : "chat"));
@@ -148,14 +173,21 @@ export function LobbyRoom({
   const [templates, setTemplates] = useState(initialTemplates);
 
   const run = useCallback(
-    (fn: () => Promise<A.LobbyResult>, ok?: string) =>
+    (fn: () => Promise<A.LobbyResult>, ok?: string) => {
+      // Fence poll ДО старта transition, чтобы уже летящий stale request
+      // не успел перетереть optimistic UI.
+      beginMutation();
       start(async () => {
-        const r = await fn();
-        if (r?.error) toast.error(r.error);
-        else if (ok) toast.success(ok);
-        await load();
-      }),
-    [load, toast],
+        try {
+          const r = await fn();
+          if (r?.error) toast.error(r.error);
+          else if (ok) toast.success(ok);
+        } finally {
+          await endMutation();
+        }
+      });
+    },
+    [beginMutation, endMutation, toast],
   );
 
   const { lobby, me, members, game } = view;
