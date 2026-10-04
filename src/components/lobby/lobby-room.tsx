@@ -12,8 +12,9 @@ import { MODES } from "@/lib/modes";
 import { useToast } from "../toast";
 import { Avatar, FaceitLevel } from "../ui";
 import { AdvancedSettings, MapThumb, QuickSettings, type MapOption, type Template } from "./settings";
-import { Button, CriticalSurface, Dialog, Facts, FeatureSurface, Menu, MenuItem as DsMenuItem, MenuSeparator, Status, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
+import { Button, CriticalSurface, Facts, FeatureSurface, Menu, MenuItem as DsMenuItem, MenuSeparator, Status, Steps, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
 import { Icon } from "./ui";
+import { MobileStickyCta } from "@/components/public/callout";
 
 type Slot = ViewMember["slot"];
 
@@ -73,6 +74,32 @@ function phaseOf(view: LobbyView) {
   return "waiting" as const;
 }
 
+function LobbyProgress({ phase }: { phase: ReturnType<typeof phaseOf> }) {
+  if (phase === "closed") return null;
+
+  const labels = ["Комната", "Готовность", "Вето", "Сервер", "Игра"] as const;
+  const current =
+    phase === "waiting" || phase === "draft"
+      ? 0
+      : phase === "ready_check"
+        ? 1
+        : phase === "veto"
+          ? 2
+          : phase === "server"
+            ? 3
+            : 4;
+
+  return (
+    <Steps
+      direction="horizontal"
+      steps={labels.map((title, index) => ({
+        title,
+        state: index < current ? "done" : index === current ? "current" : "todo",
+      }))}
+    />
+  );
+}
+
 /** Короткий сигнал (браузер пускает звук после любого клика на сайте) */
 function chime() {
   try {
@@ -116,7 +143,7 @@ export function LobbyRoom({
   const { view, setView, load, offset } = useLobbyView(code, initial);
   const now = useNow(offset);
   const [busy, start] = useTransition();
-  const [tab, setTab] = useState<"chat" | "settings">("chat");
+  const [tab, setTab] = useState<"chat" | "settings">(() => (initial.me?.isHost || initial.me?.isAdmin ? "settings" : "chat"));
   const [advanced, setAdvanced] = useState(false);
   const [templates, setTemplates] = useState(initialTemplates);
 
@@ -177,6 +204,12 @@ export function LobbyRoom({
   const inviteUrl = origin && lobby.invite_token ? `${origin}/lobby/${lobby.code}?t=${lobby.invite_token}` : null;
   const headMap = game?.maps.find((m) => m.status !== "finished")?.map ?? game?.maps[0]?.map ?? s.maps[0] ?? "de_mirage";
   const phase = phaseOf(view);
+  const meMember = members.find((m) => m.id === me?.id);
+  const needsReady =
+    phase === "ready_check" &&
+    !!meMember &&
+    (meMember.slot === "team1" || meMember.slot === "team2") &&
+    !meMember.ready;
 
   const join = (slot?: Slot) => run(() => A.joinLobby(code, { slot, invite: invite ?? undefined }));
   const clickEmpty = (slot: Slot) => {
@@ -248,6 +281,10 @@ export function LobbyRoom({
                 )
               )}
             </div>
+          </div>
+
+          <div className="mt-5 border-t border-line-subtle pt-4">
+            <LobbyProgress phase={phase} />
           </div>
         </div>
       </div>
@@ -437,7 +474,13 @@ export function LobbyRoom({
         onTemplatesChange={() => A.myTemplates().then(setTemplates)}
       />
 
-      <ReadyCheck view={view} now={now} busy={busy} onReady={() => run(() => A.toggleReady(code))} />
+      {needsReady && (
+        <MobileStickyCta note={`Проверка готовности · ${secondsLeft(lobby.ready_check_until, now)} с`}>
+          <Button block size="lg" loading={busy} onClick={() => run(() => A.toggleReady(code))}>
+            Я готов
+          </Button>
+        </MobileStickyCta>
+      )}
     </>
   );
 }
@@ -1030,46 +1073,6 @@ function GamePanel({ view, now, isHost, busy, run, code }: { view: LobbyView; no
         </div>
       )}
     </FeatureSurface>
-  );
-}
-
-// ───────────────────────── проверка готовности
-
-function ReadyCheck({ view, now, busy, onReady }: { view: LobbyView; now: number; busy: boolean; onReady: () => void }) {
-  const { lobby, me } = view;
-  const mine = view.members.find((m) => m.id === me?.id);
-  const open = !!lobby.ready_check_until && !!mine && (mine.slot === "team1" || mine.slot === "team2") && !mine.ready;
-  const left = secondsLeft(lobby.ready_check_until, now);
-  const inTeams = view.members.filter((m) => m.slot === "team1" || m.slot === "team2");
-
-  return (
-    <Dialog
-      open={open}
-      onClose={() => {}}
-      dismissible={false}
-      title="Матч готов к старту"
-      description="Подтвердите, что вы на месте. Если время закончится, проверка готовности будет отменена."
-      size="sm"
-      footer={
-        <Button block size="lg" loading={busy} onClick={onReady} data-autofocus>
-          Я готов
-        </Button>
-      }
-    >
-      <div className="py-2 text-center">
-        <div className="text-micro uppercase tracking-[0.14em] text-fg-3">Осталось</div>
-        <div className={cn("num mt-2 text-[52px] font-semibold leading-none", left <= 10 ? "text-danger" : "text-fg")}>{left}</div>
-        <div className="mt-5 flex flex-wrap justify-center gap-2" aria-label="Готовность игроков">
-          {inTeams.map((member) => (
-            <span
-              key={member.id}
-              className={cn("size-3 rounded-full border border-line", member.ready ? "bg-ok" : "bg-surface-3")}
-              title={`${member.nickname}: ${member.ready ? "готов" : "ожидаем"}`}
-            />
-          ))}
-        </div>
-      </div>
-    </Dialog>
   );
 }
 
