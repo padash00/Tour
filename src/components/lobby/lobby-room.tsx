@@ -27,17 +27,26 @@ function useLobbyView(code: string, initial: LobbyView) {
   // который был собран ДО клика. Такой ответ нельзя применять к UI —
   // иначе toggle/select на мгновение откатывается назад.
   const mutations = useRef(0);
+  const revision = useRef(0);
+  const requestId = useRef(0);
+  const appliedRequestId = useRef(0);
 
   const load = useCallback(
-    async ({ force = false }: { force?: boolean } = {}) => {
+    async () => {
+      const startedAtRevision = revision.current;
+      const startedDuringMutation = mutations.current > 0;
+      const currentRequestId = ++requestId.current;
       try {
         const r = await fetch(`/api/lobbies/${code}`, { cache: "no-store" });
         if (!r.ok) return;
         const v = (await r.json()) as LobbyView;
 
-        // Проверяем после fetch: запрос мог начаться раньше пользовательского действия.
-        if (!force && mutations.current > 0) return;
+        // Не применяем ответы, начавшиеся до клика или во время сохранения.
+        // Один счётчик активных мутаций недостаточен: старый запрос может вернуться уже после их завершения.
+        if (startedDuringMutation || mutations.current > 0 || startedAtRevision !== revision.current) return;
+        if (currentRequestId < appliedRequestId.current) return;
 
+        appliedRequestId.current = currentRequestId;
         setView(v);
         setOffset(new Date(v.now).getTime() - Date.now());
       } catch {
@@ -48,6 +57,7 @@ function useLobbyView(code: string, initial: LobbyView) {
   );
 
   const beginMutation = useCallback(() => {
+    revision.current += 1;
     mutations.current += 1;
   }, []);
 
@@ -55,7 +65,7 @@ function useLobbyView(code: string, initial: LobbyView) {
     mutations.current = Math.max(0, mutations.current - 1);
     // Если пользователь быстро сделал несколько действий, ждём последнее.
     // Только оно возвращает UI к единственному authoritative server snapshot.
-    if (mutations.current === 0) await load({ force: true });
+    if (mutations.current === 0) await load();
   }, [load]);
 
   useEffect(() => {
@@ -171,6 +181,7 @@ export function LobbyRoom({
   const [tab, setTab] = useState<"chat" | "settings">(() => (initial.me?.isHost || initial.me?.isAdmin ? "settings" : "chat"));
   const [advanced, setAdvanced] = useState(false);
   const [templates, setTemplates] = useState(initialTemplates);
+  const settingsQueue = useRef<Promise<void>>(Promise.resolve());
 
   const run = useCallback(
     (fn: () => Promise<A.LobbyResult>, ok?: string) => {
@@ -199,7 +210,11 @@ export function LobbyRoom({
   const patch = useCallback(
     (p: Partial<LobbySettings>) => {
       setView((v) => ({ ...v, lobby: { ...v.lobby, settings: { ...v.lobby.settings, ...p } } }));
-      run(() => A.updateSettings(code, p));
+      run(() => {
+        const update = settingsQueue.current.then(() => A.updateSettings(code, p));
+        settingsQueue.current = update.then(() => undefined, () => undefined);
+        return update;
+      });
     },
     [code, run, setView],
   );

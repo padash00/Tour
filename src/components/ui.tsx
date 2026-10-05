@@ -16,9 +16,9 @@ type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger" | "warm"
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed",
-  secondary: "bg-white/[0.03] text-fg border border-white/[0.14] hover:bg-white/[0.06] hover:border-white/[0.26]",
-  outline: "bg-transparent text-fg border border-white/25 hover:border-white/45 hover:bg-white/[0.03]",
+  primary: "bg-accent text-accent-ink shadow-[0_4px_18px_-12px_var(--color-accent)] hover:bg-accent-strong hover:shadow-[0_6px_22px_-12px_var(--color-accent)] active:bg-accent-pressed",
+  secondary: "bg-surface text-fg border border-line hover:bg-surface-2 hover:border-line-strong",
+  outline: "bg-transparent text-fg border border-line-strong hover:border-line-hover hover:bg-white/[0.03]",
   ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
   danger: "bg-danger/[0.1] text-danger border border-danger/35 hover:bg-danger/[0.16] hover:border-danger/55",
   // знак бренда — использовать крайне редко

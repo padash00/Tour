@@ -20,7 +20,7 @@ export function ServerActions({
   align?: "start" | "end";
   className?: string;
 }) {
-  const [state, action] = useActionState(serverCommand, null);
+  const [state, action, pending] = useActionState(serverCommand, null);
   const toast = useToast();
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function ServerActions({
   };
 
   return (
-    <form action={action} className={cn("flex flex-wrap gap-1", align === "end" ? "justify-end" : "justify-start", className)}>
+    <form action={action} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending || undefined} className={cn("flex flex-wrap gap-1", align === "end" ? "justify-end" : "justify-start", className)}>
       <input type="hidden" name="instance" value={instance} />
       {types.map((type) => (
         <SubmitButton

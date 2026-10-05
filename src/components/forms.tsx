@@ -98,7 +98,7 @@ export function ActionForm({
   className?: string;
   inline?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, null);
+  const [state, formAction, pending] = useActionState(action, null);
   const toast = useToast();
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export function ActionForm({
   }, [state, toast]);
 
   return (
-    <form action={formAction} className={cn(inline ? "inline-flex flex-col gap-2" : "", className)}>
+    <form action={formAction} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending || undefined} className={cn(inline ? "inline-flex flex-col gap-2" : "", className)}>
       {children}
       {state?.error && (
         <p role="alert" className="mt-3 flex items-start gap-2 text-[13px] leading-snug text-danger">

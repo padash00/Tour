@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { hostCommand, serverRcon, toggleLobbyServer } from "@/app/actions/admin-server";
+import { ActionToggle } from "@/components/admin/action-toggle";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { formatShortDateTime, formatTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
@@ -76,7 +77,7 @@ export default async function ServersPage() {
 
   return (
     <div className="space-y-8">
-      <LiveRefresh intervalMs={5000} />
+      <LiveRefresh watch="servers" intervalMs={5000} />
       <AdminHeader
         eyebrow="F16 Control"
         title="Серверы"
@@ -164,20 +165,15 @@ export default async function ServersPage() {
                       game :{s.port} · tv :{s.port + 5}
                       {s.role === "reserve" ? " · резерв" : ""}
                     </div>
-                    <ActionForm action={toggleLobbyServer} inline>
-                      <input type="hidden" name="instance" value={s.name} />
-                      <input type="hidden" name="on" value={s.for_lobby ? "0" : "1"} />
-                      <button
-                        type="submit"
-                        title={s.for_lobby ? "Сервер отдан под лобби игроков — турниры его не берут. Нажмите, чтобы вернуть турнирам." : "Отдать сервер под лобби игроков"}
-                        className={cn(
-                          "mt-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                          s.for_lobby ? "bg-accent/15 text-accent" : "bg-white/[0.04] text-fg-3 hover:text-fg",
-                        )}
-                      >
-                        {s.for_lobby ? "для лобби" : "турниры"}
-                      </button>
-                    </ActionForm>
+                    <ActionToggle
+                      action={toggleLobbyServer}
+                      fields={{ instance: s.name }}
+                      on={s.for_lobby ?? false}
+                      label={`Использовать ${s.name} для лобби`}
+                      onLabel="Для лобби"
+                      offLabel="Для турниров"
+                      className="mt-1"
+                    />
                   </div>
                   <div className={cn("flex items-center gap-2 text-[13px] font-medium", toneText[st.tone])}>
                     <Dot tone={st.tone === "muted" ? "muted" : st.tone} pulse={live} />

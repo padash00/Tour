@@ -18,12 +18,12 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 const BASE =
   "relative inline-flex select-none items-center justify-center whitespace-nowrap font-semibold " +
-  "transition-[background-color,border-color,color,opacity] duration-[var(--dur-hover)] ease-out " +
+  "transition-[background-color,border-color,color,opacity,transform,box-shadow] duration-[var(--dur-hover)] ease-out active:scale-[.985] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg " +
   "disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45";
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed",
+  primary: "bg-accent text-accent-ink shadow-[0_4px_18px_-12px_var(--color-accent)] hover:bg-accent-strong hover:shadow-[0_6px_22px_-12px_var(--color-accent)] active:bg-accent-pressed",
   secondary: "border border-line bg-white/[0.03] text-fg hover:border-line-strong hover:bg-white/[0.06]",
   ghost: "text-fg-2 hover:bg-white/[0.06] hover:text-fg",
   danger: "border border-danger/35 bg-danger-dim text-danger hover:border-danger/60 hover:bg-danger/[0.16]",

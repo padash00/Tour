@@ -154,7 +154,7 @@ export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; cu
                     ? "border-accent bg-accent text-[#07101b]"
                     : now
                       ? "border-accent bg-[#0d1a2c] text-accent ring-4 ring-accent/15"
-                      : "border-white/[0.14] bg-[#0a111b] text-fg-3",
+                      : "border-line-strong bg-shell text-fg-3",
               )}
             >
               {done ? "✓" : i + 1}
@@ -197,7 +197,7 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
   return (
     <ol className="grid grid-cols-2 sm:grid-cols-5 gap-px overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.06]">
       {items.map((it) => (
-        <li key={it.label} className="relative bg-[#0a111b] px-4 py-3 min-w-0">
+        <li key={it.label} className="relative bg-surface px-4 py-3 min-w-0">
           <span
             className={cn(
               "absolute left-0 top-0 h-[2px] w-full",

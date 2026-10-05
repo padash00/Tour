@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { removeMapImage, toggleMapEnabled, uploadMapImage } from "@/app/actions/admin-settings";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { removeMapImage, uploadMapImage, toggleMapEnabled } from "@/app/actions/admin-settings";
 import { MapTile } from "@/components/competition/map-tile";
+import { ActionToggle } from "@/components/admin/action-toggle";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
 import { cn } from "@/components/ui";
@@ -30,16 +31,20 @@ export function MapCard({
 }) {
   const [upState, upload, uploading] = useActionState(uploadMapImage, null);
   const [rmState, remove, removing] = useActionState(removeMapImage, null);
-  const [tgState, toggle, toggling] = useActionState(toggleMapEnabled, null);
   useResultToast(upState);
   useResultToast(rmState);
-  useResultToast(tgState);
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(null);
+  const visibleEnabled = optimisticEnabled ?? enabled;
+
+  useEffect(() => {
+    if (optimisticEnabled !== null && optimisticEnabled === enabled) setOptimisticEnabled(null);
+  }, [enabled, optimisticEnabled]);
 
   return (
-    <div className={cn("space-y-2 transition-opacity", !enabled && "opacity-55")}>
+    <div className={cn("space-y-2 transition-opacity", !visibleEnabled && "opacity-55")}>
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
@@ -49,7 +54,7 @@ export function MapCard({
       >
         <MapTile map={map} image={image} caption={uploading ? "загрузка…" : image ? "сменить картинку" : "загрузить картинку"} interactive />
       </button>
-      <form ref={formRef} action={upload} className="hidden">
+      <form ref={formRef} action={upload} data-f16-action-pending={uploading ? "true" : undefined} className="hidden">
         <input type="hidden" name="map" value={map} />
         <input
           ref={fileRef}
@@ -72,26 +77,21 @@ export function MapCard({
       </form>
       <div className="flex items-center justify-between gap-2 text-[12px]">
         {toggleable ? (
-          <form action={toggle}>
-            <input type="hidden" name="map" value={map} />
-            <button
-              type="submit"
-              disabled={toggling}
-              aria-pressed={enabled}
-              className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-md px-2 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-                enabled ? "text-ok hover:bg-white/[0.04]" : "text-fg-3 hover:bg-white/[0.04]",
-              )}
-            >
-              <span className={cn("size-1.5 rounded-full", enabled ? "bg-ok" : "bg-fg-3")} />
-              {enabled ? "Доступна" : "Скрыта"}
-            </button>
-          </form>
+          <ActionToggle
+            action={toggleMapEnabled}
+            fields={{ map }}
+            stateField="enabled"
+            on={enabled}
+            label={`Карта ${map}`}
+            onLabel="Доступна"
+            offLabel="Скрыта"
+            onOptimisticChange={setOptimisticEnabled}
+          />
         ) : (
           <span className="text-fg-3">Workshop</span>
         )}
         {image && (
-          <form action={remove}>
+          <form action={remove} data-f16-action-pending={removing ? "true" : undefined}>
             <input type="hidden" name="map" value={map} />
             <button
               type="submit"

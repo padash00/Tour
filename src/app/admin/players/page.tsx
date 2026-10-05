@@ -106,6 +106,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                         <ActionForm action={togglePlayerFlag}>
                           <input type="hidden" name="playerId" value={p.id} />
                           <input type="hidden" name="flag" value="is_admin" />
+                          <input type="hidden" name="value" value={p.is_admin ? "0" : "1"} />
                           <SubmitButton
                             size="sm"
                             variant="ghost"
@@ -118,6 +119,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                       <ActionForm action={togglePlayerFlag}>
                         <input type="hidden" name="playerId" value={p.id} />
                         <input type="hidden" name="flag" value="is_banned" />
+                        <input type="hidden" name="value" value={p.is_banned ? "0" : "1"} />
                         <SubmitButton
                           size="sm"
                           variant={p.is_banned ? "secondary" : "ghost"}

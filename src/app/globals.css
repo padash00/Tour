@@ -17,27 +17,27 @@
   /* поверхности */
   --color-bg: #080b10; /* canvas — фон страницы */
   --color-bg-2: #0b0f15; /* = shell, старое имя */
-  --color-shell: #0b0f15;
-  --color-section: #0e131b;
-  --color-surface: #121925;
-  --color-surface-2: #17202e; /* наведение на surface */
-  --color-surface-3: #1b2533; /* = elevated */
-  --color-elevated: #1b2533;
-  --color-surface-4: #222d3d; /* поверх elevated: меню, тултип */
+  --color-shell: #0b111a;
+  --color-section: #101823;
+  --color-surface: #141e2b;
+  --color-surface-2: #1a2839; /* наведение на surface */
+  --color-surface-3: #203047; /* = elevated */
+  --color-elevated: #203047;
+  --color-surface-4: #293a52; /* поверх elevated: меню, тултип */
   --color-overlay: #03060bd9; /* затемнение под модальным окном */
 
   /* рамки: subtle — разделители, line — обычная рамка, strong — активная / наведение */
-  --color-line-subtle: #ffffff0f;
-  --color-line: #ffffff1a;
-  --color-line-strong: #ffffff2b;
-  --color-line-hover: #ffffff38;
+  --color-line-subtle: #ffffff14;
+  --color-line: #ffffff20;
+  --color-line-strong: #ffffff32;
+  --color-line-hover: #ffffff48;
 
   /* текст */
   --color-fg: #f4f7fb;
-  --color-fg-2: #aeb8c7;
-  --color-fg-3: #758194; /* AA 4.6+ на canvas и surface */
-  --color-fg-4: #4a5566; /* только неактивное и декоративное */
-  --color-eyebrow: #7f93b0;
+  --color-fg-2: #bbc6d5;
+  --color-fg-3: #8d9bad; /* подписи и мета должны оставаться читаемыми */
+  --color-fg-4: #667589; /* декоративный текст */
+  --color-eyebrow: #91a5c0;
 
   /* акцент — действие */
   --color-accent: #6ea8ff;
@@ -139,7 +139,9 @@ html {
 }
 
 body {
-  background: var(--color-bg);
+  background:
+    radial-gradient(1100px 520px at 50% -260px, #6ea8ff12, transparent 72%),
+    var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
   font-size: 15px;
@@ -491,7 +493,7 @@ html[data-navigating] main > * {
     width: 100%;
     height: 44px;
     background: var(--color-bg-2);
-    border: 1px solid #ffffff17;
+    border: 1px solid var(--color-line);
     border-radius: var(--radius-sm);
     padding: 0 14px;
     font-size: 14px;
@@ -503,7 +505,7 @@ html[data-navigating] main > * {
       box-shadow 0.15s;
   }
   .field:hover {
-    border-color: #ffffff2b;
+    border-color: var(--color-line-strong);
   }
   textarea.field {
     height: auto;
@@ -525,7 +527,7 @@ html[data-navigating] main > * {
   .field:focus,
   .field:focus-visible {
     border-color: var(--color-accent);
-    background-color: #0a1320;
+    background-color: var(--color-shell);
     box-shadow: 0 0 0 3px var(--color-accent-dim);
     outline: none;
   }
@@ -668,19 +670,24 @@ html[data-navigating] main > * {
 }
 
 /* ───────────────────────── F16 Control: режим пульта
-   Холоднее и темнее публичного сайта, едва заметная инженерная сетка на фоне. */
+   Та же контрастная палитра, с чуть более плотной инженерной сеткой на фоне. */
 .control-mode {
-  --color-bg: #05090f;
-  --color-bg-2: #070c14;
-  --color-surface: #0a111b;
-  --color-surface-2: #0d1621;
-  --color-surface-3: #111c29;
-  --color-line: #ffffff10;
-  background-color: #05090f;
+  --color-bg: #080b10;
+  --color-bg-2: #0b0f15;
+  --color-shell: #0b111a;
+  --color-section: #101823;
+  --color-surface: #141e2b;
+  --color-surface-2: #1a2839;
+  --color-surface-3: #203047;
+  --color-line-subtle: #ffffff14;
+  --color-line: #ffffff20;
+  --color-line-strong: #ffffff32;
+  --color-line-hover: #ffffff48;
+  background-color: var(--color-bg);
   background-image:
-    linear-gradient(to right, #6ea8ff07 1px, transparent 1px),
-    linear-gradient(to bottom, #6ea8ff07 1px, transparent 1px);
-  background-size: 32px 32px;
+    linear-gradient(to right, #6ea8ff05 1px, transparent 1px),
+    linear-gradient(to bottom, #6ea8ff05 1px, transparent 1px);
+  background-size: 40px 40px;
   background-attachment: fixed;
 }
 
@@ -688,10 +695,11 @@ html[data-navigating] main > * {
 .ds-public {
   --color-bg: #080b10;
   --color-bg-2: #0b0f15;
-  --color-surface: #121925;
-  --color-surface-2: #17202e;
-  --color-surface-3: #1b2533;
-  --color-line: #ffffff1a;
+  --color-shell: #0b111a;
+  --color-surface: #141e2b;
+  --color-surface-2: #1a2839;
+  --color-surface-3: #203047;
+  --color-line: #ffffff20;
   background: var(--color-bg);
 }
 

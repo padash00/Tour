@@ -9,13 +9,13 @@ import { cn } from "@/components/ui";
  */
 
 /** Поверхность-карточка как на сайте */
-export const CARD = "rounded-[12px] border border-[#17243a] bg-[#0a111b]/90";
+export const CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
 /** Карточка-список со строками */
 export const CARD_LIST = `${CARD} divide-y divide-white/[0.06]`;
 
 /** Подпись-надзаголовок: капс с разрядкой, как Eyebrow на сайте */
 export function Label({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-[11px] font-medium uppercase tracking-[0.26em] text-[#7f93b0]", className)}>{children}</div>;
+  return <div className={cn("text-[11px] font-medium uppercase tracking-[0.26em] text-eyebrow", className)}>{children}</div>;
 }
 
 const TONE: Partial<Record<TournamentStatus, string>> = {

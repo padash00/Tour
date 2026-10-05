@@ -134,7 +134,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
               {/* глобальный статус площадки */}
               <Link
                 href="/admin/servers"
-                className="flex h-9 items-center gap-3 rounded-[8px] border border-[#1a2838] bg-[#0a111b] px-3 font-mono text-[11px] text-fg-2 transition-colors hover:border-[#2a3b52]"
+                className="flex h-9 items-center gap-3 rounded-control border border-line-strong bg-shell px-3 font-mono text-[11px] text-fg-2 transition-colors hover:border-line-hover"
                 title="Агент и серверы"
               >
                 <span className="flex items-center gap-1.5">

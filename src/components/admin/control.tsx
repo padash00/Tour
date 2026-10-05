@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PageTitle } from "@/components/ds";
 import { cn } from "@/components/ui";
 
 /**
@@ -8,18 +9,16 @@ import { cn } from "@/components/ui";
  * но мельче шрифт и больше данных на экране.
  */
 
-/** Карточка админки — как на публичном сайте */
-export const ADMIN_CARD = "rounded-[10px] border border-[#17243a] bg-[#0a111b]/90";
+/** Карточка админки — общая поверхность F16 DS */
+export const ADMIN_CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
 
 /** Заголовки колонок таблиц: капс с разрядкой, как подписи сайта */
 export const TH =
-  "[&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-[0.2em] [&_th]:font-medium [&_th]:text-[#7f93b0] [&_th]:h-10";
+  "[&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-[0.2em] [&_th]:font-medium [&_th]:text-eyebrow [&_th]:h-10";
 
 /** Подпись раздела: капс с разрядкой, холодный серо-синий */
 export function AdminLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("text-[11px] font-medium uppercase tracking-[0.28em] text-[#7f93b0]", className)}>{children}</div>
-  );
+  return <div className={cn("text-[11px] font-medium uppercase tracking-[0.28em] text-eyebrow", className)}>{children}</div>;
 }
 
 export function AdminHeader({
@@ -44,7 +43,7 @@ export function AdminHeader({
           </Link>
         )}
         {eyebrow && <AdminLabel className={cn(back && "mt-3")}>{eyebrow}</AdminLabel>}
-        <h1 className="mt-2.5 text-[30px] font-semibold tracking-[-0.015em] leading-tight">{title}</h1>
+        <PageTitle className="mt-2.5">{title}</PageTitle>
         {description && <div className="mt-2 text-[13px] text-fg-3">{description}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -92,7 +91,7 @@ export function TableBox({ children, minWidth = 760, maxHeight }: { children: Re
       className={cn(
         ADMIN_CARD,
         "overflow-x-auto",
-        !!maxHeight && "overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-[#0a111b]",
+        !!maxHeight && "overflow-y-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-[1] [&_thead_th]:bg-surface",
       )}
       style={maxHeight ? { maxHeight } : undefined}
     >

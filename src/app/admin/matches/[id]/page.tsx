@@ -159,7 +159,7 @@ function NextStep({
   return (
     <div
       className={cn(
-        "relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 pl-6 pr-5 py-4",
+        "relative flex flex-wrap items-center gap-x-6 gap-y-3 rounded-[12px] border border-line bg-surface pl-6 pr-5 py-4",
         "before:absolute before:left-0 before:inset-y-3 before:w-[3px] before:rounded-full",
         bar,
       )}
@@ -269,7 +269,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
 
   return (
     <div className="space-y-6">
-      {(["veto", "live"].includes(m.status) || m.server_state === "loading" || m.status === "ready") && <LiveRefresh intervalMs={4000} />}
+      {(["veto", "live"].includes(m.status) || m.server_state === "loading" || m.status === "ready") && <LiveRefresh watch={`match:${m.id}`} intervalMs={4000} />}
       <AdminHeader
         back={{ href: "/admin/matches", label: "Матчи" }}
         eyebrow={

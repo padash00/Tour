@@ -14,9 +14,18 @@ export function LiveRefresh({ intervalMs = 3000, watch }: { intervalMs?: number;
   const last = useRef<string | null>(null);
   useEffect(() => {
     let stop = false;
+    let refreshEpoch = 0;
+    let requestId = 0;
+    let appliedRequestId = 0;
+    let hadPendingAction = false;
+    let afterAction: ReturnType<typeof setTimeout> | undefined;
+    const hasPendingAction = () => !!document.querySelector('[data-f16-action-pending="true"]');
     const tick = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible" || hasPendingAction()) return;
+      const epoch = refreshEpoch;
+      const currentRequestId = ++requestId;
       if (!watch) {
+        if (epoch !== refreshEpoch || hasPendingAction()) return;
         router.refresh();
         return;
       }
@@ -24,13 +33,27 @@ export function LiveRefresh({ intervalMs = 3000, watch }: { intervalMs?: number;
         const res = await fetch(`/api/live?k=${encodeURIComponent(watch)}`, { cache: "no-store" });
         if (!res.ok) return;
         const { v } = (await res.json()) as { v: string };
-        if (stop) return;
+        if (stop || hasPendingAction() || epoch !== refreshEpoch || currentRequestId < appliedRequestId) return;
+        appliedRequestId = currentRequestId;
         if (last.current !== null && last.current !== v) router.refresh();
         last.current = v;
       } catch {
         // сеть моргнула — попробуем на следующем тике
       }
     };
+    const observer = new MutationObserver(() => {
+      refreshEpoch += 1;
+      const pending = hasPendingAction();
+      if (pending) {
+        hadPendingAction = true;
+        if (afterAction) clearTimeout(afterAction);
+      } else if (hadPendingAction) {
+        hadPendingAction = false;
+        // Let the Server Action's revalidated payload settle before the next live refresh.
+        afterAction = setTimeout(() => void tick(), 350);
+      }
+    });
+    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-f16-action-pending"] });
     const id = setInterval(tick, intervalMs);
     // вернулись на вкладку — проверить сразу
     const onVisible = () => document.visibilityState === "visible" && tick();
@@ -39,6 +62,8 @@ export function LiveRefresh({ intervalMs = 3000, watch }: { intervalMs?: number;
     return () => {
       stop = true;
       clearInterval(id);
+      observer.disconnect();
+      if (afterAction) clearTimeout(afterAction);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [router, intervalMs, watch]);

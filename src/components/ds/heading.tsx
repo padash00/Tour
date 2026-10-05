@@ -12,7 +12,11 @@ import { cn } from "./cn";
  */
 
 export function PageTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h1 className={cn("text-page text-fg text-balance", className)}>{children}</h1>;
+  return (
+    <h1 className={cn("relative pl-4 text-page text-fg text-balance before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-full before:bg-gradient-to-b before:from-accent before:to-steel", className)}>
+      {children}
+    </h1>
+  );
 }
 
 /** Заголовок раздела: название, необязательное пояснение и действие справа («Все матчи →») */

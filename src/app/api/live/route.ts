@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { applyVetoTimeouts } from "@/lib/matches";
 
@@ -9,6 +10,7 @@ import { applyVetoTimeouts } from "@/lib/matches";
  * база получает не больше запроса раз в 2 секунды на каждый матч.
  *   ?k=match:<uuid>  — матч: статус, счёт, сервер, вето, карты, раунды
  *   ?k=matches       — список матчей: live / ready / veto
+ *   ?k=servers       — агент, инстансы и очередь команд F16 Control
  *   ?k=tournament:<uuid> — режим ТВ турнира: матчи, счёт идущих карт, этап
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,13 +18,13 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function GET(request: NextRequest) {
   const k = request.nextUrl.searchParams.get("k") ?? "";
   let parts: unknown[] = [];
-  let live = false; // идёт вето — ответ не кэшируем, каждая секунда на счету
+  let noStore = false; // вето и внутреннее состояние серверов не кэшируем
 
   if (k.startsWith("match:") && UUID.test(k.slice(6))) {
     const id = k.slice(6);
     const { data: head } = await db().from("matches").select("status, veto_deadline").eq("id", id).maybeSingle();
     if (head?.status === "veto") {
-      live = true;
+      noStore = true;
       // время хода вышло — авто-бан/пик сразу, не дожидаясь перезагрузки страницы
       if (head.veto_deadline && new Date(head.veto_deadline).getTime() <= Date.now()) await applyVetoTimeouts(id);
     }
@@ -69,6 +71,18 @@ export async function GET(request: NextRequest) {
       .in("status", ["veto", "ready", "live"])
       .order("number");
     parts = [data];
+  } else if (k === "servers") {
+    const player = await getCurrentPlayer();
+    if (!isAdmin(player)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    noStore = true;
+    const [host, instances, commands] = await Promise.all([
+      db().from("server_host").select("last_seen_at, info").eq("id", "main").maybeSingle(),
+      db().from("server_instances").select("name, running, gamestate, map, players, matchzy_match_id, match_id, for_lobby, last_seen_at").order("name"),
+      db().from("agent_commands").select("id, status, result, created_at, sent_at, done_at").order("created_at", { ascending: false }).limit(15),
+    ]);
+    parts = [host.data, instances.data, commands.data];
   } else {
     return NextResponse.json({ error: "bad key" }, { status: 400 });
   }
@@ -76,6 +90,6 @@ export async function GET(request: NextRequest) {
   const v = createHash("sha1").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
   return NextResponse.json(
     { v },
-    { headers: { "Cache-Control": live ? "no-store" : "public, max-age=0, s-maxage=2, stale-while-revalidate=4" } },
+    { headers: { "Cache-Control": noStore ? "no-store" : "public, max-age=0, s-maxage=2, stale-while-revalidate=4" } },
   );
 }

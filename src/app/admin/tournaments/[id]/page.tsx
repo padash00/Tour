@@ -21,6 +21,7 @@ import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
 import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { ActionToggle } from "@/components/admin/action-toggle";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
 import { db } from "@/lib/supabase";
 import { BarCell, CARD, Label } from "@/components/admin/tournament-kit";
@@ -148,14 +149,14 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Panel title="Регламент" action={<Link href={tabHref("settings")} className="text-[12px] text-accent hover:underline">Изменить</Link>}>
             {t.rules ? (
-              <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
+              <div className="rounded-[12px] border border-line bg-surface p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.rules}</div>
             ) : (
               <EmptyState compact title="Регламент не заполнен" description="Задаётся в Настройках → Правила матча." />
             )}
           </Panel>
           <Panel title="Требования к участникам">
             {t.requirements ? (
-              <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
+              <div className="rounded-[12px] border border-line bg-surface p-5 text-[13px] text-fg-2 leading-relaxed whitespace-pre-line">{t.requirements}</div>
             ) : (
               <EmptyState compact title="Стандартные требования" description="Свои требования задаются в Настройках → Правила матча." />
             )}
@@ -358,12 +359,9 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
       </div>
 
       <Panel title="Автопилот">
-        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-start justify-between gap-4">
+        <div className="rounded-[12px] border border-line bg-surface p-5 flex flex-wrap items-start justify-between gap-4 shadow-[0_1px_0_0_#ffffff08_inset]">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[13px]">
-              <Dot tone={t.autopilot ? "ok" : "muted"} />
-              <span className={t.autopilot ? "text-ok font-medium" : "text-fg-3"}>{t.autopilot ? "Включён" : "Выключен"}</span>
-            </div>
+            <div className="text-[14px] font-semibold text-fg">Автоматизация матчей</div>
             <ul className="mt-2 space-y-1 text-[13px] text-fg-2 leading-relaxed list-disc pl-5">
               <li>сам начинает вето, как только оба соперника известны;</li>
               <li>отправляет готовые матчи на свободные серверы — по расписанию или по порядку номеров;</li>
@@ -371,52 +369,48 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
             </ul>
             <p className="mt-2 text-[12px] text-fg-3">
               {["checkin", "live"].includes(t.status)
-                ? t.autopilot
-                  ? "Сейчас работает."
-                  : "Сейчас турнир на этапе, где автопилот мог бы работать, — включите его."
-                : "Начнёт работать, когда турнир дойдёт до check-in или запуска."}
+                ? "Автопилот работает на этапах check-in и live, когда он включён."
+                : "Автопилот начнёт работать, когда турнир дойдёт до этапа check-in или live."}
             </p>
           </div>
-          <ActionForm action={setAutopilot}>
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <input type="hidden" name="on" value={t.autopilot ? "0" : "1"} />
-            <SubmitButton size="sm" variant={t.autopilot ? "secondary" : "primary"}>
-              {t.autopilot ? "Выключить автопилот" : "Включить автопилот"}
-            </SubmitButton>
-          </ActionForm>
+          <ActionToggle
+            action={setAutopilot}
+            fields={{ tournamentId: t.id }}
+            on={t.autopilot}
+            label="Автопилот турнира"
+            onLabel="Включён"
+            offLabel="Выключен"
+          />
         </div>
-        <div className="mt-3 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-3 rounded-[12px] border border-line bg-surface p-5 flex flex-wrap items-center justify-between gap-4 shadow-[0_1px_0_0_#ffffff08_inset]">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[13px]">
-              <Dot tone={t.auto_approve ? "ok" : "muted"} />
-              <span className="font-medium text-fg">Автоодобрение заявок</span>
-              <span className={t.auto_approve ? "text-ok" : "text-fg-3"}>{t.auto_approve ? "включено" : "выключено"}</span>
-            </div>
+            <div className="text-[14px] font-semibold text-fg">Автоодобрение заявок</div>
             <p className="mt-1.5 text-[13px] text-fg-2 leading-relaxed">
               Заявка с полным составом сразу становится одобренной, пока есть свободные места ({t.max_teams}). Отклонить или снять
               её можно потом во вкладке «Регистрация».
             </p>
           </div>
-          <ActionForm action={setAutoApprove}>
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <input type="hidden" name="on" value={t.auto_approve ? "0" : "1"} />
-            <SubmitButton size="sm" variant={t.auto_approve ? "secondary" : "primary"}>
-              {t.auto_approve ? "Выключить" : "Включить"}
-            </SubmitButton>
-          </ActionForm>
+          <ActionToggle
+            action={setAutoApprove}
+            fields={{ tournamentId: t.id }}
+            on={t.auto_approve}
+            label="Автоодобрение заявок"
+            onLabel="Включено"
+            offLabel="Выключено"
+          />
         </div>
       </Panel>
 
       <Panel title="Инструменты">
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5">
+          <div className="rounded-[12px] border border-line bg-surface p-5 shadow-[0_1px_0_0_#ffffff08_inset]">
             <div className="text-[14px] font-semibold text-fg">Режим ТВ</div>
             <p className="mt-1 text-[13px] text-fg-3">Сетка и счёт матчей на большом экране в клубе. Откройте на ПК у телевизора и нажмите F11.</p>
             <a href={`/tournaments/${t.slug}/tv`} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm", "mt-3")}>
               Открыть режим ТВ ↗
             </a>
           </div>
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5">
+          <div className="rounded-[12px] border border-line bg-surface p-5 shadow-[0_1px_0_0_#ffffff08_inset]">
             <div className="text-[14px] font-semibold text-fg">Экспорт в Excel (CSV)</div>
             <p className="mt-1 text-[13px] text-fg-3">Файлы открываются в Excel или Google Таблицах.</p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -451,7 +445,7 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
                   "w-full h-full text-left rounded-[8px] border px-3 py-2.5 transition",
                   t.status === f.status
                     ? "border-accent/50 bg-accent/[0.08]"
-                    : "border-white/[0.08] bg-[#0a111b]/90 hover:border-white/20 hover:bg-white/[0.02]",
+                    : "border-line-subtle bg-surface hover:border-line hover:bg-surface-2",
                   f.status === "cancelled" && t.status !== f.status && "hover:border-danger/40",
                 )}
               >
@@ -474,7 +468,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
   return (
     <div className="max-w-3xl">
       {t.bracket_published_at ? (
-        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 space-y-4">
+        <div className="rounded-[12px] border border-line bg-surface p-5 space-y-4">
           <div className="flex items-center gap-2 text-[13px]">
             <Dot tone="ok" />
             <span className="text-fg">Сетка опубликована {formatShortDateTime(t.bracket_published_at)}</span>
@@ -498,7 +492,7 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
         </div>
       ) : (
         <ActionForm action={generateBracketAction}>
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 space-y-4">
+          <div className="rounded-[12px] border border-line bg-surface p-5 space-y-4">
             <input type="hidden" name="tournamentId" value={t.id} />
             <div className="text-[13px] text-fg-2">
               Одобрено <span className="num text-fg">{approved}</span>, прошли check-in <span className="num text-fg">{checkedIn}</span>. Пустые места
@@ -574,7 +568,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
   return (
     <div className="space-y-8 max-w-3xl">
       <Panel title="Карты турнира">
-        <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
+        <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
           {t.map_pool.map((m) => {
             const id = m.split("@")[1];
             const i = id ? info[id] : null;
@@ -602,7 +596,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
       </Panel>
       {ws.length > 0 && (
         <Panel title="Прогрев Workshop-карт">
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-[12px] border border-line bg-surface p-5 flex flex-wrap items-center justify-between gap-4">
             <p className="text-[13px] text-fg-2 max-w-lg">
               Карты из Workshop скачиваются на сервер автоматически при открытии check-in. Прогрев сейчас — чтобы к первому матчу они
               уже были в кэше.
@@ -647,7 +641,7 @@ async function RegistrationTab({
         .filter((g) => g.items.length > 0)
         .map((g) => (
           <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
-            <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
+            <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
               <RegistrationHead />
               {g.items.map((r) => (
                 <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} />

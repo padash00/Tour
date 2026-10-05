@@ -280,7 +280,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="hidden md:flex h-9 w-[260px] items-center gap-2.5 rounded-[8px] border border-[#1a2838] bg-[#0a111b] px-3 text-[13px] text-fg-3 transition-colors hover:border-[#2a3b52] hover:text-fg-2"
+        className="hidden md:flex h-9 w-[260px] items-center gap-2.5 rounded-control border border-line-strong bg-shell px-3 text-[13px] text-fg-3 transition-colors hover:border-line-hover hover:text-fg-2"
       >
         <svg viewBox="0 0 24 24" className="size-4" {...stroke}>
           <circle cx="11" cy="11" r="6.5" />
@@ -309,7 +309,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
           <div
             role="dialog"
             aria-label="Быстрый переход"
-            className="w-full max-w-[600px] overflow-hidden rounded-[12px] border border-[#22324a] bg-[#0a111b] shadow-[0_30px_80px_-20px_#000]"
+            className="w-full max-w-[600px] overflow-hidden rounded-surface border border-line bg-surface shadow-[0_30px_80px_-20px_#000]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 border-b border-[#1a2838] px-4">

@@ -416,13 +416,25 @@ export async function togglePlayerFlag(_prev: ActionResult, formData: FormData):
   const playerId = String(formData.get("playerId"));
   const flag = String(formData.get("flag"));
   if (flag !== "is_banned" && flag !== "is_admin") return { error: "Неизвестный флаг" };
+  const valueInput = formData.get("value");
+  if (valueInput !== "0" && valueInput !== "1") return { error: "Не удалось определить новое состояние" };
   if (playerId === admin.id) return { error: "Нельзя менять собственные права" };
 
-  const { data: p } = await db().from("players").select(`steam_id, ${flag}`).eq("id", playerId).single();
+  const { data: p } = await db().from("players").select(`steam_id, nickname, ${flag}`).eq("id", playerId).single();
   if (!p) return { error: "Игрок не найден" };
-  const value = !(p as unknown as Record<string, boolean>)[flag];
-  await db().from("players").update({ [flag]: value }).eq("id", playerId);
+  const value = valueInput === "1";
+  const { error } = await db().from("players").update({ [flag]: value }).eq("id", playerId);
+  if (error) return { error: "Не удалось сохранить состояние игрока" };
   await audit(admin.id, `player.${flag}`, { type: "player", id: playerId }, { steam_id: p.steam_id, value });
   revalidatePath("/admin/players");
-  return null;
+  return {
+    success:
+      flag === "is_admin"
+        ? value
+          ? `Права администратора выданы игроку ${p.nickname}`
+          : `Права администратора сняты с игрока ${p.nickname}`
+        : value
+          ? `Игрок ${p.nickname} заблокирован`
+          : `Игрок ${p.nickname} разблокирован`,
+  };
 }

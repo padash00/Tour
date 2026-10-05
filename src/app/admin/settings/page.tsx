@@ -38,7 +38,7 @@ type SettingRow = Awaited<ReturnType<typeof getSettingsStatus>>[number];
 
 function SettingForm({ s }: { s: SettingRow }) {
   return (
-    <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5 max-w-2xl">
+    <div className="rounded-[12px] border border-line bg-surface p-5 max-w-2xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[14px] font-semibold">{s.label}</div>
@@ -140,7 +140,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
 
       {tab === "general" && (
         <Panel title="Состояние">
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06] max-w-2xl">
+          <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06] max-w-2xl">
             {settings.map((s) => (
               <Link
                 key={s.key}
@@ -200,7 +200,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
             проверяет, грузится ли она в CS2.
           </p>
           {workshop.length > 0 && (
-            <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
+            <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
               {workshop.map((w) => {
                 const [name, id] = w.split("@");
                 const i = info[id];
@@ -259,7 +259,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
 
       {tab === "security" && (
         <div className="space-y-6 max-w-2xl">
-          <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
+          <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
             <InfoRow label="Вход">Только через Steam OpenID</InfoRow>
             <InfoRow label="Администраторы из Vercel (ADMIN_STEAM_IDS)">
               <span className="num">{env.adminSteamIds.length}</span>
@@ -293,7 +293,7 @@ async function ServersInfo() {
   const bundle = getAgentBundle().version;
   return (
     <div className="space-y-4 max-w-2xl">
-      <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 divide-y divide-white/[0.06]">
+      <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
         <InfoRow label="F16 Server Agent">
           <span className="flex items-center gap-2">
             <Dot tone={online ? "ok" : "danger"} />

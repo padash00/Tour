@@ -123,11 +123,17 @@ export async function toggleMapEnabled(_prev: ActionResult, formData: FormData):
   const admin = await requireAdmin();
   const map = String(formData.get("map") ?? "");
   if (!MAP_KEY.test(map)) return { error: "Неизвестная карта" };
+  const enabledValue = formData.get("enabled");
+  if (enabledValue !== "0" && enabledValue !== "1") return { error: "Не удалось определить состояние карты" };
+  const enabled = enabledValue === "1";
   const disabled = await readJson<string[]>("MAPS_DISABLED", []);
-  const next = disabled.includes(map) ? disabled.filter((m) => m !== map) : [...disabled, map];
-  await writeJson("MAPS_DISABLED", next, admin.id);
-  await audit(admin.id, "settings.map_toggle", undefined, { map, enabled: !next.includes(map) });
+  const next = enabled ? disabled.filter((m) => m !== map) : [...new Set([...disabled, map])];
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: "MAPS_DISABLED", value: JSON.stringify(next), updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить доступность карты" };
+  await audit(admin.id, "settings.map_toggle", undefined, { map, enabled });
   revalidatePath("/admin/settings");
   revalidatePath("/admin/tournaments", "layout");
-  return { success: next.includes(map) ? "Карта скрыта из выбора" : "Карта доступна в турнирах" };
+  return { success: enabled ? "Карта доступна в турнирах" : "Карта скрыта из выбора" };
 }

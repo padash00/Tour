@@ -135,7 +135,7 @@ export default async function AdminOverview() {
         {/* ── живая сетка серверов ── */}
         {running.length > 0 && servers.online && (
           <Section title="Сообщение в чат игры">
-            <div className="rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-4">
+            <div className="rounded-[12px] border border-line bg-surface p-4">
               <ChatBox instances={running.map((i) => i.name)} />
             </div>
           </Section>

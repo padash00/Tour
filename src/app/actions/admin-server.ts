@@ -78,8 +78,12 @@ const HOST_TYPES = ["update_cs2", "update_plugins", "restart_all"] as const;
 export async function setAutopilot(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const id = String(formData.get("tournamentId"));
-  const on = formData.get("on") === "1";
-  await db().from("tournaments").update({ autopilot: on }).eq("id", id);
+  const onValue = formData.get("on");
+  if (onValue !== "0" && onValue !== "1") return { error: "Не удалось определить состояние автопилота" };
+  const on = onValue === "1";
+  const { data, error } = await db().from("tournaments").update({ autopilot: on }).eq("id", id).select("id");
+  if (error) return { error: "Не удалось сохранить автопилот" };
+  if (!data?.length) return { error: "Турнир не найден" };
   await audit(admin.id, on ? "tournament.autopilot_on" : "tournament.autopilot_off", { type: "tournament", id });
   revalidatePath(`/admin/tournaments/${id}`);
   return { success: on ? "Автопилот включён" : "Автопилот выключен" };
@@ -88,8 +92,12 @@ export async function setAutopilot(_prev: ActionResult, formData: FormData): Pro
 export async function setAutoApprove(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const id = String(formData.get("tournamentId"));
-  const on = formData.get("on") === "1";
-  await db().from("tournaments").update({ auto_approve: on }).eq("id", id);
+  const onValue = formData.get("on");
+  if (onValue !== "0" && onValue !== "1") return { error: "Не удалось определить состояние автоодобрения" };
+  const on = onValue === "1";
+  const { data, error } = await db().from("tournaments").update({ auto_approve: on }).eq("id", id).select("id");
+  if (error) return { error: "Не удалось сохранить автоодобрение заявок" };
+  if (!data?.length) return { error: "Турнир не найден" };
   await audit(admin.id, on ? "tournament.auto_approve_on" : "tournament.auto_approve_off", { type: "tournament", id });
   revalidatePath(`/admin/tournaments/${id}`);
   return { success: on ? "Заявки будут одобряться автоматически" : "Заявки снова одобряете вы" };
@@ -185,8 +193,11 @@ export async function sendChat(_prev: ActionResult, formData: FormData): Promise
 export async function toggleLobbyServer(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin("/admin/servers");
   const instance = String(formData.get("instance"));
-  const on = formData.get("on") === "1";
-  const { data } = await db().from("server_instances").update({ for_lobby: on }).eq("name", instance).select("name");
+  const onValue = formData.get("on");
+  if (onValue !== "0" && onValue !== "1") return { error: "Не удалось определить назначение сервера" };
+  const on = onValue === "1";
+  const { data, error } = await db().from("server_instances").update({ for_lobby: on }).eq("name", instance).select("name");
+  if (error) return { error: "Не удалось сохранить назначение сервера" };
   if (!data?.length) return { error: "Инстанс не найден" };
   await audit(admin.id, "server.for_lobby", undefined, { instance, on });
   revalidatePath("/admin/servers");

@@ -31,16 +31,17 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-start rounded-surface border border-dashed border-line", compact ? "gap-2 p-5" : "gap-3 p-8 sm:p-10", className)}>
-      {icon && <span className="mb-1 grid size-10 place-items-center rounded-control bg-white/[0.04] text-fg-3 [&>svg]:size-5">{icon}</span>}
-      <h3 className="text-title text-fg">{title}</h3>
-      {text && <p className="max-w-read text-[14px] leading-relaxed text-fg-2">{text}</p>}
+    <div className={cn("relative flex flex-col items-start overflow-hidden rounded-feature border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]", compact ? "gap-2 p-5" : "gap-3 p-8 sm:p-10", className)}>
+      <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-accent/[0.045] blur-3xl" />
+      {icon && <span className="relative mb-1 grid size-11 place-items-center rounded-control border border-accent/15 bg-accent-dim text-accent [&>svg]:size-5">{icon}</span>}
+      <h3 className="relative text-title text-fg">{title}</h3>
+      {text && <p className="relative max-w-read text-[14px] leading-relaxed text-fg-2">{text}</p>}
       {next && (
-        <p className="text-meta text-fg-3">
+        <p className="relative text-meta text-fg-3">
           Дальше: <span className="text-fg-2">{next}</span>
         </p>
       )}
-      {action && <div className="mt-2 flex flex-wrap gap-2">{action}</div>}
+      {action && <div className="relative mt-2 flex flex-wrap gap-2">{action}</div>}
     </div>
   );
 }

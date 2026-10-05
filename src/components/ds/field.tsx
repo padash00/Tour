@@ -178,12 +178,12 @@ export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChang
       disabled={disabled || !onChange}
       onClick={() => onChange?.(!on)}
       className={cn(
-        "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-[var(--dur-hover)] disabled:cursor-default",
-        on ? "bg-accent" : "bg-white/[0.14]",
-        disabled && "opacity-50",
+        "group relative h-7 w-12 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-[var(--dur-state)] ease-out disabled:cursor-default",
+        on ? "border-accent/70 bg-accent shadow-[0_0_14px_-7px_var(--color-accent)]" : "border-line-strong bg-surface-3 hover:border-line-hover",
+        disabled && "opacity-55",
       )}
     >
-      <span className={cn("absolute top-1 size-4 rounded-full bg-white shadow-sm transition-[left] duration-[var(--dur-hover)] ease-out", on ? "left-6" : "left-1")} />
+      <span className={cn("absolute left-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform duration-[var(--dur-state)] ease-out", on ? "translate-x-5" : "translate-x-0")} />
     </button>
   );
 }

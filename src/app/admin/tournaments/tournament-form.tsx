@@ -288,7 +288,7 @@ export function TournamentForm({
               onClick={() => setStep(i)}
               className={cn(
                 "relative flex items-center gap-3 h-10 px-3 rounded-[8px] text-[13px] whitespace-nowrap text-left transition",
-                step === i ? "bg-[#0a111b] border border-white/[0.08] text-fg" : "border border-transparent text-fg-3 hover:text-fg-2",
+                step === i ? "bg-surface border border-line text-fg" : "border border-transparent text-fg-3 hover:text-fg-2",
               )}
             >
               <span className={cn("num text-[11px] w-5", step === i ? "text-accent" : "text-fg-3")}>{String(i + 1).padStart(2, "0")}</span>
@@ -299,7 +299,7 @@ export function TournamentForm({
         </nav>
 
         {/* активный шаг */}
-        <div className="min-w-0 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-6 sm:p-8">
+        <div className="min-w-0 rounded-[12px] border border-line bg-surface p-6 sm:p-8">
           <Section show={step === 0} title="Основное" hint="Название, обложка и описание для страницы турнира">
             <div>
               <Label>Название</Label>
@@ -874,7 +874,7 @@ export function TournamentForm({
         </div>
 
         {/* сводка */}
-        <aside className="xl:sticky xl:top-8 rounded-[12px] border border-[#17243a] bg-[#0a111b]/90 p-5">
+        <aside className="xl:sticky xl:top-8 rounded-[12px] border border-line bg-surface p-5">
           <div className="text-[11px] font-medium uppercase tracking-[0.26em] text-[#7f93b0]">Сводка</div>
           <div className="mt-2 text-[18px] font-semibold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
           <div className="mt-4">
