@@ -239,26 +239,6 @@ export async function syncOpenRosters(teamId: string) {
   }
 }
 
-export async function writeRoster(
-  registrationId: string,
-  tournamentId: string,
-  members: Pick<TeamMemberWithPlayer, "player_id" | "role">[],
-) {
-  await db().from("tournament_roster_players").delete().eq("registration_id", registrationId);
-  if (members.length === 0) return null;
-  const { error } = await db()
-    .from("tournament_roster_players")
-    .insert(
-      members.map((m) => ({
-        registration_id: registrationId,
-        tournament_id: tournamentId,
-        player_id: m.player_id,
-        role: m.role === "substitute" ? "sub" : "main",
-      })),
-    );
-  return error;
-}
-
 export async function getUnreadCount(playerId: string) {
   const { count } = await db()
     .from("notifications")

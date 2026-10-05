@@ -140,7 +140,7 @@ export async function getMembers(lobbyId: string) {
 }
 
 export async function getGame(id: string) {
-  const { data } = await db().from("lobby_games").select("*").eq("id", id).maybeSingle();
+  const { data } = await db().from("lobby_games").select("*").eq("id", id).maybeSingle().throwOnError();
   if (!data) return null;
   const g = data as LobbyGame;
   g.settings = normalizeSettings(g.settings);
@@ -604,18 +604,8 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
       }
       return; // по одному за тик
     }
-    await db()
-      .from("lobby_games")
-      .update({ server_instance: inst, server_state: "loading", server_address: null, server_assigned_at: new Date().toISOString(), server_ready_at: null, note: `загружаем матч на ${inst}…` })
-      .eq("id", g.id);
-    // первая карта — по .r в игре: A2S считает и зрителей, и ботов, по числу игроков старт мог бы уйти без кого-то из состава.
-    // MatchZy сам знает состав и стартует, когда готовы все игроки матча
-    const bots = g.team1.bots.length + g.team2.bots.length;
-    await db().from("agent_commands").insert({
-      instance: inst,
-      type: "load_match",
-      payload: { match_id: g.id, matchzy_id: g.matchzy_id, lobby: true, autostart_off: bots > 0 },
-    });
+    const { error } = await db().rpc("assign_game_server", { p_game: g.id, p_instance: inst, p_lobby: true });
+    if (error) throw new Error("Не удалось назначить сервер лобби", { cause: error });
     return;
   }
 }
@@ -737,16 +727,17 @@ async function upsertLobbyStats(g: LobbyGame, mapNumber: number, ev: LobbyEvent)
         };
       }),
   );
-  await db().from("lobby_player_stats").upsert(rows, { onConflict: "game_id,map_number,steam_id" });
+  await db().from("lobby_player_stats").upsert(rows, { onConflict: "game_id,map_number,steam_id" }).throwOnError();
 }
 
 /** Возвращает строки для чата игры (итог карты / матча) или null */
 export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: string; lines: string[] } | null> {
   if (ev.matchid == null) return null;
-  const { data } = await db().from("lobby_games").select("*").eq("matchzy_id", ev.matchid).maybeSingle();
+  const { data } = await db().from("lobby_games").select("*").eq("matchzy_id", ev.matchid).maybeSingle().throwOnError();
   if (!data) return null;
   const g = data as LobbyGame;
   const idx = ev.map_number ?? 0;
+  if (["going_live", "round_end"].includes(ev.event) && (g.status === "finished" || g.status === "cancelled" || g.maps[idx]?.status === "finished")) return null;
   const maps = [...g.maps];
   const setMap = (patch: Partial<GameMap>) => {
     if (maps[idx]) maps[idx] = { ...maps[idx], ...patch };
@@ -759,12 +750,12 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
       await db()
         .from("lobby_games")
         .update({ status: g.status === "waiting" ? "live" : g.status, started_at: g.started_at ?? new Date().toISOString(), maps, note: null })
-        .eq("id", g.id);
+        .eq("id", g.id).in("status", ["waiting", "live"]).throwOnError();
       return null;
     }
     case "round_end": {
       setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "live" });
-      await db().from("lobby_games").update({ maps, status: g.status === "waiting" ? "live" : g.status }).eq("id", g.id);
+      await db().from("lobby_games").update({ maps, status: g.status === "waiting" ? "live" : g.status }).eq("id", g.id).in("status", ["waiting", "live"]).throwOnError();
       await upsertLobbyStats(g, idx + 1, ev);
       return null;
     }
@@ -779,7 +770,7 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
       await db()
         .from("lobby_games")
         .update({ maps, team1_score: s1, team2_score: s2, ...(done && { winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }) })
-        .eq("id", g.id);
+        .eq("id", g.id).throwOnError();
       if (done) await finishGame(g.id);
       const m = maps[idx];
       const lines = [`Карта ${idx + 1} (${mapTitle(m?.map ?? "")}): ${g.team1.name} ${m?.team1_score ?? 0}:${m?.team2_score ?? 0} ${g.team2.name}`];
@@ -795,7 +786,7 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
         await db()
           .from("lobby_games")
           .update({ team1_score: s1, team2_score: s2, winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null })
-          .eq("id", g.id);
+          .eq("id", g.id).throwOnError();
         await finishGame(g.id);
       }
       return null;

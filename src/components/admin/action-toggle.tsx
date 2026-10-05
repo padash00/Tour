@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
-import type { ActionResult, FormAction } from "@/components/forms";
+import { useRef, useState, useTransition } from "react";
+import type { FormAction } from "@/components/forms";
 import { Spinner, cn } from "@/components/ds";
 import { useToast } from "@/components/toast";
 
@@ -29,44 +29,39 @@ export function ActionToggle({
   onOptimisticChange?: (value: boolean | null) => void;
   className?: string;
 }) {
-  const safeAction = useCallback(async (_previous: ActionResult, data: FormData): Promise<ActionResult> => {
-    try {
-      return await action(_previous, data);
-    } catch {
-      return { error: "Не удалось сохранить настройку. Попробуйте ещё раз." };
-    }
-  }, [action]);
-  const [state, dispatch, pending] = useActionState(safeAction, null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
+  const saving = useRef(false);
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const toast = useToast();
   const value = optimistic ?? on;
 
-  useEffect(() => {
-    if (optimistic !== null && optimistic === on) {
-      setOptimistic(null);
-      onOptimisticChange?.(null);
-    }
-  }, [on, optimistic, onOptimisticChange]);
-
-  useEffect(() => {
-    if (state?.error) {
-      setOptimistic(null);
-      onOptimisticChange?.(null);
-      toast.error(state.error);
-    } else if (state?.success) {
-      toast.success(state.success);
-    }
-  }, [onOptimisticChange, state, toast]);
+  // A confirmed server prop releases the local override. This conditional
+  // adjustment avoids an effect and an intermediate render of the old value.
+  if (optimistic !== null && optimistic === on) setOptimistic(null);
 
   const toggle = () => {
+    if (saving.current || disabled) return;
+    saving.current = true;
     const next = !value;
     const data = new FormData();
     for (const [key, fieldValue] of Object.entries(fields)) data.set(key, fieldValue);
     data.set(stateField, next ? "1" : "0");
     setOptimistic(next);
     onOptimisticChange?.(next);
-    startTransition(() => dispatch(data));
+    startTransition(async () => {
+      try {
+        const result = await action(null, data);
+        if (result?.error) {
+          setOptimistic(null);
+          onOptimisticChange?.(null);
+          toast.error(result.error);
+        } else if (result?.success) toast.success(result.success);
+      } catch {
+        setOptimistic(null);
+        onOptimisticChange?.(null);
+        toast.error("Не удалось сохранить настройку. Попробуйте ещё раз.");
+      } finally { saving.current = false; }
+    });
   };
 
   return (

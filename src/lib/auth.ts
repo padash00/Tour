@@ -14,7 +14,7 @@ export const getCurrentPlayer = cache(async (): Promise<Player | null> => {
 });
 
 export function isAdmin(player: Player | null): boolean {
-  if (!player) return false;
+  if (!player || player.is_banned) return false;
   return player.is_admin || env.adminSteamIds.includes(player.steam_id);
 }
 

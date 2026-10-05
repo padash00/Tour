@@ -41,7 +41,7 @@ export async function getMatch(id: string): Promise<MatchFull | null> {
     .from("matches")
     .select(`${MATCH_SELECT}, tournament:tournaments(*), maps:match_maps(*), veto:veto_actions(*)`)
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle().throwOnError();
   if (!data) return null;
   const m = data as MatchFull;
   m.maps.sort((a, b) => a.map_number - b.map_number);
@@ -480,35 +480,9 @@ async function finishVetoIfComplete(m: MatchFull) {
 
 /** Пересчитывает счёт серии по картам; если кто-то набрал нужное число карт — завершает матч. */
 export async function recomputeSeries(matchId: string) {
-  const m = await getMatch(matchId);
-  if (!m) return;
-  const need = Math.floor(m.best_of / 2) + 1;
-  // фора в гранд-финале Double Elimination: команде из верхней сетки (слот 1) +1 карта
-  const advantage = m.bracket === "grand_final" && m.best_of >= 3 ? GRAND_FINAL_ADVANTAGE : 0;
-  const s1 = m.maps.filter((x) => x.winner_id && x.winner_id === m.team1_id).length + advantage;
-  const s2 = m.maps.filter((x) => x.winner_id && x.winner_id === m.team2_id).length;
-  const winner = s1 >= need ? m.team1_id : s2 >= need ? m.team2_id : null;
-
-  await db()
-    .from("matches")
-    .update({
-      team1_score: s1,
-      team2_score: s2,
-      ...(winner && { status: "finished", winner_id: winner, finished_at: new Date().toISOString() }),
-    })
-    .eq("id", m.id);
-
-  if (winner && advantage && winner === m.team1_id && m.server_instance) {
-    // серию закрыла фора — MatchZy об этом не знает и запустил бы следующую карту
-    await db().from("agent_commands").insert({ instance: m.server_instance, type: "end_match", payload: {} });
-    await db().from("matches").update({ server_instance: null, server_state: null, server_address: null }).eq("id", m.id);
-  }
-
-  if (winner) {
-    // несыгранные карты серии больше не нужны
-    await db().from("match_maps").delete().eq("match_id", m.id).eq("status", "pending");
-    await syncBracket(m.tournament_id);
-  }
+  const { data, error } = await db().rpc("recompute_match_series", { p_match: matchId, p_advantage: GRAND_FINAL_ADVANTAGE });
+  if (error) throw new Error("Не удалось сохранить результат серии", { cause: error });
+  if (data?.winner) await syncBracket(data.tournament_id);
 }
 
 /** Ближайшие и идущие матчи опубликованных турниров: live/вето сверху, дальше по времени начала */

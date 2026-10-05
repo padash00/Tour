@@ -164,7 +164,7 @@ export function RegisterForm({
   const error = local ?? state?.error ?? null;
 
   return (
-    <form action={action} onSubmit={onSubmit}>
+    <form action={action} onSubmit={onSubmit} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
       <input type="hidden" name="tournamentId" value={tournamentId} />
       {children}
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -365,7 +365,7 @@ export function CheckinTask({
                   Исправить заявку после закрытия регистрации может только администратор турнира — напишите ему.
                 </Callout>
               ) : isCaptain ? (
-                <form action={action}>
+                <form action={action} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
                   <input type="hidden" name="tournamentId" value={tournamentId} />
                   <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto sm:min-w-64">
                     {pending ? "Подтверждаем…" : "Подтвердить участие"}

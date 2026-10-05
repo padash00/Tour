@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, fromLocalInput } from "@/lib/format";
-import { createBracket, getMatch, recomputeSeries, syncBracket } from "@/lib/matches";
+import { createBracket, getMatch, syncBracket } from "@/lib/matches";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import { VETO_STEP_SECONDS } from "@/lib/veto";
@@ -188,21 +188,11 @@ export async function saveMapScore(_prev: ActionResult, formData: FormData): Pro
   const finish = formData.get("finish") === "1";
   if (finish && s1 === s2) return { error: "Карта не может закончиться ничьей" };
 
-  await db()
-    .from("match_maps")
-    .update({
-      team1_score: s1,
-      team2_score: s2,
-      status: finish ? "finished" : "live",
-      winner_id: finish ? (s1 > s2 ? m.team1_id : m.team2_id) : null,
-    })
-    .eq("id", map.id);
-
-  if (finish) {
-    const next = m.maps.find((x) => x.map_number > map.map_number && x.status === "pending");
-    if (next) await db().from("match_maps").update({ status: "live" }).eq("id", next.id);
-    await recomputeSeries(m.id);
-  }
+  const { data: result, error } = await db().rpc("save_match_map_score", {
+    p_match: m.id, p_map: map.id, p_score1: s1, p_score2: s2, p_finish: finish,
+  });
+  if (error) return { error: "Не удалось сохранить счёт: состояние матча изменилось. Обновите страницу." };
+  if (result?.winner) await syncBracket(m.tournament_id);
   await audit(admin.id, finish ? "match.map_finish" : "match.map_score", { type: "match", id: m.id }, { map: map.map_name, s1, s2 });
   revalidateMatch(m.id, m.tournament.slug);
   return null;

@@ -11,27 +11,44 @@ import {
   lobbyServersTick,
   takePendingCommands,
   verifyWorkshopLibrary,
-  type AgentReport,
 } from "@/lib/server-control";
 import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/ops";
 import { refreshStaleProfilesTick } from "@/lib/profile-sync";
 import { getSetting } from "@/lib/settings";
 import { applyDueVetoTimeouts } from "@/lib/matches";
 import { lobbyTick } from "@/lib/lobby";
+import { agentReportSchema, type SyncMetrics } from "@/lib/server/agent-report";
+import { db } from "@/lib/supabase";
+import { logSiteError } from "@/lib/site-errors";
 
-/** Фоновые задачи на каждой синхронизации: сбой одной не должен отменять остальные */
-async function safely(name: string, job: () => Promise<unknown>) {
-  try {
-    await job();
-  } catch (e) {
-    console.error(`${name} failed`, e);
-  }
-}
+export const maxDuration = 60;
 
 /** F16 Server Agent раз в несколько секунд присылает состояние хоста и инстансов, в ответ получает команды. */
 export async function POST(request: NextRequest) {
   if (!checkBearer(request, "AGENT_TOKEN")) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const report = (await request.json()) as AgentReport;
+  const started = performance.now();
+  const metrics: SyncMetrics = { at: new Date().toISOString(), duration_ms: 0, phases: [] };
+  // Keep failures visible while allowing independent maintenance jobs to proceed.
+  async function safely(name: string, job: () => Promise<unknown>) {
+    const start = performance.now();
+    let ok = true;
+    try { await job(); }
+    catch (e) {
+      ok = false;
+      console.error(`${name} failed`, e);
+      await logSiteError({ source: "server", message: `Agent sync: ${name}`, path: "/api/agent/sync", kind: "background_job" }).catch(() => {});
+    }
+    metrics.phases.push({ name, ms: Math.round(performance.now() - start), ok });
+  }
+  let body: unknown;
+  try {
+    const raw = await request.text();
+    if (raw.length > 512_000) return NextResponse.json({ error: "report too large" }, { status: 413 });
+    body = JSON.parse(raw);
+  } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  const parsed = agentReportSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "invalid agent report" }, { status: 400 });
+  const report = parsed.data;
   await applyAgentReport(report);
   await safely("agent events", () => applyAgentEvents(report.events));
   await safely("watchdog", expireStaleWork);
@@ -45,13 +62,18 @@ export async function POST(request: NextRequest) {
   await safely("dedupe prune", pruneIngest);
   await safely("profile sync", refreshStaleProfilesTick);
   await safely("auto maintenance", autoMaintenanceTick);
-  const commands = await takePendingCommands(request.nextUrl.origin);
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
-  const admins = await adminPlayers()
-    .then((a) => a.map((x) => x.steam_id))
-    .catch(() => null);
+  const [admins, retention] = await Promise.all([
+    adminPlayers().then((a) => a.map((x) => x.steam_id)).catch(() => null),
+    getSetting("BACKUP_RETENTION_DAYS").catch(() => null),
+  ]);
   // срок хранения бэкапов и демо на серверном ПК (дней), по умолчанию 1
-  const days = Number((await getSetting("BACKUP_RETENTION_DAYS").catch(() => null)) ?? "");
+  const days = Number(retention ?? "");
   const backup_days = Number.isFinite(days) && days >= 1 ? Math.min(90, Math.floor(days)) : 1;
+  // Claim last: work done above cannot consume the delivery lease.
+  const commands = await takePendingCommands(request.nextUrl.origin, report.protocol === 2);
+  metrics.duration_ms = Math.round(performance.now() - started);
+  const { error } = await db().from("app_settings").upsert({ key: "AGENT_SYNC_METRICS", value: JSON.stringify(metrics), updated_at: metrics.at });
+  if (error) console.error("agent sync metrics could not be saved", error.code);
   return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days });
 }

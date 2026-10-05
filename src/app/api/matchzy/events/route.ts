@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { checkBearer, handleMatchzyEvent } from "@/lib/server-control";
-import { claimIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
+import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
 
 /**
  * MatchZy присылает сюда события матча (matchzy_remote_log_url) — напрямую или через буфер агента,
@@ -19,11 +19,14 @@ export async function POST(request: NextRequest) {
   if (!event || typeof event.event !== "string") return NextResponse.json({ error: "bad event" }, { status: 400 });
 
   const key = ingestKey("mz", raw);
-  if (!(await claimIngest(key))) return NextResponse.json({ ok: true, duplicate: true });
+  const claim = await claimIngest(key);
+  if (claim.status === "done") return NextResponse.json({ ok: true, duplicate: true });
+  if (claim.status === "busy" || !claim.token) return NextResponse.json({ error: "processing" }, { status: 503, headers: { "Retry-After": "5" } });
   try {
     await handleMatchzyEvent(event as Parameters<typeof handleMatchzyEvent>[0]);
+    await completeIngest(key, claim.token);
   } catch (e) {
-    await releaseIngest(key).catch(() => {});
+    await releaseIngest(key, claim.token).catch(() => {});
     console.error("matchzy event failed", event.event, e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }

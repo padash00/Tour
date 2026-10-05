@@ -4,7 +4,7 @@ import { closePost, invitePlayer, respondToTeam, savePlayerPost, saveTeamPost } 
 import { formatDate } from "@/lib/format";
 import { FINDER_MODES, FINDER_ROLES, roleLabel, type FinderPost } from "@/lib/finder";
 import { ActionForm, SubmitButton } from "../forms";
-import { Avatar, FaceitLevel, Input, Panel, TeamLogo, Textarea, cn } from "@/components/ds";
+import { Avatar, FaceitLevel, Input, Panel, TeamLogo, Textarea } from "@/components/ds";
 
 const modeLabel = (m: string) => (m === "2v2" ? "2×2" : "5×5");
 

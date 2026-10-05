@@ -39,9 +39,7 @@ export function MapCard({
   const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(null);
   const visibleEnabled = optimisticEnabled ?? enabled;
 
-  useEffect(() => {
-    if (optimisticEnabled !== null && optimisticEnabled === enabled) setOptimisticEnabled(null);
-  }, [enabled, optimisticEnabled]);
+  if (optimisticEnabled !== null && optimisticEnabled === enabled) setOptimisticEnabled(null);
 
   return (
     <div className={cn("space-y-2 transition-opacity", !visibleEnabled && "opacity-55")}>

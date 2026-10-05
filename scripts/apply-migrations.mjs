@@ -1,77 +1,40 @@
-// Применяет новые миграции из supabase/migrations через Supabase Management API
-// и сохраняет ключи проекта в .env.local (файл в .gitignore).
-// Запуск: SUPABASE_ACCESS_TOKEN=sbp_... node scripts/apply-migrations.mjs
-//         node scripts/apply-migrations.mjs --ci   (в сборке Vercel: только миграции; без токена — пропуск)
-import { readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+// Explicit release step. Building/previewing the website never mutates a database.
+// --check only reads migration history and fails if schema changes are pending.
+import { readdirSync, readFileSync } from "node:fs";
+import { migrationPlan, migrationTransaction } from "./lib/migrations.mjs";
 
-const REF = process.env.SUPABASE_PROJECT_REF ?? "dgpxlpjnjthyotjcccfl";
-const CI = process.argv.includes("--ci");
+const ref = process.env.SUPABASE_PROJECT_REF;
 const token = process.env.SUPABASE_ACCESS_TOKEN;
-if (!token) {
-  if (CI) {
-    console.log("migrations: SUPABASE_ACCESS_TOKEN не задан — пропускаю");
-    process.exit(0);
-  }
-  console.error("Нет SUPABASE_ACCESS_TOKEN");
+if (!ref || !/^[a-z0-9]+$/.test(ref) || !token) {
+  console.error("Set SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN for the intended database.");
   process.exit(1);
 }
-const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-const api = (path, init) => fetch(`https://api.supabase.com/v1/projects/${REF}${path}`, { headers, ...init });
-
 const query = async (sql) => {
-  const r = await api("/database/query", { method: "POST", body: JSON.stringify({ query: sql }) });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`${r.status} ${text}`);
-  return JSON.parse(text);
+  const response = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query: sql }), signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error(`Database migration request failed: HTTP ${response.status}`);
+  return response.json();
 };
-const esc = (s) => s.replace(/'/g, "''");
-
-const [{ has_migrations, has_players }] = await query(`
-  select exists(select 1 from information_schema.tables where table_schema='public' and table_name='_migrations') as has_migrations,
-         exists(select 1 from information_schema.tables where table_schema='public' and table_name='players') as has_players`);
-
-const applied = new Set(
-  has_migrations ? (await query("select name from _migrations")).map((r) => r.name) : [],
-);
-// первая миграция применялась до появления учёта
-if (!has_migrations && has_players) applied.add("20261001000000_core.sql");
-
-const files = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
-for (const file of files) {
-  if (applied.has(file)) continue;
-  await query(readFileSync(`supabase/migrations/${file}`, "utf8"));
-  console.log("✓ применена", file);
+const files = readdirSync("supabase/migrations").filter((name) => name.endsWith(".sql")).sort()
+  .map((name) => ({ name, sql: readFileSync(`supabase/migrations/${name}`, "utf8") }));
+const [schema] = await query(`select to_regclass('public._migrations') is not null as history,
+  to_regclass('public.players') is not null as players,
+  exists(select 1 from information_schema.columns where table_schema='public' and table_name='_migrations' and column_name='checksum') as checksums`);
+if (!schema.history && schema.players) throw new Error("Existing database has no migration history. Reconcile its schema before applying migrations.");
+const applied = schema.history ? await query(`select name, ${schema.checksums ? "checksum" : "null::text as checksum"} from public._migrations`) : [];
+const pending = migrationPlan(files, applied);
+if (process.argv.includes("--check")) {
+  if (pending.length) {
+    console.error("Pending migrations:", pending.map((file) => file.name).join(", "));
+    process.exit(1);
+  }
+  console.log("Schema matches repository migration history.");
+} else {
+  for (const file of pending) {
+    await query(migrationTransaction(file));
+    console.log("Applied:", file.name);
+  }
+  console.log(`Migrations complete: ${pending.length}.`);
 }
-// записываем всё, что применено
-await query("create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())");
-await query(
-  `insert into _migrations(name) values ${files.map((f) => `('${esc(f)}')`).join(",")} on conflict do nothing`,
-);
-
-if (CI) {
-  console.log("migrations: ok");
-  process.exit(0);
-}
-
-const tables = await query("select table_name from information_schema.tables where table_schema='public' order by 1");
-console.log("Таблицы:", tables.map((t) => t.table_name).join(", "));
-
-const keys = await (await api("/api-keys?reveal=true")).json();
-const secret =
-  keys.find((k) => k.type === "secret" && k.api_key)?.api_key ??
-  keys.find((k) => k.name === "service_role")?.api_key;
-if (!secret) {
-  console.error("Не нашёл service_role / secret ключ");
-  process.exit(1);
-}
-
-const lines = existsSync(".env.local") ? readFileSync(".env.local", "utf8").split(/\r?\n/).filter(Boolean) : [];
-const set = (k, v) => {
-  const i = lines.findIndex((l) => l.startsWith(`${k}=`));
-  if (i >= 0) lines[i] = `${k}=${v}`;
-  else lines.push(`${k}=${v}`);
-};
-set("SUPABASE_URL", `https://${REF}.supabase.co`);
-set("SUPABASE_SERVICE_ROLE_KEY", secret);
-writeFileSync(".env.local", lines.join("\n") + "\n");
-console.log("✓ ключи в .env.local актуальны");

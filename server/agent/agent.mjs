@@ -22,6 +22,7 @@ import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
 import { a2sInfo, rcon } from "./lib.mjs";
 import { applyBundle, cs2Build, localBundleVersion, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 import { createRelay } from "./relay.mjs";
+import { CommandJournal } from "./command-journal.mjs";
 import { ensureUpnp } from "./upnp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +40,9 @@ const readJsonSafe = (p, fallback) => {
 // для живых тестов: свой конфиг, отдельная папка состояния и подмножество инстансов (на ПК работает настоящий агент)
 const config = readJson(process.env.F16_AGENT_CONFIG ?? path.join(F16_DIR, "agent.json"));
 const STATE_DIR = process.env.F16_STATE_DIR ?? F16_DIR;
+mkdirSync(STATE_DIR, { recursive: true });
+const commandJournal = new CommandJournal(path.join(STATE_DIR, "command-journal.json"));
+const flushCommandResults = () => commandJournal.flush((reply) => api("/api/agent/ack", reply));
 const secrets = readJson(path.join(SERVER_DIR, "f16-secrets.json"));
 const instancesCsv = existsSync(path.join(F16_DIR, "instances.csv"))
   ? path.join(F16_DIR, "instances.csv")
@@ -517,7 +521,10 @@ const HOST_COMMANDS = {
 
 /** Долгие команды обслуживания выполняются в фоне, агент продолжает отчитываться сайту */
 function runHostCommand(cmd) {
-  if (busy) return api("/api/agent/ack", { id: cmd.id, ok: false, result: `агент занят: ${busy}` }).catch(() => {});
+  if (busy) {
+    commandJournal.complete(cmd.id, { ok: false, result: `агент занят: ${busy}` });
+    return;
+  }
   busy = cmd.type;
   hostInfoAt = 0;
   log("maintenance start", cmd.type);
@@ -528,8 +535,9 @@ function runHostCommand(cmd) {
       busy = null;
       hostInfoAt = 0;
       log("maintenance", r.ok ? "ok" : "fail", r.result.slice(0, 300));
-      await api("/api/agent/ack", { id: cmd.id, ...r }).catch((e) => log("ack failed", e.message));
-    });
+      commandJournal.complete(cmd.id, r);
+      await flushCommandResults().catch((e) => log("ack failed; сохранён для повтора", e.message));
+    }).catch((e) => log("command journal failed", e.message));
 }
 
 const q = (s) => `"${String(s).replace(/"/g, "")}"`;
@@ -747,6 +755,7 @@ function ensureMatchzyRu() {
 }
 
 async function tick() {
+  await flushCommandResults().catch((e) => log("ack retry failed", e.message));
   try {
     ensureServerLanguage();
     ensureMatchzyRu();
@@ -756,10 +765,11 @@ async function tick() {
   }
   await refreshUpnp().catch(() => {});
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
-  const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState };
+  const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState, pending_results: commandJournal.pendingResults, protocol: 2 };
   const events = pendingEvents.slice();
   const t0 = Date.now();
-  const { commands, bundle_version, admins, backup_days } = await api("/api/agent/sync", { lan_ip: config.lanIp, info: publicInfo, instances, events });
+  const { commands, bundle_version, admins, backup_days } = await api("/api/agent/sync", { protocol: 2, lan_ip: config.lanIp, info: publicInfo, instances, events });
+  commandJournal.accept(commands ?? []);
   await syncMatchzyAdmins(admins).catch((e) => log(`MatchZy admins: ${e.message}`));
   try {
     cleanupBackups(Number(backup_days ?? 1));
@@ -776,6 +786,7 @@ async function tick() {
 
   // сайт уже пометил эти команды «отправлено» — выполняем их ДО самообновления, иначе они потеряются
   for (const cmd of commands ?? []) {
+    if (!commandJournal.begin(cmd.id)) continue;
     if (cmd.type in HOST_COMMANDS) {
       runHostCommand(cmd);
       continue;
@@ -791,8 +802,10 @@ async function tick() {
       r = { ok: false, result: String(e?.message ?? e) };
     }
     log(r.ok ? "  ok" : "  fail", r.result.slice(0, 200));
-    await api("/api/agent/ack", { id: cmd.id, ...r }).catch((e) => log("ack failed", e.message));
+    commandJournal.complete(cmd.id, r);
+    await flushCommandResults().catch((e) => log("ack failed; сохранён для повтора", e.message));
   }
+  await flushCommandResults().catch((e) => log("ack retry failed", e.message));
 
   // на сайте новая версия агента/скриптов/конфигов → обновляемся и перезапускаемся (F16-agent.bat поднимет снова).
   // Не во время автоподъёма сервера — дождёмся конца.

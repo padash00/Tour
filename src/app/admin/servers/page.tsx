@@ -17,20 +17,16 @@ import { requireAdmin } from "@/lib/auth";
 import { getCs2UpdateCheck, getSelfCheck } from "@/lib/server/ops";
 import { OpsAlerts, type OpsInfo } from "@/components/admin/ops-alerts";
 import { SelfCheckPanel } from "@/components/admin/self-check";
+import { AgentHealth } from "@/components/admin/agent-health";
+import { CommandLog } from "@/components/admin/command-log";
+import type { SyncMetrics } from "@/lib/server/agent-report";
 
 export const metadata: Metadata = { title: "Серверы — F16 Control" };
-
-const CMD_STATUS: Record<AgentCommand["status"], string> = {
-  done: "text-ok",
-  error: "text-danger",
-  sent: "text-accent",
-  pending: "text-warn",
-};
 
 export default async function ServersPage() {
   await requireAdmin("/admin/servers"); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
-  const [{ data: matches }, { data: commands }, cs2Check, selfReport, { data: lobbyGames }] = await Promise.all([
+  const [{ data: matches }, { data: commands }, cs2Check, selfReport, { data: lobbyGames }, { count: pending }, { count: inflight }, { data: timing }] = await Promise.all([
     db()
       .from("matches")
       .select(
@@ -46,7 +42,12 @@ export default async function ServersPage() {
       .select("id, status, server_instance, server_state, team1, team2, lobby:lobbies!lobby_games_lobby_id_fkey(code)")
       .not("server_instance", "is", null)
       .in("status", ["waiting", "live"]),
+    db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "pending"),
+    db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "sent"),
+    db().from("app_settings").select("value").eq("key", "AGENT_SYNC_METRICS").maybeSingle(),
   ]);
+  let metrics: SyncMetrics | null = null;
+  try { metrics = timing?.value ? JSON.parse(timing.value) as SyncMetrics : null; } catch {}
   type LG = { id: string; status: string; server_instance: string; server_state: string | null; team1: { name: string }; team2: { name: string }; lobby: { code: string } | null };
   const lobbyOn = new Map(((lobbyGames ?? []) as unknown as LG[]).map((g) => [g.server_instance, g]));
   const nowTs = serverNow();
@@ -89,6 +90,8 @@ export default async function ServersPage() {
           </span>
         }
       />
+
+      <AgentHealth lastSeen={host?.last_seen_at ?? null} initialNow={nowTs} pending={pending ?? 0} inflight={inflight ?? 0} metrics={metrics} />
 
       {!online && (
         <AlertRow tone="danger" title="F16 Server Agent не на связи">
@@ -260,46 +263,7 @@ export default async function ServersPage() {
       </div>
 
       <Section title="Журнал команд агенту" count={(commands ?? []).length}>
-        {(commands ?? []).length === 0 ? (
-          <p className="text-[13px] text-fg-3">Команд ещё не было.</p>
-        ) : (
-          <div className="rounded-[12px] border border-white/[0.08] bg-[#04070c] overflow-x-auto">
-            <table className="w-full min-w-[860px] font-mono text-[12px]">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.2em] text-[#7f93b0]">
-                  <th className="px-4 h-9 font-medium w-[130px]">Время</th>
-                  <th className="px-2 font-medium w-16">Статус</th>
-                  <th className="px-2 font-medium w-20">Инстанс</th>
-                  <th className="px-2 font-medium w-[220px]">Команда</th>
-                  <th className="px-2 font-medium">Ответ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {((commands ?? []) as AgentCommand[]).map((c) => (
-                  <tr key={c.id} className="align-top border-t border-white/[0.04] hover:bg-white/[0.02]">
-                    <td className="px-4 py-1.5 text-fg-3 whitespace-nowrap">{formatShortDateTime(c.created_at)}</td>
-                    <td className={cn("px-2 py-1.5", CMD_STATUS[c.status])}>{c.status}</td>
-                    <td className="px-2 py-1.5 text-fg-3">{c.instance ?? "host"}</td>
-                    <td className="px-2 py-1.5 text-fg-2 max-w-[220px] truncate">
-                      {c.type}
-                      {c.type === "rcon" ? ` ${String(c.payload.command)}` : ""}
-                    </td>
-                    <td className="px-2 py-1.5 text-fg-3">
-                      {c.result && c.result.length > 100 ? (
-                        <details>
-                          <summary className="cursor-pointer truncate hover:text-fg-2">{c.result.split(/\r?\n/)[0].slice(0, 100)}…</summary>
-                          <pre className="mt-1 mb-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-fg-2">{c.result}</pre>
-                        </details>
-                      ) : (
-                        <span className="whitespace-pre-wrap break-all">{c.result ?? ""}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <CommandLog commands={(commands ?? []) as AgentCommand[]} />
       </Section>
     </div>
   );

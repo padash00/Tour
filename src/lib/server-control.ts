@@ -77,15 +77,19 @@ export type AgentCommand = {
   status: "pending" | "sent" | "done" | "error";
   result: string | null;
   created_at: string;
+  sent_at: string | null;
+  done_at: string | null;
+  delivery_attempts: number;
 };
 
 export const AGENT_OFFLINE_AFTER_MS = 30_000;
 
 export async function getServerState() {
-  const [{ data: host }, { data: instances }] = await Promise.all([
+  const [{ data: host, error: hostError }, { data: instances, error: instanceError }] = await Promise.all([
     db().from("server_host").select("*").eq("id", "main").maybeSingle(),
     db().from("server_instances").select("*").order("name"),
   ]);
+  if (hostError || instanceError) throw new Error("Не удалось получить состояние серверов");
   const h = host as ServerHost | null;
   const online = !!h?.last_seen_at && Date.now() - new Date(h.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
   return { host: h, online, instances: (instances ?? []) as ServerInstance[] };
@@ -97,7 +101,8 @@ export async function enqueueCommand(
   payload: Record<string, unknown> = {},
   createdBy?: string,
 ) {
-  await db().from("agent_commands").insert({ instance, type, payload, created_by: createdBy ?? null });
+  const { error } = await db().from("agent_commands").insert({ instance, type, payload, created_by: createdBy ?? null });
+  if (error) throw new Error("Не удалось поставить команду агенту в очередь", { cause: error });
 }
 
 // ───────────────────────── конфиг матча для MatchZy
@@ -180,23 +185,17 @@ export async function pickFreeInstance(preferRole: "active" | "reserve" = "activ
 }
 
 export async function assignServer(match: Match, instanceName: string, actorId?: string) {
-  await db()
-    .from("matches")
-    .update({
-      server_instance: instanceName,
-      server_state: "loading",
-      server_address: null,
-      server_password: null,
-      server_assigned_at: new Date().toISOString(),
-      server_ready_at: null,
-    })
-    .eq("id", match.id);
-  await enqueueCommand(instanceName, "load_match", { match_id: match.id, matchzy_id: match.matchzy_id }, actorId);
+  const { data, error } = await db().rpc("assign_game_server", {
+    p_game: match.id, p_instance: instanceName, p_actor: actorId ?? null,
+  });
+  if (error) throw new Error("Не удалось назначить сервер", { cause: error });
+  return data === true;
 }
 
 // ───────────────────────── синхронизация с агентом
 
 export type AgentReport = {
+  protocol?: number;
   lan_ip?: string;
   info?: Record<string, unknown>;
   instances?: {
@@ -212,9 +211,10 @@ export type AgentReport = {
 
 export async function applyAgentReport(report: AgentReport) {
   const now = new Date().toISOString();
-  await db()
+  const { error: hostError } = await db()
     .from("server_host")
     .upsert({ id: "main", lan_ip: report.lan_ip ?? null, last_seen_at: now, info: report.info ?? {} });
+  if (hostError) throw new Error("Не удалось сохранить отчёт агента", { cause: hostError });
 
   const upnpIp = (report.info as { upnp?: { ip?: string | null } } | undefined)?.upnp?.ip ?? null;
   const lanIp = ((await getSetting("PLAYER_IP")) ?? "").trim() || upnpIp || report.lan_ip;
@@ -222,7 +222,7 @@ export async function applyAgentReport(report: AgentReport) {
     const gamestate = inst.running ? (inst.get5?.gamestate ?? null) : null;
     const matchzyId = inst.running ? (inst.get5?.matchid ?? null) : null;
     const { data: match } = matchzyId
-      ? await db().from("matches").select("*").eq("matchzy_id", matchzyId).maybeSingle()
+      ? await db().from("matches").select("*").eq("matchzy_id", matchzyId).maybeSingle().throwOnError()
       : { data: null };
     if (matchzyId && !match && gamestate && gamestate !== "none") {
       await lobbyHealthCheck(matchzyId, inst.name, inst.map ?? null, report.lan_ip ?? null, upnpIp);
@@ -239,7 +239,7 @@ export async function applyAgentReport(report: AgentReport) {
         match_id: match?.id ?? null,
         last_seen_at: now,
       })
-      .eq("name", inst.name);
+      .eq("name", inst.name).throwOnError();
 
     // health check: матч загрузился на назначенный сервер и на нём нужная карта → выдаём адрес игрокам
     const m = match as Match | null;
@@ -277,19 +277,11 @@ export async function applyAgentReport(report: AgentReport) {
 }
 
 /** Отдаёт агенту ожидающие команды, подставляя абсолютные URL и токены */
-export async function takePendingCommands(siteOrigin: string) {
-  const { data } = await db()
-    .from("agent_commands")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at")
-    .limit(20);
-  const commands = (data ?? []) as AgentCommand[];
+export async function takePendingCommands(siteOrigin: string, replay = false) {
+  const { data, error } = await db().rpc("claim_agent_commands", { p_replay: replay });
+  if (error) throw new Error("Не удалось получить очередь команд", { cause: error });
+  const commands = ((data ?? []) as AgentCommand[]).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   if (commands.length === 0) return [];
-  await db()
-    .from("agent_commands")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
-    .in("id", commands.map((c) => c.id));
 
   return Promise.all(commands.map(async (c) => {
     if (c.type === "load_match" && c.payload.lobby) {
@@ -373,19 +365,29 @@ async function matchzyPostCommands(matchId: string) {
 }
 
 export async function ackCommand(id: string, ok: boolean, result: string) {
-  const { data } = await db()
+  const { data, error: readError } = await db().from("agent_commands").select("*").eq("id", id).maybeSingle();
+  if (readError) throw new Error("Не удалось прочитать команду", { cause: readError });
+  const cmd = data as AgentCommand | null;
+  if (!cmd) return false;
+  // Delayed/duplicate acknowledgements must not overwrite a watchdog decision.
+  if (cmd.status === "done" || cmd.status === "error") return true;
+  if (cmd.status !== "sent") return false;
+  if (cmd.type === "prefetch_maps") await saveWorkshopResults(result);
+  if (cmd.type === "self_check" && ok) await saveSelfCheck(result);
+  if (cmd.type === "load_match" && !ok) {
+    const table = cmd.payload.lobby ? "lobby_games" : "matches";
+    const { error } = await db().from(table).update({ server_state: "error" })
+      .eq("id", String(cmd.payload.match_id)).eq("server_instance", cmd.instance)
+      .eq("server_state", "loading").lte("server_assigned_at", cmd.created_at);
+    if (error) throw new Error("Не удалось сохранить ошибку загрузки", { cause: error });
+  }
+  const { error } = await db()
     .from("agent_commands")
     .update({ status: ok ? "done" : "error", result: result.slice(0, 4000), done_at: new Date().toISOString() })
     .eq("id", id)
-    .select("*")
-    .maybeSingle();
-  const cmd = data as AgentCommand | null;
-  if (cmd?.type === "prefetch_maps") await saveWorkshopResults(result);
-  if (cmd?.type === "self_check" && ok) await saveSelfCheck(result);
-  if (cmd?.type === "load_match" && !ok) {
-    const table = cmd.payload.lobby ? "lobby_games" : "matches";
-    await db().from(table).update({ server_state: "error" }).eq("id", String(cmd.payload.match_id));
-  }
+    .eq("status", "sent");
+  if (error) throw new Error("Не удалось подтвердить команду", { cause: error });
+  return true;
 }
 
 // ───────────────────────── события MatchZy
@@ -448,7 +450,7 @@ async function upsertPlayerStats(match: Match, mapNumber: number, ev: MatchzyEve
       };
     }),
   );
-  await db().from("player_map_stats").upsert(rows, { onConflict: "match_id,map_number,steam_id" });
+  await db().from("player_map_stats").upsert(rows, { onConflict: "match_id,map_number,steam_id" }).throwOnError();
 }
 
 /** Текст для чата CS2 через консоль: без разделителей команд, кавычек и управляющих символов */
@@ -482,7 +484,7 @@ async function announceMapResult(matchId: string, mapNumber: number) {
 
 export async function handleMatchzyEvent(ev: MatchzyEvent) {
   const { data } = ev.matchid != null
-    ? await db().from("matches").select("*").eq("matchzy_id", ev.matchid).maybeSingle()
+    ? await db().from("matches").select("*").eq("matchzy_id", ev.matchid).maybeSingle().throwOnError()
     : { data: null };
   const match = data as Match | null;
 
@@ -493,7 +495,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
     map_number: ev.map_number ?? null,
     round_number: ev.round_number ?? null,
     payload: ev,
-  });
+  }).throwOnError();
   if (!match) {
     // игра лобби: итог карты — в чат сервера
     const out = await handleLobbyEvent(ev as LobbyEvent);
@@ -503,23 +505,30 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
 
   // MatchZy нумерует карты с 0, у нас — с 1
   const mapNumber = (ev.map_number ?? 0) + 1;
-  const setMap = (patch: Record<string, unknown>) =>
-    db().from("match_maps").update(patch).eq("match_id", match.id).eq("map_number", mapNumber);
+  const setMap = (patch: Record<string, unknown>, unfinished = false) => {
+    let query = db().from("match_maps").update(patch).eq("match_id", match.id).eq("map_number", mapNumber);
+    if (unfinished) query = query.neq("status", "finished");
+    return query.throwOnError();
+  };
 
   switch (ev.event) {
     case "series_start":
     case "going_live": {
       if (match.status === "ready") {
-        await db().from("matches").update({ status: "live", started_at: new Date().toISOString() }).eq("id", match.id);
+        await db().from("matches").update({ status: "live", started_at: new Date().toISOString() }).eq("id", match.id).eq("status", "ready").throwOnError();
       }
       if (ev.event === "going_live") {
-        await setMap({ status: "live" });
+        if (match.status === "finished" || match.status === "cancelled") break;
+        await setMap({ status: "live" }, true);
         await startMapLogging(match.id, mapNumber);
       }
       break;
     }
     case "round_end": {
-      await setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "live" });
+      if (match.status === "finished" || match.status === "cancelled") break;
+      const { data: map } = await db().from("match_maps").select("status").eq("match_id", match.id).eq("map_number", mapNumber).maybeSingle().throwOnError();
+      if (map?.status === "finished") break;
+      await setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "live" }, true);
       await upsertPlayerStats(match, mapNumber, ev);
       break;
     }
@@ -533,7 +542,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       });
       await upsertPlayerStats(match, mapNumber, ev);
       await stopMapLogging(match.id);
-      if (match.status === "ready") await db().from("matches").update({ status: "live" }).eq("id", match.id);
+      if (match.status === "ready") await db().from("matches").update({ status: "live" }).eq("id", match.id).eq("status", "ready").throwOnError();
       await recomputeSeries(match.id);
       await announceMapResult(match.id, mapNumber).catch(() => {});
       break;
@@ -552,7 +561,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
               team2_score: ev.team2_series_score ?? fresh.team2_score,
               finished_at: new Date().toISOString(),
             })
-            .eq("id", match.id);
+            .eq("id", match.id).in("status", ["ready", "live"]).throwOnError();
           await syncBracket(match.tournament_id);
         }
       }
@@ -643,7 +652,7 @@ export async function autopilotTick() {
       busy.add(m.team2_id!);
       const { data: full } = await db().from("matches").select("*").eq("id", m.id).single();
       if (!full) continue;
-      await assignServer(full as Match, inst.name);
+      if (!(await assignServer(full as Match, inst.name))) continue;
       await db()
         .from("audit_logs")
         .insert({ action: "autopilot.assign", entity_type: "match", entity_id: m.id, payload: { instance: inst.name } });
@@ -774,13 +783,17 @@ export async function expireStaleWork() {
     .eq("status", "sent")
     .in("type", QUICK_COMMANDS)
     .lt("sent_at", staleBefore)
-    .select("id, type, instance, payload");
+    .select("id, type, instance, payload, created_at");
   for (const c of stale ?? []) {
     if (c.type === "load_match" && c.payload?.match_id) {
       const table = c.payload.lobby ? "lobby_games" : "matches";
-      await db().from(table).update({ server_state: "error" }).eq("id", String(c.payload.match_id)).eq("server_state", "loading");
+      await db().from(table).update({ server_state: "error" }).eq("id", String(c.payload.match_id))
+        .eq("server_state", "loading").eq("server_instance", c.instance).lte("server_assigned_at", c.created_at);
     }
   }
+  await db().from("agent_commands").update({ status: "error", result: "Время обслуживания истекло — проверьте агент перед повтором", done_at: new Date().toISOString() })
+    .eq("status", "sent").not("type", "in", `(${QUICK_COMMANDS.join(",")})`)
+    .lt("sent_at", new Date(Date.now() - 45 * 60_000).toISOString());
 
   // игра лобби «загружается», но MatchZy её так и не взял → ошибка, назначим заново
   const { data: lobbyLoading } = await db()

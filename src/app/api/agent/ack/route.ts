@@ -11,10 +11,11 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "bad json" }, { status: 400 });
   }
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "bad body" }, { status: 400 });
   const id = typeof body.id === "string" ? body.id : "";
-  if (!UUID.test(id)) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!UUID.test(id) || typeof body.ok !== "boolean") return NextResponse.json({ error: "id and boolean ok required" }, { status: 400 });
   // ответ консоли может быть длинным — в базу хватит первых 20 КБ
   const result = typeof body.result === "string" ? body.result.slice(0, 20_000) : "";
-  await ackCommand(id, !!body.ok, result);
+  if (!(await ackCommand(id, body.ok, result))) return NextResponse.json({ error: "command not sent" }, { status: 409 });
   return NextResponse.json({ ok: true });
 }

@@ -4,10 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/apply-migrations.mjs --ci && next build",
+    "build": "node scripts/check-deploy-schema.mjs && next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "tsc --noEmit && eslint"
+    "check": "next typegen && tsc --noEmit && eslint",
+    "test": "node scripts/test-offline.mjs",
+    "test:reliability": "node scripts/test-reliability.mjs",
+    "db:migrate": "node scripts/apply-migrations.mjs",
+    "db:check": "node scripts/apply-migrations.mjs --check"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -20,6 +24,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -27,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }

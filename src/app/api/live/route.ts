@@ -82,7 +82,12 @@ export async function GET(request: NextRequest) {
       db().from("server_instances").select("name, running, gamestate, map, players, matchzy_match_id, match_id, for_lobby, last_seen_at").order("name"),
       db().from("agent_commands").select("id, status, result, created_at, sent_at, done_at").order("created_at", { ascending: false }).limit(15),
     ]);
-    parts = [host.data, instances.data, commands.data];
+    // Time crossing the heartbeat deadline is itself a state change, even when
+    // the offline agent can no longer update any database row.
+    const cutoff = Date.now() - 30_000;
+    parts = [host.data, instances.data, commands.data,
+      !!host.data?.last_seen_at && Date.parse(host.data.last_seen_at) > cutoff,
+      instances.data?.map((i) => !!i.last_seen_at && Date.parse(i.last_seen_at) > cutoff)];
   } else {
     return NextResponse.json({ error: "bad key" }, { status: 400 });
   }

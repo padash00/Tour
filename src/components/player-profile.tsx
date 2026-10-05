@@ -14,7 +14,6 @@ import {
   Region,
   RowList,
   Section,
-  SectionTitle,
   TeamLogo,
   cn,
 } from "@/components/ds";

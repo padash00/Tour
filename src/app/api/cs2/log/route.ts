@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { claimIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
+import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
 import { ingestLog } from "@/lib/swing-ingest";
 
 /**
@@ -11,7 +11,9 @@ import { ingestLog } from "@/lib/swing-ingest";
 export async function POST(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("t") ?? "";
   const expected = process.env.MATCHZY_TOKEN ?? "";
-  const ok = expected && token.length === expected.length && timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  const actualBytes = Buffer.from(token);
+  const expectedBytes = Buffer.from(expected);
+  const ok = expected && actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const matchzyId = Number(request.nextUrl.searchParams.get("m"));
@@ -19,12 +21,15 @@ export async function POST(request: NextRequest) {
 
   const body = await request.text();
   const key = ingestKey(`log${matchzyId}`, body);
-  if (!(await claimIngest(key))) return NextResponse.json({ ok: true, duplicate: true });
+  const claim = await claimIngest(key);
+  if (claim.status === "done") return NextResponse.json({ ok: true, duplicate: true });
+  if (claim.status === "busy" || !claim.token) return NextResponse.json({ error: "processing" }, { status: 503, headers: { "Retry-After": "5" } });
   try {
-    const result = await ingestLog(matchzyId, body);
+    const result = await ingestLog(matchzyId, body, { key, token: claim.token });
+    await completeIngest(key, claim.token);
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    await releaseIngest(key).catch(() => {});
+    await releaseIngest(key, claim.token).catch(() => {});
     console.error("cs2 log ingest failed", e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }

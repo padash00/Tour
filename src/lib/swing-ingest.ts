@@ -10,62 +10,30 @@ type State = {
   round_number: number;
   roster: Record<string, Side>;
   buffer: LogEvent[];
+  revision: number;
 };
 
 /** Вызывается из события MatchZy going_live: с этого момента раунды карты идут в зачёт */
 export async function startMapLogging(matchId: string, mapNumber: number) {
-  await db().from("match_log_state").upsert({
-    match_id: matchId,
-    live: true,
-    map_number: mapNumber,
-    round_number: 0,
-    roster: {},
-    buffer: [],
-    updated_at: new Date().toISOString(),
-  });
+  await db().rpc("start_map_logging", { p_match: matchId, p_map: mapNumber }).throwOnError();
 }
 
 /** map_result: карта закончилась, лог до следующего going_live не учитываем */
 export async function stopMapLogging(matchId: string) {
-  await db().from("match_log_state").update({ live: false, buffer: [], updated_at: new Date().toISOString() }).eq("match_id", matchId);
-}
-
-async function addSwing(matchId: string, mapNumber: number, swing: Map<string, number>, roster: Record<string, Side>) {
-  // раунд засчитывается всем игрокам состава карты, даже без событий в нём
-  const ids = new Set([...Object.keys(roster), ...swing.keys()]);
-  if (ids.size === 0) return;
-  const { data } = await db()
-    .from("player_map_swing")
-    .select("steam_id, swing_sum, rounds")
-    .eq("match_id", matchId)
-    .eq("map_number", mapNumber)
-    .in("steam_id", [...ids]);
-  const prev = new Map((data ?? []).map((r) => [r.steam_id, r]));
-  await db()
-    .from("player_map_swing")
-    .upsert(
-      [...ids].map((id) => ({
-        match_id: matchId,
-        map_number: mapNumber,
-        steam_id: id,
-        swing_sum: (prev.get(id)?.swing_sum ?? 0) + (swing.get(id) ?? 0),
-        rounds: (prev.get(id)?.rounds ?? 0) + 1,
-      })),
-      { onConflict: "match_id,map_number,steam_id" },
-    );
+  await db().from("match_log_state").update({ live: false, buffer: [], updated_at: new Date().toISOString() }).eq("match_id", matchId).throwOnError();
 }
 
 /** Строки HTTP-лога CS2 для матча → события раундов → swing после каждого раунда */
-export async function ingestLog(matchzyId: number, body: string) {
+export async function ingestLog(matchzyId: number, body: string, receipt: { key: string; token: string }) {
   const { data: match } = await db()
     .from("matches")
     .select("id, tournament:tournaments(format)")
     .eq("matchzy_id", matchzyId)
-    .maybeSingle();
+    .maybeSingle().throwOnError();
   if (!match) return { ignored: "unknown match" };
   // размер команды режима: в дуэли одно убийство решает раунд (1 на 0), а не 5 на 4
   const teamSize = modeOf((match as unknown as { tournament: { format: string } }).tournament?.format).size;
-  const { data } = await db().from("match_log_state").select("*").eq("match_id", match.id).maybeSingle();
+  const { data } = await db().from("match_log_state").select("*").eq("match_id", match.id).maybeSingle().throwOnError();
   const state = data as State | null;
   if (!state?.live) return { ignored: "map not live" };
 
@@ -73,6 +41,7 @@ export async function ingestLog(matchzyId: number, body: string) {
   let buffer = state.buffer;
   let round = state.round_number;
   let rounds = 0;
+  const completed = [];
 
   for (const line of body.split(/\r?\n/)) {
     const e = parseLogLine(line);
@@ -87,32 +56,23 @@ export async function ingestLog(matchzyId: number, body: string) {
       const swing = computeRoundSwing(buffer, roster, teamSize);
       round++;
       rounds++;
-      const rosterObj = Object.fromEntries(roster);
-      await db()
-        .from("match_rounds")
-        .upsert({
-          match_id: match.id,
-          map_number: state.map_number,
+      const ids = new Set([...roster.keys(), ...swing.keys()]);
+      completed.push({
           round_number: round,
           winner_side: e.winner,
           events: buffer,
-          swing: Object.fromEntries(swing),
+          swing: Object.fromEntries([...ids].map((id) => [id, swing.get(id) ?? 0])),
         });
-      await addSwing(match.id, state.map_number, swing, rosterObj);
       buffer = [];
     }
   }
 
   updateRoster(roster, buffer);
-  await db()
-    .from("match_log_state")
-    .update({
-      roster: Object.fromEntries(roster),
-      buffer,
-      round_number: round,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("match_id", match.id);
+  await db().rpc("commit_log_batch", {
+    p_match: match.id, p_map: state.map_number, p_revision: state.revision,
+    p_roster: Object.fromEntries(roster), p_buffer: buffer, p_rounds: completed,
+    p_key: receipt.key, p_token: receipt.token,
+  }).throwOnError();
   return { rounds };
 }
 

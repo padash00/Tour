@@ -10,8 +10,10 @@ Next.js (App Router) на Vercel, база — Supabase. Вход только �
 
 ## База данных
 
-Миграции лежат в `supabase/migrations/`. Применяются по порядку
-(Supabase → SQL Editor, либо `supabase db push`).
+Миграции лежат в `supabase/migrations/`. Применяются по порядку через `npm run db:migrate`.
+История этого проекта хранится в `public._migrations`; не смешивайте её с отдельной историей `supabase db push`.
+Для применения задайте `SUPABASE_PROJECT_REF` и `SUPABASE_ACCESS_TOKEN` нужного проекта.
+`npm run db:check` проверяет историю без изменения базы. Ключи приложение получает из настроек окружения.
 
 ## Этапы
 
@@ -32,9 +34,18 @@ Next.js (App Router) на Vercel, база — Supabase. Вход только �
 - `supabase/migrations/` — схема базы по порядку.
 - Ошибки: `app/error.tsx`, `app/global-error.tsx`, `app/admin/error.tsx`. SEO: `robots.ts`, `sitemap.ts`, `opengraph-image.tsx`, адрес сайта — `src/lib/site.ts` (`NEXT_PUBLIC_SITE_URL`).
 
-**Порядок выкладки:** `npm run check` (типы + линтер) → `next build` → push в `main`.
-Новая миграция в Vercel сама **не применяется** — её нужно применить вручную
-(`SUPABASE_ACCESS_TOKEN=… node scripts/apply-migrations.mjs`) **до** пуша кода, который её использует.
+**Порядок выкладки:** `npm run check` → `npm test` → `npm run build` → `npm run db:migrate` → `npm run db:check` → push в `main`.
+Сборка никогда не применяет миграции. Production-сборка Vercel только читает `_migrations`
+и останавливается, если нужная миграция отсутствует. Preview и локальная сборка эту проверку пропускают.
+Каждая миграция применяется вместе с записью истории в одной транзакции, повторный запуск безопасен.
+Контрольные суммы защищают новые миграции от редактирования после применения; старые записи без суммы сохраняются.
+
+`npm test` работает без рабочей базы и секретов: сетки, форматы, лобби, буфер агента,
+заявки, счёт, доставка команд и миграции проверяются на временных данных.
+SQL выполняется в PostgreSQL через PGlite. Эти проверки не моделируют несколько независимых подключений
+и не заменяют проверку запуска реального CS2.
+
+Эксплуатация, восстановление и ограничения: [docs/operations.md](docs/operations.md).
 
 ## Устройство
 

@@ -12,9 +12,8 @@ import {
   getTeamMembers,
   getTournamentById,
   isRateLimited,
-  writeRoster,
-  countApproved,
 } from "@/lib/data";
+import { registrationError } from "@/lib/registration-errors";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { db } from "@/lib/supabase";
 import type { Tournament } from "@/lib/types";
@@ -69,54 +68,17 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const banned = chosen.find((m) => m.player.is_banned);
   if (banned) return { error: `Игрок ${banned.player.nickname} заблокирован на платформе` };
 
-  const existing = await getRegistration(tournament.id, team.id);
-  const isUpdate = !!existing && (existing.status === "pending" || existing.status === "approved");
-
-  let registrationId: string;
-  if (isUpdate) {
-    registrationId = existing!.id;
-  } else if (existing) {
-    await db()
-      .from("tournament_registrations")
-      .update({ status: "pending", note: null, decided_by: null, decided_at: null, checked_in_at: null, seed: null })
-      .eq("id", existing.id);
-    registrationId = existing.id;
-  } else {
-    const { data, error } = await db()
-      .from("tournament_registrations")
-      .insert({ tournament_id: tournament.id, team_id: team.id })
-      .select("id")
-      .single();
-    if (error || !data) return { error: "Не удалось подать заявку" };
-    registrationId = data.id;
-  }
-
-  const rosterError = await writeRoster(
-    registrationId,
-    tournament.id,
-    chosen.map((m) => ({ ...m, role: subIds.includes(m.player_id) ? ("substitute" as const) : ("player" as const) })),
-  );
-  if (rosterError) {
-    if (!isUpdate) {
-      await db().from("tournament_registrations").update({ status: "withdrawn" }).eq("id", registrationId);
-      await db().from("tournament_roster_players").delete().eq("registration_id", registrationId);
-    }
-    return { error: "Кто-то из игроков уже заявлен на этот турнир в составе другой команды" };
-  }
+  const { data: saved, error } = await db().rpc("save_registration", {
+    p_tournament: tournament.id, p_team: team.id, p_actor: player.id, p_main: mainIds, p_sub: subIds,
+  });
+  if (error) return { error: registrationError(error) };
+  const isUpdate = saved.updated as boolean;
+  const auto = saved.approved as boolean;
 
   if (isUpdate) {
     await audit(player.id, "registration.roster", { type: "tournament", id: tournament.id }, { team: team.tag });
     revalidatePath(`/tournaments/${tournament.slug}`, "layout");
     return { success: "Состав заявки обновлён" };
-  }
-
-  // автоодобрение: состав уже проверен выше (размер, баны, двойные заявки) — одобряем, пока есть места
-  const auto = tournament.auto_approve && (await countApproved(tournament.id)) < tournament.max_teams;
-  if (auto) {
-    await db()
-      .from("tournament_registrations")
-      .update({ status: "approved", decided_at: new Date().toISOString(), decided_by: null, note: "одобрено автоматически" })
-      .eq("id", registrationId);
   }
 
   await notify(
@@ -149,8 +111,8 @@ export async function withdrawRegistration(_prev: ActionResult, formData: FormDa
     return { error: "Регистрация закрыта — отозвать заявку можно только через администратора" };
   }
 
-  await db().from("tournament_registrations").update({ status: "withdrawn", checked_in_at: null }).eq("id", reg.id);
-  await db().from("tournament_roster_players").delete().eq("registration_id", reg.id);
+  const { error } = await db().rpc("change_registration", { p_registration: reg.id, p_actor: player.id, p_status: "withdrawn" });
+  if (error) return { error: registrationError(error) };
   await audit(player.id, "registration.withdraw", { type: "tournament", id: tournament.id }, { team: team.tag });
   revalidatePath(`/tournaments/${tournament.slug}`);
   revalidatePath("/team");
@@ -182,10 +144,8 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   const invalidSteam = reg.roster.find((r) => !/^\d{17}$/.test(r.player.steam_id));
   if (invalidSteam) return { error: `У игрока ${invalidSteam.player.nickname} неверный SteamID` };
 
-  await db()
-    .from("tournament_registrations")
-    .update({ checked_in_at: new Date().toISOString(), checked_in_by: player.id })
-    .eq("id", reg.id);
+  const { error } = await db().rpc("check_in_registration", { p_registration: reg.id, p_actor: player.id });
+  if (error) return { error: registrationError(error) };
   await audit(player.id, "registration.checkin", { type: "tournament", id: tournament.id }, { team: team.tag });
   revalidatePath(`/tournaments/${tournament.slug}`, "layout");
   return { success: "TEAM READY — команда прошла check-in" };

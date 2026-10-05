@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
-import { countApproved, getPlayerBySteamId, getTournamentById } from "@/lib/data";
+import { getPlayerBySteamId, getTournamentById } from "@/lib/data";
+import { registrationError } from "@/lib/registration-errors";
 import { fromLocalInput } from "@/lib/format";
 import { closeMatchesOfEndedTournaments, enqueueCommand, enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
@@ -303,12 +304,8 @@ export async function decideRegistration(_prev: ActionResult, formData: FormData
     .single();
   if (!reg) return { error: "Заявка не найдена" };
 
-  const now = new Date().toISOString();
   let status: string;
   if (decision === "approve") {
-    if ((await countApproved(reg.tournament_id)) >= reg.tournament.max_teams) {
-      return { error: `Уже одобрено максимальное количество команд (${reg.tournament.max_teams})` };
-    }
     status = "approved";
   } else if (decision === "reject") {
     status = "rejected";
@@ -320,19 +317,11 @@ export async function decideRegistration(_prev: ActionResult, formData: FormData
     return { error: "Неизвестное действие" };
   }
 
-  await db()
-    .from("tournament_registrations")
-    .update({
-      status,
-      note,
-      decided_by: admin.id,
-      decided_at: now,
-      ...(status !== "approved" && { checked_in_at: null }),
-    })
-    .eq("id", id);
-  if (status === "rejected" || status === "withdrawn") {
-    await db().from("tournament_roster_players").delete().eq("registration_id", id);
-  }
+  const { data: changed, error } = await db().rpc("change_registration", {
+    p_registration: id, p_actor: admin.id, p_status: status, p_note: note, p_admin: true,
+  });
+  if (error) return { error: registrationError(error) };
+  if (!changed) return { success: "Заявка уже в этом состоянии" };
 
   const titles: Record<string, string> = {
     approved: `Заявка ${reg.team.name} на «${reg.tournament.name}» одобрена`,
@@ -351,11 +340,10 @@ export async function adminCheckIn(_prev: ActionResult, formData: FormData): Pro
   const admin = await requireAdmin();
   const id = String(formData.get("registrationId"));
   const undo = formData.get("undo") === "1";
-  await db()
-    .from("tournament_registrations")
-    .update(undo ? { checked_in_at: null, checked_in_by: null } : { checked_in_at: new Date().toISOString(), checked_in_by: admin.id })
-    .eq("id", id)
-    .eq("status", "approved");
+  const { error } = await db().rpc("check_in_registration", {
+    p_registration: id, p_actor: admin.id, p_admin: true, p_undo: undo,
+  });
+  if (error) return { error: registrationError(error) };
   await audit(admin.id, undo ? "registration.checkin_undo" : "registration.checkin_admin", { type: "registration", id });
   revalidatePath("/admin/tournaments", "layout");
   return null;

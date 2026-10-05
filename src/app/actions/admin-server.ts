@@ -25,11 +25,9 @@ export async function sendMatchToServer(_prev: ActionResult, formData: FormData)
   if (!target.running) return { error: `${target.name} не запущен` };
   if ((target.gamestate ?? "none") !== "none") return { error: `На ${target.name} уже загружен матч` };
 
-  // если матч переезжает (резерв) — снимаем его со старого инстанса
-  if (m.server_instance && m.server_instance !== target.name) {
-    await enqueueCommand(m.server_instance, "end_match", {}, admin.id);
+  if (!(await assignServer(m, target.name, admin.id))) {
+    return { error: "Состояние сервера изменилось: он занят, уже назначен или потерял связь. Обновите страницу." };
   }
-  await assignServer(m, target.name, admin.id);
   await audit(admin.id, "server.assign", { type: "match", id: m.id }, { instance: target.name, from: m.server_instance });
   revalidatePath(`/admin/matches/${m.id}`);
   revalidatePath("/admin/servers");

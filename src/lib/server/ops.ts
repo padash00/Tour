@@ -16,18 +16,24 @@ import { db } from "../supabase";
 export const ingestKey = (prefix: string, body: string) => `${prefix}:${createHash("sha256").update(body).digest("hex")}`;
 
 /**
- * Застолбить событие. false — такое уже обработано (агент дослал повтор после потерянного ответа).
- * Если таблицы нет или база недоступна — пропускаем проверку: потерять событие хуже, чем принять дважды.
+ * A delivery is acknowledged only after completion. Database errors must reach
+ * the relay as 5xx so its durable outbox keeps the event for another attempt.
  */
-export async function claimIngest(key: string): Promise<boolean> {
-  const { data, error } = await db().from("ingest_dedupe").upsert({ key }, { onConflict: "key", ignoreDuplicates: true }).select("key");
-  if (error) return true;
-  return (data?.length ?? 0) > 0;
+export async function claimIngest(key: string): Promise<{ status: "done" | "busy" | "claimed"; token?: string }> {
+  const { data, error } = await db().rpc("claim_ingest", { p_key: key });
+  if (error) throw new Error("Не удалось принять событие", { cause: error });
+  return data;
 }
 
 /** Обработка упала — снимаем отметку, чтобы досылка агента обработала событие заново */
-export async function releaseIngest(key: string) {
-  await db().from("ingest_dedupe").delete().eq("key", key);
+export async function releaseIngest(key: string, token: string) {
+  await db().from("ingest_dedupe").delete().eq("key", key).eq("lease_token", token).is("completed_at", null).throwOnError();
+}
+
+export async function completeIngest(key: string, token: string) {
+  const { data } = await db().from("ingest_dedupe").update({ completed_at: new Date().toISOString(), lease_until: null })
+    .eq("key", key).eq("lease_token", token).select("key").throwOnError();
+  if (!data?.length) throw new Error("Срок обработки события истёк");
 }
 
 /** Старые ключи не нужны: агент досылает в пределах часов, не дней */
