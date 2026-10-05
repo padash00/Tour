@@ -15,6 +15,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $TaskName = "F16 Server Agent"
+$WatchTaskName = "F16 Server Agent Watchdog"
 $f16 = Join-Path $ServerDir "f16"
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -25,6 +26,12 @@ if (-not $Remove) {
   $node = (Get-Command node -ErrorAction Stop).Source
   $service = Join-Path $f16 "agent\service.mjs"
   if (-not (Test-Path $service)) { throw "Нет $service — агент ещё не обновился с сайта" }
+  $watchdogSource = Join-Path $PSScriptRoot "watchdog.ps1"
+  if (-not (Test-Path $watchdogSource)) { throw "Нет $watchdogSource" }
+  $watchdogPath = Join-Path $f16 "watchdog.ps1"
+  if ([IO.Path]::GetFullPath($watchdogSource) -ne [IO.Path]::GetFullPath($watchdogPath)) {
+    Copy-Item -LiteralPath $watchdogSource -Destination $watchdogPath -Force
+  }
 }
 
 function Stop-OldAgent {
@@ -34,6 +41,8 @@ function Stop-OldAgent {
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
+Stop-ScheduledTask -TaskName $WatchTaskName -ErrorAction SilentlyContinue
+Unregister-ScheduledTask -TaskName $WatchTaskName -Confirm:$false -ErrorAction SilentlyContinue
 Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 Stop-OldAgent
@@ -50,7 +59,7 @@ if ($Remove) {
   return
 }
 
-$action = New-ScheduledTaskAction -Execute $node -Argument "`"$service`"" -WorkingDirectory $f16
+$action = New-ScheduledTaskAction -Execute $node -Argument "`"$service`" --no-servers" -WorkingDirectory $f16
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `
@@ -70,10 +79,19 @@ for ($attempt = 0; $attempt -lt 25; $attempt++) {
 }
 if (-not $running) { throw "Агент не запустился — смотрите $f16\agent.log" }
 
+# Завершение процесса вручную не считается сбоем для RestartCount в Планировщике.
+# Отдельная короткая задача этого же пользователя проверяет агент каждую минуту.
+# Повторение без Duration продолжается бессрочно; отключённую задачу сторож не включает.
+$watchAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watchdogPath`"" -WorkingDirectory $f16
+$watchTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
+$watchSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
+Register-ScheduledTask -TaskName $WatchTaskName -Action $watchAction -Trigger $watchTrigger -Principal $principal -Settings $watchSettings `
+  -Description "F16 Arena: проверяет агент раз в минуту и запускает его после остановки" | Out-Null
+
 # Старая задача прежнего агента не должна запускать вторую копию после следующего входа.
 $legacy = Get-ScheduledTask -TaskName "F16ArenaAgent" -ErrorAction SilentlyContinue
 if ($legacy -and ($legacy.Actions | Where-Object { $_.Execute -match 'cs2lan\\agent\\start-agent\.bat$' })) {
   try { Disable-ScheduledTask -TaskName "F16ArenaAgent" | Out-Null }
   catch { Write-Warning "Не удалось отключить старую задачу F16ArenaAgent: $_" }
 }
-Write-Host "OK  агент работает в фоне от $user (PID $($running.ProcessId -join ', ')). Лог: $f16\agent.log"
+Write-Host "OK  агент работает в фоне от $user (PID $($running.ProcessId -join ', ')); сторож проверяет его каждую минуту. Лог: $f16\agent.log"

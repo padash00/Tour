@@ -37,7 +37,7 @@ export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics }
       <details className="rounded-surface border border-line bg-surface px-5 py-4">
         <summary className="cursor-pointer text-sm font-medium focus-visible:outline-accent">Как запустить агент на этом ПК</summary>
         <div className="mt-4 max-w-3xl space-y-3 text-sm leading-relaxed text-fg-2">
-          <p>Агент работает на компьютере с установленным CS2 Server. После входа в Windows он запускается автоматически в сеансе пользователя. Когда появится «На связи», кнопки ниже смогут запускать и останавливать игровые серверы.</p>
+          <p>Агент работает на компьютере с установленным CS2 Server. После входа в Windows он запускается автоматически в сеансе пользователя. Если процесс закрыть, сторож запустит его снова в течение минуты. Когда появится «На связи», кнопки ниже смогут запускать и останавливать игровые серверы.</p>
           <ol className="list-decimal space-y-2 pl-5">
             <li>На серверном ПК откройте Планировщик заданий Windows.</li>
             <li>Найдите задачу <strong>F16 Server Agent</strong> и нажмите «Выполнить».</li>

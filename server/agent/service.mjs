@@ -1,7 +1,8 @@
 // F16 Server Agent без окна, с входа пользователя в Windows.
 // Задача Планировщика «F16 Server Agent» (её создаёт service.ps1) запускает:
 //   node D:\cs2server\f16\agent\service.mjs
-// Сторож один раз поднимает активные серверы CS2 (start.ps1 -Active), дальше держит agent.mjs живым:
+// При запуске без --no-servers поднимает активные серверы CS2 (start.ps1 -Active),
+// дальше держит agent.mjs живым:
 // агент упал или обновился (выходит сам после самообновления) — через 5 секунд запускается снова, уже новый код.
 // Лог — в D:\cs2server\f16\agent.log (окна нет — заморозить кликом нечего).
 import { spawn } from "node:child_process";
