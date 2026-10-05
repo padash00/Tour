@@ -499,6 +499,7 @@ const maintenanceCtx = () => ({
   a2sInfo,
   rconPassword: secrets.rcon,
   // для «Проверки перед турниром»
+  log,
   listRunning: async () => {
     const procs = await listCs2Processes();
     return new Set(INSTANCES.filter((i) => isRunning(procs, i)).map((i) => i.name));

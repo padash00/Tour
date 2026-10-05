@@ -53,8 +53,9 @@ powershell -ExecutionPolicy Bypass -File server\start.ps1 -Name CS2-01 -Stop
 start / stop / restart / load_match / end_match / rcon. Сайт к серверу не подключается — только исходящие HTTPS.
 
 - Конфиг: `D:\cs2server\f16\agent.json` — `siteUrl`, `token` (= `AGENT_TOKEN` в Vercel), `lanIp`. В git не хранится.
-- Фоновая служба (так и должно работать): `D:\cs2server\f16\service.ps1` от администратора — задача Планировщика
-  «F16 Server Agent»: при включении ПК (вход не нужен), от SYSTEM, без окна, без лимита времени, перезапуск при сбое.
+- Фоновый агент: `D:\cs2server\f16\service.ps1` из сеанса владельца ПК в PowerShell администратора — задача Планировщика
+  «F16 Server Agent»: при входе этого пользователя, без окна, без лимита времени, перезапуск при сбое.
+  CS2 Dedicated Server падает при запуске агентом от `SYSTEM`, поэтому этот режим не используется.
   `agent\service.mjs` поднимает CS2-01..03 и держит агента живым (после самообновления — сразу новый код).
   Лог: `D:\cs2server\f16\agent.log`. Вернуть запуск в окне при входе: `service.ps1 -Remove`.
 - Ручной запуск в окне: `D:\cs2server\F16-agent.bat` (перезапускается сам при падении).

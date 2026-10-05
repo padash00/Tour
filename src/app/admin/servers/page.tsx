@@ -96,7 +96,7 @@ export default async function ServersPage() {
       {!online && (
         <AlertRow tone="danger" title="F16 Server Agent не на связи">
           {host?.last_seen_at ? `Последний сигнал ${formatShortDateTime(host.last_seen_at)}. ` : ""}Проверьте, что серверный ПК включён — агент
-          запускается автоматически задачей «F16 Server Agent».
+          запускается после входа в Windows задачей «F16 Server Agent».
         </AlertRow>
       )}
       {busy && (

@@ -32,7 +32,7 @@ export async function rebootPending() {
 }
 
 /** Ждём, пока сервер начнёт отвечать по RCON (после запуска CS2 грузится 10–60 с) */
-async function waitRcon(ctx, inst, timeoutMs) {
+async function waitRcon(ctx, inst, timeoutMs, startedHere) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const out = await ctx.rcon(inst.port, ctx.rconPassword, "get5_status").catch(() => null);
@@ -42,6 +42,9 @@ async function waitRcon(ctx, inst, timeoutMs) {
       } catch {
         return { gamestate: "unknown" };
       }
+    }
+    if (startedHere && Date.now() - started >= 12_000 && !(await ctx.listRunning()).has(inst.name)) {
+      throw new Error("CS2 завершился после запуска — проверьте журнал ошибок Windows");
     }
     await sleep(3000);
   }
@@ -65,9 +68,13 @@ export async function selfCheck(ctx, payload) {
     const t0 = Date.now();
     const wasRunning = runningBefore.has(name);
     const rec = { name, was_running: wasRunning, rcon: false, map: null, map_ok: false, matchzy: null, css: null, metamod: null, seconds: 0 };
+    ctx.log?.("self_check", name, wasRunning ? "проверка работающего сервера" : "запуск сервера");
     try {
-      if (!wasRunning) await ctx.runStart(name, false);
-      const g5 = await waitRcon(ctx, inst, wasRunning ? 15_000 : 120_000);
+      if (!wasRunning) {
+        const start = await ctx.runStart(name, false);
+        if (!start.ok) throw new Error(start.result);
+      }
+      const g5 = await waitRcon(ctx, inst, wasRunning ? 15_000 : 120_000, !wasRunning);
       rec.rcon = !!g5;
       if (!g5) throw new Error("RCON не ответил");
       if (g5.gamestate && g5.gamestate !== "none" && g5.gamestate !== "unknown") {
@@ -96,6 +103,7 @@ export async function selfCheck(ctx, payload) {
     // возвращаем в прежнее состояние: был выключен — выключаем
     if (!wasRunning && !rec.skipped) await ctx.runStart(name, true).catch(() => {});
     rec.seconds = Math.round((Date.now() - t0) / 1000);
+    ctx.log?.("self_check", name, rec.error ?? `RCON ${rec.rcon ? "OK" : "нет"}, карта ${rec.map_ok ? "OK" : "нет"}, ${rec.seconds} с`);
     instances.push(rec);
   }
 

@@ -44,5 +44,11 @@ foreach ($i in $targets) {
   $cmd = "`"$exe`" " + ($argList -join " ")
   $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmd; CurrentDirectory = (Split-Path $exe) }
   if ($r.ReturnValue -ne 0) { throw "Не удалось запустить $($i.name): код $($r.ReturnValue)" }
+  # WMI подтверждает создание процесса, но CS2 может упасть при загрузке tier0.dll.
+  # Пауза между инстансами убирает одновременную загрузку движка.
+  Start-Sleep -Seconds 6
+  if (-not (Get-Process -Id $r.ProcessId -ErrorAction SilentlyContinue)) {
+    throw "$($i.name) завершился сразу после запуска. Проверьте события Application Error для cs2.exe"
+  }
   Write-Host "START $($i.name) :$port pid $($r.ProcessId)"
 }
