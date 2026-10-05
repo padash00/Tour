@@ -74,6 +74,17 @@ const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_
 const ENFORCE_FILE = path.join(STATE_DIR, "enforce.json");
 const enforce = readJsonSafe(ENFORCE_FILE, {});
 const saveEnforce = () => writeFileSync(ENFORCE_FILE, JSON.stringify(enforce));
+const DEFAULT_VOICE = "sv_voiceenable 1;sv_alltalk 0;sv_deadtalk 1;sv_full_alltalk 0;sv_talk_enemy_living 0;sv_talk_enemy_dead 0";
+
+async function clearEnforce(inst) {
+  const rule = enforce[inst.name];
+  if (!rule) return;
+  delete enforce[inst.name];
+  saveEnforce();
+  if (rule.cvars && Object.hasOwn(rule.cvars, "sv_alltalk")) {
+    await rcon(inst.port, secrets.rcon, DEFAULT_VOICE).catch(() => {});
+  }
+}
 
 async function enforceCvars(inst, get5) {
   const rule = enforce[inst.name];
@@ -83,8 +94,7 @@ async function enforceCvars(inst, get5) {
     // снимаем правило только по явному ответу «матча нет / другой матч». Пустой ответ (get5 = null) бывает,
     // пока сервер меняет карту между картами серии — правило нужно сохранить для следующей карты.
     if (get5 && (get5.gamestate === "none" || get5.matchid !== rule.matchid)) {
-      delete enforce[inst.name];
-      saveEnforce();
+      await clearEnforce(inst);
     }
     return;
   }
@@ -642,7 +652,9 @@ async function execute(cmd) {
     case "end_match": {
       forget();
       await rcon(inst.port, secrets.rcon, "logaddress_delall_http").catch(() => {});
-      return { ok: true, result: (await rcon(inst.port, secrets.rcon, "get5_endmatch")).trim() || "ended" };
+      const result = (await rcon(inst.port, secrets.rcon, "get5_endmatch")).trim() || "ended";
+      await clearEnforce(inst);
+      return { ok: true, result };
     }
     case "rcon":
       return { ok: true, result: (await rcon(inst.port, secrets.rcon, String(cmd.payload.command))).trim() };
