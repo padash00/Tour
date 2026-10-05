@@ -66,7 +66,7 @@ Write-Host "OK  конфиги инстансов: $($instances.name -join ', ')
 # 5. Скрипт запуска в путь без кириллицы — для F16-start-servers.bat / F16-stop-servers.bat
 $f16 = Join-Path $ServerDir "f16"
 New-Item -ItemType Directory -Force $f16 | Out-Null
-Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "service.ps1"), (Join-Path $repo "watchdog.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
+Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "service.ps1"), (Join-Path $repo "launch-agent.ps1"), (Join-Path $repo "watchdog.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
 # F16 Server Agent
 New-Item -ItemType Directory -Force (Join-Path $f16 "agent") | Out-Null
 Copy-Item (Join-Path $repo "agent\*.mjs") (Join-Path $f16 "agent") -Force

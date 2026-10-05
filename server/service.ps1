@@ -1,29 +1,33 @@
 ﻿# F16 Arena — Server Agent в пользовательском сеансе Windows (без окна).
 #
 #   powershell -ExecutionPolicy Bypass -File D:\cs2server\f16\service.ps1            установить и запустить
-#   powershell -ExecutionPolicy Bypass -File D:\cs2server\f16\service.ps1 -Remove    вернуть запуск в окне при входе
+#   powershell -ExecutionPolicy Bypass -File D:\cs2server\f16\service.ps1 -UpdateActionOnly    скрыть окно без перезапуска агента
+#   powershell -ExecutionPolicy Bypass -File D:\cs2server\f16\service.ps1 -Remove              вернуть запуск в окне при входе
 #
 # Задача Планировщика «F16 Server Agent»: при входе пользователя, без окна,
 # без ограничения по времени, перезапуск при сбое. CS2 падает в сеансе SYSTEM,
 # поэтому задача запускается с интерактивным токеном владельца ПК.
-# Запускает agent\service.mjs — тот поднимает CS2-01..03
-# и держит агента живым. Лог: D:\cs2server\f16\agent.log. Запускать от администратора.
+# Запускает launch-agent.ps1 -> agent\service.mjs; служба держит агента живым.
+# Лог: D:\cs2server\f16\agent.log. Запускать от администратора.
 
 param(
   [string]$ServerDir = "D:\cs2server",
-  [switch]$Remove
+  [switch]$Remove,
+  [switch]$UpdateActionOnly
 )
 $ErrorActionPreference = "Stop"
 $TaskName = "F16 Server Agent"
 $WatchTaskName = "F16 Server Agent Watchdog"
 $f16 = Join-Path $ServerDir "f16"
+$launcherPath = Join-Path $f16 "launch-agent.ps1"
+if ($Remove -and $UpdateActionOnly) { throw "-Remove и -UpdateActionOnly нельзя использовать вместе" }
 
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $admin) { throw "Запустите PowerShell от имени администратора" }
 $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 if ($user -match '\\SYSTEM$') { throw "Установите задачу из сеанса пользователя, под которым должен работать CS2" }
 if (-not $Remove) {
-  $node = (Get-Command node -ErrorAction Stop).Source
+  Get-Command node -ErrorAction Stop | Out-Null
   $service = Join-Path $f16 "agent\service.mjs"
   if (-not (Test-Path $service)) { throw "Нет $service — агент ещё не обновился с сайта" }
   $watchdogSource = Join-Path $PSScriptRoot "watchdog.ps1"
@@ -32,6 +36,33 @@ if (-not $Remove) {
   if ([IO.Path]::GetFullPath($watchdogSource) -ne [IO.Path]::GetFullPath($watchdogPath)) {
     Copy-Item -LiteralPath $watchdogSource -Destination $watchdogPath -Force
   }
+  $launcherSource = Join-Path $PSScriptRoot "launch-agent.ps1"
+  if (-not (Test-Path $launcherSource)) { throw "Нет $launcherSource" }
+  if ([IO.Path]::GetFullPath($launcherSource) -ne [IO.Path]::GetFullPath($launcherPath)) {
+    Copy-Item -LiteralPath $launcherSource -Destination $launcherPath -Force
+  }
+}
+
+function HiddenAgentAction {
+  New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherPath`"" `
+    -WorkingDirectory $f16
+}
+
+if ($UpdateActionOnly) {
+  Set-ScheduledTask -TaskName $TaskName -Action (HiddenAgentAction) | Out-Null
+  # Скрыть уже открытое окно без остановки агента и игрового сервера.
+  try {
+    Add-Type -Namespace F16 -Name AgentWindow -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr handle, int command);'
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+      Where-Object { $_.CommandLine -match [regex]::Escape($service) } |
+      ForEach-Object {
+        $handle = (Get-Process -Id $_.ProcessId -ErrorAction Stop).MainWindowHandle
+        if ($handle -ne [IntPtr]::Zero) { [F16.AgentWindow]::ShowWindow($handle, 0) | Out-Null }
+      }
+  } catch { Write-Warning "Не удалось скрыть текущее окно: $_" }
+  Write-Host "OK  следующий запуск агента будет без окна; работающий агент не перезапущен"
+  return
 }
 
 function Stop-OldAgent {
@@ -59,7 +90,7 @@ if ($Remove) {
   return
 }
 
-$action = New-ScheduledTaskAction -Execute $node -Argument "`"$service`" --no-servers" -WorkingDirectory $f16
+$action = HiddenAgentAction
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $user
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `

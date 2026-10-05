@@ -55,12 +55,14 @@ start / stop / restart / load_match / end_match / rcon. Сайт к сервер
 - Конфиг: `D:\cs2server\f16\agent.json` — `siteUrl`, `token` (= `AGENT_TOKEN` в Vercel), `lanIp`. В git не хранится.
 - Фоновый агент: `D:\cs2server\f16\service.ps1` из сеанса владельца ПК в PowerShell администратора — задача Планировщика
   «F16 Server Agent»: при входе этого пользователя, без окна, без лимита времени, перезапуск при сбое.
+  Запуск через `launch-agent.ps1` скрывает окно Node.js. Для уже установленной задачи команда
+  `service.ps1 -UpdateActionOnly` меняет способ запуска без остановки работающего агента.
   CS2 Dedicated Server падает при запуске агентом от `SYSTEM`, поэтому этот режим не используется.
   Отдельная задача «F16 Server Agent Watchdog» под тем же пользователем проверяет агент раз в минуту и возвращает его после ручного закрытия Node.js.
   `agent\service.mjs --no-servers` держит агента живым, не меняя состояние CS2 при перезапуске агента.
   Лог: `D:\cs2server\f16\agent.log`. Вернуть запуск в окне при входе: `service.ps1 -Remove`.
 - Ручной запуск в окне: `D:\cs2server\F16-agent.bat` (перезапускается сам при падении).
-- Самообновление: сайт отдаёт `server/agent`, `start.ps1`, `service.ps1`, `watchdog.ps1`, `install.ps1`, `instances.csv`, `cfg/**` по версии (хэш).
+- Самообновление: сайт отдаёт `server/agent`, `start.ps1`, `service.ps1`, `launch-agent.ps1`, `watchdog.ps1`, `install.ps1`, `instances.csv`, `cfg/**` по версии (хэш).
   После деплоя агент сам скачивает новую версию и перезапускается. Ручное копирование не нужно.
 - Обслуживание из админки «Серверы»: обновить CS2 (SteamCMD под кешированным логином), обновить плагины
   (последние Metamod / CounterStrikeSharp / MatchZy), перезапустить все — только когда нет активных матчей.
