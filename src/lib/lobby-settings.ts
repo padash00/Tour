@@ -215,6 +215,8 @@ export function lobbyCvars(s: LobbySettings, bots: number, humans: number): Reco
     sv_alltalk: s.voice === "all" ? 1 : 0,
     sv_deadtalk: s.voice === "all" ? 1 : 0,
     sv_full_alltalk: s.voice === "all" ? 1 : 0,
+    sv_talk_enemy_living: s.voice === "all" ? 1 : 0,
+    sv_talk_enemy_dead: s.voice === "all" ? 1 : 0,
     // GOTV для зрителей: порт игры + 5
     tv_maxclients: s.gotv ? 10 : 0,
     tv_delay: 0,

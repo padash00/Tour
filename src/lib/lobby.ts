@@ -666,7 +666,13 @@ export async function lobbyEnforce(gameId: string) {
   const humans = g.team1.players.length + g.team2.players.length;
   const bots = g.team1.bots.length + g.team2.bots.length;
   const all = lobbyCvars(g.settings, bots, humans);
-  const keep = ["mp_maxrounds", "mp_freezetime", "mp_startmoney", "mp_maxmoney", "mp_damage_headshot_only", "sv_gravity", "sv_infinite_ammo", "bot_quota", "bot_difficulty", "tv_delay", "mp_match_restart_delay"];
+  const keep = [
+    "mp_maxrounds", "mp_freezetime", "mp_startmoney", "mp_maxmoney", "mp_damage_headshot_only",
+    "sv_gravity", "sv_infinite_ammo", "bot_quota", "bot_difficulty", "tv_delay", "mp_match_restart_delay",
+    // MatchZy загружает warmup/live.cfg после конфига матча и сбрасывает голосовые cvars.
+    "sv_voiceenable", "sv_alltalk", "sv_deadtalk", "sv_full_alltalk",
+    "sv_talk_enemy_living", "sv_talk_enemy_dead",
+  ];
   const cvars = Object.fromEntries(keep.filter((k) => typeof all[k] === "number").map((k) => [k, all[k] as number]));
   return { matchid: g.matchzy_id, cvars };
 }

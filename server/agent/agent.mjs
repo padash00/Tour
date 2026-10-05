@@ -91,8 +91,11 @@ async function enforceCvars(inst, get5) {
   const names = Object.keys(rule.cvars);
   const out = await rcon(inst.port, secrets.rcon, names.join(";")).catch(() => "");
   const fix = names.filter((n) => {
-    const m = new RegExp(`${n} = ([\\d.]+)`).exec(out);
-    return m && Number(m[1]) !== Number(rule.cvars[n]);
+    const m = new RegExp(`${n} = (true|false|[-+]?\\d+(?:\\.\\d+)?)`, "i").exec(out);
+    if (!m) return false;
+    const value = m[1].toLowerCase();
+    const current = value === "true" ? 1 : value === "false" ? 0 : Number(value);
+    return current !== Number(rule.cvars[n]);
   });
   if (fix.length) {
     await rcon(inst.port, secrets.rcon, fix.map((n) => `${n} ${rule.cvars[n]}`).join(";")).catch(() => {});
