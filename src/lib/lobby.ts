@@ -614,10 +614,11 @@ async function setNote(g: LobbyGame, note: string) {
   if (g.note !== note) await db().from("lobby_games").update({ note }).eq("id", g.id);
 }
 
-/** Адрес для игроков: LAN-лобби — локальный адрес сервера, интернет — внешний (настройка или UPnP) */
+/** Явно заданный адрес игрокам важнее сети лобби; иначе LAN использует адрес агента, интернет — UPnP. */
 export async function lobbyAddress(g: LobbyGame, lanIp: string | null, upnpIp: string | null) {
-  if (g.settings.network === "lan" && lanIp) return lanIp;
-  return ((await getSetting("PLAYER_IP")) ?? "").trim() || upnpIp || lanIp;
+  const configured = ((await getSetting("PLAYER_IP")) ?? "").trim();
+  if (configured) return configured;
+  return g.settings.network === "lan" ? lanIp || upnpIp : upnpIp || lanIp;
 }
 
 /** Конфиг MatchZy для игры лобби */
