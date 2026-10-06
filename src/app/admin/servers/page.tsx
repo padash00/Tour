@@ -20,13 +20,14 @@ import { SelfCheckPanel } from "@/components/admin/self-check";
 import { AgentHealth } from "@/components/admin/agent-health";
 import { CommandLog } from "@/components/admin/command-log";
 import type { SyncMetrics } from "@/lib/server/agent-report";
+import { getSetting } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Серверы — F16 Control" };
 
 export default async function ServersPage() {
   await requireAdmin("/admin/servers"); // права проверяются в каждой странице, не только в layout
   const { host, online, instances } = await getServerState();
-  const [{ data: matches }, { data: commands }, cs2Check, selfReport, { data: lobbyGames }, { count: pending }, { count: inflight }, { data: timing }] = await Promise.all([
+  const [{ data: matches }, { data: commands }, cs2Check, selfReport, { data: lobbyGames }, { count: pending }, { count: inflight }, { data: timing }, { data: jobTimings }, playerIp] = await Promise.all([
     db()
       .from("matches")
       .select(
@@ -45,9 +46,15 @@ export default async function ServersPage() {
     db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "pending"),
     db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "sent"),
     db().from("app_settings").select("value").eq("key", "AGENT_SYNC_METRICS").maybeSingle(),
+    db().from("app_settings").select("key, value").in("key", ["AGENT_DISPATCH_METRICS", "AGENT_MAINTENANCE_METRICS"]),
+    getSetting("PLAYER_IP"),
   ]);
   let metrics: SyncMetrics | null = null;
   try { metrics = timing?.value ? JSON.parse(timing.value) as SyncMetrics : null; } catch {}
+  const jobMetrics = new Map<string, SyncMetrics>();
+  for (const row of jobTimings ?? []) {
+    try { jobMetrics.set(row.key, JSON.parse(row.value) as SyncMetrics); } catch {}
+  }
   type LG = { id: string; status: string; server_instance: string; server_state: string | null; team1: { name: string }; team2: { name: string }; lobby: { code: string } | null };
   const lobbyOn = new Map(((lobbyGames ?? []) as unknown as LG[]).map((g) => [g.server_instance, g]));
   const nowTs = serverNow();
@@ -69,6 +76,7 @@ export default async function ServersPage() {
   const assigned = new Map(((matches ?? []) as unknown as M[]).map((m) => [m.server_instance, m]));
   const info = (host?.info ?? {}) as Record<string, string | number>;
   const versions = ((host?.info as { versions?: Record<string, string> } | undefined)?.versions ?? {}) as Record<string, string>;
+  const upnpIp = (host?.info as { upnp?: { ip?: string | null } } | undefined)?.upnp?.ip ?? null;
   const busy = (host?.info as { busy?: string | null } | undefined)?.busy ?? null;
   const siteBundle = getAgentBundle().version;
   const cpu = info.cpu_load != null ? Number(info.cpu_load) : null;
@@ -91,7 +99,15 @@ export default async function ServersPage() {
         }
       />
 
-      <AgentHealth lastSeen={host?.last_seen_at ?? null} initialNow={nowTs} pending={pending ?? 0} inflight={inflight ?? 0} metrics={metrics} />
+      <AgentHealth lastSeen={host?.last_seen_at ?? null} initialNow={nowTs} pending={pending ?? 0} inflight={inflight ?? 0}
+        metrics={metrics} dispatch={jobMetrics.get("AGENT_DISPATCH_METRICS") ?? null} maintenance={jobMetrics.get("AGENT_MAINTENANCE_METRICS") ?? null} />
+
+      {online && !playerIp && host?.lan_ip && upnpIp && host.lan_ip !== upnpIp && (
+        <AlertRow tone="warn" title="Адрес для игроков не задан">
+          Сервер: {host.lan_ip}, роутер: {upnpIp}. Если игровые ПК в другой подсети, укажите доступный им адрес в{" "}
+          <Link href="/admin/settings?tab=servers" className="underline">настройках серверов</Link> — он будет общим для турниров и лобби.
+        </AlertRow>
+      )}
 
       {!online && (
         <AlertRow tone="danger" title="F16 Server Agent не на связи">
@@ -122,6 +138,7 @@ export default async function ServersPage() {
         <StripCell label="CPU" value={cpu != null ? `${cpu}%` : "—"} tone={cpu == null ? undefined : cpu > 85 ? "danger" : cpu > 65 ? "warn" : undefined} />
         <StripCell label="RAM" value={info.ram_used_gb ?? "—"} hint={info.ram_total_gb ? `из ${info.ram_total_gb} GB` : undefined} />
         <StripCell label="Диск D" value={info.disk_free_gb ?? "—"} hint="GB свободно" />
+        <StripCell label="Адрес игроков" value={playerIp || "Автоматически"} hint={playerIp ? "задан в настройках" : "LAN или адрес роутера"} />
         <StripCell label="CS2 build" value={info.cs2_build ?? "—"} />
         <StripCell label="MatchZy" value={versions.matchzy ?? "—"} />
         <StripCell label="CSSharp" value={versions.counterstrikesharp ?? "—"} hint={versions.metamod ? `Metamod ${versions.metamod}` : undefined} />

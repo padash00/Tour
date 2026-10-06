@@ -3,20 +3,12 @@ import { getAgentBundle } from "@/lib/agent-bundle";
 import {
   adminPlayers,
   applyAgentReport,
-  autoMaintenanceTick,
-  autopilotTick,
   checkBearer,
-  closeMatchesOfEndedTournaments,
-  expireStaleWork,
-  lobbyServersTick,
   takePendingCommands,
-  verifyWorkshopLibrary,
 } from "@/lib/server-control";
-import { applyAgentEvents, checkCs2UpToDate, pruneIngest } from "@/lib/server/ops";
-import { refreshStaleProfilesTick } from "@/lib/profile-sync";
+import { applyAgentEvents } from "@/lib/server/ops";
 import { getSetting } from "@/lib/settings";
-import { applyDueVetoTimeouts } from "@/lib/matches";
-import { lobbyTick } from "@/lib/lobby";
+import { runAgentJobs } from "@/lib/server/agent-jobs";
 import { agentReportSchema, type SyncMetrics } from "@/lib/server/agent-report";
 import { db } from "@/lib/supabase";
 import { logSiteError } from "@/lib/site-errors";
@@ -51,17 +43,11 @@ export async function POST(request: NextRequest) {
   const report = parsed.data;
   await applyAgentReport(report);
   await safely("agent events", () => applyAgentEvents(report.events));
-  await safely("watchdog", expireStaleWork);
-  await safely("veto timeouts", applyDueVetoTimeouts);
-  await safely("autopilot", autopilotTick);
-  await safely("lobby", lobbyTick);
-  await safely("lobby servers", lobbyServersTick);
-  await safely("workshop check", verifyWorkshopLibrary);
-  await safely("close ended", () => closeMatchesOfEndedTournaments());
-  await safely("cs2 version", () => checkCs2UpToDate(report.info?.cs2_patch));
-  await safely("dedupe prune", pruneIngest);
-  await safely("profile sync", refreshStaleProfilesTick);
-  await safely("auto maintenance", autoMaintenanceTick);
+  // Старый агент не вызывает /api/agent/jobs. Пока он не самообновится, сохраняем прежнее поведение.
+  if ((report.protocol ?? 1) < 3) {
+    await runAgentJobs("dispatch", safely, report.info?.cs2_patch);
+    await runAgentJobs("maintenance", safely, report.info?.cs2_patch);
+  }
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
   const [admins, retention] = await Promise.all([
     adminPlayers().then((a) => a.map((x) => x.steam_id)).catch(() => null),
@@ -71,7 +57,7 @@ export async function POST(request: NextRequest) {
   const days = Number(retention ?? "");
   const backup_days = Number.isFinite(days) && days >= 1 ? Math.min(90, Math.floor(days)) : 1;
   // Claim last: work done above cannot consume the delivery lease.
-  const commands = await takePendingCommands(request.nextUrl.origin, report.protocol === 2);
+  const commands = await takePendingCommands(request.nextUrl.origin, (report.protocol ?? 1) >= 2);
   metrics.duration_ms = Math.round(performance.now() - started);
   const { error } = await db().from("app_settings").upsert({ key: "AGENT_SYNC_METRICS", value: JSON.stringify(metrics), updated_at: metrics.at });
   if (error) console.error("agent sync metrics could not be saved", error.code);

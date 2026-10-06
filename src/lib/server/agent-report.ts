@@ -6,7 +6,7 @@ const matchId = z.preprocess((value) => {
 }, z.number().int().nonnegative().nullable()).optional();
 
 export const agentReportSchema = z.object({
-  protocol: z.number().int().min(1).max(2).optional(),
+  protocol: z.number().int().min(1).max(3).optional(),
   lan_ip: z.string().max(128).optional(),
   info: z.record(z.string(), z.unknown()).optional(),
   instances: z.array(z.object({

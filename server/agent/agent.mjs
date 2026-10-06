@@ -685,15 +685,31 @@ async function execute(cmd) {
 
 // ───────────────────────── связь с сайтом
 
-async function api(pathname, body) {
+async function api(pathname, body, timeoutMs = 15_000) {
   const res = await fetch(`${config.siteUrl}${pathname}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`${pathname} → HTTP ${res.status}`);
   return res.json();
+}
+
+// Отдельные запросы не задерживают приём команд: быстрые игровые таймеры идут чаще обслуживания.
+const siteJobs = {
+  dispatch: { interval: 5_000, last: 0, inFlight: false },
+  maintenance: { interval: 60_000, last: 0, inFlight: false },
+};
+function scheduleSiteJobs() {
+  for (const [lane, state] of Object.entries(siteJobs)) {
+    if (state.inFlight || Date.now() - state.last < state.interval) continue;
+    state.inFlight = true;
+    state.last = Date.now();
+    api("/api/agent/jobs", { lane }, 65_000)
+      .catch((e) => log(`фоновые задачи ${lane}: ${e.message}`))
+      .finally(() => { state.inFlight = false; });
+  }
 }
 
 let failures = 0;
@@ -801,10 +817,10 @@ async function tick() {
   }
   await refreshUpnp().catch(() => {});
   const [info, instances] = await Promise.all([collectHostInfo(), collectInstances()]);
-  const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState, pending_results: commandJournal.pendingResults, protocol: 2 };
+  const publicInfo = { ...Object.fromEntries(Object.entries(info).filter(([k]) => k !== "_cpu")), upnp: upnpState, pending_results: commandJournal.pendingResults, protocol: 3 };
   const events = pendingEvents.slice();
   const t0 = Date.now();
-  const { commands, bundle_version, admins, backup_days } = await api("/api/agent/sync", { protocol: 2, lan_ip: config.lanIp, info: publicInfo, instances, events });
+  const { commands, bundle_version, admins, backup_days } = await api("/api/agent/sync", { protocol: 3, lan_ip: config.lanIp, info: publicInfo, instances, events });
   commandJournal.accept(commands ?? []);
   await syncMatchzyAdmins(admins).catch((e) => log(`MatchZy admins: ${e.message}`));
   try {
@@ -845,11 +861,12 @@ async function tick() {
 
   // на сайте новая версия агента/скриптов/конфигов → обновляемся и перезапускаемся (F16-agent.bat поднимет снова).
   // Не во время автоподъёма сервера — дождёмся конца.
-  if (!busy && !recovering.size && bundle_version && bundle_version !== localBundleVersion(F16_DIR)) {
+  if (!busy && !recovering.size && !Object.values(siteJobs).some((state) => state.inFlight) && bundle_version && bundle_version !== localBundleVersion(F16_DIR)) {
     const r = await applyBundle({ siteUrl: config.siteUrl, token: config.token, f16Dir: F16_DIR, serverDir: SERVER_DIR });
     log(`обновление агента ${localBundleVersion(F16_DIR)}: ${r.count} файлов, перезапуск`);
     process.exit(0);
   }
+  scheduleSiteJobs();
 }
 
 await relay.start();

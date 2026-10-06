@@ -27,7 +27,7 @@ Next.js (App Router) на Vercel, база — Supabase. Вход только �
 
 - `src/app/` — маршруты (App Router). Публичная часть: `/`, `/tournaments`, `/matches`, `/teams`, `/players`, `/stats`, `/rules`, `/about`; личное: `/me`, `/team`, `/notifications`, `/join`; F16 Control — `/admin/**` (своя оболочка с левым меню).
 - `src/app/actions/` — серверные действия (формы). Бизнес-правила — только здесь и в `src/lib/`.
-- `src/app/api/agent/*` — связь с F16 Server Agent: `sync` (состояние ⇄ команды), `bundle` (самообновление агента); `src/app/api/matchzy/*` и `src/app/api/cs2/*` — события MatchZy и HTTP-логи CS2; `src/app/api/auth/*` — вход через Steam.
+- `src/app/api/agent/*` — связь с F16 Server Agent: `sync` (состояние ⇄ команды), `jobs` (игровые таймеры и обслуживание отдельно от выдачи команд), `bundle` (самообновление агента); `src/app/api/matchzy/*` и `src/app/api/cs2/*` — события MatchZy и HTTP-логи CS2; `src/app/api/auth/*` — вход через Steam.
 - `src/lib/` — домен: турниры и форматы, сетки, вето, матчи, серверы и автопилот (`server-control.ts`), статистика и Swing, настройки, сессия, Steam.
 - `src/components/` — отображение: `brand.tsx` (логотип — только файлы из `public/brand`), `ui.tsx` (примитивы), `public/` (главная и публичные страницы), `competition/` (матч, вето, сервер), `admin/` (F16 Control). Компоненты не обращаются к базе напрямую.
 - `server/agent/` — агент серверного ПК (Node без зависимостей), доезжает до ПК сам через `/api/agent/bundle`.

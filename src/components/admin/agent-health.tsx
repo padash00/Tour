@@ -5,15 +5,28 @@ import { Activity, Clock3, Radio, Terminal } from "lucide-react";
 import type { SyncMetrics } from "@/lib/server/agent-report";
 import { cn } from "@/components/ui";
 
-export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics }: {
-  lastSeen: string | null; initialNow: number; pending: number; inflight: number; metrics: SyncMetrics | null;
+export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics, dispatch, maintenance }: {
+  lastSeen: string | null; initialNow: number; pending: number; inflight: number;
+  metrics: SyncMetrics | null; dispatch: SyncMetrics | null; maintenance: SyncMetrics | null;
 }) {
   const [now, setNow] = useState(initialNow);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const age = lastSeen ? Math.max(0, Math.floor((now - Date.parse(lastSeen)) / 1000)) : null;
   const online = age !== null && Number.isFinite(age) && age < 30;
   const delayed = online && age >= 15;
-  const failed = metrics?.phases.filter((phase) => !phase.ok) ?? [];
+  const jobs = [
+    { label: "Игровые таймеры", metrics: dispatch, staleAfter: 30 },
+    { label: "Обслуживание", metrics: maintenance, staleAfter: 150 },
+  ];
+  const jobCards = jobs.map(({ label, metrics: result, staleAfter }) => {
+    const failed = result?.phases.filter((phase) => !phase.ok).length ?? 0;
+    const stale = !!result && (now - Date.parse(result.at)) / 1000 > staleAfter;
+    return {
+      icon: Activity, label, value: result ? `${(result.duration_ms / 1000).toFixed(1)} с` : "Нет измерения",
+      hint: failed ? `Задач с ошибкой: ${failed}` : stale ? "Последний запуск задерживается" : result ? "Время последнего запуска" : "Появится после обновления агента",
+      tone: failed || stale ? "text-warn" : "text-fg",
+    };
+  });
   const cards = [
     { icon: Radio, label: "Связь с серверным ПК", value: online ? delayed ? "Сигнал задерживается" : "На связи" : "Нет связи",
       hint: age === null ? "Агент ещё не подключался" : `Последний сигнал ${age} с назад`,
@@ -21,7 +34,8 @@ export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics }
     { icon: Clock3, label: "Очередь команд", value: `${pending} ожидают · ${inflight} отправлены`,
       hint: !online && pending > 0 ? "Команды ждут подключения агента" : "Результат появится после подтверждения агента", tone: pending > 0 ? "text-warn" : "text-fg" },
     { icon: Activity, label: "Обработка синхронизации", value: metrics ? `${(metrics.duration_ms / 1000).toFixed(1)} с` : "Нет измерения",
-      hint: failed.length ? `Задач с ошибкой: ${failed.length}` : metrics ? "Время последней обработки на сайте" : "Появится после обновления агента", tone: failed.length ? "text-danger" : "text-fg" },
+      hint: metrics ? "Время приёма состояния и выдачи команд" : "Нет измерения", tone: "text-fg" },
+    ...jobCards,
   ];
   return (
     <section aria-label="Состояние управления серверами" className="space-y-3">
@@ -48,12 +62,17 @@ export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics }
           <p className="text-xs text-fg-3">Журнал запуска: D:\cs2server\f16\agent.log. Если сервер установлен на другом диске, замените путь. Для запуска выключенного агента требуется действие на серверном ПК.</p>
         </div>
       </details>
-      {metrics && (
+      {jobs.some((job) => job.metrics) && (
         <details className="rounded-surface border border-line bg-surface px-5 py-4">
-          <summary className="cursor-pointer text-sm text-fg-2">Время фоновых задач{failed.length ? " · есть ошибки" : ""}</summary>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {metrics.phases.map((phase) => <li key={phase.name} className="flex justify-between gap-4 text-xs"><span className={phase.ok ? "text-fg-3" : "text-danger"}>{phase.name}{phase.ok ? "" : " · ошибка"}</span><span className="num">{phase.ms} мс</span></li>)}
-          </ul>
+          <summary className="cursor-pointer text-sm text-fg-2">Время фоновых задач</summary>
+          {jobs.map(({ label, metrics: result }) => result && (
+            <div key={label} className="mt-3">
+              <p className="text-xs font-semibold text-fg-2">{label}</p>
+              <ul className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {result.phases.map((phase) => <li key={phase.name} className="flex justify-between gap-4 text-xs"><span className={phase.ok ? "text-fg-3" : "text-danger"}>{phase.name}{phase.ok ? "" : " · ошибка"}</span><span className="num">{phase.ms} мс</span></li>)}
+              </ul>
+            </div>
+          ))}
         </details>
       )}
     </section>

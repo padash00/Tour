@@ -1,5 +1,6 @@
 "use server";
 
+import { isIP } from "node:net";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -22,6 +23,9 @@ export async function saveSetting(_prev: ActionResult, formData: FormData): Prom
     if (!value) return { error: "Введите значение" };
     if (key === "OBSERVER_STEAM_IDS" && !value.split(",").every((s) => /^\d{17}$/.test(s.trim()))) {
       return { error: "SteamID64 — 17 цифр, через запятую" };
+    }
+    if (key === "PLAYER_IP" && isIP(value) !== 4 && !/^(?=.{1,253}$)(?=.*[a-z])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i.test(value)) {
+      return { error: "Укажите IPv4-адрес или имя сервера без http:// и номера порта" };
     }
     if (value.length > 500) return { error: "Слишком длинное значение" };
     const { error } = await db()
