@@ -41,7 +41,7 @@ const tournamentSchema = z.object({
   final_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(3),
   overtime: z.string().optional(),
   knife_round: z.string().optional(),
-  timeouts_per_team: z.coerce.number().int().min(0).max(10).default(3),
+  timeouts_per_team: z.coerce.number().int().min(0).max(10).default(4),
   timeout_seconds: z.coerce.number().int().min(15).max(120).default(30),
   tech_pauses: z.coerce.number().int().min(0).max(10).default(2),
   tech_pause_seconds: z.coerce.number().int().min(60).max(900).default(300),

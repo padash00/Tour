@@ -66,7 +66,7 @@ const INTERVAL_MS = 5000;
 
 // ───────────────────────── буфер событий
 
-const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_DIR, siteUrl: config.siteUrl, log });
+const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_DIR, siteUrl: config.siteUrl, log, onMatchzyEvent: handleLocalMatchzyEvent });
 
 // ───────────────────────── удержание настроек режима
 
@@ -74,14 +74,30 @@ const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_
 const ENFORCE_FILE = path.join(STATE_DIR, "enforce.json");
 const enforce = readJsonSafe(ENFORCE_FILE, {});
 const saveEnforce = () => writeFileSync(ENFORCE_FILE, JSON.stringify(enforce));
-const DEFAULT_VOICE = "sv_voiceenable 1;sv_alltalk 0;sv_deadtalk 1;sv_full_alltalk 0;sv_talk_enemy_living 0;sv_talk_enemy_dead 0";
+const AUTO_HALFTIME_VOICE = "sv_auto_full_alltalk_during_warmup_half_end";
+const DEFAULT_VOICE = `${AUTO_HALFTIME_VOICE} 0;sv_voiceenable 1;sv_alltalk 0;sv_deadtalk 1;sv_full_alltalk 0;sv_talk_enemy_living 0;sv_talk_enemy_dead 0`;
+
+async function handleLocalMatchzyEvent(ev, token) {
+  if (!ev || !["going_live", "map_result", "series_end"].includes(ev.event)) return;
+  for (const inst of INSTANCES) {
+    const rule = enforce[inst.name];
+    if (!rule?.halftimeVoiceMaps?.length || Number(rule.matchid) !== Number(ev.matchid) || !rule.eventToken || token !== rule.eventToken) continue;
+    const mapNumber = Number(ev.map_number);
+    if (ev.event === "map_result" && rule.halftimeVoiceActiveMap !== mapNumber) continue;
+    const enabled = ev.event === "going_live" && rule.halftimeVoiceMaps.includes(mapNumber);
+    rule.halftimeVoiceActiveMap = enabled ? mapNumber : null;
+    saveEnforce();
+    await rcon(inst.port, secrets.rcon, `${AUTO_HALFTIME_VOICE} ${enabled ? 1 : 0}`);
+    log(`голос на смене сторон ${inst.name}: ${enabled ? "включён" : "выключен"} (карта ${Number.isFinite(mapNumber) ? mapNumber + 1 : "—"})`);
+  }
+}
 
 async function clearEnforce(inst) {
   const rule = enforce[inst.name];
   if (!rule) return;
   delete enforce[inst.name];
   saveEnforce();
-  if (rule.cvars && Object.hasOwn(rule.cvars, "sv_alltalk")) {
+  if (rule.cvars && (Object.hasOwn(rule.cvars, "sv_alltalk") || Object.hasOwn(rule.cvars, AUTO_HALFTIME_VOICE))) {
     await rcon(inst.port, secrets.rcon, DEFAULT_VOICE).catch(() => {});
   }
 }
@@ -100,16 +116,19 @@ async function enforceCvars(inst, get5) {
   }
   const names = Object.keys(rule.cvars);
   const out = await rcon(inst.port, secrets.rcon, names.join(";")).catch(() => "");
+  const expected = (name) => name === AUTO_HALFTIME_VOICE && rule.halftimeVoiceMaps?.length
+    ? rule.halftimeVoiceActiveMap === get5.map_number && ["going_live", "live"].includes(get5.gamestate) ? 1 : 0
+    : rule.cvars[name];
   const fix = names.filter((n) => {
     const m = new RegExp(`${n} = (true|false|[-+]?\\d+(?:\\.\\d+)?)`, "i").exec(out);
     if (!m) return false;
     const value = m[1].toLowerCase();
     const current = value === "true" ? 1 : value === "false" ? 0 : Number(value);
-    return current !== Number(rule.cvars[n]);
+    return current !== Number(expected(n));
   });
   if (fix.length) {
-    await rcon(inst.port, secrets.rcon, fix.map((n) => `${n} ${rule.cvars[n]}`).join(";")).catch(() => {});
-    log(`enforce ${inst.name}: ${fix.map((n) => `${n}=${rule.cvars[n]}`).join(" ")}`);
+    await rcon(inst.port, secrets.rcon, fix.map((n) => `${n} ${expected(n)}`).join(";")).catch(() => {});
+    log(`enforce ${inst.name}: ${fix.map((n) => `${n}=${expected(n)}`).join(" ")}`);
   }
 }
 
@@ -584,11 +603,12 @@ async function viaRelay(payload) {
 /** Загрузка матча в MatchZy на инстансе (и при команде сайта, и при автоподъёме после падения) */
 async function loadMatch(inst, payload) {
   const { url, header_key, header_value, events_url, log_url, post_cmds = [], enforce: rule = null } = payload;
-  if (rule) enforce[inst.name] = rule;
+  if (rule) enforce[inst.name] = { ...rule, eventToken: header_value };
   else delete enforce[inst.name];
   saveEnforce();
   // на случай, если на сервере остался старый матч
   await rcon(inst.port, secrets.rcon, "get5_endmatch").catch(() => {});
+  await rcon(inst.port, secrets.rcon, `${AUTO_HALFTIME_VOICE} 0`).catch(() => {});
   const out = await rcon(inst.port, secrets.rcon, `matchzy_loadmatch_url ${q(url)} ${q(header_key)} ${q(header_value)}`);
   // загрузка матча сбрасывает настройки отправки событий — выставляем после неё, в кавычках
   await sleep(2500);

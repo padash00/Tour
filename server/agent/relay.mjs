@@ -21,7 +21,7 @@ import path from "node:path";
 
 const RETRY_MAX_MS = 30_000;
 
-export function createRelay({ port = 27099, dir, siteUrl, log = () => {} }) {
+export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatchzyEvent = null }) {
   const outbox = path.join(dir, "outbox");
   const failedDir = path.join(outbox, "failed");
   const configDir = path.join(dir, "match-configs");
@@ -71,6 +71,11 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {} }) {
         const body = await readBody(req);
         const token = req.headers["x-f16-token"];
         enqueue({ path: "/api/matchzy/events", headers: { "Content-Type": "application/json", ...(token ? { "X-F16-Token": String(token) } : {}) }, body });
+        // Локальные настройки матча применяются сразу, даже если связь с сайтом пропала.
+        if (onMatchzyEvent) {
+          try { await onMatchzyEvent(JSON.parse(body), token); }
+          catch (e) { log(`локальное событие MatchZy: ${e?.message ?? e}`); }
+        }
         return send(200, { ok: true, queued: true });
       }
       if (req.method === "POST" && url.pathname === "/cs2/log") {

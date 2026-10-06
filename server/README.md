@@ -72,5 +72,15 @@ MatchZy забирает конфиг (составы по SteamID, карты) 
 `get5_status` = warmup и выдаёт игрокам IP → события MatchZy (`round_end`, `map_result`, `series_end`)
 обновляют счёт, статистику и сетку.
 
+На de-картах турнира агент при событии `going_live` включает штатный `sv_auto_full_alltalk_during_warmup_half_end`:
+соперники слышат друг друга во время смены сторон, в раундах действует командный голос. На `map_result`
+и `series_end` параметр возвращается к 0; в разминке и на aim-картах он остаётся выключенным.
+Для обычных карт 5×5 профиль задаёт MR12, овертайм MR3, $800 на старте, $12 500 в овертайме,
+раунд 1:55, закупку 20 с, фризтайм 20 с и таймер бомбы 40 с. Голос в перерыве — правило F16,
+добавленное отдельно от официальных регламентов ESL/PGL.
+Ориентиры: [FACEIT Season 9](https://www.faceit.com/cs/news/faceit-season-9-launch),
+[настройки матчей ESL](https://pro.eslgaming.com/tour/2023/10/esl-pro-tour-fall-2023-rule-book-update/),
+[дополнительный регламент Valve для мейджоров](https://github.com/ValveSoftware/counter-strike_rules_and_regs/blob/main/major-supplemental-rulebook.md).
+
 Проверки: `node scripts/e2e-server-test.mjs CS2-01` (загрузка матча на сервер),
 `node scripts/e2e-events-test.mjs` (обработка событий).

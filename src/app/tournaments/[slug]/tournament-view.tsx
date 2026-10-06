@@ -332,9 +332,12 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
           className="mt-6 border-t border-line-subtle pt-6"
           items={[
             { label: "Стороны", value: t.knife_round ? "Ножевой раунд" : "Фиксированные" },
-            { label: "Овертайм", value: t.overtime ? "MR3 при 12:12" : "Нет" },
+            { label: "Овертайм", value: t.overtime ? `MR3 при ${mode.size === 2 ? "8:8" : "12:12"}` : "Нет" },
             { label: "Тактические паузы", value: <span className="num">{t.timeouts_per_team} × {t.timeout_seconds} с</span> },
             { label: "Технические паузы", value: <span className="num">{t.tech_pauses} × {Math.round(t.tech_pause_seconds / 60)} мин</span> },
+            ...(t.map_pool.some((map) => /^de_/i.test(map.split("@")[0]))
+              ? [{ label: "Голос на смене сторон", value: "Обе команды на de-картах" }]
+              : []),
             ...(t.match_format ? [{ label: "Матчи", value: t.match_format }] : []),
           ]}
         />

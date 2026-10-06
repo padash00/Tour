@@ -14,6 +14,7 @@ const DEFAULT_RULES = `Вето проходит на странице матч�
 На сервер допускаются только заявленные игроки (по SteamID).
 Разминка: .ready / .r — матч стартует при 10/10 готовых.
 Ножевой раунд: победитель выбирает сторону командой .stay или .switch.
+На картах de_* соперники слышат друг друга во время смены сторон; в раундах голос командный.
 Тактические паузы — .tac, технические — .tech.
 Каждая карта записывается в демо. Споры — через страницу матча.`;
 
@@ -172,7 +173,7 @@ export function TournamentForm({
   const [cover, setCover] = useState<string | null>(t?.cover_url ?? null);
   const [overtime, setOvertime] = useState(t?.overtime ?? true);
   const [knife, setKnife] = useState(t?.knife_round ?? true);
-  const [timeouts, setTimeouts] = useState(t?.timeouts_per_team ?? 3);
+  const [timeouts, setTimeouts] = useState(t?.timeouts_per_team ?? 4);
   const [timeoutSec, setTimeoutSec] = useState(t?.timeout_seconds ?? 30);
   const [techPauses, setTechPauses] = useState(t?.tech_pauses ?? 2);
   const [techSec, setTechSec] = useState(t?.tech_pause_seconds ?? 300);
@@ -566,10 +567,15 @@ export function TournamentForm({
                 </div>
               </div>
             </div>
+            <p className="mt-4 text-xs text-fg-3">
+              На турнирных картах de_* обе команды слышат друг друга только при смене сторон.
+              {format === "5v5" && " Для карт 5×5: MR12, при включённом овертайме MR3, фризтайм 20 с и соревновательная экономика."}
+            </p>
             {(() => {
               const size = (format === "1v1" ? 1 : format === "2v2" ? 2 : 5) as 1 | 2 | 5;
               const opts = {
                 size,
+                halftimeVoice: maps.some((map) => /^de_/i.test(map.split("@")[0])),
                 bracket,
                 bo,
                 finalBo,

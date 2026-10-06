@@ -327,6 +327,8 @@ export function modeCvars(format: string, maps: string[] = []): Record<string, n
   const size = modeOf(format).size;
   const base: Record<string, number> = {
     ...(size === 1 ? { mp_maxrounds: 24, mp_halftime_duration: 5 } : size === 2 ? { mp_maxrounds: 16 } : { mp_maxrounds: 24 }),
+    // MatchZy включает это только для турнирных de-карт после перехода в live.
+    sv_auto_full_alltalk_during_warmup_half_end: 0,
     // смена карты в серии: gamemode_competitive.cfg на каждой карте ставит tv_delay 105, и MatchZy
     // растягивает экран итогов до tv_delay + 25 = 130 с. Трансляцию с задержкой мы не ведём —
     // держим 0, тогда экран итогов 15 с (минимум MatchZy)
@@ -335,7 +337,25 @@ export function modeCvars(format: string, maps: string[] = []): Record<string, n
   };
   // aim-карты (aim_map и т.п.): без фризтайма и с быстрым рестартом раунда; на обычных картах — стандарт MatchZy
   if (maps.length > 0 && maps.every(isAimMap)) return { ...base, mp_freezetime: 0, mp_round_restart_delay: 2 };
-  // обычные карты: фризтайм 15 с, как в соревновательном CS2 (в live.cfg MatchZy стоит 18); Wingman — свой конфиг
+  if (size === 5) {
+    // Турнирные карты 5×5: MR12, MR3, экономика и тайминги соревновательного CS2.
+    return {
+      ...base,
+      mp_halftime: 1,
+      mp_halftime_duration: 16,
+      mp_overtime_startmoney: 12500,
+      mp_roundtime: 1.92,
+      mp_roundtime_defuse: 1.92,
+      mp_startmoney: 800,
+      mp_maxmoney: 16000,
+      mp_freezetime: 20,
+      mp_buytime: 20,
+      mp_c4timer: 40,
+      mp_round_restart_delay: 5,
+      mp_friendlyfire: 1,
+    };
+  }
+  // Wingman — свой конфиг MatchZy; на дуэлях сохраняем короткий фризтайм.
   return size === 2 ? base : { ...base, mp_freezetime: 15 };
 }
 
@@ -345,12 +365,22 @@ export function isAimMap(map: string) {
 }
 
 async function matchEnforce(matchId: string) {
-  const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format)").eq("id", matchId).single();
-  const row = data as unknown as { matchzy_id: number; tournament: { format: string } } | null;
+  const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format, overtime, timeouts_per_team, timeout_seconds)").eq("id", matchId).single();
+  const row = data as unknown as { matchzy_id: number; tournament: { format: string; overtime: boolean; timeouts_per_team: number; timeout_seconds: number } } | null;
   if (!row) return null;
-  const { data: maps } = await db().from("match_maps").select("map_name").eq("match_id", matchId);
-  const cvars = modeCvars(row.tournament.format, (maps ?? []).map((x) => x.map_name));
-  return Object.keys(cvars).length ? { matchid: row.matchzy_id, cvars } : null;
+  const { data: maps } = await db().from("match_maps").select("map_number, map_name").eq("match_id", matchId).order("map_number");
+  const cvars = {
+    ...modeCvars(row.tournament.format, (maps ?? []).map((x) => x.map_name)),
+    mp_overtime_enable: row.tournament.overtime ? 1 : 0,
+    mp_overtime_maxrounds: 6,
+    mp_team_timeout_max: row.tournament.timeouts_per_team,
+    mp_team_timeout_time: row.tournament.timeout_seconds,
+  };
+  // MatchZy нумерует карты с нуля. Голос между командами включается только на de-картах турнира.
+  const halftimeVoiceMaps = (maps ?? [])
+    .filter((x) => /^de_/i.test(x.map_name.split("@")[0]))
+    .map((x) => x.map_number - 1);
+  return Object.keys(cvars).length ? { matchid: row.matchzy_id, cvars, halftimeVoiceMaps } : null;
 }
 
 async function matchzyPostCommands(matchId: string) {
