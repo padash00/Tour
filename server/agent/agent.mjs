@@ -575,6 +575,7 @@ async function housekeepingLoop() {
     await hud.ensurePlugin(Object.keys(recovery.assignments).length > 0).catch((e) => log(`F16Hud: ${e.message}`));
     await refreshUpnp().catch(() => {});
     await housekeeping.ensureFirewall().catch((e) => log(`брандмауэр: ${e.message}`));
+    await housekeeping.ensureHiddenTasks().catch((e) => log(`планировщик: ${e.message}`));
     await refreshHostInfo().catch(() => {});
     await sleep(60_000);
   }

@@ -116,7 +116,27 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
     return firewall;
   }
 
+  // Задачи Планировщика агента — без мигающего окна консоли (hide-tasks.ps1). Удачный результат запоминаем по хэшу скрипта.
+  const hideTasksScript = path.join(f16Dir, "hide-tasks.ps1");
+  const hideTasksState = path.join(stateDir, "hide-tasks.json");
+  let hideTasksAt = 0;
+  async function ensureHiddenTasks() {
+    if (process.platform !== "win32" || !existsSync(hideTasksScript)) return;
+    const key = createHash("sha256").update(readFileSync(hideTasksScript)).digest("hex").slice(0, 12);
+    if (readJsonSafe(hideTasksState, null)?.key === key) return;
+    if (Date.now() - hideTasksAt < 30 * 60_000) return;
+    hideTasksAt = Date.now();
+    const result = await new Promise((resolve) => {
+      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", hideTasksScript], { windowsHide: true, timeout: 60_000 }, (err, out, stderr) =>
+        resolve(err ? { ok: false, text: String(stderr || err.message).trim().slice(0, 300) } : { ok: true, text: String(out).trim().slice(0, 300) }),
+      );
+    });
+    if (result.ok) writeFileSync(hideTasksState, JSON.stringify({ key, at: new Date().toISOString() }));
+    log(result.ok ? `планировщик: ${result.text}` : `планировщик: не удалось скрыть окно задач — ${result.text}`);
+  }
+
   return {
+    ensureHiddenTasks,
     ensureServerLanguage,
     ensureMatchzyRu,
     syncMatchzyAdmins,

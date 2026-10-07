@@ -44,8 +44,9 @@ if (-not $Remove) {
 }
 
 function HiddenAgentAction {
-  New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherPath`"" `
+  # conhost --headless: консоль без окна (одного -WindowStyle Hidden мало — окно мелькает)
+  New-ScheduledTaskAction -Execute "conhost.exe" `
+    -Argument "--headless powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$launcherPath`"" `
     -WorkingDirectory $f16
 }
 
@@ -113,7 +114,7 @@ if (-not $running) { throw "Агент не запустился — смотр�
 # Завершение процесса вручную не считается сбоем для RestartCount в Планировщике.
 # Отдельная короткая задача этого же пользователя проверяет агент каждую минуту.
 # Повторение без Duration продолжается бессрочно; отключённую задачу сторож не включает.
-$watchAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watchdogPath`"" -WorkingDirectory $f16
+$watchAction = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$watchdogPath`"" -WorkingDirectory $f16
 $watchTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
 $watchSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $WatchTaskName -Action $watchAction -Trigger $watchTrigger -Principal $principal -Settings $watchSettings `
