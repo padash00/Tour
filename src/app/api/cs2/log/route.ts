@@ -1,23 +1,26 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { verifyLogSignature } from "@/lib/server/ingest-signature";
 import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
+import { safeEqual } from "@/lib/server/state";
 import { ingestLog } from "@/lib/swing-ingest";
 
 /**
- * HTTP-лог CS2 (logaddress_add_http). Заголовки задать нельзя, поэтому токен — в query.
- * /api/cs2/log?m=<matchzy_id>&t=<MATCHZY_TOKEN>
+ * HTTP-лог CS2 (logaddress_add_http). Заголовки задать нельзя, поэтому подпись — в query:
+ * /api/cs2/log?m=<matchzy_id>&sig=<HMAC(MATCHZY_TOKEN, matchzy_id)> — сам токен в адресе не светится.
  * Пачки могут прийти повторно (буфер агента досылает после обрыва связи) — повтор отбрасывается по хэшу.
  */
 export async function POST(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get("t") ?? "";
+  const params = request.nextUrl.searchParams;
   const expected = process.env.MATCHZY_TOKEN ?? "";
-  const actualBytes = Buffer.from(token);
-  const expectedBytes = Buffer.from(expected);
-  const ok = expected && actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
+  const m = params.get("m") ?? "";
+  const matchzyId = Number(m);
+  if (!/^\d+$/.test(m) || !Number.isSafeInteger(matchzyId)) return NextResponse.json({ error: "bad match" }, { status: 400 });
+  const sig = params.get("sig");
+  // Переходный период: матчи, загруженные до выката подписи, шлют лог со старым адресом ?t=<токен>
+  // (его держит CS2 до конца матча и буфер агента). Убрать приём t, когда такие матчи закончатся.
+  const legacy = params.get("t");
+  const ok = !!expected && (sig ? verifyLogSignature(m, sig, expected) : legacy != null && safeEqual(legacy, expected));
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
-  const matchzyId = Number(request.nextUrl.searchParams.get("m"));
-  if (!Number.isInteger(matchzyId)) return NextResponse.json({ error: "bad match" }, { status: 400 });
 
   const body = await request.text();
   const key = ingestKey(`log${matchzyId}`, body);
