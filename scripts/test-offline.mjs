@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 const env = { ...process.env, SUPABASE_URL: "http://127.0.0.1:9", SUPABASE_SERVICE_ROLE_KEY: "offline-test", SESSION_SECRET: "offline-only-session-secret" };
 const cases = [
   "test-bracket-sizes.mts", "test-stage-formats.mts", "test-awards.mts", "test-lobby-settings.mts",
-  "test-agent-relay.mjs", "test-reliability.mjs", "test-agent-report.mts", "test-deployment-gate.mjs",
+  "test-agent-relay.mjs", "test-agent-relay-park.mjs", "test-agent-units.mjs", "test-reliability.mjs", "test-agent-report.mts", "test-deployment-gate.mjs",
 ];
 for (const name of cases) {
   const args = name.endsWith(".mts") ? ["--conditions=react-server", "--import=tsx", `scripts/${name}`] : [`scripts/${name}`];

@@ -49,19 +49,52 @@ export class CommandJournal {
     entry.acked = false;
     this.save();
   }
+  /**
+   * Delivers every undelivered result. One failed acknowledgement does not hold back the others.
+   * A permanent rejection (4xx except auth/timeouts/rate limits: the site no longer expects this
+   * command) is parked, so it is not retried forever. Transient failures are retried on the next
+   * flush; the first of them is rethrown after all results were attempted.
+   */
   async flush(send) {
-    if (this.flushing) return;
+    if (this.flushing) return { sent: 0, parked: 0, failed: 0 };
     this.flushing = true;
+    const out = { sent: 0, parked: 0, failed: 0 };
+    let firstError = null;
     try {
       for (const [id, entry] of Object.entries(this.entries)) {
         if (entry.state !== "finished" || entry.acked) continue;
-        await send({ id, ...entry.reply });
-        entry.acked = true;
+        try {
+          await send({ id, ...entry.reply });
+          entry.acked = true;
+          out.sent++;
+        } catch (e) {
+          if (!isPermanentRejection(e)) {
+            out.failed++;
+            firstError ??= e;
+            continue;
+          }
+          entry.acked = true;
+          entry.parked = `HTTP ${e.status}`;
+          out.parked++;
+        }
         this.save();
       }
     } finally { this.flushing = false; }
+    if (firstError) throw firstError;
+    return out;
   }
   get pendingResults() {
     return Object.values(this.entries).filter((e) => e.state === "finished" && !e.acked).length;
   }
+  /** Commands accepted or running: a self-update must wait for them to finish.
+   * An accepted command that was never started (the site stopped redelivering it) stops counting after 10 minutes. */
+  get inFlight() {
+    return Object.values(this.entries)
+      .filter((e) => e.state === "running" || (e.state === "accepted" && this.now() - e.at < 10 * 60_000)).length;
+  }
+}
+
+export function isPermanentRejection(e) {
+  const status = Number(e?.status);
+  return status >= 400 && status < 500 && ![401, 403, 408, 429].includes(status);
 }

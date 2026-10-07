@@ -1,15 +1,22 @@
 // Буфер событий на серверном ПК: защита от обрыва интернета в клубе.
 //
 // MatchZy (matchzy_remote_log_url) и HTTP-лог CS2 (logaddress_add_http) шлют события сюда, на 127.0.0.1,
-// а не на сайт. Каждое событие сразу пишется на диск (outbox/) и досылается на сайт по порядку
-// с повторами. Если связь пропала — события копятся на диске и уходят, когда она вернётся;
+// а не на сайт. Каждое событие сразу пишется на диск (outbox/) и досылается на сайт с повторами.
+// Если связь пропала — события копятся на диске и уходят, когда она вернётся;
 // перезапуск агента их не теряет. Сайт отбрасывает повторы (ответ мог потеряться), поэтому
 // досылать безопасно.
+//
+// Очередь разбита на дорожки: события одного матча (и отдельно его HTTP-лог) идут строго по порядку,
+// а разные матчи друг друга не ждут. Сайт раз за разом отвечает ошибкой 5xx на одно событие
+// (не обрыв связи, а сбой обработки) — через PARK_AFTER_MS и PARK_AFTER_ATTEMPTS событие уходит
+// в outbox/failed, и дорожка идёт дальше. Отложенные события админ возвращает в очередь командой
+// replay_failed_events. Обрыв связи (сайт не ответил вовсе) ничего не откладывает — ждём сколько нужно.
 //
 // Конфиг матча агент скачивает с сайта при загрузке матча и отдаёт MatchZy отсюда же (/config/<id>):
 // после падения сервера матч можно загрузить заново даже без интернета.
 import http from "node:http";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 // файловые операции очереди не должны ронять цикл досылки (файл мог исчезнуть)
 const quiet = (fn) => {
@@ -17,11 +24,39 @@ const quiet = (fn) => {
     fn();
   } catch {}
 };
-import path from "node:path";
 
 const RETRY_MAX_MS = 30_000;
+const PARK_AFTER_MS = 5 * 60_000;
+const PARK_AFTER_ATTEMPTS = 10;
 
-export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatchzyEvent = null }) {
+/** Дорожка события: матч MatchZy или HTTP-лог матча. Только [\w], потому что она часть имени файла */
+export function laneOf(item) {
+  const clean = (s) => String(s ?? "x").replace(/[^\w]/g, "").slice(0, 24) || "x";
+  if (String(item.path).startsWith("/api/cs2/log")) {
+    const m = /[?&]m=([^&]*)/.exec(item.path)?.[1];
+    return `log${clean(m)}`;
+  }
+  try {
+    return `mz${clean(JSON.parse(item.body)?.matchid)}`;
+  } catch {
+    return "mzx";
+  }
+}
+
+/** Имя файла: <время>-<порядковый>-<дорожка>.json; у файлов прежней версии дорожки нет */
+export const laneOfFile = (name) => /^\d+-\d+-(\w+)\.json$/.exec(name)?.[1] ?? "legacy";
+
+export function createRelay({
+  port = 27099,
+  dir,
+  siteUrl,
+  log = () => {},
+  onMatchzyEvent = null,
+  parkAfterMs = PARK_AFTER_MS,
+  parkAfterAttempts = PARK_AFTER_ATTEMPTS,
+  retryMaxMs = RETRY_MAX_MS,
+  idleMs = 2000,
+}) {
   const outbox = path.join(dir, "outbox");
   const failedDir = path.join(outbox, "failed");
   const configDir = path.join(dir, "match-configs");
@@ -31,14 +66,16 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatc
   let running = false;
   let lastError = null;
   let lastOkAt = null;
-  let attempt = 0;
   let wake = null;
+  const workers = new Map(); // дорожка → работающая досылка
+  const offline = { since: null, attempts: 0 }; // сайт недоступен вовсе: общий признак для всех дорожек
 
   const list = () => readdirSync(outbox).filter((f) => f.endsWith(".json")).sort();
+  const failedList = () => readdirSync(failedDir).filter((f) => f.endsWith(".json")).sort();
 
   /** Атомарная запись: сначала .tmp, затем rename — обрыв питания не оставит полфайла */
   function enqueue(item) {
-    const name = `${Date.now().toString().padStart(15, "0")}-${String(seq++).padStart(6, "0")}.json`;
+    const name = `${Date.now().toString().padStart(15, "0")}-${String(seq++).padStart(6, "0")}-${laneOf(item)}.json`;
     const tmp = path.join(outbox, `${name}.tmp`);
     writeFileSync(tmp, JSON.stringify(item));
     renameSync(tmp, path.join(outbox, name));
@@ -96,36 +133,56 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatc
     }
   });
 
-  /** Досылка по порядку: первое событие не ушло — следующие ждут (порядок событий матча важен) */
-  async function forwardLoop() {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** Раздаёт дорожки работникам: у каждой дорожки с событиями — свой, независимый от остальных */
+  async function scheduleLoop() {
     for (;;) {
       try {
-        await forwardOnce();
+        for (const f of list()) {
+          const lane = laneOfFile(f);
+          if (!workers.has(lane)) workers.set(lane, laneWorker(lane).finally(() => workers.delete(lane)));
+        }
       } catch (e) {
         lastError = String(e?.message ?? e);
-        await new Promise((r) => setTimeout(r, 2000));
+      }
+      await new Promise((r) => {
+        wake = r;
+        setTimeout(r, idleMs);
+      });
+      wake = null;
+    }
+  }
+
+  /** Досылка одной дорожки по порядку, пока в ней есть события */
+  async function laneWorker(lane) {
+    const state = { attempts: 0, failingSince: null, file: null };
+    for (;;) {
+      const files = list().filter((f) => laneOfFile(f) === lane);
+      if (!files.length) return;
+      try {
+        await forwardHead(lane, files[0], state);
+      } catch (e) {
+        lastError = String(e?.message ?? e);
+        await sleep(2000);
       }
     }
   }
 
-  /** Один шаг досылки: первое событие очереди или ожидание */
-  async function forwardOnce() {
-    const files = list();
-    if (!files.length) {
-      attempt = 0;
-      await new Promise((r) => {
-        wake = r;
-        setTimeout(r, 2000);
-      });
-      wake = null;
-      return;
-    }
-    const file = path.join(outbox, files[0]);
+  const park = (name, reason) => {
+    quiet(() => renameSync(path.join(outbox, name), path.join(failedDir, name)));
+    lastError = `${reason} — событие отложено в outbox/failed`;
+  };
+
+  /** Один шаг дорожки: первое событие ушло, отложено или ждёт повтора */
+  async function forwardHead(lane, name, state) {
+    if (state.file !== name) Object.assign(state, { attempts: 0, failingSince: null, file: name });
+    const file = path.join(outbox, name);
     let item;
     try {
       item = JSON.parse(readFileSync(file, "utf8"));
     } catch {
-      quiet(() => renameSync(file, path.join(failedDir, files[0]))); // битый файл — в сторону, не блокирует очередь
+      park(name, "битый файл"); // не блокирует дорожку
       return;
     }
     let status = 0;
@@ -143,36 +200,76 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatc
     if (status >= 200 && status < 300) {
       quiet(() => unlinkSync(file));
       lastOkAt = new Date().toISOString();
-      if (attempt > 2) log(`буфер: связь восстановлена, досылаю очередь (${list().length})`);
-      attempt = 0;
+      if (offline.attempts > 2) log(`буфер: связь восстановлена, досылаю очередь (${list().length})`);
+      offline.attempts = 0;
+      offline.since = null;
       lastError = null;
       return;
     }
-    // сайт отклонил событие (неверный токен/формат) — повтор не поможет, откладываем в failed/
+    // сайт отклонил событие (неверный токен/формат/чужой матч) — повтор не поможет
     if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
-      quiet(() => renameSync(file, path.join(failedDir, files[0])));
-      lastError = `HTTP ${status} — событие отложено в outbox/failed`;
+      park(name, `HTTP ${status}`);
       log(`буфер: ${item.path.split("?")[0]} → ${lastError}`);
       return;
     }
-    if (status) lastError = `HTTP ${status}`;
-    attempt++;
-    if (attempt === 1 || attempt % 20 === 0) log(`буфер: сайт недоступен (${lastError}), в очереди ${files.length}`);
-    await new Promise((r) => setTimeout(r, Math.min(RETRY_MAX_MS, 1000 * 2 ** Math.min(attempt - 1, 5))));
+    if (!status) {
+      // сайт недоступен вовсе: это обрыв связи — ничего не откладываем, просто ждём
+      offline.attempts++;
+      offline.since ??= Date.now();
+      if (offline.attempts === 1 || offline.attempts % 20 === 0) log(`буфер: сайт недоступен (${lastError}), в очереди ${list().length}`);
+      await sleep(Math.min(retryMaxMs, 1000 * 2 ** Math.min(offline.attempts - 1, 5)));
+      return;
+    }
+    // сайт ответил, но обработать не смог (5xx, 408, 429)
+    lastError = `HTTP ${status}`;
+    state.attempts++;
+    state.failingSince ??= Date.now();
+    if (state.attempts >= parkAfterAttempts && Date.now() - state.failingSince >= parkAfterMs) {
+      park(name, `HTTP ${status} ${state.attempts} раз за ${Math.round((Date.now() - state.failingSince) / 1000)} с`);
+      log(`буфер: дорожка ${lane}: ${lastError}`);
+      return;
+    }
+    if (state.attempts === 1 || state.attempts % 10 === 0) log(`буфер: дорожка ${lane}: сайт ответил ${status}, повтор ${state.attempts}`);
+    await sleep(Math.min(retryMaxMs, 1000 * 2 ** Math.min(state.attempts - 1, 5)));
   }
+
+  const ageOf = (name, dirPath) => {
+    const ts = Number(name.split("-")[0]);
+    if (Number.isFinite(ts) && ts > 0) return Math.round((Date.now() - ts) / 1000);
+    try {
+      return Math.round((Date.now() - statSync(path.join(dirPath, name)).mtimeMs) / 1000);
+    } catch {
+      return 0;
+    }
+  };
 
   function stats() {
     const files = list();
-    const oldest = files[0] ? Number(files[0].split("-")[0]) : null;
+    const failed = failedList();
     return {
       running,
       port,
       queued: files.length,
-      failed: readdirSync(failedDir).length,
-      oldest_age_s: oldest ? Math.round((Date.now() - oldest) / 1000) : 0,
+      lanes: new Set(files.map(laneOfFile)).size,
+      oldest_age_s: files[0] ? ageOf(files[0], outbox) : 0,
+      failed: failed.length,
+      failed_oldest_age_s: failed[0] ? ageOf(failed[0], failedDir) : 0,
       last_error: lastError,
       last_ok_at: lastOkAt,
     };
+  }
+
+  /** Отложенные события → обратно в очередь (по порядку времени, со своими дорожками) */
+  function replayFailed() {
+    let moved = 0;
+    for (const name of failedList()) {
+      try {
+        renameSync(path.join(failedDir, name), path.join(outbox, name));
+        moved++;
+      } catch {}
+    }
+    if (wake) wake();
+    return moved;
   }
 
   /** Конфиг матча с сайта — на диск, чтобы MatchZy мог загрузить матч и без интернета */
@@ -189,8 +286,8 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatc
       });
       server.listen(port, "127.0.0.1", () => {
         running = true;
-        log(`буфер событий: 127.0.0.1:${port}, в очереди ${list().length}`);
-        forwardLoop();
+        log(`буфер событий: 127.0.0.1:${port}, в очереди ${list().length}, отложено ${failedList().length}`);
+        scheduleLoop();
         resolve(true);
       });
     });
@@ -202,6 +299,7 @@ export function createRelay({ port = 27099, dir, siteUrl, log = () => {}, onMatc
     stats,
     saveConfig,
     hasConfig,
+    replayFailed,
     get running() {
       return running;
     },

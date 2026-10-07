@@ -21,35 +21,9 @@ const run = (file, args, { timeoutMs = 30 * 60_000, cwd } = {}) =>
 
 const ps = (script, opts) => run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script], opts);
 
-// ───────────────────────── самообновление
+// ───────────────────────── самообновление (bundle.mjs)
 
-export const versionFile = (f16Dir) => path.join(f16Dir, "bundle-version.txt");
-
-export function localBundleVersion(f16Dir) {
-  const f = versionFile(f16Dir);
-  return existsSync(f) ? readFileSync(f, "utf8").trim() : "none";
-}
-
-/** Скачивает код агента, скрипты и конфиги с сайта и раскладывает их по местам */
-export async function applyBundle({ siteUrl, token, f16Dir, serverDir }) {
-  const res = await fetch(`${siteUrl}/api/agent/bundle`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!res.ok) throw new Error(`bundle → HTTP ${res.status}`);
-  const { version, files } = await res.json();
-  const csgoCfg = path.join(serverDir, "game", "csgo", "cfg");
-  for (const f of files) {
-    const targets = [path.join(f16Dir, ...f.path.split("/"))];
-    if (f.path.startsWith("cfg/")) targets.push(path.join(csgoCfg, ...f.path.slice(4).split("/")));
-    for (const target of targets) {
-      mkdirSync(path.dirname(target), { recursive: true });
-      writeFileSync(target, f.content, "utf8");
-    }
-  }
-  writeFileSync(versionFile(f16Dir), version);
-  return { version, count: files.length };
-}
+export { applyBundle, localBundleVersion, versionFile } from "./bundle.mjs";
 
 // ───────────────────────── версии
 
@@ -187,17 +161,22 @@ export async function restartAll({ instances, startPs1 }) {
 
 // ───────────────────────── прогрев workshop-карт
 
+/** Карт за один прогрев: каждая — до 4 минут загрузки и минута на возврат, сайт ставит следующий прогрев сам */
+export const PREFETCH_MAX_MAPS = 3;
+
 /**
  * Скачивает workshop-карты в кэш: на свободном сервере по очереди грузит каждую карту
  * (host_workshop_map), ждёт, пока она реально загрузится, затем возвращает сервер на de_mirage.
  * Установка CS2 общая для всех инстансов — карта скачивается один раз для всех.
+ * Занят только выбранный сервер (ctx.markBusy): остальные инстансы получают матчи как обычно.
  */
-export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, payload) {
-  const ids = (payload?.workshop_ids ?? []).filter((x) => /^\d+$/.test(String(x)));
+export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword, isAssigned = () => false, markBusy = () => {} }, payload) {
+  const ids = (payload?.workshop_ids ?? []).filter((x) => /^\d+$/.test(String(x))).slice(0, PREFETCH_MAX_MAPS);
   if (!ids.length) return "нет карт для прогрева";
-  // свободный запущенный сервер: MatchZy без матча
+  // свободный запущенный сервер: MatchZy без матча, агент не держит на нём назначенный матч
   let target = null;
   for (const i of instances) {
+    if (isAssigned(i.name)) continue;
     const status = await rcon(i.port, rconPassword, "get5_status").catch(() => null);
     if (!status) continue;
     try {
@@ -208,7 +187,15 @@ export async function prefetchMaps({ instances, rcon, a2sInfo, rconPassword }, p
     } catch {}
   }
   if (!target) throw new Error("нет свободного запущенного сервера для прогрева");
+  markBusy(target.name, true);
+  try {
+    return await prefetchOn(target, ids, { rcon, a2sInfo, rconPassword });
+  } finally {
+    markBusy(target.name, false);
+  }
+}
 
+async function prefetchOn(target, ids, { rcon, a2sInfo, rconPassword }) {
   // исходная точка — de_mirage: если на сервере уже стоит та же workshop-карта, смену не увидим
   if ((await a2sInfo(target.port))?.map !== "de_mirage") {
     await rcon(target.port, rconPassword, "changelevel de_mirage").catch(() => {});
