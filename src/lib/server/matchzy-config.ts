@@ -88,7 +88,7 @@ export function modeCvars(format: string, maps: string[] = []): Record<string, n
       ...base,
       mp_halftime: 1,
       mp_halftime_duration: 16,
-      mp_overtime_startmoney: 12500,
+      mp_overtime_startmoney: 10000,
       mp_roundtime: 1.92,
       mp_roundtime_defuse: 1.92,
       mp_startmoney: 800,
