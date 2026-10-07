@@ -176,14 +176,16 @@ export async function joinTeam(_prev: ActionResult, formData: FormData): Promise
   const locked = await lockedError(team.id);
   if (locked) return { error: locked };
 
-  const members = await getTeamMembers(team.id);
-  const mains = members.filter((m) => m.role !== "substitute").length;
-  const subs = members.length - mains;
-  const role = mains < MAX_MAIN ? "player" : subs < MAX_SUBS ? "substitute" : null;
-  if (!role) return { error: "В команде нет свободных мест" };
-
-  const { error } = await db().from("team_members").insert({ team_id: team.id, player_id: player.id, role });
-  if (error) return { error: "Не удалось вступить — возможно, вы уже в другой команде" };
+  // места считаются и игрок добавляется под блокировкой команды — одновременные вступления не переполнят состав
+  const { data: role, error } = await db().rpc("join_team", {
+    p_team: team.id,
+    p_player: player.id,
+    p_max_main: MAX_MAIN,
+    p_max_subs: MAX_SUBS,
+  });
+  if (error?.message.includes("team_full")) return { error: "В команде нет свободных мест" };
+  if (error?.message.includes("team_missing")) return { error: "Ссылка недействительна" };
+  if (error || !role) return { error: "Не удалось вступить — возможно, вы уже в другой команде" };
 
   await syncOpenRosters(team.id);
   await notify([team.captain_id], `${player.nickname} вступил в ${team.name}`, undefined, "/team");
@@ -271,9 +273,10 @@ export async function transferCaptain(_prev: ActionResult, formData: FormData): 
   const me = members.find((m) => m.player_id === player.id);
   if (!target || !me || target.id === me.id) return { error: "Игрок не найден" };
 
-  await db().from("team_members").update({ role: target.role === "substitute" ? "substitute" : "player" }).eq("id", me.id);
-  await db().from("team_members").update({ role: "captain" }).eq("id", target.id);
-  await db().from("teams").update({ captain_id: target.player_id }).eq("id", team.id);
+  // роли обоих игроков и captain_id команды меняются одной транзакцией
+  const { error } = await db().rpc("transfer_team_captain", { p_team: team.id, p_actor: player.id, p_member: target.id });
+  if (error?.message.includes("captain_required")) return { error: NOT_CAPTAIN };
+  if (error) return { error: "Не удалось передать капитанство — обновите страницу" };
   await syncOpenRosters(team.id);
   await notify([target.player_id], `Вы стали капитаном ${team.name}`, undefined, "/team");
   await audit(player.id, "team.transfer_captain", { type: "team", id: team.id }, { to: target.player.steam_id });

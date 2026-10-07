@@ -186,6 +186,12 @@ export type Match = {
   created_at: string;
 };
 
+/** Поля сетки, которые сверяет и пишет RPC sync_bracket_apply */
+export type BracketSyncRow = Pick<Match, "id" | "status" | "team1_id" | "team2_id" | "winner_id" | "is_walkover">;
+
+/** Режим RPC create_stage_matches: первая стадия, плей-офф после групп/швейцарки, следующий тур швейцарки */
+export type StageCreateMode = "bracket" | "playoff" | "round";
+
 export type MatchMap = {
   id: string;
   match_id: string;

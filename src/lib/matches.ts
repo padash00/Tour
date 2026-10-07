@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { cache } from "react";
 import { notify } from "./audit";
 import { generateBracket, resolveBracket, type BracketMatch, GRAND_FINAL_ADVANTAGE } from "./bracket";
 import {
@@ -14,21 +15,25 @@ import {
   type StageMatch,
 } from "./formats";
 import { db } from "./supabase";
-import type { Match, MatchMap, Player, Team, Tournament, VetoActionRow } from "./types";
-import { VETO_STEP_SECONDS, seriesMaps, vetoState } from "./veto";
+import type { BracketSyncRow, Match, MatchMap, Player, StageCreateMode, Team, Tournament, VetoActionRow } from "./types";
+import { VETO_STEP_SECONDS, vetoState } from "./veto";
 
 export type MatchWithTeams = Match & { team1: Team | null; team2: Team | null };
 
 const MATCH_SELECT = "*, team1:teams!matches_team1_id_fkey(*), team2:teams!matches_team2_id_fkey(*)";
 
-export async function getTournamentMatches(tournamentId: string): Promise<MatchWithTeams[]> {
+// Геттеры для страниц обёрнуты в React cache(): generateMetadata и страница в одном рендере делают один
+// запрос. Вне рендера (Server Actions, маршруты API) cache() ничего не кэширует. Логика, которой нужно
+// свежее состояние после собственной записи (вето, стадии), читает некэшированные load*/fetch*.
+
+export const getTournamentMatches = cache(async (tournamentId: string): Promise<MatchWithTeams[]> => {
   const { data } = await db()
     .from("matches")
     .select(MATCH_SELECT)
     .eq("tournament_id", tournamentId)
     .order("number");
   return (data ?? []) as MatchWithTeams[];
-}
+});
 
 export type MatchFull = MatchWithTeams & {
   tournament: Tournament;
@@ -36,7 +41,7 @@ export type MatchFull = MatchWithTeams & {
   veto: VetoActionRow[];
 };
 
-export async function getMatch(id: string): Promise<MatchFull | null> {
+async function fetchMatch(id: string): Promise<MatchFull | null> {
   const { data } = await db()
     .from("matches")
     .select(`${MATCH_SELECT}, tournament:tournaments(*), maps:match_maps(*), veto:veto_actions(*)`)
@@ -49,8 +54,10 @@ export async function getMatch(id: string): Promise<MatchFull | null> {
   return m;
 }
 
+export const getMatch = cache(fetchMatch);
+
 /** Матчи команды (кроме отменённых и технических без соперника) */
-export async function getTeamMatches(teamId: string): Promise<(MatchWithTeams & { tournament: Tournament })[]> {
+export const getTeamMatches = cache(async (teamId: string): Promise<(MatchWithTeams & { tournament: Tournament })[]> => {
   const { data } = await db()
     .from("matches")
     .select(`${MATCH_SELECT}, tournament:tournaments(*)`)
@@ -61,7 +68,7 @@ export async function getTeamMatches(teamId: string): Promise<(MatchWithTeams & 
     // черновик турнира виден только админу — его матчи игроку не показываем
     (m) => !(m.is_walkover && (!m.team1_id || !m.team2_id)) && m.tournament?.status !== "draft",
   );
-}
+});
 
 /** Состав команды на турнир — кто может действовать в вето и видеть данные сервера */
 export async function getMatchRosters(match: Match) {
@@ -100,30 +107,52 @@ function toBracket(m: Match): BracketMatch {
   };
 }
 
+const syncRow = (m: Pick<Match, "status" | "team1_id" | "team2_id" | "winner_id" | "is_walkover">, id: string): BracketSyncRow => ({
+  id,
+  status: m.status,
+  team1_id: m.team1_id,
+  team2_id: m.team2_id,
+  winner_id: m.winner_id,
+  is_walkover: m.is_walkover,
+});
+
+/**
+ * Чистый расчёт сетки плей-офф по снимку матчей: `expected` — снимок для сверки в базе,
+ * `updates` — изменённые матчи. Пустой `updates` — сетка уже согласована.
+ */
+export function planBracketSync(rows: Match[]) {
+  const playoff = rows.filter((r) => (r.stage ?? "playoff") === "playoff");
+  const bm = playoff.map(toBracket);
+  const changed = resolveBracket(bm);
+  return {
+    expected: playoff.map((r) => syncRow(r, r.id)),
+    updates: bm.filter((m) => changed.has(m.key)).map((m) => syncRow(m, m.key)),
+  };
+}
+
+const SYNC_ATTEMPTS = 5;
+
 /** Применяет результаты к сетке плей-офф, затем двигает стадии (следующий раунд швейцарки, создание плей-офф) */
 export async function syncBracket(tournamentId: string) {
-  const { data } = await db().from("matches").select("*").eq("tournament_id", tournamentId);
-  const rows = ((data ?? []) as Match[]).filter((r) => (r.stage ?? "playoff") === "playoff");
-  const before = new Map(rows.map((r) => [r.id, r]));
-  const bm = rows.map(toBracket);
-  const changed = resolveBracket(bm);
-
-  const nowUpcoming: string[] = [];
-  for (const m of bm) {
-    if (!changed.has(m.key)) continue;
-    const prev = before.get(m.key)!;
-    if (prev.status !== "upcoming" && m.status === "upcoming") nowUpcoming.push(m.key);
-    await db()
-      .from("matches")
-      .update({
-        team1_id: m.team1_id,
-        team2_id: m.team2_id,
-        status: m.status,
-        winner_id: m.winner_id,
-        is_walkover: m.is_walkover,
-        ...(m.status === "finished" && !prev.finished_at && { finished_at: new Date().toISOString() }),
-      })
-      .eq("id", m.key);
+  let nowUpcoming: string[] = [];
+  // Оптимистичная запись: база применяет изменения, только если сетка не менялась с момента чтения.
+  // Иначе (параллельный пересчёт или новый результат) — читаем заново и пересчитываем.
+  for (let attempt = 1; ; attempt++) {
+    const { data, error } = await db().from("matches").select("*").eq("tournament_id", tournamentId).eq("stage", "playoff");
+    if (error) throw new Error("Не удалось прочитать сетку", { cause: error });
+    const { expected, updates } = planBracketSync((data ?? []) as Match[]);
+    if (updates.length === 0) break;
+    const { data: result, error: applyError } = await db().rpc("sync_bracket_apply", {
+      p_tournament: tournamentId,
+      p_expected: expected,
+      p_updates: updates,
+    });
+    if (applyError) throw new Error("Не удалось обновить сетку", { cause: applyError });
+    if (result?.status === "ok") {
+      nowUpcoming = (result.upcoming ?? []) as string[];
+      break;
+    }
+    if (attempt >= SYNC_ATTEMPTS) throw new Error("Сетка меняется одновременно из нескольких мест — повторите позже");
   }
 
   if (nowUpcoming.length) await afterMatchesUpcoming(tournamentId, nowUpcoming);
@@ -135,7 +164,7 @@ async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
   if (matchIds.length === 0) return;
   const [{ data: t }, { data: list }] = await Promise.all([
     db().from("tournaments").select("map_pool").eq("id", tournamentId).single(),
-    db().from("matches").select("id, number, team1_id, team2_id, best_of").in("id", matchIds),
+    db().from("matches").select("id, number, team1_id, team2_id").in("id", matchIds),
   ]);
   const pool = (t?.map_pool ?? []) as string[];
   const teamIds = (list ?? []).flatMap((m) => [m.team1_id, m.team2_id]).filter(Boolean) as string[];
@@ -144,13 +173,10 @@ async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
     : { data: [] as { id: string; captain_id: string; name: string }[] };
   for (const m of list ?? []) {
     if (pool.length === 1) {
-      // одна карта (например aim_map): BO3 — эта карта три раза, MatchZy перезагружает её между играми
-      const n = Math.max(1, m.best_of ?? 1);
-      await db().from("match_maps").delete().eq("match_id", m.id);
-      await db()
-        .from("match_maps")
-        .insert(Array.from({ length: n }, (_, i) => ({ match_id: m.id, map_number: i + 1, map_name: pool[0] })));
-      await db().from("matches").update({ status: "ready" }).eq("id", m.id);
+      // одна карта (например aim_map): BO3 — эта карта три раза, MatchZy перезагружает её между играми.
+      // Карты серии и статус «готов» записываются одной транзакцией.
+      const { error } = await db().rpc("finish_veto", { p_match: m.id, p_single_map: pool[0] });
+      if (error) throw new Error("Не удалось подготовить карты матча", { cause: error });
     }
     const t1 = teams?.find((x) => x.id === m.team1_id);
     const t2 = teams?.find((x) => x.id === m.team2_id);
@@ -177,36 +203,37 @@ type NewMatch = {
   best_of: number;
 };
 
-async function insertStageMatches(tournament: Tournament, list: NewMatch[]) {
-  const { data: last } = await db()
-    .from("matches")
-    .select("number")
-    .eq("tournament_id", tournament.id)
-    .order("number", { ascending: false })
-    .limit(1);
-  let n = last?.[0]?.number ?? 0;
-  const rows = list.map((m) => {
+/**
+ * Записывает матчи стадии вместе с отметкой о ней (create_stage_matches). Номера матчей относительные —
+ * сквозной номер назначает база. false — стадия уже создана (повтор или параллельный вызов).
+ */
+async function saveStage(tournamentId: string, mode: StageCreateMode, rows: { id: string; status: string; team1_id: string | null; team2_id: string | null }[]) {
+  const { data: created, error } = await db().rpc("create_stage_matches", { p_tournament: tournamentId, p_mode: mode, p_rows: rows });
+  if (error) throw new Error(error.message);
+  if (!created) return false;
+  await afterMatchesUpcoming(
+    tournamentId,
+    rows.filter((r) => r.status === "upcoming" && r.team1_id && r.team2_id).map((r) => r.id),
+  );
+  return true;
+}
+
+async function insertStageMatches(tournament: Tournament, list: NewMatch[], mode: StageCreateMode) {
+  const finishedAt = new Date().toISOString();
+  const rows = list.map((m, i) => {
     // бай швейцарки: соперника нет — сразу техническая победа
     const bye = m.stage === "swiss" && !!m.team1_id && !m.team2_id;
     return {
       id: randomUUID(),
-      tournament_id: tournament.id,
-      number: ++n,
+      number: i + 1,
       status: m.team1_id && m.team2_id ? "upcoming" : bye ? "finished" : "pending",
-      // одинаковый набор колонок у всех строк: при пакетной вставке недостающие поля стали бы NULL
       winner_id: bye ? m.team1_id : null,
       is_walkover: bye,
-      finished_at: bye ? new Date().toISOString() : null,
+      finished_at: bye ? finishedAt : null,
       ...m,
     };
   });
-  const { error } = await db().from("matches").insert(rows);
-  if (error) throw new Error(error.message);
-  await afterMatchesUpcoming(
-    tournament.id,
-    rows.filter((r) => r.status === "upcoming").map((r) => r.id),
-  );
-  return rows;
+  return saveStage(tournament.id, mode, rows);
 }
 
 /** Создаёт первую стадию турнира по его формату */
@@ -214,6 +241,7 @@ export async function createBracket(tournament: Tournament, seededTeamIds: strin
   const kind = tournament.bracket_type as FormatKind;
   const bo = tournament.default_best_of ?? 1;
 
+  let created: boolean;
   if (kind === "round_robin" || kind === "groups_playoff") {
     const groupsCount = Math.max(1, Math.min(tournament.groups_count ?? 2, Math.floor(seededTeamIds.length / 2)));
     const groups = kind === "round_robin" ? [seededTeamIds] : splitGroups(seededTeamIds, groupsCount);
@@ -237,22 +265,34 @@ export async function createBracket(tournament: Tournament, seededTeamIds: strin
     });
     // номера матчей: тур за туром по всем группам
     list.sort((x, y) => x.round - y.round || (x.group_label ?? "").localeCompare(y.group_label ?? "") || x.position - y.position);
-    await insertStageMatches(tournament, list);
+    created = await insertStageMatches(tournament, list, "bracket");
   } else if (kind === "swiss" || kind === "swiss_playoff") {
     const pairs = swissFirstRound(seededTeamIds);
-    await insertStageMatches(
+    created = await insertStageMatches(
       tournament,
       pairs.map(([a, b], i) => ({ bracket: "swiss", stage: "swiss", round: 1, position: i, team1_id: a, team2_id: b, best_of: bo })),
+      "bracket",
     );
   } else {
-    await createEliminationStage(tournament, seededTeamIds, kind === "double_elimination", 0);
+    created = await createEliminationStage(tournament, seededTeamIds, kind === "double_elimination", "bracket");
   }
-  await db().from("tournaments").update({ bracket_published_at: new Date().toISOString() }).eq("id", tournament.id);
+  if (!created) throw new Error("Сетка уже создана");
   await syncBracket(tournament.id);
 }
 
 /** Сетка на выбывание (весь турнир или плей-офф после групп/швейцарки) */
-async function createEliminationStage(tournament: Tournament, seededTeamIds: string[], double: boolean, numberOffset: number) {
+async function createEliminationStage(tournament: Tournament, seededTeamIds: string[], double: boolean, mode: StageCreateMode) {
+  // матчи первого раунда создаются сразу «скоро» — уведомить и (при одной карте) подготовить серию,
+  // как это делает syncBracket для следующих раундов
+  return saveStage(tournament.id, mode, eliminationStageRows(tournament, seededTeamIds, double));
+}
+
+/** Строки матчей сетки на выбывание для create_stage_matches (чистая функция, номера относительные) */
+export function eliminationStageRows(
+  tournament: Pick<Tournament, "default_best_of" | "final_best_of">,
+  seededTeamIds: string[],
+  double: boolean,
+) {
   const generated = generateBracket({
     seeded: seededTeamIds,
     double,
@@ -260,10 +300,10 @@ async function createEliminationStage(tournament: Tournament, seededTeamIds: str
     finalBestOf: tournament.final_best_of ?? 3,
   });
   const ids = new Map(generated.map((m) => [m.key, randomUUID()]));
-  const rows = generated.map((m) => ({
+  const finishedAt = new Date().toISOString();
+  return generated.map((m) => ({
     id: ids.get(m.key)!,
-    tournament_id: tournament.id,
-    number: m.number + numberOffset,
+    number: m.number,
     bracket: m.bracket,
     stage: "playoff",
     round: m.round,
@@ -274,24 +314,16 @@ async function createEliminationStage(tournament: Tournament, seededTeamIds: str
     team2_id: m.team2_id,
     winner_id: m.winner_id,
     is_walkover: m.is_walkover,
-    finished_at: m.status === "finished" ? new Date().toISOString() : null,
+    finished_at: m.status === "finished" ? finishedAt : null,
     winner_to_match: m.winner_to ? ids.get(m.winner_to.key)! : null,
     winner_to_slot: m.winner_to?.slot ?? null,
     loser_to_match: m.loser_to ? ids.get(m.loser_to.key)! : null,
     loser_to_slot: m.loser_to?.slot ?? null,
   }));
-  const { error } = await db().from("matches").insert(rows);
-  if (error) throw new Error(error.message);
-  // матчи первого раунда создаются сразу «скоро» — уведомить и (при одной карте) подготовить серию,
-  // как это делает syncBracket для следующих раундов
-  await afterMatchesUpcoming(
-    tournament.id,
-    rows.filter((r) => r.status === "upcoming" && r.team1_id && r.team2_id).map((r) => r.id),
-  );
 }
 
 /** Команды стадии (группы/швейцарки) в порядке посева и матчи стадии */
-export async function getStageData(tournamentId: string) {
+async function loadStageData(tournamentId: string) {
   const [{ data: regs }, { data: ms }] = await Promise.all([
     db().from("tournament_registrations").select("team_id, seed").eq("tournament_id", tournamentId).eq("status", "approved").order("seed"),
     db()
@@ -307,9 +339,9 @@ export async function getStageData(tournamentId: string) {
   return { seeded, matches };
 }
 
-/** Таблицы групп / швейцарки */
-export async function getStandings(tournament: Tournament) {
-  const { seeded, matches } = await getStageData(tournament.id);
+export const getStageData = cache(loadStageData);
+
+function stageTables(tournament: Tournament, { seeded, matches }: Awaited<ReturnType<typeof loadStageData>>) {
   const kind = tournament.bracket_type as FormatKind;
   if (kind === "swiss" || kind === "swiss_playoff") {
     return [{ label: null as string | null, table: standings(seeded, matches, { swiss: true, swissWins: tournament.swiss_wins }), matches }];
@@ -320,6 +352,11 @@ export async function getStandings(tournament: Tournament) {
     const ids = seeded.filter((id) => gm.some((m) => m.team1_id === id || m.team2_id === id));
     return { label: label as string | null, table: standings(ids, gm), matches: gm };
   });
+}
+
+/** Таблицы групп / швейцарки */
+export async function getStandings(tournament: Tournament) {
+  return stageTables(tournament, await getStageData(tournament.id));
 }
 
 /**
@@ -333,7 +370,8 @@ export async function progressStages(tournamentId: string) {
   const kind = tournament.bracket_type as FormatKind;
   if (!["round_robin", "groups_playoff", "swiss", "swiss_playoff"].includes(kind)) return;
 
-  const { seeded, matches } = await getStageData(tournament.id);
+  const stage = await loadStageData(tournament.id);
+  const { seeded, matches } = stage;
   if (matches.length === 0 || matches.some((m) => !["finished", "cancelled"].includes(m.status))) return;
 
   const swiss = kind === "swiss" || kind === "swiss_playoff";
@@ -347,7 +385,8 @@ export async function progressStages(tournamentId: string) {
       const round = Math.max(...matches.map((m) => m.round)) + 1;
       const pairs = swissPairings(table, played, tournament.swiss_wins);
       if (pairs.length) {
-        await insertStageMatches(
+        // тур создаётся один раз: параллельный вызов получит false
+        const created = await insertStageMatches(
           tournament,
           pairs.map(([a, b], i) => ({
             bracket: "swiss",
@@ -358,9 +397,10 @@ export async function progressStages(tournamentId: string) {
             team2_id: b,
             best_of: tournament.default_best_of ?? 1,
           })),
+          "round",
         );
         // раунд из одного бая играть некому — сразу двигаем стадию дальше
-        if (pairs.every(([, b]) => !b)) await progressStages(tournamentId);
+        if (created && pairs.every(([, b]) => !b)) await progressStages(tournamentId);
       }
       return;
     }
@@ -374,23 +414,16 @@ export async function progressStages(tournamentId: string) {
       .filter((r) => r.status === "advanced")
       .map((r) => r.teamId);
   } else {
-    const groups = (await getStandings(tournament)).map((g) => g.table.slice(0, tournament.advance_per_group).map((r) => r.teamId));
+    const groups = stageTables(tournament, stage).map((g) => g.table.slice(0, tournament.advance_per_group).map((r) => r.teamId));
     // посев плей-офф: все первые места по группам, затем все вторые… → A1–B2, B1–A2
     advancing = [];
     for (let place = 0; place < tournament.advance_per_group; place++) for (const g of groups) if (g[place]) advancing.push(g[place]);
   }
   if (advancing.length < 2) return;
-  // отметку ставим до создания — чтобы параллельный вызов не создал плей-офф дважды
-  const { data: claimed } = await db()
-    .from("tournaments")
-    .update({ playoff_created_at: new Date().toISOString() })
-    .eq("id", tournament.id)
-    .is("playoff_created_at", null)
-    .select("id");
-  if (!claimed?.length) return;
-  const last = Math.max(0, ...matches.map((m) => m.number));
-  await createEliminationStage(tournament, advancing, tournament.playoff_type === "double_elimination", last);
-  await syncBracket(tournament.id);
+  // матчи плей-офф и playoff_created_at пишутся одной транзакцией: при сбое отметка не остаётся,
+  // а параллельный вызов не создаст плей-офф дважды
+  const created = await createEliminationStage(tournament, advancing, tournament.playoff_type === "double_elimination", "playoff");
+  if (created) await syncBracket(tournament.id);
 }
 
 // ───────────────────────── вето
@@ -398,13 +431,13 @@ export async function progressStages(tournamentId: string) {
 /** Выполняет авто-баны/пики по истёкшим таймерам. Вызывается при открытии матча и при каждом действии. */
 export async function applyVetoTimeouts(matchId: string) {
   for (let i = 0; i < 10; i++) {
-    const m = await getMatch(matchId);
+    const m = await fetchMatch(matchId);
     if (!m || m.status !== "veto" || !m.veto_deadline) return;
     const deadline = new Date(m.veto_deadline).getTime();
     if (deadline > Date.now()) return;
     const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
     if (!state.current || state.current.action === "decider") {
-      await finishVetoIfComplete(m);
+      await completeVeto(m);
       return;
     }
     const map = state.remaining[Math.floor(Math.random() * state.remaining.length)];
@@ -447,33 +480,37 @@ export async function insertVetoAction(
   });
   if (error) return false; // кто-то успел раньше
 
-  const fresh = (await getMatch(m.id))!;
+  const fresh = (await fetchMatch(m.id))!;
   const next = vetoState(fresh.best_of, fresh.tournament.map_pool, fresh.veto);
-  if (next.current?.action === "decider") {
-    await db().from("veto_actions").insert({
-      match_id: m.id,
-      step: next.current.step,
-      team_id: null,
-      action: "decider",
-      map_name: next.remaining[0],
-      auto: true,
-    });
-    await finishVetoIfComplete((await getMatch(m.id))!);
+  if (next.current?.action === "decider" || next.complete) {
+    await completeVeto(fresh);
   } else {
-    await db().from("matches").update({ veto_deadline: nextDeadline.toISOString() }).eq("id", m.id);
+    await db().from("matches").update({ veto_deadline: nextDeadline.toISOString() }).eq("id", m.id).eq("status", "veto");
   }
   return true;
 }
 
-async function finishVetoIfComplete(m: MatchFull) {
+/**
+ * Дописывает decider (если его ещё нет) и завершает вето: карты серии и статус «готов» —
+ * одной транзакцией finish_veto под блокировкой матча. Параллельные вызовы (таймер и ход капитана)
+ * безопасны: decider защищён unique(match_id, step), повторное завершение ничего не меняет.
+ */
+async function completeVeto(m: MatchFull) {
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
-  if (!state.complete) return;
-  const maps = seriesMaps(m.veto);
-  await db().from("match_maps").delete().eq("match_id", m.id);
-  await db()
-    .from("match_maps")
-    .insert(maps.map((x, i) => ({ match_id: m.id, map_number: i + 1, map_name: x.map_name, picked_by: x.picked_by })));
-  await db().from("matches").update({ status: "ready", veto_deadline: null }).eq("id", m.id).eq("status", "veto");
+  if (state.current?.action === "decider") {
+    await db().from("veto_actions").insert({
+      match_id: m.id,
+      step: state.current.step,
+      team_id: null,
+      action: "decider",
+      map_name: state.remaining[0],
+      auto: true,
+    });
+  } else if (!state.complete) {
+    return;
+  }
+  const { error } = await db().rpc("finish_veto", { p_match: m.id });
+  if (error) throw new Error("Не удалось завершить вето", { cause: error });
 }
 
 // ───────────────────────── результат
@@ -503,69 +540,4 @@ export async function getUpcomingMatches(limit = 6) {
         a.number - b.number,
     )
     .slice(0, limit);
-}
-
-
-export type ActiveMatch = {
-  id: string;
-  number: number;
-  status: "veto" | "ready" | "live";
-  opponent: string;
-  address: string | null;
-  password: string | null;
-};
-
-/**
- * Матч игрока, который требует внимания сейчас: сервер готов (заходить), вето, или идёт игра.
- * Только турниры, где игрок в одобренном составе — адрес сервера видят лишь участники.
- */
-export async function getPlayerActiveMatch(playerId: string): Promise<ActiveMatch | null> {
-  const { data: rows } = await db()
-    .from("tournament_roster_players")
-    .select("tournament_id, registration:tournament_registrations!inner(team_id, status)")
-    .eq("player_id", playerId)
-    .eq("registration.status", "approved");
-  const pairs = ((rows ?? []) as unknown as { tournament_id: string; registration: { team_id: string } }[]).map((r) => ({
-    t: r.tournament_id,
-    team: r.registration.team_id,
-  }));
-  if (pairs.length === 0) return null;
-  const teamIds = [...new Set(pairs.map((p) => p.team))];
-  const { data } = await db()
-    .from("matches")
-    .select(
-      "id, number, status, tournament_id, team1_id, team2_id, server_state, server_address, server_password, team1:teams!matches_team1_id_fkey(name), team2:teams!matches_team2_id_fkey(name)",
-    )
-    .in("status", ["veto", "ready", "live"])
-    .or(`team1_id.in.(${teamIds.join(",")}),team2_id.in.(${teamIds.join(",")})`);
-  type Row = {
-    id: string;
-    number: number;
-    status: ActiveMatch["status"];
-    tournament_id: string;
-    team1_id: string | null;
-    team2_id: string | null;
-    server_state: string | null;
-    server_address: string | null;
-    server_password: string | null;
-    team1: { name: string } | null;
-    team2: { name: string } | null;
-  };
-  const mine = ((data ?? []) as unknown as Row[]).filter((m) =>
-    pairs.some((p) => p.t === m.tournament_id && (p.team === m.team1_id || p.team === m.team2_id)),
-  );
-  // сначала то, что требует действия: сервер готов → вето → идёт игра
-  const rank = (m: Row) => (m.status === "ready" ? 0 : m.status === "veto" ? 1 : 2);
-  const m = mine.sort((a, b) => rank(a) - rank(b))[0];
-  if (!m) return null;
-  const isTeam1 = pairs.some((p) => p.t === m.tournament_id && p.team === m.team1_id);
-  const ready = m.server_state === "ready" && !!m.server_address;
-  return {
-    id: m.id,
-    number: m.number,
-    status: m.status,
-    opponent: (isTeam1 ? m.team2?.name : m.team1?.name) ?? "соперник",
-    address: ready ? m.server_address : null,
-    password: ready ? m.server_password : null,
-  };
 }

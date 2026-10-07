@@ -17,9 +17,14 @@ const snapshot = (m: { status: string; winner_id: string | null; team1_score: nu
   is_walkover: m.is_walkover,
 });
 
+/** Администраторы: флаг is_admin или SteamID из ADMIN_STEAM_IDS — фильтр в SQL, без чтения всех игроков */
 async function adminIds() {
-  const { data } = await db().from("players").select("id, steam_id, is_admin");
-  return (data ?? []).filter((p) => p.is_admin || env.adminSteamIds.includes(p.steam_id)).map((p) => p.id);
+  const steamIds = env.adminSteamIds.filter((id) => /^\d{17}$/.test(id));
+  const { data } = await db()
+    .from("players")
+    .select("id")
+    .or(steamIds.length ? `is_admin.eq.true,steam_id.in.(${steamIds.join(",")})` : "is_admin.eq.true");
+  return (data ?? []).map((p) => p.id as string);
 }
 
 /** Открыть спор по матчу: капитан одной из команд или админ */

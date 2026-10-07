@@ -93,14 +93,24 @@ export async function listTeams(): Promise<TeamListItem[]> {
 
 export type PlayerListItem = Player & { team: Pick<Team, "name" | "tag"> | null };
 
+const PLAYERS_PAGE = 1000; // максимум строк за запрос у PostgREST по умолчанию
+
+/** Все игроки (постранично — без молчаливой обрезки списка) */
 export async function listPlayers(): Promise<PlayerListItem[]> {
-  const { data } = await db()
-    .from("players")
-    .select("*, team_members(left_at, team:teams(name, tag))")
-    .order("faceit_elo", { ascending: false, nullsFirst: false })
-    .limit(500);
   type Row = Player & { team_members: { left_at: string | null; team: Pick<Team, "name" | "tag"> }[] };
-  return ((data ?? []) as Row[]).map(({ team_members, ...p }) => ({
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PLAYERS_PAGE) {
+    const { data, error } = await db()
+      .from("players")
+      .select("*, team_members(left_at, team:teams(name, tag))")
+      .order("faceit_elo", { ascending: false, nullsFirst: false })
+      .order("id")
+      .range(from, from + PLAYERS_PAGE - 1);
+    if (error) throw new Error("Не удалось загрузить игроков", { cause: error });
+    rows.push(...((data ?? []) as Row[]));
+    if ((data?.length ?? 0) < PLAYERS_PAGE) break;
+  }
+  return rows.map(({ team_members, ...p }) => ({
     ...p,
     team: team_members.find((m) => !m.left_at)?.team ?? null,
   }));
@@ -289,18 +299,15 @@ export async function getEntrantTeam(player: Player, tournament: Pick<Tournament
 export const BANNED_ERROR = "Ваш аккаунт заблокирован";
 
 /**
- * Простое ограничение частоты: было ли такое же действие этого игрока за последние `seconds` секунд
+ * Ограничение частоты: было ли такое же действие этого игрока за последние `seconds` секунд
  * (по журналу audit_logs — действие должно записываться через audit()).
+ * Проверка и отметка попытки атомарны (RPC rate_limit_claim): из двух одновременных запросов
+ * (двойной клик) проходит один.
  */
 export async function isRateLimited(playerId: string, action: string, seconds: number) {
-  const since = new Date(Date.now() - seconds * 1000).toISOString();
-  const { count } = await db()
-    .from("audit_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("actor_id", playerId)
-    .eq("action", action)
-    .gte("created_at", since);
-  return (count ?? 0) > 0;
+  const { data, error } = await db().rpc("rate_limit_claim", { p_actor: playerId, p_action: action, p_seconds: seconds });
+  if (error) throw new Error("Не удалось проверить частоту действий", { cause: error });
+  return data === true;
 }
 
 /** Тип картинки по первым байтам файла (не по заявленному браузером типу) */
