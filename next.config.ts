@@ -15,6 +15,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // выгрузка Excel (только сервер, админка) — пакет загружается Node.js как есть, без сборки в бандл
+  serverExternalPackages: ["exceljs"],
   experimental: {
     serverActions: {
       // картинки до 3 МБ (обложка турнира, карты, логотип) + поля формы; у Vercel предел тела запроса 4,5 МБ
