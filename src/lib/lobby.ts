@@ -227,13 +227,15 @@ export async function closeLobby(lobby: Lobby, reason: string) {
 }
 
 /** Хост давно не открывал лобби — передаём хоста тому, кто на месте */
+/** true — хост передан (лобби нужно перечитать) */
 export async function checkHostAway(lobby: Lobby, members: LobbyMember[]) {
   // во время игры хост в CS2, а не на странице — не передаём
-  if (lobby.status !== "waiting") return;
+  if (lobby.status !== "waiting") return false;
   const host = members.find((m) => m.player_id === lobby.host_id);
-  if (host && Date.now() - new Date(host.last_seen_at).getTime() < HOST_AWAY_MS) return;
-  if (!members.some((m) => m.player_id !== lobby.host_id && isOnline(m))) return;
+  if (host && Date.now() - new Date(host.last_seen_at).getTime() < HOST_AWAY_MS) return false;
+  if (!members.some((m) => m.player_id !== lobby.host_id && isOnline(m))) return false;
   await passHost(lobby, host ? null : lobby.host_id);
+  return true;
 }
 
 // ───────────────────────── состав

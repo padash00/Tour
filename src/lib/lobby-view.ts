@@ -20,6 +20,9 @@ import {
 import type { LobbySettings } from "./lobby-settings";
 import type { Player } from "./types";
 
+/** Как часто обновлять last_seen_at зрителя (мс) — с запасом меньше ONLINE_MS */
+const SEEN_WRITE_MS = 10_000;
+
 export type ViewMember = {
   id: string;
   steam_id: string;
@@ -94,11 +97,17 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   let lobby = await getLobbyByCode(code);
   if (!lobby) return null;
 
-  // зритель — участник: отмечаем, что он на странице
-  if (viewer) {
-    await db().from("lobby_members").update({ last_seen_at: new Date().toISOString() }).eq("lobby_id", lobby.id).eq("player_id", viewer.id);
-  }
-  let game = lobby.current_game_id ? await getGame(lobby.current_game_id) : null;
+  // зритель — участник: отмечаем, что он на странице. Пишем не чаще раза в SEEN_WRITE_MS
+  // (страница опрашивает каждые 1,5 с, а «в сети» — это 45 с), параллельно с чтением игры
+  const seen = viewer
+    ? db()
+        .from("lobby_members")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("lobby_id", lobby.id)
+        .eq("player_id", viewer.id)
+        .lt("last_seen_at", new Date(Date.now() - SEEN_WRITE_MS).toISOString())
+    : null;
+  let [game] = await Promise.all([lobby.current_game_id ? getGame(lobby.current_game_id) : null, seen]);
   if (lobbyHasDue(lobby, game)) {
     await lobbyTimeouts(lobby);
     lobby = (await getLobbyByCode(code))!;
@@ -106,11 +115,10 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   }
 
   let members = await getMembers(lobby.id);
-  if (lobby.status !== "closed" && members.length) {
-    const before = lobby.host_id;
-    await checkHostAway(lobby, members);
+  // перечитываем лобби, только если хост действительно сменился
+  if (lobby.status !== "closed" && members.length && (await checkHostAway(lobby, members))) {
     const fresh = await getLobbyByCode(code);
-    if (fresh && fresh.host_id !== before) {
+    if (fresh) {
       lobby = fresh;
       members = await getMembers(lobby.id);
     }
