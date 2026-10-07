@@ -6,28 +6,15 @@ import { mapLabel } from "@/lib/maps";
 import { MapThumb } from "./settings";
 import { Button, CriticalSurface, FeatureSurface, cn } from "@/components/ds";
 import { Countdown } from "./countdown";
-import { useToast } from "../toast";
+import { CopyConnect } from "../copy-connect";
 import type { Run } from "./use-lobby-view";
 
-/** Адрес сервера: видно и копируется одной кнопкой — игрок вставляет в консоль CS2 */
-function ConnectBox({ address, label = "Сервер" }: { address: string; label?: string }) {
-  const toast = useToast();
-  const command = `connect ${address}`;
+/** Адрес сервера виден, кнопка копирует его — как на FACEIT */
+function ConnectBox({ address, label }: { address: string; label?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-meta text-fg-3">{label}</span>
-      <code className="num select-all rounded-control border border-line bg-shell px-3 py-2 text-[16px] font-semibold text-fg">{command}</code>
-      <Button
-        size="md"
-        onClick={() =>
-          navigator.clipboard.writeText(command).then(
-            () => toast.success("Скопировано — вставьте в консоль CS2 (~)"),
-            () => toast.error("Не удалось скопировать — выделите адрес вручную"),
-          )
-        }
-      >
-        Скопировать
-      </Button>
+      <CopyConnect address={address} label={label ? `Скопировать ${label}` : "Скопировать IP"} />
+      <code className="num select-all rounded-control border border-line bg-shell px-3 py-2.5 text-[14px] text-fg-2">connect {address}</code>
     </div>
   );
 }

@@ -15,7 +15,8 @@ import { getTeamMatches } from "@/lib/matches";
 import { tournamentEta } from "@/lib/schedule";
 import { getPlayerActivity, type Activity } from "@/lib/activity";
 import { modeOf } from "@/lib/modes";
-import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
+import { ActionForm, SubmitButton } from "@/components/forms";
+import { CopyConnect } from "@/components/copy-connect";
 import { MatchListRow } from "@/components/match-row";
 import { NotificationItem } from "@/components/public/notification-feed";
 import {
@@ -377,7 +378,7 @@ function CurrentActivity({ c }: { c: Current }) {
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          {c.connect && <CopyField value={`connect ${c.connect}`} />}
+          {c.connect && <CopyConnect address={c.connect} />}
           {c.cta && (
             <Button href={c.cta.href} size="lg" variant={c.connect ? "secondary" : "primary"} iconRight={<ArrowRight />}>
               {c.cta.label}

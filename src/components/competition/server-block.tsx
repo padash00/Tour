@@ -1,7 +1,6 @@
-import { ArrowRight } from "lucide-react";
 import { mapName } from "@/lib/format";
-import { CopyField } from "../forms";
-import { CriticalSurface, FeatureSurface, Timer, buttonClass } from "@/components/ds";
+import { CopyConnect } from "../copy-connect";
+import { CriticalSurface, FeatureSurface, Timer } from "@/components/ds";
 
 /** Ссылка подключения Steam — одна на всю страницу */
 export function connectHref(address: string, password: string | null) {
@@ -48,21 +47,18 @@ export function ServerReady({
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <a href={connectHref(address, password)} className={buttonClass("primary", "lg", "min-w-[220px]")}>
-          Подключиться
-          <ArrowRight className="size-4" aria-hidden />
-        </a>
+        <CopyConnect address={address} password={password} />
+        <code className="num select-all rounded-control border border-line bg-shell px-3 py-2.5 text-[14px] text-fg-2">
+          connect {address}{password ? `; password ${password}` : ""}
+        </code>
         {map && <span className="text-[14px] text-fg-2">Карта: <strong className="font-medium text-fg">{mapName(map)}</strong></span>}
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,420px)_1fr] lg:items-center">
-        <CopyField value={`connect ${address}${password ? `; password ${password}` : ""}`} />
-        <ol className="grid gap-1.5 text-meta text-fg-3">
-          <li><span className="num mr-2 text-fg-4">01</span>Откройте сервер кнопкой или вставьте команду в консоль.</li>
-          <li><span className="num mr-2 text-fg-4">02</span>В разминке напишите <span className="num text-fg-2">.ready</span>.</li>
-          <li><span className="num mr-2 text-fg-4">03</span>После ножевого — <span className="num text-fg-2">.stay</span> / <span className="num text-fg-2">.switch</span>.</li>
-        </ol>
-      </div>
+      <ol className="mt-6 grid gap-1.5 text-meta text-fg-3">
+        <li><span className="num mr-2 text-fg-4">01</span>Нажмите «Скопировать IP» и вставьте в консоль CS2 (~).</li>
+        <li><span className="num mr-2 text-fg-4">02</span>В разминке напишите <span className="num text-fg-2">.ready</span>.</li>
+        <li><span className="num mr-2 text-fg-4">03</span>После ножевого — <span className="num text-fg-2">.stay</span> / <span className="num text-fg-2">.switch</span>.</li>
+      </ol>
     </>
   );
 

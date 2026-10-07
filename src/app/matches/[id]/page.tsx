@@ -22,7 +22,8 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
-import { ServerPreparing, ServerReady, connectHref } from "@/components/competition/server-block";
+import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
+import { CopyConnect } from "@/components/copy-connect";
 import { VetoBoard } from "@/components/competition/veto-board";
 import { MatchProgress } from "@/components/competition/match-progress";
 import { MobileStickyCta } from "@/components/public/callout";
@@ -39,7 +40,6 @@ import {
   Status,
   SubsectionTitle,
   Textarea,
-  buttonClass,
   cn,
 } from "@/components/ds";
 
@@ -392,9 +392,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
       {serverPhase && (inRoster || admin) && m.server_address && m.status === "ready" && (
         <MobileStickyCta note="Сервер готов">
-          <a href={connectHref(m.server_address, m.server_password)} className={buttonClass("primary", "lg", "w-full")}>
-            Подключиться
-          </a>
+          <CopyConnect address={m.server_address} password={m.server_password} block />
         </MobileStickyCta>
       )}
     </>
