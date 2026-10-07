@@ -67,6 +67,14 @@ const tournamentSchema = z.object({
   description: z.string().trim().max(4000).optional().default(""),
   requirements: z.string().trim().max(4000).optional().default(""),
   rules: z.string().trim().max(20000).optional().default(""),
+  third_place_match: z.string().optional(),
+  // официальный турнир: возраст, город, тренер, запасные
+  is_official: z.string().optional(),
+  min_age: z.coerce.number().int().min(0, "Минимальный возраст — от 0").max(120).default(16),
+  max_age: z.coerce.number().int().min(0).max(120, "Максимальный возраст — до 120").default(35),
+  city: z.string().trim().max(60).optional().default(""),
+  require_coach: z.string().optional(),
+  allow_substitutes: z.string().optional(),
   starts_at: z.string().optional(),
   registration_opens_at: z.string().optional(),
   registration_closes_at: z.string().optional(),
@@ -165,8 +173,22 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     registration_closes_at: fromLocalInput(data.registration_closes_at),
     checkin_opens_at: fromLocalInput(data.checkin_opens_at),
     checkin_closes_at: fromLocalInput(data.checkin_closes_at),
+    third_place_match: data.third_place_match === "on",
+    is_official: data.is_official === "on",
+    min_age: data.min_age,
+    max_age: data.max_age,
+    city: data.city || "Усть-Каменогорск",
+    require_coach: data.require_coach === "on",
+    allow_substitutes: data.allow_substitutes === "on",
     updated_at: new Date().toISOString(),
   };
+}
+
+/** Официальный турнир — только командный режим, возрастной диапазон по порядку */
+function checkOfficial(row: { is_official: boolean; format: string; min_age: number; max_age: number }) {
+  if (row.max_age < row.min_age) return "Максимальный возраст должен быть не меньше минимального";
+  if (row.is_official && row.format === "1v1") return "Официальный турнир — только командный режим (5×5 или 2×2)";
+  return null;
 }
 
 async function uploadCover(tournamentId: string, formData: FormData): Promise<string | null | { error: string }> {
@@ -219,7 +241,7 @@ export async function createTournament(_prev: ActionResult, formData: FormData):
 
   const row = tournamentRow(parsed.data);
   if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
-  const datesError = checkDates(row);
+  const datesError = checkDates(row) ?? checkOfficial(row);
   if (datesError) return { error: datesError };
   const { data, error } = await db().from("tournaments").insert(row).select("id").single();
   if (error || !data) {
@@ -238,7 +260,7 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
 
   const row = tournamentRow(parsed.data);
   if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
-  const datesError = checkDates(row);
+  const datesError = checkDates(row) ?? checkOfficial(row);
   if (datesError) return { error: datesError };
   const before = await getTournamentById(id);
   const { error } = await db().from("tournaments").update(row).eq("id", id);

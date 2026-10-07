@@ -184,6 +184,16 @@ export function TournamentForm({
   const [freeEntry, setFreeEntry] = useState(!t?.entry_fee || t.entry_fee === "Бесплатно");
   const [entryFee, setEntryFee] = useState(t?.entry_fee && t.entry_fee !== "Бесплатно" ? t.entry_fee : "");
   const [sponsors, setSponsors] = useState<{ name: string; url?: string }[]>(t?.sponsors ?? []);
+  const [thirdPlace, setThirdPlace] = useState(t?.third_place_match ?? false);
+  // официальный турнир (городской, с акиматом): анкеты, возраст, город, тренер, без запасных
+  const [official, setOfficial] = useState(t?.is_official ?? false);
+  const [minAge, setMinAge] = useState(t?.min_age ?? 16);
+  const [maxAge, setMaxAge] = useState(t?.max_age ?? 35);
+  const [city, setCity] = useState(t?.city ?? "Усть-Каменогорск");
+  const [requireCoach, setRequireCoach] = useState(t?.require_coach ?? true);
+  const [allowSubs, setAllowSubs] = useState(t?.allow_substitutes ?? false);
+  // матч за 3-е место — там, где плей-офф на выбывание с одной сеткой
+  const singleElim = bracket === "single_elimination" || ((bracket === "groups_playoff" || bracket === "swiss_playoff") && playoffType === "single_elimination");
 
   const effectiveSlug = slugEdited ? slug : slugify(name);
   const mapWarning =
@@ -241,8 +251,10 @@ export function TournamentForm({
   );
 
   // что ещё не заполнено — по шагам
+  const officialIssue = official && format === "1v1" ? "Официальный турнир — только командный режим" : official && maxAge < minAge ? "Возраст: максимум меньше минимума" : null;
   const missing: Record<number, string | null> = {
     0: name.trim() ? null : "Нет названия",
+    5: officialIssue,
     2: !start ? "Нет даты старта" : dateIssues.length ? "Даты не по порядку" : null,
     4: mapWarning && maps.length > 1 && maps.length < Math.max(bo, finalBo) ? mapWarning : null,
   };
@@ -278,6 +290,13 @@ export function TournamentForm({
       <input type="hidden" name="tech_pause_seconds" value={techSec} />
       <input type="hidden" name="entry_fee" value={freeEntry ? "Бесплатно" : entryFee} />
       <input type="hidden" name="sponsors" value={JSON.stringify(sponsors.filter((x) => x.name.trim()))} />
+      {thirdPlace && <input type="hidden" name="third_place_match" value="on" />}
+      {official && <input type="hidden" name="is_official" value="on" />}
+      <input type="hidden" name="min_age" value={minAge} />
+      <input type="hidden" name="max_age" value={maxAge} />
+      <input type="hidden" name="city" value={city} />
+      {requireCoach && <input type="hidden" name="require_coach" value="on" />}
+      {allowSubs && <input type="hidden" name="allow_substitutes" value="on" />}
 
       <div className="grid grid-cols-1 xl:grid-cols-[180px_minmax(0,1fr)_300px] gap-8 items-start">
         {/* шаги */}
@@ -467,6 +486,19 @@ export function TournamentForm({
                 </p>
               </div>
             </div>
+            {singleElim && (
+              <div>
+                <Label>Матч за 3-е место</Label>
+                <Segmented
+                  value={thirdPlace ? "on" : "off"}
+                  onChange={(v) => setThirdPlace(v === "on")}
+                  options={[{ value: "off", label: "Без матча" }, { value: "on", label: "Матч за 3-е место" }]}
+                />
+                <p className="mt-1.5 text-xs text-fg-3">
+                  {thirdPlace ? "Проигравшие в полуфиналах сыграют за бронзу" : "Оба проигравших полуфиналиста делят 3–4 место"}
+                </p>
+              </div>
+            )}
           </Section>
 
           <Section show={step === 2} title="Расписание" hint="Место проведения и даты. Время Алматы">
@@ -754,6 +786,64 @@ export function TournamentForm({
           </Section>
 
           <Section show={step === 5} title="Регистрация" hint="Взнос, призы и контакты для участников">
+            <div className="rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="max-w-lg">
+                  <div className="text-[14px] font-semibold text-fg">Официальный турнир</div>
+                  <p className="mt-1 text-xs text-fg-3 leading-relaxed">
+                    Городской турнир по положению (например, с акиматом): заявка от организации, анкеты игроков, проверка возраста, тренер,
+                    отметки о бумажных документах, выгрузка в Excel и печать заявок (Приложение №1).
+                  </p>
+                </div>
+                <Segmented
+                  value={official ? "on" : "off"}
+                  onChange={(v) => {
+                    setOfficial(v === "on");
+                    if (v === "on" && format === "1v1") setFormat("5v5");
+                  }}
+                  options={[{ value: "off", label: "Обычный" }, { value: "on", label: "Официальный" }]}
+                />
+              </div>
+              {official && (
+                <>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <Field label="Возраст от" hint="включительно, на дату старта">
+                      <input type="number" min={0} max={120} value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} className="field num" />
+                    </Field>
+                    <Field label="Возраст до" hint="включительно">
+                      <input type="number" min={0} max={120} value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} className="field num" />
+                    </Field>
+                    <Field label="Город участников" hint="живут, учатся или работают">
+                      <input value={city} onChange={(e) => setCity(e.target.value)} className="field" />
+                    </Field>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Тренер в заявке</Label>
+                      <Segmented
+                        value={requireCoach ? "on" : "off"}
+                        onChange={(v) => setRequireCoach(v === "on")}
+                        options={[{ value: "on", label: "Обязателен" }, { value: "off", label: "Не нужен" }]}
+                      />
+                    </div>
+                    <div>
+                      <Label>Запасные</Label>
+                      <Segmented
+                        value={allowSubs ? "on" : "off"}
+                        onChange={(v) => setAllowSubs(v === "on")}
+                        options={[{ value: "off", label: "Без запасных" }, { value: "on", label: "Разрешены" }]}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-fg-3">
+                    {format === "1v1"
+                      ? "Официальный турнир — только командный режим."
+                      : `Команда: ${MODES[format as ModeKey]?.size ?? 5} игроков${requireCoach ? " + тренер" : ""}${allowSubs ? `, до ${MODES[format as ModeKey]?.subs ?? 0} запасных` : ", без запасных — состав в заявке окончательный"}. Игроки ${minAge}–${maxAge} лет.`}
+                  </p>
+                  {officialIssue && <p className="text-[13px] text-warn">{officialIssue}</p>}
+                </>
+              )}
+            </div>
             <div>
               <Label>Взнос за участие</Label>
               <div className="flex flex-wrap items-center gap-3">
@@ -894,6 +984,8 @@ export function TournamentForm({
             <SummaryRow label="Старт" value={human(start)} warn={!start} />
             <SummaryRow label="Призовой" value={prizePool || "—"} />
             <SummaryRow label="Взнос" value={freeEntry ? "бесплатно" : entryFee || "—"} />
+            {official && <SummaryRow label="Официальный" value={`${minAge}–${maxAge} лет · ${city || "—"}`} warn={!!officialIssue} />}
+            {singleElim && thirdPlace && <SummaryRow label="3-е место" value="матч за бронзу" />}
           </div>
           <div className="mt-5">
             {canSubmit ? (
