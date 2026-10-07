@@ -6,6 +6,12 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  // Скрипты и стили не ограничиваем (инлайн-скрипты Next, встраивание трансляций): только то, что ничего не ломает —
+  // запрет встраивания сайта, плагинов, подмены <base> и отправки форм на чужие адреса (вход Steam — переход, не форма)
+  {
+    key: "Content-Security-Policy",
+    value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self' https://steamcommunity.com",
+  },
 ];
 
 const nextConfig: NextConfig = {

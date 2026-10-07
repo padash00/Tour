@@ -8,6 +8,8 @@
 
 param([string]$Csv = (Join-Path $PSScriptRoot "instances.csv"))
 $ErrorActionPreference = "Stop"
+# агент читает вывод как UTF-8 (иначе в agent.log кириллица превращается в кракозябры)
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 $group = "F16 Arena RCON"
 
 $ports = @(Import-Csv $Csv | ForEach-Object { [int]$_.port } | Where-Object { $_ -gt 0 })

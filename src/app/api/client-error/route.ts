@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createHash } from "node:crypto";
 import { logSiteError } from "@/lib/site-errors";
+import { db } from "@/lib/supabase";
 
 /**
  * Ошибки, которые случились в браузере (страница «Что-то пошло не так»).
@@ -22,6 +24,17 @@ function throttled(ip: string) {
   return cur.count > LIMIT;
 }
 
+/**
+ * Общий для всех инстансов лимит: не чаще раза в 3 с с одного адреса (rate_limit_claim, ключ — UUID из хэша IP).
+ * Сам IP в базу не пишем. Если база недоступна — пропускаем, журнал ошибок важнее.
+ */
+async function throttledShared(ip: string) {
+  const h = createHash("sha256").update(`client-error:${ip}`).digest("hex");
+  const actor = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+  const { data, error } = await db().rpc("rate_limit_claim", { p_actor: actor, p_action: "client_error", p_seconds: 3 });
+  return !error && data === true;
+}
+
 /** Запрос со страниц нашего сайта: браузер ставит Sec-Fetch-Site, старые браузеры — Origin. Без обоих — отказ */
 function sameOrigin(request: NextRequest) {
   const site = request.headers.get("sec-fetch-site");
@@ -33,7 +46,7 @@ function sameOrigin(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const ip = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (throttled(ip)) return NextResponse.json({ ok: false }, { status: 429 });
+  if (throttled(ip) || (await throttledShared(ip))) return NextResponse.json({ ok: false }, { status: 429 });
   let body: { message?: unknown; digest?: unknown; path?: unknown };
   try {
     body = await request.json();

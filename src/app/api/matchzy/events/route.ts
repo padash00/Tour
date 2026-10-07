@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { handleMatchzyEvent, matchzyIdAccepted, type MatchzyEvent } from "@/lib/server/matchzy-events";
 import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
 import { checkBearer } from "@/lib/server/state";
+import { db } from "@/lib/supabase";
 
 /**
  * MatchZy присылает сюда события матча (matchzy_remote_log_url) — напрямую или через буфер агента,
@@ -36,7 +37,24 @@ export async function POST(request: NextRequest) {
     console.error("matchzy event failed", event.event, e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
-  // публичные страницы (турнир, сетка, матчи, статистика) кэшируются CDN — после ключевых событий обновляем их сразу
-  if (["going_live", "map_result", "series_end"].includes(event.event)) revalidatePath("/", "layout");
+  // публичные страницы турнира, матча и статистики кэшируются CDN — после ключевых событий обновляем их сразу
+  if (["going_live", "map_result", "series_end"].includes(event.event)) {
+    await revalidateMatchPages(event.matchid, event.event === "series_end").catch((e) => console.error("revalidate failed", e));
+  }
   return NextResponse.json({ ok: true });
+}
+
+/** Только страницы этого матча и его турнира (а не весь сайт): события идут с каждой карты всех серверов */
+async function revalidateMatchPages(matchzyId: unknown, seriesEnded: boolean) {
+  if (typeof matchzyId !== "number" && typeof matchzyId !== "string") return;
+  const { data } = await db().from("matches").select("id, tournament:tournaments(slug)").eq("matchzy_id", Number(matchzyId)).maybeSingle();
+  if (!data) return; // игра лобби — её страница обновляется опросом
+  for (const path of ["/", "/matches", "/stats", "/tv", `/matches/${data.id}`]) revalidatePath(path);
+  const slug = data.tournament?.slug;
+  if (slug) for (const path of [`/tournaments/${slug}`, `/tournaments/${slug}/tv`, `/tournaments/${slug}/recap`, `/stats/${slug}`]) revalidatePath(path);
+  if (seriesEnded) {
+    // итог серии меняет статистику и историю игроков и команд
+    revalidatePath("/players/[steamId]", "page");
+    revalidatePath("/teams/[tag]", "page");
+  }
 }

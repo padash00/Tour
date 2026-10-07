@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArrowLeft, Gamepad2, Trophy } from "lucide-react";
-import { MAX_MAIN, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations } from "@/lib/data";
+import { MAX_MAIN, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations, getTeamTagByAlias } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
 import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
@@ -50,7 +50,11 @@ const ROLE: Record<string, string> = { captain: "Капитан", player: "Ос�
 export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
-  if (!team) notFound();
+  if (!team) {
+    const current = await getTeamTagByAlias(decodeURIComponent(tag));
+    if (current) permanentRedirect(`/teams/${encodeURIComponent(current)}`);
+    notFound();
+  }
 
   const [members, regs, matches, board, awards, h2h] = await Promise.all([
     getTeamMembers(team.id),

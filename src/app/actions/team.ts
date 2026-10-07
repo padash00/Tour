@@ -123,6 +123,12 @@ async function lockedError(teamId: string) {
     : null;
 }
 
+/** Моя команда и её публичная страница (под одним или несколькими тегами) */
+function revalidateTeamPages(...tags: string[]) {
+  revalidatePath("/team");
+  for (const tag of new Set(tags)) revalidatePath(`/teams/${encodeURIComponent(tag)}`);
+}
+
 export async function updateTeam(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const ctx = await requireCaptain();
   if (!ctx) return { error: NOT_CAPTAIN };
@@ -148,7 +154,10 @@ export async function updateTeam(_prev: ActionResult, formData: FormData): Promi
   if (error) return { error: uniqueViolation(error) ?? "Не удалось сохранить" };
 
   await audit(player.id, "team.update", { type: "team", id: team.id }, { name, tag });
-  revalidatePath("/team");
+  // публичная страница под старым и новым тегом (старый теперь перенаправляет), списки и сетки с названием команды
+  revalidateTeamPages(team.tag, tag.toUpperCase());
+  revalidatePath("/teams");
+  revalidatePath("/tournaments/[slug]", "page");
   return { success: "Сохранено" };
 }
 
@@ -223,11 +232,14 @@ export async function kickMember(_prev: ActionResult, formData: FormData): Promi
   if (!target) return { error: "Игрок не найден" };
   if (target.player_id === player.id) return { error: "Нельзя исключить себя" };
 
-  await db().from("team_members").update({ left_at: new Date().toISOString() }).eq("id", target.id);
+  // проверка капитана и исключение — под блокировкой команды (параллельная передача капитанства не проскочит)
+  const { error } = await db().rpc("kick_team_member", { p_team: team.id, p_actor: player.id, p_member: target.id });
+  if (error?.message.includes("captain_required")) return { error: NOT_CAPTAIN };
+  if (error) return { error: "Игрок уже не в команде — обновите страницу" };
   await syncOpenRosters(team.id);
   await notify([target.player_id], `Вас исключили из ${team.name}`);
   await audit(player.id, "team.kick", { type: "team", id: team.id }, { player: target.player.steam_id });
-  revalidatePath("/team");
+  revalidateTeamPages(team.tag);
   return { success: `${target.player.nickname} исключён` };
 }
 
@@ -244,19 +256,22 @@ export async function setMemberRole(_prev: ActionResult, formData: FormData): Pr
   const target = members.find((m) => m.id === memberId);
   if (!target || target.role === "captain") return { error: "Нельзя изменить роль" };
 
-  const mains = members.filter((m) => m.role !== "substitute").length;
-  const subs = members.length - mains;
-  if (role === "player" && target.role === "substitute" && mains >= MAX_MAIN) {
-    return { error: `В основе уже ${MAX_MAIN} игроков` };
-  }
-  if (role === "substitute" && target.role === "player" && subs >= MAX_SUBS) {
-    return { error: `Уже ${MAX_SUBS} запасных` };
-  }
-
-  await db().from("team_members").update({ role }).eq("id", target.id);
+  // места в основе/запасе считаются под блокировкой команды — два быстрых нажатия не переполнят основу
+  const { error } = await db().rpc("set_team_member_role", {
+    p_team: team.id,
+    p_actor: player.id,
+    p_member: target.id,
+    p_role: role,
+    p_max_main: MAX_MAIN,
+    p_max_subs: MAX_SUBS,
+  });
+  if (error?.message.includes("main_full")) return { error: `В основе уже ${MAX_MAIN} игроков` };
+  if (error?.message.includes("subs_full")) return { error: `Уже ${MAX_SUBS} запасных` };
+  if (error?.message.includes("captain_required")) return { error: NOT_CAPTAIN };
+  if (error) return { error: "Не удалось изменить роль — обновите страницу" };
   await syncOpenRosters(team.id);
   await audit(player.id, "team.role", { type: "team", id: team.id }, { player: target.player.steam_id, role });
-  revalidatePath("/team");
+  revalidateTeamPages(team.tag);
   return null;
 }
 

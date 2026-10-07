@@ -174,6 +174,28 @@ try {
     assert.equal((await row<{ n: number }>("select count(*)::int as n from team_members where team_id = $1 and role = 'captain'", [tm])).n, 1);
   });
 
+  await test("set_team_member_role respects slots, kick_team_member needs the captain, old tags stay as aliases", async () => {
+    const captain = await player();
+    const tm = await team(captain);
+    for (let i = 0; i < 6; i++) await sql.query("select join_team($1, $2, 5, 2)", [tm, await player()]);
+    const sub = await row<{ id: string }>("select id from team_members where team_id = $1 and role = 'substitute' limit 1", [tm]);
+    await assert.rejects(sql.query("select set_team_member_role($1, $2, $3, 'player', 5, 2)", [tm, captain, sub.id]), /main_full/);
+    const main = await row<{ id: string; player_id: string }>("select id, player_id from team_members where team_id = $1 and role = 'player' limit 1", [tm]);
+    await assert.rejects(sql.query("select set_team_member_role($1, $2, $3, 'substitute', 5, 2)", [tm, captain, main.id]), /subs_full/);
+    await assert.rejects(sql.query("select kick_team_member($1, $2, $3)", [tm, main.player_id, sub.id]), /captain_required/);
+    await sql.query("select kick_team_member($1, $2, $3)", [tm, captain, sub.id]);
+    assert.equal((await row<{ role: string }>("select set_team_member_role($1, $2, $3, 'substitute', 5, 2) as role", [tm, captain, main.id])).role, "substitute");
+    assert.equal((await row<{ n: number }>("select count(*)::int as n from team_members where team_id = $1 and left_at is null and role <> 'substitute'", [tm])).n, 4);
+
+    const { tag } = await row<{ tag: string }>("select tag from teams where id = $1", [tm]);
+    await sql.query("update teams set tag = 'RENAMED' || $2 where id = $1", [tm, seq]);
+    assert.equal((await row<{ team_id: string }>("select team_id from team_tag_aliases where tag = $1", [tag])).team_id, tm);
+    // другая команда заняла освободившийся тег — псевдоним уходит, ссылка ведёт на новую команду
+    const other = await team(await player());
+    await sql.query("update teams set tag = $2 where id = $1", [other, tag]);
+    assert.equal((await rows("select 1 from team_tag_aliases where tag = $1", [tag])).length, 0);
+  });
+
   await test("Rate limiting is atomic: a concurrent duplicate is refused, a later retry passes", async () => {
     const p = await player();
     const hit = async (action: string, seconds = 30) => (await row<{ limited: boolean }>("select rate_limit_claim($1, $2, $3) as limited", [p, action, seconds])).limited;
@@ -228,7 +250,7 @@ try {
     assert.deepEqual(open, []);
     for (const role of ["anon", "authenticated"]) {
       const { allowed } = await row<{ allowed: boolean }>(`select bool_or(has_function_privilege($1, oid, 'execute')) as allowed from pg_proc where proname in
-        ('sync_bracket_apply', 'create_stage_matches', 'finish_veto', 'join_team', 'transfer_team_captain', 'rate_limit_claim', 'prune_old_rows')`, [role]);
+        ('sync_bracket_apply', 'create_stage_matches', 'finish_veto', 'join_team', 'transfer_team_captain', 'rate_limit_claim', 'prune_old_rows', 'set_team_member_role', 'kick_team_member')`, [role]);
       assert.equal(allowed, false);
     }
   });

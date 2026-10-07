@@ -59,6 +59,13 @@ export async function getTeamByTag(tag: string): Promise<Team | null> {
   return data as Team | null;
 }
 
+/** Текущий тег команды по её старому тегу (после переименования старые ссылки ведут на команду) */
+export async function getTeamTagByAlias(tag: string): Promise<string | null> {
+  const { data } = await db().from("team_tag_aliases").select("team:teams!inner(tag, disbanded_at, is_solo)").eq("tag", tag).maybeSingle();
+  const team = data?.team;
+  return team && !team.disbanded_at && !team.is_solo ? team.tag : null;
+}
+
 export async function getTeamByInvite(code: string): Promise<Team | null> {
   const { data } = await db()
     .from("teams")

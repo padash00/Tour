@@ -1503,6 +1503,32 @@ export type Database = {
           },
         ]
       }
+      team_tag_aliases: {
+        Row: {
+          created_at: string
+          tag: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          tag: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          tag?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_tag_aliases_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           captain_id: string
@@ -1972,6 +1998,10 @@ export type Database = {
         }
         Returns: string
       }
+      kick_team_member: {
+        Args: { p_actor: string; p_member: string; p_team: string }
+        Returns: string
+      }
       prune_old_rows: {
         Args: {
           p_audit_days?: number
@@ -2008,6 +2038,17 @@ export type Database = {
           p_tournament: string
         }
         Returns: Json
+      }
+      set_team_member_role: {
+        Args: {
+          p_actor: string
+          p_max_main: number
+          p_max_subs: number
+          p_member: string
+          p_role: string
+          p_team: string
+        }
+        Returns: string
       }
       start_map_logging: {
         Args: { p_map: number; p_match: string }

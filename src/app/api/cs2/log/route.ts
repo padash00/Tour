@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyLogSignature } from "@/lib/server/ingest-signature";
 import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
-import { safeEqual } from "@/lib/server/state";
 import { ingestLog } from "@/lib/swing-ingest";
 
 /**
@@ -16,10 +15,7 @@ export async function POST(request: NextRequest) {
   const matchzyId = Number(m);
   if (!/^\d+$/.test(m) || !Number.isSafeInteger(matchzyId)) return NextResponse.json({ error: "bad match" }, { status: 400 });
   const sig = params.get("sig");
-  // Переходный период: матчи, загруженные до выката подписи, шлют лог со старым адресом ?t=<токен>
-  // (его держит CS2 до конца матча и буфер агента). Убрать приём t, когда такие матчи закончатся.
-  const legacy = params.get("t");
-  const ok = !!expected && (sig ? verifyLogSignature(m, sig, expected) : legacy != null && safeEqual(legacy, expected));
+  const ok = !!expected && !!sig && verifyLogSignature(m, sig, expected);
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.text();

@@ -69,7 +69,9 @@ function invalid(...checks: [z.ZodType, unknown][]): LobbyResult {
 const PASSWORD_MIN = 4;
 const PASSWORD_ERROR = `Пароль — от ${PASSWORD_MIN} до 32 символов`;
 
-// подбор пароля: не чаще попытки в 3 с, не больше 10 неверных за 10 минут с игрока и 30 — к одному лобби
+// подбор пароля: не чаще попытки в 3 с, не больше 10 неверных за 10 минут с игрока.
+// Общий лимит лобби (30 неверных) касается только тех, кто уже ошибался в этом лобби: иначе любой
+// мог бы спамом закрыть вход всем, кто знает пароль.
 const JOIN_FAILED = "lobby.join_failed";
 async function failedJoins(by: { actor?: string; lobby?: string }, seconds: number) {
   let q = db()
@@ -83,13 +85,14 @@ async function failedJoins(by: { actor?: string; lobby?: string }, seconds: numb
   return count ?? 0;
 }
 async function passwordThrottle(playerId: string, lobbyId: string): Promise<string | null> {
-  const [recent, mine, lobby] = await Promise.all([
+  const [recent, mine, mineHere, lobby] = await Promise.all([
     isRateLimited(playerId, JOIN_FAILED, 3),
     failedJoins({ actor: playerId }, 600),
+    failedJoins({ actor: playerId, lobby: lobbyId }, 600),
     failedJoins({ lobby: lobbyId }, 600),
   ]);
   if (recent) return "Слишком часто — подождите пару секунд";
-  if (mine >= 10 || lobby >= 30) return "Слишком много неверных паролей — попробуйте через несколько минут или войдите по ссылке-приглашению";
+  if (mine >= 10 || (mineHere > 0 && lobby >= 30)) return "Слишком много неверных паролей — попробуйте через несколько минут или войдите по ссылке-приглашению";
   return null;
 }
 const touch = (id: string, patch: Record<string, unknown> = {}) => db().from("lobbies").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
