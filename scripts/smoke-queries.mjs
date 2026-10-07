@@ -29,11 +29,11 @@ const checks = {
   rosters: () =>
     db
       .from("tournament_roster_players")
-      .select("role, player:players(*), registration:tournament_registrations!inner(team_id)")
+      .select("role, player:players(*), registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(team_id)")
       .in("registration.team_id", ["00000000-0000-0000-0000-000000000000"])
       .limit(1),
   registrations: () =>
-    db.from("tournament_registrations").select("*, team:teams(*), roster:tournament_roster_players(*, player:players(*))").limit(1),
+    db.from("tournament_registrations").select("*, team:teams(*), roster:tournament_roster_players!tournament_roster_players_registration_id_fkey(*, player:players(*))").limit(1),
   teamMembers: () => db.from("team_members").select("*, team:teams(*)").limit(1),
   teamsList: () => db.from("teams").select("*, team_members(left_at, player:players(faceit_elo))").limit(1),
   playersList: () => db.from("players").select("*, team_members(left_at, team:teams(name, tag))").limit(1),
@@ -70,7 +70,7 @@ const checks = {
   rosterTournaments: () =>
     db
       .from("tournament_roster_players")
-      .select("tournament_id, registration:tournament_registrations!inner(status), tournament:tournaments!inner(status)")
+      .select("tournament_id, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(status), tournament:tournaments!inner(status)")
       .eq("registration.status", "approved")
       .neq("tournament.status", "draft")
       .limit(1),

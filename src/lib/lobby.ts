@@ -7,72 +7,44 @@ import { modeOf } from "./modes";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
 import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, type LobbySettings } from "./lobby-settings";
-import type { Player } from "./types";
+import type { Tables, TablesUpdate } from "./database.types";
+import type { Narrow, Player } from "./types";
 
 // ───────────────────────── типы
 
 export type Slot = "team1" | "team2" | "wait" | "spec";
 
-export type Lobby = {
-  id: string;
-  code: string;
-  host_id: string;
-  visibility: "public" | "closed" | "private";
-  password_hash: string | null;
-  invite_token: string;
-  status: "waiting" | "playing" | "closed";
-  settings: LobbySettings;
-  team1_name: string;
-  team2_name: string;
-  bots: { team1: string[]; team2: string[] };
-  ready_check_until: string | null;
-  draft: { captains: [string, string]; turn: 1 | 2; deadline: string } | null;
-  current_game_id: string | null;
-  created_at: string;
-  updated_at: string;
-  closed_at: string | null;
-};
+export type Lobby = Narrow<
+  Tables<"lobbies">,
+  {
+    visibility: "public" | "closed" | "private";
+    status: "waiting" | "playing" | "closed";
+    settings: LobbySettings;
+    bots: { team1: string[]; team2: string[] };
+    draft: { captains: [string, string]; turn: 1 | 2; deadline: string } | null;
+  }
+>;
 
-export type LobbyMember = {
-  lobby_id: string;
-  player_id: string;
-  slot: Slot;
-  ready: boolean;
-  joined_at: string;
-  last_seen_at: string;
-};
+export type LobbyMember = Narrow<Tables<"lobby_members">, { slot: Slot }>;
 
 export type GamePlayer = { id: string; steam_id: string; nickname: string };
 export type GameTeam = { name: string; players: GamePlayer[]; bots: string[] };
 export type GameMap = { map: string; team1_score: number; team2_score: number; status: "pending" | "live" | "finished"; winner: 1 | 2 | null };
 export type GameVeto = { step: number; team: 1 | 2 | null; action: "ban" | "pick" | "decider"; map: string; auto: boolean };
 
-export type LobbyGame = {
-  id: string;
-  lobby_id: string;
-  matchzy_id: number;
-  status: "veto" | "waiting" | "live" | "finished" | "cancelled";
-  best_of: number;
-  settings: LobbySettings;
-  team1: GameTeam;
-  team2: GameTeam;
-  veto: GameVeto[];
-  veto_pool: string[];
-  veto_deadline: string | null;
-  maps: GameMap[];
-  team1_score: number;
-  team2_score: number;
-  winner: 1 | 2 | null;
-  server_instance: string | null;
-  server_state: "loading" | "ready" | "error" | null;
-  server_address: string | null;
-  server_assigned_at: string | null;
-  server_ready_at: string | null;
-  note: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-  created_at: string;
-};
+export type LobbyGame = Narrow<
+  Tables<"lobby_games">,
+  {
+    status: "veto" | "waiting" | "live" | "finished" | "cancelled";
+    settings: LobbySettings;
+    team1: GameTeam;
+    team2: GameTeam;
+    veto: GameVeto[];
+    maps: GameMap[];
+    winner: 1 | 2 | null;
+    server_state: "loading" | "ready" | "error" | null;
+  }
+>;
 
 export const ONLINE_MS = 45_000; // игрок «в лобби», если страница опрашивала сервер за это время
 const HOST_AWAY_MS = 3 * 60_000; // хост пропал — хост переходит к следующему
@@ -110,19 +82,25 @@ export function checkInvite(token: string | null | undefined, lobby: Pick<Lobby,
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const touch = (lobbyId: string, patch: Record<string, unknown> = {}) =>
+const touch = (lobbyId: string, patch: TablesUpdate<"lobbies"> = {}) =>
   db().from("lobbies").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", lobbyId);
 
 export async function systemMessage(lobbyId: string, body: string) {
   await db().from("lobby_messages").insert({ lobby_id: lobbyId, player_id: null, body: body.slice(0, 300) });
 }
 
-function parseLobby(row: Record<string, unknown> | null): Lobby | null {
+/** Строка lobbies → Lobby: jsonb-поля приводятся к доменным типам, настройки нормализуются */
+function parseLobby<R extends Tables<"lobbies">>(row: R | null): (Omit<R, keyof Lobby> & Lobby) | null {
   if (!row) return null;
-  const l = row as unknown as Lobby;
-  l.settings = normalizeSettings(l.settings);
-  l.bots = { team1: l.bots?.team1 ?? [], team2: l.bots?.team2 ?? [] };
-  return l;
+  const bots = row.bots as Partial<Lobby["bots"]> | null;
+  return {
+    ...row,
+    visibility: row.visibility as Lobby["visibility"],
+    status: row.status as Lobby["status"],
+    draft: row.draft as Lobby["draft"],
+    settings: normalizeSettings(row.settings),
+    bots: { team1: bots?.team1 ?? [], team2: bots?.team2 ?? [] },
+  };
 }
 
 export async function getLobbyByCode(code: string) {
@@ -161,7 +139,7 @@ export async function playerLobby(playerId: string) {
     .select("lobby_id, lobby:lobbies!inner(code, status)")
     .eq("player_id", playerId)
     .neq("lobby.status", "closed");
-  const row = (data ?? [])[0] as unknown as { lobby_id: string; lobby: { code: string } } | undefined;
+  const row = (data ?? [])[0];
   return row ? { id: row.lobby_id, code: row.lobby.code } : null;
 }
 
@@ -433,7 +411,7 @@ export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean) {
   if (!state.remaining.includes(map)) return "Эта карта уже выбрана";
   const veto = [...g.veto, { step: state.current.step, team: state.current.team, action: state.current.action, map, auto }];
   const next = vetoState(g.best_of, g.veto_pool, toVeto({ ...g, veto }));
-  const patch: Record<string, unknown> = { veto, veto_deadline: new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() };
+  const patch: TablesUpdate<"lobby_games"> = { veto, veto_deadline: new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() };
   if (next.current?.action === "decider") {
     veto.push({ step: next.current.step, team: null, action: "decider", map: next.remaining[0], auto: true });
     const maps = veto
@@ -643,7 +621,7 @@ export async function buildLobbyConfig(gameId: string, observers: [string, strin
     .eq("lobby_id", g.lobby_id)
     .eq("slot", "spec");
   const spectators = [
-    ...((specs ?? []) as unknown as { player: { steam_id: string; nickname: string } }[]).map((r) => [r.player.steam_id, r.player.nickname] as [string, string]),
+    ...(specs ?? []).map((r) => [r.player.steam_id, r.player.nickname] as [string, string]),
     ...observers,
   ].filter(([id]) => !inGame.has(id));
   const perTeam = Math.max(g.team1.players.length + g.team1.bots.length, g.team2.players.length + g.team2.bots.length, 1);
@@ -924,15 +902,11 @@ export async function listOpenLobbies(): Promise<LobbyListItem[]> {
     .in("visibility", ["public", "closed"])
     .order("created_at", { ascending: false })
     .limit(60);
-  type Row = Lobby & {
-    host: { nickname: string; avatar_url: string | null };
-    members: { slot: Slot; last_seen_at: string; player: { nickname: string; avatar_url: string | null } }[];
-    game: { status: string; team1_score: number; team2_score: number; maps: GameMap[] } | null;
-  };
-  return ((data ?? []) as unknown as Row[])
+  return (data ?? [])
     .map((r) => {
-      const l = parseLobby(r as unknown as Record<string, unknown>)!;
+      const l = parseLobby(r)!;
       const inTeams = r.members.filter((m) => m.slot === "team1" || m.slot === "team2");
+      const maps = (r.game?.maps ?? []) as GameMap[];
       return {
         code: l.code,
         visibility: l.visibility,
@@ -944,7 +918,7 @@ export async function listOpenLobbies(): Promise<LobbyListItem[]> {
         members: r.members.map((m) => m.player).slice(0, 10),
         game:
           r.game && ["veto", "waiting", "live"].includes(r.game.status)
-            ? { status: r.game.status, team1_score: r.game.team1_score, team2_score: r.game.team2_score, map: (r.game.maps.find((m) => m.status === "live") ?? r.game.maps[0])?.map ?? null }
+            ? { status: r.game.status, team1_score: r.game.team1_score, team2_score: r.game.team2_score, map: (maps.find((m) => m.status === "live") ?? maps[0])?.map ?? null }
             : null,
         created_at: l.created_at,
       };

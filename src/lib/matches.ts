@@ -15,7 +15,7 @@ import {
   type StageMatch,
 } from "./formats";
 import { db } from "./supabase";
-import type { BracketSyncRow, Match, MatchMap, Player, StageCreateMode, Team, Tournament, VetoActionRow } from "./types";
+import type { BracketSyncRow, Match, MatchMap, SeriesResult, StageCreateMode, SyncBracketResult, Team, Tournament, VetoActionRow } from "./types";
 import { VETO_STEP_SECONDS, vetoState } from "./veto";
 
 export type MatchWithTeams = Match & { team1: Team | null; team2: Team | null };
@@ -76,11 +76,10 @@ export async function getMatchRosters(match: Match) {
   if (ids.length === 0) return { team1: [], team2: [] };
   const { data } = await db()
     .from("tournament_roster_players")
-    .select("role, player:players(*), registration:tournament_registrations!inner(team_id)")
+    .select("role, player:players(*), registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(team_id)")
     .eq("tournament_id", match.tournament_id)
     .in("registration.team_id", ids);
-  type Row = { role: "main" | "sub"; player: Player; registration: { team_id: string } };
-  const rows = (data ?? []) as unknown as Row[];
+  const rows = data ?? [];
   return {
     team1: rows.filter((r) => r.registration.team_id === match.team1_id),
     team2: rows.filter((r) => r.registration.team_id === match.team2_id),
@@ -148,8 +147,9 @@ export async function syncBracket(tournamentId: string) {
       p_updates: updates,
     });
     if (applyError) throw new Error("Не удалось обновить сетку", { cause: applyError });
-    if (result?.status === "ok") {
-      nowUpcoming = (result.upcoming ?? []) as string[];
+    const applied = result as SyncBracketResult | null;
+    if (applied?.status === "ok") {
+      nowUpcoming = applied.upcoming ?? [];
       break;
     }
     if (attempt >= SYNC_ATTEMPTS) throw new Error("Сетка меняется одновременно из нескольких мест — повторите позже");
@@ -519,7 +519,8 @@ async function completeVeto(m: MatchFull) {
 export async function recomputeSeries(matchId: string) {
   const { data, error } = await db().rpc("recompute_match_series", { p_match: matchId, p_advantage: GRAND_FINAL_ADVANTAGE });
   if (error) throw new Error("Не удалось сохранить результат серии", { cause: error });
-  if (data?.winner) await syncBracket(data.tournament_id);
+  const series = data as SeriesResult | null;
+  if (series?.winner) await syncBracket(series.tournament_id);
 }
 
 /** Ближайшие и идущие матчи опубликованных турниров: live/вето сверху, дальше по времени начала */

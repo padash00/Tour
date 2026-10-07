@@ -45,11 +45,11 @@ async function tournamentAwards(t: Tournament): Promise<Award[]> {
   // составы призёров на этот турнир
   const { data: roster } = await db()
     .from("tournament_roster_players")
-    .select("player_id, registration:tournament_registrations!inner(team_id, status)")
+    .select("player_id, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(team_id, status)")
     .eq("tournament_id", t.id)
     .eq("registration.status", "approved");
   const playersOf = (teamId: string) =>
-    ((roster ?? []) as unknown as { player_id: string; registration: { team_id: string } }[])
+    (roster ?? [])
       .filter((r) => r.registration.team_id === teamId)
       .map((r) => r.player_id);
 

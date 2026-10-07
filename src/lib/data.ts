@@ -174,10 +174,10 @@ export type RegistrationWithTeam = Registration & {
 export async function getTournamentRegistrations(tournamentId: string): Promise<RegistrationWithTeam[]> {
   const { data } = await db()
     .from("tournament_registrations")
-    .select("*, team:teams(*), roster:tournament_roster_players(*, player:players(*))")
+    .select("*, team:teams(*), roster:tournament_roster_players!tournament_roster_players_registration_id_fkey(*, player:players(*))")
     .eq("tournament_id", tournamentId)
     .order("created_at", { ascending: true });
-  return (data ?? []) as RegistrationWithTeam[];
+  return data ?? [];
 }
 
 export async function countApproved(tournamentId: string) {
@@ -215,11 +215,11 @@ export async function getTeamRegistrations(teamId: string): Promise<TeamRegistra
 export async function getRegistration(tournamentId: string, teamId: string) {
   const { data } = await db()
     .from("tournament_registrations")
-    .select("*, roster:tournament_roster_players(*, player:players(*))")
+    .select("*, roster:tournament_roster_players!tournament_roster_players_registration_id_fkey(*, player:players(*))")
     .eq("tournament_id", tournamentId)
     .eq("team_id", teamId)
     .maybeSingle();
-  return data as (Registration & { roster: RosterEntry[] }) | null;
+  return data satisfies (Registration & { roster: RosterEntry[] }) | null;
 }
 
 export function isActiveRegistration(r: { status: string }) {

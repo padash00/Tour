@@ -28,7 +28,7 @@ export async function pickFreeInstance(preferRole: "active" | "reserve" = "activ
 
 export async function assignServer(match: Match, instanceName: string, actorId?: string) {
   const { data, error } = await db().rpc("assign_game_server", {
-    p_game: match.id, p_instance: instanceName, p_actor: actorId ?? null,
+    p_game: match.id, p_instance: instanceName, p_actor: actorId, // не передан → DEFAULT null
   });
   if (error) throw new Error("Не удалось назначить сервер", { cause: error });
   return data === true;
@@ -97,7 +97,7 @@ export async function autopilotTick() {
         .eq("status", "upcoming")
         .select("id");
       if (!updated?.length) continue;
-      const { data: teams } = await db().from("teams").select("captain_id").in("id", [m.team1_id, m.team2_id]);
+      const { data: teams } = await db().from("teams").select("captain_id").in("id", [m.team1_id, m.team2_id].filter((id): id is string => !!id));
       await notify(
         (teams ?? []).map((x) => x.captain_id),
         `Вето матча #${m.number} началось`,

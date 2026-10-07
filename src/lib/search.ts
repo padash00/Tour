@@ -52,9 +52,8 @@ export async function searchAll(raw: string): Promise<SearchResult> {
       .not("team1_id", "is", null)
       .not("team2_id", "is", null)
       .limit(30);
-    type Row = { id: string; number: number; status: string; team1_score: number; team2_score: number; finished_at: string | null; team1: { name: string } | null; team2: { name: string } | null; tournament: { name: string } };
     const rank: Record<string, number> = { live: 0, ready: 1, veto: 1, upcoming: 2, finished: 3 };
-    matches = ((data ?? []) as unknown as Row[])
+    matches = (data ?? [])
       .sort((a, b) => rank[a.status] - rank[b.status] || (b.finished_at ?? "").localeCompare(a.finished_at ?? ""))
       .slice(0, 4)
       .map((m) => ({

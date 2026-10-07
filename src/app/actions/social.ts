@@ -5,6 +5,7 @@ import { requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { BANNED_ERROR, getActiveMembership, getTeamMembers, isRateLimited } from "@/lib/data";
 import { FINDER_MODES, FINDER_ROLES, FINDER_TTL_DAYS, closeExpired } from "@/lib/finder";
+import type { Tables } from "@/lib/database.types";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -17,17 +18,19 @@ function clean(v: FormDataEntryValue | null, max: number) {
   return s ? s.slice(0, max) : null;
 }
 
-function parsePost(formData: FormData) {
+type PostFields = Pick<Tables<"finder_posts">, "roles" | "modes" | "availability" | "note">;
+
+function parsePost(formData: FormData): { error: string } | PostFields {
   const roles = [...new Set(formData.getAll("roles").map(String))].filter((r) => ROLE_KEYS.includes(r));
   const modes = [...new Set(formData.getAll("modes").map(String))].filter((m) => (FINDER_MODES as readonly string[]).includes(m));
-  if (roles.length === 0) return { error: "Отметьте хотя бы одну роль" } as const;
-  if (modes.length === 0) return { error: "Отметьте режим: 5×5 или 2×2" } as const;
+  if (roles.length === 0) return { error: "Отметьте хотя бы одну роль" };
+  if (modes.length === 0) return { error: "Отметьте режим: 5×5 или 2×2" };
   return {
     roles,
     modes,
     availability: clean(formData.get("availability"), 80),
     note: clean(formData.get("note"), 300),
-  } as const;
+  };
 }
 
 const expires = () => new Date(Date.now() + FINDER_TTL_DAYS * 24 * 3600 * 1000).toISOString();
@@ -146,7 +149,7 @@ export async function respondToTeam(_prev: ActionResult, formData: FormData): Pr
     .eq("id", id)
     .eq("kind", "team")
     .maybeSingle();
-  const team = (post as unknown as { team: { id: string; name: string; captain_id: string } | null } | null)?.team;
+  const team = post?.team;
   if (!post || !team || !post.active || new Date(post.expires_at).getTime() < Date.now()) return { error: "Объявление уже неактуально" };
   const membership = await getActiveMembership(player.id);
   if (membership?.team.id === team.id) return { error: "Вы уже в этой команде" };

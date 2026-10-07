@@ -196,7 +196,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   ]);
   const allPlayers = (playersData ?? []) as { steam_id: string; nickname: string }[];
   const inRoster = new Set([...rosters.team1, ...rosters.team2].map((r) => r.player.steam_id));
-  const bench = ((membersData ?? []) as unknown as { team_id: string; player: { steam_id: string; nickname: string } }[])
+  const bench = (membersData ?? [])
     .filter((x) => !inRoster.has(x.player.steam_id))
     .map((x) => ({ ...x.player, hint: x.team_id === m.team1_id ? (m.team1?.tag ?? "") : (m.team2?.tag ?? "") }));
   const disputes = (disputesRes.data ?? []) as (Dispute & { opener: Pick<Player, "nickname"> | null })[];

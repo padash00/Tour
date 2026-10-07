@@ -2,33 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { db } from "./supabase";
 import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
-import type { Match, MatchMap, Player, Team, VetoActionRow } from "./types";
+import type { Tables } from "./database.types";
+import type { Narrow, Player, Team } from "./types";
 
-export type MapStatRow = {
-  match_id: string;
-  map_number: number;
-  steam_id: string;
-  player_id: string | null;
-  team_id: string | null;
-  name: string | null;
-  kills: number;
-  deaths: number;
-  assists: number;
-  damage: number;
-  headshot_kills: number;
-  rounds_played: number;
-  kast: number;
-  first_kills: number;
-  first_deaths: number;
-  trade_kills: number;
-  clutch_wins: number;
-  multi_kills: { "2k"?: number; "3k"?: number; "4k"?: number; "5k"?: number };
-  utility_damage: number;
-  enemies_flashed: number;
-  flash_assists: number;
-  bomb_plants: number;
-  bomb_defuses: number;
-  mvp: number;
+/** Строка player_map_stats (без сырого отчёта MatchZy) + swing из player_map_swing */
+export type MapStatRow = Narrow<
+  Omit<Tables<"player_map_stats">, "raw" | "updated_at">,
+  { multi_kills: { "2k"?: number; "3k"?: number; "4k"?: number; "5k"?: number } }
+> & {
   swing_sum?: number;
   swing_rounds?: number;
 };
@@ -262,7 +243,7 @@ async function attachLogFacts(rows: MapStatRow[]) {
 }
 
 /** Подмешивает swing из player_map_swing к строкам статистики (по матчу, карте и SteamID) */
-async function attachSwing(rows: MapStatRow[]) {
+async function attachSwing<R extends MapStatRow>(rows: R[]): Promise<R[]> {
   const matchIds = [...new Set(rows.map((r) => r.match_id))];
   if (matchIds.length === 0) return rows;
   const data = await fetchAllIn<{ match_id: string; map_number: number; steam_id: string; swing_sum: number; rounds: number }>(matchIds, (ids, from, to) =>
@@ -350,17 +331,12 @@ export async function getTeamTable(tournamentId?: string): Promise<TeamAgg[]> {
     .neq("tournament.status", "draft");
   if (tournamentId) q = q.eq("tournament_id", tournamentId);
   const { data } = await q;
-  type Row = Pick<Match, "id" | "team1_id" | "team2_id" | "winner_id"> & {
-    maps: Pick<MatchMap, "team1_score" | "team2_score" | "winner_id" | "status">[];
-    team1: TeamAgg["team"];
-    team2: TeamAgg["team"];
-  };
   const table = new Map<string, TeamAgg>();
   const get = (t: TeamAgg["team"]) => {
     if (!table.has(t.id)) table.set(t.id, { team: t, matches: 0, wins: 0, maps: 0, mapWins: 0, roundsFor: 0, roundsAgainst: 0 });
     return table.get(t.id)!;
   };
-  for (const m of (data ?? []) as unknown as Row[]) {
+  for (const m of data ?? []) {
     for (const [side, team] of [[1, m.team1], [2, m.team2]] as const) {
       if (!team) continue;
       const t = get(team);
@@ -471,13 +447,8 @@ export async function getHeadToHead({ teamIds, matchIds }: { teamIds: string[]; 
     .or(`team1_id.in.(${list}),team2_id.in.(${list})`);
   if (matchIds) q = q.in("id", matchIds);
   const { data } = await q;
-  type Row = Pick<Match, "id" | "team1_id" | "team2_id" | "winner_id"> & {
-    maps: Pick<MatchMap, "team1_score" | "team2_score" | "winner_id" | "status">[];
-    team1: HeadToHead["opponent"] | null;
-    team2: HeadToHead["opponent"] | null;
-  };
   const by = new Map<string, HeadToHead>();
-  for (const m of (data ?? []) as unknown as Row[]) {
+  for (const m of data ?? []) {
     const mine = ids.includes(m.team1_id ?? "") ? 1 : 2;
     const me = mine === 1 ? m.team1_id : m.team2_id;
     const opp = mine === 1 ? m.team2 : m.team1;
@@ -541,12 +512,12 @@ export async function getMapTable(tournamentId?: string): Promise<MapAgg[]> {
     if (!table.has(map)) table.set(map, { map, played: 0, picked: 0, banned: 0, avgRounds: 0, rounds: 0 });
     return table.get(map)!;
   };
-  for (const m of (maps ?? []) as unknown as Pick<MatchMap, "map_name" | "team1_score" | "team2_score">[]) {
+  for (const m of maps ?? []) {
     const t = get(m.map_name);
     t.played++;
     t.rounds += m.team1_score + m.team2_score;
   }
-  for (const v of (veto ?? []) as unknown as Pick<VetoActionRow, "map_name" | "action">[]) {
+  for (const v of veto ?? []) {
     const t = get(v.map_name);
     if (v.action === "pick") t.picked++;
     if (v.action === "ban") t.banned++;
@@ -567,16 +538,9 @@ export async function getPlayerMapHistory(playerId: string) {
     .neq("match.tournament.status", "draft")
     .gt("rounds_played", 0)
     .order("updated_at", { ascending: false })
-    .limit(30);
-  type Row = MapStatRow & {
-    match: Pick<Match, "id" | "number" | "team1_id" | "team2_id" | "winner_id" | "status"> & {
-      tournament: { name: string; slug: string };
-      team1: { name: string; tag: string } | null;
-      team2: { name: string; tag: string } | null;
-      maps: Pick<MatchMap, "map_number" | "map_name" | "team1_score" | "team2_score">[];
-    };
-  };
-  const rows = (await attachSwing((data ?? []) as unknown as MapStatRow[])) as unknown as Row[];
+    .limit(30)
+    .overrideTypes<{ multi_kills: MapStatRow["multi_kills"] }[]>();
+  const rows = await attachSwing(data ?? []);
   return rows.map((r) => {
     const agg = aggregatePlayers([r])[0];
     const map = r.match.maps.find((x) => x.map_number === r.map_number);

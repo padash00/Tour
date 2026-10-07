@@ -9,6 +9,7 @@ import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, syncBracket } from "@/lib/matches";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
+import type { SeriesResult } from "@/lib/types";
 import { VETO_STEP_SECONDS } from "@/lib/veto";
 import type { ActionResult } from "@/components/forms";
 
@@ -195,7 +196,7 @@ export async function saveMapScore(_prev: ActionResult, formData: FormData): Pro
     p_match: m.id, p_map: map.id, p_score1: s1, p_score2: s2, p_finish: finish,
   });
   if (error) return { error: "Не удалось сохранить счёт: состояние матча изменилось. Обновите страницу." };
-  if (result?.winner) await syncBracket(m.tournament_id);
+  if ((result as SeriesResult | null)?.winner) await syncBracket(m.tournament_id);
   await audit(admin.id, finish ? "match.map_finish" : "match.map_score", { type: "match", id: m.id }, { map: map.map_name, s1, s2 });
   revalidateMatch(m.id, m.tournament.slug);
   return null;
@@ -250,7 +251,7 @@ export async function reopenMatch(_prev: ActionResult, formData: FormData): Prom
     if (!id || !slot) return;
     await db()
       .from("matches")
-      .update({ [slot === 1 ? "team1_id" : "team2_id"]: null, status: "pending" })
+      .update(slot === 1 ? { team1_id: null, status: "pending" } : { team2_id: null, status: "pending" })
       .eq("id", id);
   };
   await clear(m.winner_to_match, m.winner_to_slot);
@@ -299,12 +300,12 @@ export async function replaceRosterPlayer(_prev: ActionResult, formData: FormDat
 
   const { data: outRow } = await db()
     .from("tournament_roster_players")
-    .select("*, registration:tournament_registrations!inner(team_id), player:players(steam_id, nickname)")
+    .select("*, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(team_id), player:players(steam_id, nickname)")
     .eq("tournament_id", m.tournament_id)
     .eq("player_id", outId)
     .maybeSingle();
   if (!outRow) return { error: "Игрок не найден в составе" };
-  const teamId = outRow.registration.team_id as string;
+  const teamId = outRow.registration.team_id;
   if (teamId !== m.team1_id && teamId !== m.team2_id) return { error: "Игрок не из этого матча" };
 
   const { data: inPlayer } = await db().from("players").select("id, nickname, steam_id, is_banned").eq("steam_id", inSteam).maybeSingle();

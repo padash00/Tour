@@ -3,7 +3,7 @@ import { LiveRefresh } from "@/components/live-refresh";
 import Link from "next/link";
 import { db } from "@/lib/supabase";
 import type { MatchWithTeams } from "@/lib/matches";
-import type { Tournament } from "@/lib/types";
+import type { MatchStatus, Tournament } from "@/lib/types";
 import { formatShortDateTime, mapName } from "@/lib/format";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
 import { EmptyState, cn } from "@/components/ui";
@@ -12,7 +12,7 @@ import { requireAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Матчи — F16 Control" };
 
-const FILTERS = [
+const FILTERS: { key: string; label: string; statuses: MatchStatus[] }[] = [
   { key: "active", label: "Активные", statuses: ["upcoming", "veto", "ready", "live"] },
   { key: "pending", label: "Ожидают", statuses: ["pending"] },
   { key: "finished", label: "Завершённые", statuses: ["finished"] },

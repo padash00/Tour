@@ -14,7 +14,8 @@
     "test": "node scripts/test-offline.mjs",
     "test:reliability": "node scripts/test-reliability.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
-    "db:check": "node scripts/apply-migrations.mjs --check"
+    "db:check": "node scripts/apply-migrations.mjs --check",
+    "db:types": "node scripts/gen-db-types.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

@@ -3,6 +3,7 @@ import { GRAND_FINAL_ADVANTAGE } from "../bracket";
 import { handleLobbyEvent, type LobbyEvent } from "../lobby";
 import { getMatch, syncBracket } from "../matches";
 import { logSiteError } from "../site-errors";
+import type { TablesUpdate } from "../database.types";
 import { db } from "../supabase";
 import { startMapLogging, stopMapLogging } from "../swing-ingest";
 import type { Match } from "../types";
@@ -176,7 +177,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
 
   // MatchZy нумерует карты с 0, у нас — с 1
   const mapNumber = (ev.map_number ?? 0) + 1;
-  const setMap = (patch: Record<string, unknown>, unfinished = false) => {
+  const setMap = (patch: TablesUpdate<"match_maps">, unfinished = false) => {
     let query = db().from("match_maps").update(patch).eq("match_id", match.id).eq("map_number", mapNumber);
     if (unfinished) query = query.neq("status", "finished");
     return query.throwOnError();

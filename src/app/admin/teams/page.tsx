@@ -3,7 +3,6 @@ import Link from "next/link";
 import { listTeams } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
-import type { RegistrationStatus } from "@/lib/types";
 import { EmptyState, TeamLogo } from "@/components/ui";
 import { AdminHeader, TableBox } from "@/components/admin/control";
 import { requireAdmin } from "@/lib/auth";
@@ -25,9 +24,8 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
       .in("status", ["pending", "approved"])
       .not("tournament.status", "in", "(finished,cancelled)"),
   ]);
-  const captainName = new Map((captains ?? []).map((p) => [p.id as string, p.nickname as string]));
-  type Reg = { team_id: string; status: RegistrationStatus; tournament: { name: string } };
-  const regByTeam = new Map(((regs ?? []) as unknown as Reg[]).map((r) => [r.team_id, r]));
+  const captainName = new Map((captains ?? []).map((p) => [p.id, p.nickname]));
+  const regByTeam = new Map((regs ?? []).map((r) => [r.team_id, r]));
 
   return (
     <div className="space-y-6">

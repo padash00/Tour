@@ -1,13 +1,16 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 import { env } from "./env";
 
-let client: SupabaseClient | null = null;
+export type Db = SupabaseClient<Database>;
+
+let client: Db | null = null;
 
 /** Серверный клиент с service role. Никогда не импортировать в клиентские компоненты. */
-export function db(): SupabaseClient {
+export function db(): Db {
   if (!client) {
-    client = createClient(env.supabaseUrl, env.supabaseServiceKey, {
+    client = createClient<Database>(env.supabaseUrl, env.supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }

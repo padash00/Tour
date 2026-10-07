@@ -3,6 +3,7 @@ import { notify } from "../audit";
 import { db } from "../supabase";
 import { syncBracket } from "../matches";
 import { adminIds } from "./admins";
+import type { AgentCommand } from "./state";
 import { MAP_LOAD_TIMEOUT_MS } from "./workshop";
 
 // ───────────────────────── сторож: зависшие команды, загрузки и матчи, пропавшие с сервера
@@ -32,9 +33,11 @@ export async function expireStaleWork() {
     .lt("sent_at", staleBefore)
     .select("id, type, instance, payload, created_at");
   for (const c of stale ?? []) {
-    if (c.type === "load_match" && c.payload?.match_id) {
-      const table = c.payload.lobby ? "lobby_games" : "matches";
-      await db().from(table).update({ server_state: "error" }).eq("id", String(c.payload.match_id))
+    const payload = c.payload as AgentCommand["payload"] | null;
+    // load_match всегда адресован инстансу; без него update не нашёл бы строку (server_instance = null не совпадает)
+    if (c.type === "load_match" && payload?.match_id && c.instance) {
+      const table = payload.lobby ? "lobby_games" : "matches";
+      await db().from(table).update({ server_state: "error" }).eq("id", String(payload.match_id))
         .eq("server_state", "loading").eq("server_instance", c.instance).lte("server_assigned_at", c.created_at);
     }
   }
@@ -50,7 +53,7 @@ export async function expireStaleWork() {
     .lt("server_assigned_at", new Date(Date.now() - LOAD_WATCHDOG_MS).toISOString());
   if (lobbyLoading?.length) {
     const { data: insts } = await db().from("server_instances").select("name, matchzy_match_id");
-    const onServer = new Map((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
+    const onServer = new Map<string | null, number | null>((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
     for (const g of lobbyLoading) {
       if (onServer.get(g.server_instance) === g.matchzy_id) continue;
       await db()
@@ -70,7 +73,7 @@ export async function expireStaleWork() {
     .lt("server_assigned_at", loadBefore);
   if (loading?.length) {
     const { data: insts } = await db().from("server_instances").select("name, matchzy_match_id");
-    const onServer = new Map((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
+    const onServer = new Map<string | null, number | null>((insts ?? []).map((i) => [i.name, i.matchzy_match_id]));
     for (const m of loading) {
       if (onServer.get(m.server_instance) === m.matchzy_id) continue; // загружен — ждёт карту, это проверяет health check
       await db().from("matches").update({ server_state: "error" }).eq("id", m.id).eq("server_state", "loading");

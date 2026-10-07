@@ -80,14 +80,13 @@ export async function getPreviousRoster(
 ) {
   const { data } = await db()
     .from("tournament_registrations")
-    .select("id, created_at, tournament:tournaments!inner(id, name, format, status), roster:tournament_roster_players(player_id, role)")
+    .select("id, created_at, tournament:tournaments!inner(id, name, format, status), roster:tournament_roster_players!tournament_roster_players_registration_id_fkey(player_id, role)")
     .eq("team_id", teamId)
     .eq("status", "approved")
     .neq("tournament_id", tournament.id)
     .order("created_at", { ascending: false })
     .limit(10);
-  type R = { tournament: { name: string; format: string; status: string }; roster: { player_id: string; role: "main" | "sub" }[] };
-  const prev = ((data ?? []) as unknown as R[]).find((r) => r.tournament.format === tournament.format && r.tournament.status !== "draft" && r.roster.length);
+  const prev = (data ?? []).find((r) => r.tournament.format === tournament.format && r.tournament.status !== "draft" && r.roster.length);
   if (!prev) return null;
   const mode = modeOf(tournament.format);
   const ok = new Map(currentMembers.filter((m) => !m.player.is_banned).map((m) => [m.player_id, m.player.nickname]));

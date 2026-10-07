@@ -1,11 +1,12 @@
 import "server-only";
+import type { Json } from "./database.types";
 import { db } from "./supabase";
 
 export async function audit(
   actorId: string | null,
   action: string,
   entity?: { type: string; id: string },
-  payload: Record<string, unknown> = {},
+  payload: { [key: string]: Json | undefined } = {},
 ) {
   await db().from("audit_logs").insert({
     actor_id: actorId,

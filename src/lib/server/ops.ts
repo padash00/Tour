@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { notify } from "../audit";
 import { db } from "../supabase";
+import type { ClaimIngestResult } from "../types";
 import { adminIds } from "./admins";
 import { enqueueAutoPrefetch } from "./workshop";
 
@@ -21,10 +22,10 @@ export const ingestKey = (prefix: string, body: string) => `${prefix}:${createHa
  * A delivery is acknowledged only after completion. Database errors must reach
  * the relay as 5xx so its durable outbox keeps the event for another attempt.
  */
-export async function claimIngest(key: string): Promise<{ status: "done" | "busy" | "claimed"; token?: string }> {
+export async function claimIngest(key: string): Promise<ClaimIngestResult> {
   const { data, error } = await db().rpc("claim_ingest", { p_key: key });
   if (error) throw new Error("Не удалось принять событие", { cause: error });
-  return data;
+  return data as ClaimIngestResult;
 }
 
 /** Обработка упала — снимаем отметку, чтобы досылка агента обработала событие заново */

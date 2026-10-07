@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./supabase";
-import type { Player, Team } from "./types";
+import type { Tables } from "./database.types";
+import type { Narrow, Player, Team } from "./types";
 
 /** Поиск команды и игроков: объявления «ищу команду» (игрок) и «ищем игрока» (капитан команды) */
 
@@ -18,19 +19,7 @@ export const FINDER_TTL_DAYS = 14;
 
 export const roleLabel = (r: string) => FINDER_ROLES.find((x) => x.key === r)?.label ?? r;
 
-export type FinderPost = {
-  id: string;
-  kind: "player" | "team";
-  player_id: string;
-  team_id: string | null;
-  roles: string[];
-  modes: string[];
-  availability: string | null;
-  note: string | null;
-  active: boolean;
-  expires_at: string;
-  created_at: string;
-  updated_at: string;
+export type FinderPost = Narrow<Tables<"finder_posts">, { kind: "player" | "team" }> & {
   player: Pick<Player, "id" | "nickname" | "avatar_url" | "steam_id" | "faceit_level" | "faceit_elo" | "country">;
   team: (Pick<Team, "id" | "name" | "tag" | "logo_url" | "region"> & { member_count?: number }) | null;
 };
@@ -53,7 +42,7 @@ export async function listFinderPosts(kind: "player" | "team", f: FinderFilter =
   if (f.role && f.role !== "all") q = q.contains("roles", [f.role]);
   if (f.mode && f.mode !== "all") q = q.contains("modes", [f.mode]);
   const { data } = await q;
-  let list = (data ?? []) as unknown as FinderPost[];
+  let list = (data ?? []) as FinderPost[];
   // уровень FACEIT: для игрока — его уровень, для команды — уровень капитана
   if (f.faceitMin) list = list.filter((p) => (p.player.faceit_level ?? 0) >= f.faceitMin!);
   if (f.faceitMax) list = list.filter((p) => (p.player.faceit_level ?? 0) <= f.faceitMax!);
@@ -78,7 +67,7 @@ export async function getOwnPost(kind: "player" | "team", ownerId: string): Prom
     .eq("active", true)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
-  return (data as unknown as FinderPost) ?? null;
+  return data as FinderPost | null;
 }
 
 /** Закрыть истёкшие объявления владельца, чтобы уникальный индекс не мешал новому */

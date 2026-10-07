@@ -1,190 +1,61 @@
-export type TournamentStatus =
-  | "draft"
-  | "registration"
-  | "registration_closed"
-  | "checkin"
-  | "live"
-  | "finished"
-  | "cancelled";
+/**
+ * Доменные типы строк базы. Основа — сгенерированные типы Supabase (`database.types.ts`, `npm run db:types`);
+ * здесь только сужение того, что база хранит как text/jsonb: строковые статусы до union, jsonb до формы.
+ */
+import type { Enums, Tables } from "./database.types";
+import type { FormatKind } from "./formats";
+import type { ModeKey } from "./modes";
 
-export type RegistrationStatus = "pending" | "approved" | "rejected" | "withdrawn";
-export type MemberRole = "captain" | "player" | "substitute";
-export type RosterRole = "main" | "sub";
+/** Заменяет типы полей T на поля O (сужение колонок text/jsonb сгенерированной строки) */
+export type Narrow<T, O extends { [K in keyof O]: K extends keyof T ? unknown : never }> = Omit<T, keyof O> & O;
 
-export type Player = {
-  id: string;
-  steam_id: string;
-  nickname: string;
-  avatar_url: string | null;
-  profile_url: string | null;
-  country: string | null;
-  is_admin: boolean;
-  is_banned: boolean;
-  faceit_id: string | null;
-  faceit_nickname: string | null;
-  faceit_level: number | null;
-  faceit_elo: number | null;
-  faceit_updated_at: string | null;
-  created_at: string;
-  last_login_at: string | null;
-};
+export type TournamentStatus = Enums<"tournament_status">;
+export type RegistrationStatus = Enums<"registration_status">;
+export type MemberRole = Enums<"member_role">;
+export type RosterRole = Enums<"roster_role">;
+export type MatchStatus = Enums<"match_status">;
+export type BracketSide = Enums<"bracket_side">;
 
-export type Team = {
-  id: string;
-  name: string;
-  tag: string;
-  region: string | null;
-  description: string | null;
-  logo_url: string | null;
-  captain_id: string;
-  invite_code: string;
-  created_at: string;
-  disbanded_at: string | null;
-  is_solo?: boolean;
-};
+export type Player = Tables<"players">;
 
-export type TeamMember = {
-  id: string;
-  team_id: string;
-  player_id: string;
-  role: MemberRole;
-  joined_at: string;
-  left_at: string | null;
-};
+export type Team = Tables<"teams">;
+
+export type TeamMember = Tables<"team_members">;
 
 export type TeamMemberWithPlayer = TeamMember & { player: Player };
 
 export type PrizeRow = { place: string; prize: string };
 
-export type Tournament = {
-  id: string;
-  slug: string;
-  name: string;
-  game: string;
-  format: string;
-  bracket_type: string;
-  max_teams: number;
-  status: TournamentStatus;
-  starts_at: string | null;
-  registration_opens_at: string | null;
-  registration_closes_at: string | null;
-  checkin_opens_at: string | null;
-  checkin_closes_at: string | null;
-  location: string | null;
-  is_lan: boolean;
-  prize_pool: string | null;
-  prize_distribution: PrizeRow[];
-  match_format: string | null;
-  map_pool: string[];
-  description: string | null;
-  rules: string | null;
-  requirements: string | null;
-  bracket_published_at: string | null;
-  cover_url: string | null;
-  default_best_of: number;
-  final_best_of: number;
-  overtime: boolean;
-  knife_round: boolean;
-  timeouts_per_team: number;
-  timeout_seconds: number;
-  tech_pauses: number;
-  tech_pause_seconds: number;
-  stream_url: string | null;
-  discord_url: string | null;
-  contact: string | null;
-  entry_fee: string | null;
-  sponsors: { name: string; url?: string }[];
-  groups_count: number;
-  advance_per_group: number;
-  swiss_wins: number;
-  playoff_type: "single_elimination" | "double_elimination";
-  playoff_created_at: string | null;
-  autopilot: boolean;
-  auto_approve: boolean;
-  created_at: string;
-  updated_at: string;
-};
+export type Tournament = Narrow<
+  Tables<"tournaments">,
+  {
+    /** CHECK tournaments_format_known — режимы из modes.ts */
+    format: ModeKey;
+    /** CHECK tournaments_bracket_type_known — ключи FORMATS из formats.ts */
+    bracket_type: FormatKind;
+    playoff_type: "single_elimination" | "double_elimination";
+    prize_distribution: PrizeRow[];
+    sponsors: { name: string; url?: string }[];
+  }
+>;
 
-export type Registration = {
-  id: string;
-  tournament_id: string;
-  team_id: string;
-  status: RegistrationStatus;
-  seed: number | null;
-  note: string | null;
-  decided_by: string | null;
-  decided_at: string | null;
-  checked_in_at: string | null;
-  checked_in_by: string | null;
-  created_at: string;
-};
+export type Registration = Tables<"tournament_registrations">;
 
-export type RosterPlayer = {
-  id: string;
-  registration_id: string;
-  tournament_id: string;
-  player_id: string;
-  role: RosterRole;
-};
+export type RosterPlayer = Tables<"tournament_roster_players">;
 
-export type Notification = {
-  id: string;
-  player_id: string;
-  title: string;
-  body: string | null;
-  link: string | null;
-  read_at: string | null;
-  created_at: string;
-};
+export type Notification = Tables<"notifications">;
 
-export type AuditLog = {
-  id: string;
-  actor_id: string | null;
-  action: string;
-  entity_type: string | null;
-  entity_id: string | null;
-  payload: Record<string, unknown>;
-  created_at: string;
-};
+export type AuditLog = Narrow<Tables<"audit_logs">, { payload: Record<string, unknown> }>;
 
-export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
-export type BracketSide = "upper" | "lower" | "grand_final" | "group" | "swiss";
-
-export type Match = {
-  id: string;
-  tournament_id: string;
-  number: number;
-  bracket: BracketSide;
-  round: number;
-  position: number;
-  best_of: number;
-  status: MatchStatus;
-  team1_id: string | null;
-  team2_id: string | null;
-  team1_score: number;
-  team2_score: number;
-  winner_id: string | null;
-  is_walkover: boolean;
-  winner_to_match: string | null;
-  winner_to_slot: 1 | 2 | null;
-  loser_to_match: string | null;
-  loser_to_slot: 1 | 2 | null;
-  veto_deadline: string | null;
-  server_address: string | null;
-  server_password: string | null;
-  matchzy_id: number | null;
-  server_instance: string | null;
-  server_state: "assigned" | "loading" | "ready" | "error" | null;
-  under_review: boolean;
-  server_assigned_at: string | null;
-  server_ready_at: string | null;
-  stage: "group" | "swiss" | "playoff";
-  group_label: string | null;
-  scheduled_at: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-  created_at: string;
-};
+export type Match = Narrow<
+  Tables<"matches">,
+  {
+    winner_to_slot: 1 | 2 | null;
+    loser_to_slot: 1 | 2 | null;
+    server_state: "assigned" | "loading" | "ready" | "error" | null;
+    stage: "group" | "swiss" | "playoff";
+  }
+>;
 
 /** Поля сетки, которые сверяет и пишет RPC sync_bracket_apply */
 export type BracketSyncRow = Pick<Match, "id" | "status" | "team1_id" | "team2_id" | "winner_id" | "is_walkover">;
@@ -192,41 +63,29 @@ export type BracketSyncRow = Pick<Match, "id" | "status" | "team1_id" | "team2_i
 /** Режим RPC create_stage_matches: первая стадия, плей-офф после групп/швейцарки, следующий тур швейцарки */
 export type StageCreateMode = "bracket" | "playoff" | "round";
 
-export type MatchMap = {
-  id: string;
-  match_id: string;
-  map_number: number;
-  map_name: string;
-  picked_by: string | null;
-  team1_score: number;
-  team2_score: number;
-  winner_id: string | null;
-  status: "pending" | "live" | "finished";
-};
+export type MatchMap = Narrow<Tables<"match_maps">, { status: "pending" | "live" | "finished" }>;
 
-export type VetoActionRow = {
-  id: string;
-  match_id: string;
-  step: number;
-  team_id: string | null;
-  action: "ban" | "pick" | "decider";
-  map_name: string;
-  auto: boolean;
-  actor_id: string | null;
-  created_at: string;
-};
+export type VetoActionRow = Narrow<Tables<"veto_actions">, { action: "ban" | "pick" | "decider" }>;
 
-export type Dispute = {
-  id: string;
-  match_id: string;
-  opened_by: string;
-  team_id: string | null;
-  reason: string;
-  status: "open" | "resolved" | "rejected";
-  decision: string | null;
-  decided_by: string | null;
-  decided_at: string | null;
-  result_before: Record<string, unknown> | null;
-  result_after: Record<string, unknown> | null;
-  created_at: string;
-};
+export type Dispute = Narrow<
+  Tables<"disputes">,
+  {
+    status: "open" | "resolved" | "rejected";
+    result_before: Record<string, unknown> | null;
+    result_after: Record<string, unknown> | null;
+  }
+>;
+
+// ───────────────────────── jsonb-ответы RPC (в сгенерированных типах это просто Json)
+
+/** recompute_match_series / save_match_map_score */
+export type SeriesResult = { tournament_id: string; winner: string | null };
+
+/** sync_bracket_apply */
+export type SyncBracketResult = { status: "conflict" } | { status: "ok"; upcoming: string[] };
+
+/** save_registration */
+export type SaveRegistrationResult = { id: string; updated: boolean; approved: boolean };
+
+/** claim_ingest */
+export type ClaimIngestResult = { status: "done" | "busy" | "claimed"; token?: string };

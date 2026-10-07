@@ -43,7 +43,7 @@ export async function tournamentEta(tournamentId: string): Promise<TournamentEta
     db().from("server_instances").select("role"),
   ]);
   if (!t || ["finished", "cancelled", "draft"].includes(t.status)) return null;
-  const rows = (ms ?? []) as unknown as Row[];
+  const rows: Row[] = ms ?? [];
   const size = modeOf(t.format).size;
 
   // средняя длительность карты по сыгранным матчам

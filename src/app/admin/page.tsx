@@ -54,7 +54,7 @@ export default async function AdminOverview() {
   const opsCount = servers.online ? opsAlertCount(opsInfo, cs2Check) : 0;
   const now = serverNow();
 
-  const active = (activeRes.data ?? []) as unknown as (InstanceMatch & { server_instance: string | null })[];
+  const active: (InstanceMatch & { server_instance: string | null })[] = activeRes.data ?? [];
   const live = active.filter((m) => m.status === "live");
   const onServers = active.filter((m) => m.server_instance);
   const byInstance = new Map(onServers.map((m) => [m.server_instance as string, m] as const));
@@ -62,9 +62,9 @@ export default async function AdminOverview() {
   const serverErrors = active.filter((m) => m.status === "ready" && m.server_state === "error");
   const noShow = ready.filter((m) => (minutesSince(m.server_ready_at, now) ?? 0) >= 10);
 
-  const disputes = (disputesRes.data ?? []) as unknown as { id: string; match: { id: string; number: number } }[];
+  const disputes = disputesRes.data ?? [];
   const disputeMatches = [...new Map(disputes.map((d) => [d.match.id, d.match])).values()];
-  const pending = (pendingRes.data ?? []) as unknown as { id: string; tournament: { id: string; name: string } }[];
+  const pending = pendingRes.data ?? [];
   const pendingTournaments = [...new Map(pending.map((p) => [p.tournament.id, p.tournament])).values()];
   const tournaments = (tournamentsRes.data ?? []) as Tournament[];
   const current = tournaments.find((t) => t.status === "live") ?? tournaments.find((t) => t.status === "checkin") ?? tournaments[0] ?? null;

@@ -12,7 +12,7 @@ import { fromLocalInput } from "@/lib/format";
 import { closeMatchesOfEndedTournaments, enqueueCommand, enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
 import { db } from "@/lib/supabase";
-import type { PrizeRow, TournamentStatus } from "@/lib/types";
+import type { PrizeRow, RegistrationStatus, TournamentStatus } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
 
 const STATUSES: TournamentStatus[] = [
@@ -278,7 +278,7 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
       .select("team:teams(captain_id)")
       .eq("tournament_id", id)
       .eq("status", "approved");
-    const captains = ((data ?? []) as unknown as { team: { captain_id: string } }[]).map((r) => r.team.captain_id);
+    const captains = (data ?? []).map((r) => r.team.captain_id);
     await notify(captains, `Check-in на «${before.name}» открыт`, "Подтвердите участие команды.", `/tournaments/${before.slug}/checkin`);
   }
 
@@ -327,7 +327,7 @@ export async function decideRegistration(_prev: ActionResult, formData: FormData
     .single();
   if (!reg) return { error: "Заявка не найдена" };
 
-  let status: string;
+  let status: RegistrationStatus;
   if (decision === "approve") {
     status = "approved";
   } else if (decision === "reject") {
@@ -341,7 +341,7 @@ export async function decideRegistration(_prev: ActionResult, formData: FormData
   }
 
   const { data: changed, error } = await db().rpc("change_registration", {
-    p_registration: id, p_actor: admin.id, p_status: status, p_note: note, p_admin: true,
+    p_registration: id, p_actor: admin.id, p_status: status, p_note: note ?? undefined, p_admin: true,
   });
   if (error) return { error: registrationError(error) };
   if (!changed) return { success: "Заявка уже в этом состоянии" };
@@ -434,7 +434,7 @@ export async function togglePlayerFlag(_prev: ActionResult, formData: FormData):
   const { data: p } = await db().from("players").select(`steam_id, nickname, ${flag}`).eq("id", playerId).single();
   if (!p) return { error: "Игрок не найден" };
   const value = valueInput === "1";
-  const { error } = await db().from("players").update({ [flag]: value }).eq("id", playerId);
+  const { error } = await db().from("players").update(flag === "is_banned" ? { is_banned: value } : { is_admin: value }).eq("id", playerId);
   if (error) return { error: "Не удалось сохранить состояние игрока" };
   await audit(admin.id, `player.${flag}`, { type: "player", id: playerId }, { steam_id: p.steam_id, value });
   revalidatePath("/admin/players");

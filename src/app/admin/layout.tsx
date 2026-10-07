@@ -30,19 +30,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   ]);
   const now = serverNow();
 
-  type M = {
-    id: string;
-    number: number;
-    status: string;
-    server_instance: string | null;
-    server_state: string | null;
-    server_ready_at: string | null;
-    team1: { tag: string } | null;
-    team2: { tag: string } | null;
-    tournament: { format: string } | null;
-  };
-  const matches = (matchesRes.data ?? []) as unknown as M[];
-  const tournaments = (tournamentsRes.data ?? []) as { id: string; name: string; status: string }[];
+  const matches = matchesRes.data ?? [];
+  const tournaments = tournamentsRes.data ?? [];
 
   const live = matches.filter((m) => m.status === "live").length;
   const busy = servers.instances.filter((i) => i.running && i.match_id).length;

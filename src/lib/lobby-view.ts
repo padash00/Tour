@@ -202,8 +202,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
           ready: m.ready,
           online: isOnline(m),
         })),
-    bans: ((bans ?? []) as unknown as { player: { id: string; nickname: string } }[]).map((b) => b.player),
-    messages: ((msgs ?? []) as unknown as { id: number; player_id: string | null; body: string; created_at: string; player: { nickname: string; avatar_url: string | null } | null }[])
+    bans: (bans ?? []).map((b) => b.player),
+    messages: (msgs ?? [])
       .reverse()
       .map((m) => ({ id: m.id, player_id: m.player_id, nickname: m.player?.nickname ?? null, avatar_url: m.player?.avatar_url ?? null, body: m.body, created_at: m.created_at })),
     game:

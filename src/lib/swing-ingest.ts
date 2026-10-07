@@ -32,7 +32,7 @@ export async function ingestLog(matchzyId: number, body: string, receipt: { key:
     .maybeSingle().throwOnError();
   if (!match) return { ignored: "unknown match" };
   // размер команды режима: в дуэли одно убийство решает раунд (1 на 0), а не 5 на 4
-  const teamSize = modeOf((match as unknown as { tournament: { format: string } }).tournament?.format).size;
+  const teamSize = modeOf(match.tournament?.format).size;
   const { data } = await db().from("match_log_state").select("*").eq("match_id", match.id).maybeSingle().throwOnError();
   const state = data as State | null;
   if (!state?.live) return { ignored: "map not live" };
@@ -79,7 +79,7 @@ export async function ingestLog(matchzyId: number, body: string, receipt: { key:
 /** Пересчитать Swing матча по сохранённым событиям раундов (после исправления модели) */
 export async function recomputeMatchSwing(matchId: string) {
   const { data: m } = await db().from("matches").select("tournament:tournaments(format)").eq("id", matchId).single();
-  const teamSize = modeOf((m as unknown as { tournament: { format: string } } | null)?.tournament?.format).size;
+  const teamSize = modeOf(m?.tournament?.format).size;
   const { data: rounds } = await db()
     .from("match_rounds")
     .select("map_number, round_number, events")

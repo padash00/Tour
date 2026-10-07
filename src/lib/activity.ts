@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
+import type { VetoActionRow } from "./types";
 import { checkinWindowError } from "./data";
 import { vetoState } from "./veto";
 import { getGame, getLobby, getMembers, lobbyVetoState, playerLobby } from "./lobby";
@@ -50,11 +51,10 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
   // команды игрока в одобренных составах турниров
   const { data: rows } = await db()
     .from("tournament_roster_players")
-    .select("tournament_id, registration:tournament_registrations!inner(id, team_id, status, checked_in_at)")
+    .select("tournament_id, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(id, team_id, status, checked_in_at)")
     .eq("player_id", playerId)
     .eq("registration.status", "approved");
-  type Row = { tournament_id: string; registration: { id: string; team_id: string; status: string; checked_in_at: string | null } };
-  const regs = (rows ?? []) as unknown as Row[];
+  const regs = rows ?? [];
   if (!regs.length) return [];
   const teamIds = [...new Set(regs.map((r) => r.registration.team_id))];
   const tIds = [...new Set(regs.map((r) => r.tournament_id))];
@@ -69,32 +69,21 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
       .in("tournament_id", tIds)
       .or(`team1_id.in.(${teamIds.join(",")}),team2_id.in.(${teamIds.join(",")})`),
   ]);
-  const captainOf = new Map((teams ?? []).map((t) => [t.id, t.captain_id as string]));
+  const captainOf = new Map((teams ?? []).map((t) => [t.id, t.captain_id]));
   const tour = new Map((tours ?? []).map((t) => [t.id, t]));
   const out: Activity[] = [];
 
-  type M = {
-    id: string;
-    number: number;
-    status: "veto" | "ready" | "live";
-    tournament_id: string;
-    best_of: number;
-    team1_id: string | null;
-    team2_id: string | null;
-    veto_deadline: string | null;
-    server_state: string | null;
-    server_address: string | null;
-    server_password: string | null;
-    team1: { name: string } | null;
-    team2: { name: string } | null;
-  };
-  const matches = ((ms ?? []) as unknown as M[]).filter((m) =>
+  const matches = (ms ?? []).filter((m) =>
     regs.some((r) => r.tournament_id === m.tournament_id && (r.registration.team_id === m.team1_id || r.registration.team_id === m.team2_id)),
   );
   const vetoIds = matches.filter((m) => m.status === "veto").map((m) => m.id);
   const { data: vetoRows } = vetoIds.length
-    ? await db().from("veto_actions").select("match_id, step, team_id, action, map_name").in("match_id", vetoIds)
-    : { data: [] as { match_id: string; step: number; team_id: string | null; action: "ban" | "pick" | "decider"; map_name: string }[] };
+    ? await db()
+        .from("veto_actions")
+        .select("match_id, step, team_id, action, map_name")
+        .in("match_id", vetoIds)
+        .overrideTypes<Pick<VetoActionRow, "action">[]>()
+    : { data: [] as Pick<VetoActionRow, "match_id" | "step" | "team_id" | "action" | "map_name">[] };
 
   for (const m of matches) {
     const mine = regs.find((r) => r.tournament_id === m.tournament_id && (r.registration.team_id === m.team1_id || r.registration.team_id === m.team2_id))!;
@@ -103,7 +92,7 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
     const href = `/matches/${m.id}`;
     if (m.status === "veto") {
       const t = tour.get(m.tournament_id);
-      const st = vetoState(m.best_of, (t?.map_pool ?? []) as string[], (vetoRows ?? []).filter((v) => v.match_id === m.id));
+      const st = vetoState(m.best_of, t?.map_pool ?? [], (vetoRows ?? []).filter((v) => v.match_id === m.id));
       const turnTeam = st.current?.team === 1 ? m.team1_id : st.current?.team === 2 ? m.team2_id : null;
       if (turnTeam === myTeam && captainOf.get(myTeam) === playerId && st.current?.action !== "decider") {
         out.push({

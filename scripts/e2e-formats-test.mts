@@ -80,7 +80,7 @@ async function makeTournament(slug: string, patch: Partial<Tournament>, teamIds:
 }
 
 /** Отыграть все готовые матчи: победитель — с меньшим seed с вероятностью 65% */
-async function playAvailable(t: Tournament, seedOf: Map<string, number>) {
+async function playAvailable(t: Tournament, seedOf: ReadonlyMap<string | null, number>) {
   const { data } = await db()
     .from("matches")
     .select("id, team1_id, team2_id, status")
@@ -122,7 +122,7 @@ async function playToEnd(t: Tournament, seeded: string[]) {
 
 async function names() {
   const { data } = await db().from("teams").select("id, name").or("invite_code.like.E2EF-%,invite_code.like.SOLO-765611990000002%");
-  return new Map((data ?? []).map((x) => [x.id, x.name]));
+  return new Map<string | null, string>((data ?? []).map((x) => [x.id, x.name]));
 }
 
 async function printStandings(t: Tournament) {

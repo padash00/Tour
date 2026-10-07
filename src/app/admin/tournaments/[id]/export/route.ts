@@ -43,14 +43,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/admin/tourna
   if (type === "rosters") {
     const { data } = await db()
       .from("tournament_roster_players")
-      .select("role, player:players(nickname, steam_id), registration:tournament_registrations(status, seed, checked_in_at, team:teams(name, tag))")
+      .select("role, player:players(nickname, steam_id), registration:tournament_registrations!tournament_roster_players_registration_id_fkey(status, seed, checked_in_at, team:teams(name, tag))")
       .eq("tournament_id", id);
-    type R = {
-      role: string;
-      player: { nickname: string; steam_id: string } | null;
-      registration: { status: string; seed: number | null; checked_in_at: string | null; team: { name: string; tag: string } | null } | null;
-    };
-    const list = ((data ?? []) as unknown as R[]).sort(
+    const list = (data ?? []).sort(
       (a, b) => (a.registration?.team?.name ?? "").localeCompare(b.registration?.team?.name ?? "") || a.role.localeCompare(b.role),
     );
     rows = [
@@ -97,28 +92,10 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/admin/tourna
       )
       .eq("tournament_id", id)
       .order("number");
-    type M = {
-      number: number;
-      stage: string | null;
-      bracket: string;
-      group_label: string | null;
-      round: number;
-      best_of: number;
-      status: string;
-      team1_score: number;
-      team2_score: number;
-      is_walkover: boolean;
-      scheduled_at: string | null;
-      finished_at: string | null;
-      team1: { name: string } | null;
-      team2: { name: string } | null;
-      winner: { name: string } | null;
-      maps: { map_number: number; map_name: string; team1_score: number; team2_score: number; status: string }[];
-    };
     const time = (s: string | null) => (s ? new Date(s).toLocaleString("ru-RU", { timeZone: "Asia/Almaty" }) : "");
     rows = [
       ["Матч", "Стадия", "Раунд", "Группа", "Формат", "Команда 1", "Команда 2", "Счёт", "Победитель", "Статус", "Тех. результат", "Карты", "Начало", "Завершён"],
-      ...((data ?? []) as unknown as M[]).map((m) => [
+      ...(data ?? []).map((m) => [
         m.number,
         m.bracket === "grand_final" ? "гранд-финал" : m.bracket === "upper" ? "верхняя" : m.bracket === "lower" ? "нижняя" : m.bracket === "group" ? "группа" : m.bracket === "swiss" ? "швейцарка" : m.bracket,
         m.round,

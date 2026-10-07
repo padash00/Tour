@@ -16,7 +16,7 @@ import {
 import { registrationError } from "@/lib/registration-errors";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { db } from "@/lib/supabase";
-import type { Tournament } from "@/lib/types";
+import type { SaveRegistrationResult, Tournament } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
 
 async function captainContext(next: string, tournament?: Tournament, createSolo = false) {
@@ -72,8 +72,7 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     p_tournament: tournament.id, p_team: team.id, p_actor: player.id, p_main: mainIds, p_sub: subIds,
   });
   if (error) return { error: registrationError(error) };
-  const isUpdate = saved.updated as boolean;
-  const auto = saved.approved as boolean;
+  const { updated: isUpdate, approved: auto } = saved as SaveRegistrationResult;
 
   if (isUpdate) {
     await audit(player.id, "registration.roster", { type: "tournament", id: tournament.id }, { team: team.tag });

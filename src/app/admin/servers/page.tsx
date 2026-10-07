@@ -3,6 +3,7 @@ import Link from "next/link";
 import { hostCommand, serverRcon, toggleLobbyServer } from "@/app/actions/admin-server";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { getAgentBundle } from "@/lib/agent-bundle";
+import type { LobbyGame } from "@/lib/lobby";
 import { formatShortDateTime, formatTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
@@ -42,7 +43,8 @@ export default async function ServersPage() {
       .from("lobby_games")
       .select("id, status, server_instance, server_state, team1, team2, lobby:lobbies!lobby_games_lobby_id_fkey(code)")
       .not("server_instance", "is", null)
-      .in("status", ["waiting", "live"]),
+      .in("status", ["waiting", "live"])
+      .overrideTypes<Pick<LobbyGame, "team1" | "team2">[]>(),
     db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "pending"),
     db().from("agent_commands").select("id", { head: true, count: "exact" }).eq("status", "sent"),
     db().from("app_settings").select("value").eq("key", "AGENT_SYNC_METRICS").maybeSingle(),
@@ -55,25 +57,12 @@ export default async function ServersPage() {
   for (const row of jobTimings ?? []) {
     try { jobMetrics.set(row.key, JSON.parse(row.value) as SyncMetrics); } catch {}
   }
-  type LG = { id: string; status: string; server_instance: string; server_state: string | null; team1: { name: string }; team2: { name: string }; lobby: { code: string } | null };
-  const lobbyOn = new Map(((lobbyGames ?? []) as unknown as LG[]).map((g) => [g.server_instance, g]));
+  const lobbyOn = new Map((lobbyGames ?? []).map((g) => [g.server_instance, g]));
   const nowTs = serverNow();
   const selfCheckRunning = ((commands ?? []) as AgentCommand[]).some(
     (c) => c.type === "self_check" && (c.status === "pending" || c.status === "sent") && nowTs - new Date(c.created_at).getTime() < 15 * 60_000,
   );
-  type M = {
-    id: string;
-    number: number;
-    status: string;
-    server_instance: string;
-    server_state: string | null;
-    server_ready_at: string | null;
-    team1_score: number;
-    team2_score: number;
-    team1: { tag: string } | null;
-    team2: { tag: string } | null;
-  };
-  const assigned = new Map(((matches ?? []) as unknown as M[]).map((m) => [m.server_instance, m]));
+  const assigned = new Map((matches ?? []).map((m) => [m.server_instance, m]));
   const info = (host?.info ?? {}) as Record<string, string | number>;
   const versions = ((host?.info as { versions?: Record<string, string> } | undefined)?.versions ?? {}) as Record<string, string>;
   const upnpIp = (host?.info as { upnp?: { ip?: string | null } } | undefined)?.upnp?.ip ?? null;

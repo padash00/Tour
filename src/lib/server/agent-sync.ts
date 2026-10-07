@@ -4,6 +4,7 @@ import { currentLobbyMap, lobbyAddress, lobbyEnforce, type LobbyGame } from "../
 import { getMatch } from "../matches";
 import { getSetting } from "../settings";
 import { logSiteError } from "../site-errors";
+import type { Json } from "../database.types";
 import { db } from "../supabase";
 import type { Match } from "../types";
 import { adminIds } from "./admins";
@@ -38,7 +39,8 @@ export async function applyAgentReport(report: AgentReport) {
   const now = new Date().toISOString();
   const { error: hostError } = await db()
     .from("server_host")
-    .upsert({ id: "main", lan_ip: report.lan_ip ?? null, last_seen_at: now, info: report.info ?? {} });
+    // info пришёл JSON-телом запроса агента — это JSON по построению
+    .upsert({ id: "main", lan_ip: report.lan_ip ?? null, last_seen_at: now, info: (report.info ?? {}) as Json });
   if (hostError) throw new Error("Не удалось сохранить отчёт агента", { cause: hostError });
 
   const upnpIp = (report.info as { upnp?: { ip?: string | null } } | undefined)?.upnp?.ip ?? null;
@@ -192,7 +194,8 @@ export async function ackCommand(id: string, ok: boolean, result: string) {
   if (cmd.status !== "sent") return false;
   if (cmd.type === "prefetch_maps") await saveWorkshopResults(result);
   if (cmd.type === "self_check" && ok) await saveSelfCheck(result);
-  if (cmd.type === "load_match" && !ok) {
+  // load_match всегда адресован инстансу; без него update не нашёл бы строку (server_instance = null не совпадает)
+  if (cmd.type === "load_match" && !ok && cmd.instance) {
     const table = cmd.payload.lobby ? "lobby_games" : "matches";
     const { error } = await db().from(table).update({ server_state: "error" })
       .eq("id", String(cmd.payload.match_id)).eq("server_instance", cmd.instance)

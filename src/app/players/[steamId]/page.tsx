@@ -33,7 +33,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
     getPlayerMapHistory(player.id),
     db()
       .from("tournament_roster_players")
-      .select("tournament_id, registration:tournament_registrations!inner(status), tournament:tournaments!inner(status)")
+      .select("tournament_id, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(status), tournament:tournaments!inner(status)")
       .eq("player_id", player.id)
       .eq("registration.status", "approved")
       .neq("tournament.status", "draft"),

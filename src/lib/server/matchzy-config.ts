@@ -111,7 +111,7 @@ export function isAimMap(map: string) {
 
 export async function matchEnforce(matchId: string) {
   const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format, overtime, timeouts_per_team, timeout_seconds)").eq("id", matchId).single();
-  const row = data as unknown as { matchzy_id: number; tournament: { format: string; overtime: boolean; timeouts_per_team: number; timeout_seconds: number } } | null;
+  const row = data;
   if (!row) return null;
   const { data: maps } = await db().from("match_maps").select("map_number, map_name").eq("match_id", matchId).order("map_number");
   const cvars = {
@@ -134,7 +134,7 @@ export async function matchzyPostCommands(matchId: string) {
     .select("tournament:tournaments(tech_pauses, tech_pause_seconds)")
     .eq("id", matchId)
     .single();
-  const t = (data as unknown as { tournament: { tech_pauses: number; tech_pause_seconds: number } } | null)?.tournament;
+  const t = data?.tournament;
   if (!t) return [];
   return [`matchzy_max_tech_pauses_allowed ${t.tech_pauses}`, `matchzy_tech_pause_duration ${t.tech_pause_seconds}`];
 }

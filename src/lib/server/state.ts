@@ -1,6 +1,8 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
+import type { Json, Tables } from "../database.types";
 import { db } from "../supabase";
+import type { Narrow } from "../types";
 
 // ───────────────────────── авторизация агента и MatchZy
 
@@ -23,28 +25,15 @@ export function checkBearer(request: Request, envName: "AGENT_TOKEN" | "MATCHZY_
 
 // ───────────────────────── типы
 
-export type ServerInstance = {
-  name: string;
-  port: number;
-  role: "active" | "reserve";
-  /** отдан под лобби — турниры его не берут */
-  for_lobby?: boolean;
-  running: boolean;
-  gamestate: string | null;
-  map: string | null;
-  players: number | null;
-  matchzy_match_id: number | null;
-  match_id: string | null;
-  last_seen_at: string | null;
-  info: Record<string, unknown>;
-};
+/** for_lobby: инстанс отдан под лобби — турниры его не берут */
+export type ServerInstance = Narrow<Tables<"server_instances">, { role: "active" | "reserve"; info: Record<string, unknown> }>;
 
-export type ServerHost = { id: string; lan_ip: string | null; last_seen_at: string | null; info: Record<string, unknown> };
+export type ServerHost = Narrow<Tables<"server_host">, { info: Record<string, unknown> }>;
 
-export type AgentCommand = {
-  id: string;
-  instance: string | null;
-  type:
+export type AgentCommand = Narrow<
+  Tables<"agent_commands">,
+  {
+    type:
     | "start"
     | "stop"
     | "restart"
@@ -57,14 +46,10 @@ export type AgentCommand = {
     | "prefetch_maps"
     | "self_check"
     | "replay_failed_events";
-  payload: Record<string, unknown>;
-  status: "pending" | "sent" | "done" | "error";
-  result: string | null;
-  created_at: string;
-  sent_at: string | null;
-  done_at: string | null;
-  delivery_attempts: number;
-};
+    payload: Record<string, unknown>;
+    status: "pending" | "sent" | "done" | "error";
+  }
+>;
 
 /** Агент шлёт отчёт раз в 5 с отдельно от опроса серверов и команд; 45 с тишины — нет связи */
 export const AGENT_OFFLINE_AFTER_MS = 45_000;
@@ -92,7 +77,7 @@ export type ServiceCommandType = "replay_failed_events";
 export async function enqueueCommand(
   instance: string | null,
   type: AgentCommand["type"] | ServiceCommandType,
-  payload: Record<string, unknown> = {},
+  payload: { [key: string]: Json | undefined } = {},
   createdBy?: string,
 ) {
   const { error } = await db().from("agent_commands").insert({ instance, type, payload, created_by: createdBy ?? null });
