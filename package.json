@@ -15,7 +15,8 @@
     "test:reliability": "node scripts/test-reliability.mjs",
     "db:migrate": "node scripts/apply-migrations.mjs",
     "db:check": "node scripts/apply-migrations.mjs --check",
-    "db:types": "node scripts/gen-db-types.mjs"
+    "db:types": "node scripts/gen-db-types.mjs",
+    "demo": "node --conditions=react-server --import=tsx scripts/demo-tournament.mts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
