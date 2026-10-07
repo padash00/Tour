@@ -8,9 +8,15 @@ import { getActiveMembership, getRegistration, getSoloTeam, getTeamMembers, getT
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { getPreviousRoster } from "@/lib/progress";
 import { formatDateTime, formatTime } from "@/lib/format";
-import type { Registration, Tournament } from "@/lib/types";
+import type { Registration, TeamMemberWithPlayer, Tournament } from "@/lib/types";
+import { ageRangeLabel, checkPlayer, officialRoster } from "@/lib/official";
+import { formatPhone, tournamentDay } from "@/lib/profile";
+import { getOrganizationSuggestions, getProfile, getProfiles, needsProfile, profileLock } from "@/lib/profiles";
+import { db } from "@/lib/supabase";
 import { Button, Callout, Container, EmptyState, Eyebrow, FaceitLevel, PageTitle, Panel, PlayerIdentity, Status, Steps, TeamIdentity, registrationStatus, type StepState } from "@/components/ds";
 import { RegisterForm, RosterPicker, WithdrawApplication, type PickerMember } from "@/components/competition/registration";
+import { OfficialApplicationForm, type ApplicationValues } from "@/components/competition/official-application";
+import { ProfileRequired } from "@/components/profile/profile-required";
 
 export const metadata: Metadata = { title: "Регистрация на турнир" };
 
@@ -31,6 +37,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   if (mode.size === 1) {
     const solo = await getSoloTeam(player, false);
     const reg = solo ? await getRegistration(t.id, solo.id) : null;
+    const gated = await needsProfile(player.id);
     return (
       <Shell t={t} open={open}>
         <Panel padded={false}>
@@ -61,7 +68,13 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           ) : null}
           {!player.is_banned && open && !activeOf(reg) && (
             <div className="border-t border-line-subtle">
-              <RegisterForm tournamentId={t.id} label={reg?.status === "rejected" ? "Подать заявку снова" : "Участвовать"} footer="Турнир 1×1 — команда не нужна." />
+              {gated ? (
+                <div className="p-4 sm:p-5">
+                  <ProfileRequired next={`/tournaments/${t.slug}/register`} action="участвовать в турнире" />
+                </div>
+              ) : (
+                <RegisterForm tournamentId={t.id} label={reg?.status === "rejected" ? "Подать заявку снова" : "Участвовать"} footer="Турнир 1×1 — команда не нужна." />
+              )}
             </div>
           )}
           {!open && !activeOf(reg) && reg?.status !== "rejected" && (
@@ -134,6 +147,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
     return (
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
+        {t.is_official && <OwnOfficialStatus t={t} playerId={player.id} nickname={player.nickname} />}
         {regShown ? (
           <ApplicationStatus t={t} reg={regShown} open={open} fresh={false} captainName={captain?.nickname} />
         ) : (
@@ -181,6 +195,38 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           Сейчас в команде доступно {available} из {mode.size}
           {available < members.length ? " (заблокированные игроки не учитываются)" : ""}. Пригласите игроков по ссылке со страницы команды.
         </Callout>
+      </Shell>
+    );
+  }
+
+  // капитан без анкеты (настройка PROFILE_REQUIRED): сначала анкета
+  if (await needsProfile(player.id)) {
+    return (
+      <Shell t={t} open={open} steps={steps}>
+        {teamPanel}
+        {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={false} canEdit />}
+        <ProfileRequired next={`/tournaments/${t.slug}/register`} action="подать заявку на турнир" />
+      </Shell>
+    );
+  }
+
+  // капитан, официальный турнир: состав без запасных, организация, тренер и чек-лист
+  if (t.is_official) {
+    const form = await officialForm(t, members, team.captain_id, player.id, regShown, active);
+    return (
+      <Shell t={t} open={open} steps={steps}>
+        {teamPanel}
+        {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={fresh} canEdit />}
+        <section aria-labelledby="application-title">
+          <div className="mb-3">
+            <h2 id="application-title" className="text-heading text-fg">
+              Заявка — Приложение №1
+            </h2>
+            <p className="mt-1 text-meta text-fg-3">Заявку можно менять, пока открыта регистрация. После закрытия состав меняет только администратор.</p>
+          </div>
+          <Panel padded={false}>{form}</Panel>
+        </section>
+        {active && <WithdrawRow tournamentId={t.id} />}
       </Shell>
     );
   }
@@ -286,6 +332,15 @@ function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; ste
         </p>
       </header>
       {steps && <Steps direction="horizontal" className="mt-6" steps={titles.map((title, i) => ({ title, state: steps[i] }))} />}
+      {t.is_official && (
+        <Callout title="Официальный турнир — условия участия" className="mt-6">
+          Команда представляет организацию (предприятие, учреждение, вуз, колледж): {mainPlayersLabel(officialRoster(t).size)}
+          {t.require_coach ? " и тренер" : ""}
+          {officialRoster(t).subs ? `, до ${officialRoster(t).subs} запасных` : ", без запасных — состав в заявке окончательный"}. Возраст участников —{" "}
+          {ageRangeLabel(t)} на день турнира, живут, учатся или работают в городе {t.city}. Каждый игрок — только в одной команде. Справки с места
+          работы или учёбы сдаются организатору на бумаге.
+        </Callout>
+      )}
       <div className="mt-6 space-y-5">{children}</div>
     </Container>
   );
@@ -408,6 +463,97 @@ function WithdrawRow({ tournamentId, solo }: { tournamentId: string; solo?: bool
   );
 }
 
+
+// ───────────────────────── официальный турнир
+
+/**
+ * Форма заявки на официальный турнир. Анкеты игроков читаются на сервере, в браузер капитана уходит
+ * только итог проверки (ник, что не заполнено, возраст при несоответствии) — не сами данные товарищей.
+ */
+async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], captainId: string, meId: string, reg: Reg | null, active: Reg | null) {
+  const day = tournamentDay(t);
+  const { size, subs } = officialRoster(t);
+  const [profiles, suggestions, app] = await Promise.all([
+    getProfiles(members.map((m) => m.player_id)),
+    getOrganizationSuggestions(),
+    reg ? db().from("tournament_applications").select("*").eq("registration_id", reg.id).maybeSingle().then((r) => r.data) : Promise.resolve(null),
+  ]);
+  const checks = members.map((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, t, day));
+
+  const initial: Record<string, "main" | "sub" | "out"> = {};
+  if (active && active.roster.length) {
+    for (const r of active.roster) initial[r.player_id] = r.role === "sub" && subs ? "sub" : "main";
+  } else {
+    const ordered = [...members.filter((m) => m.role !== "substitute"), ...members.filter((m) => m.role === "substitute")].filter((m) => !m.player.is_banned);
+    ordered.forEach((m, i) => (initial[m.player_id] = i < size ? "main" : i < size + subs ? "sub" : "out"));
+  }
+  const rank = (id: string) => (id === captainId ? 0 : initial[id] === "main" ? 1 : initial[id] === "sub" ? 2 : 3);
+  const pickerMembers: PickerMember[] = [...members]
+    .sort((a, b) => rank(a.player_id) - rank(b.player_id))
+    .map((m) => ({
+      player_id: m.player_id,
+      nickname: m.player.nickname,
+      avatar_url: m.player.avatar_url,
+      faceit_level: m.player.faceit_level,
+      banned: m.player.is_banned,
+      captain: m.player_id === captainId,
+    }));
+  const own = profiles.get(meId);
+  const values: ApplicationValues = {
+    organization: app?.organization ?? "",
+    captain_phone: formatPhone(app?.captain_phone ?? own?.phone),
+    responsible_name: app?.responsible_name ?? "",
+    responsible_phone: formatPhone(app?.responsible_phone),
+    coach_name: app?.coach_name ?? "",
+    coach_birth_date: app?.coach_birth_date ?? "",
+    coach_workplace: app?.coach_workplace ?? "",
+    coach_position: app?.coach_position ?? "",
+  };
+  return (
+    <OfficialApplicationForm
+      tournamentId={t.id}
+      settings={t}
+      day={day}
+      members={pickerMembers}
+      initial={initial}
+      checks={checks}
+      values={values}
+      suggestions={suggestions}
+      update={!!active}
+      label={active ? "Сохранить заявку" : reg?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
+      footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}
+    />
+  );
+}
+
+/** Игрок официального турнира видит, всё ли в порядке с его анкетой (свои данные — только ему) */
+async function OwnOfficialStatus({ t, playerId, nickname }: { t: Tournament; playerId: string; nickname: string }) {
+  const [profile, lock] = await Promise.all([getProfile(playerId), profileLock(playerId)]);
+  const check = checkPlayer({ id: playerId, nickname }, profile, t, tournamentDay(t));
+  if (!check.issues.length) {
+    return (
+      <Callout tone="ok" title="Ваша анкета в порядке">
+        Анкета заполнена, возраст подходит.{check.warnings.length ? ` ${check.warnings[0].replace(`${nickname}: `, "").replace(/^в/, "В")}.` : ""}
+      </Callout>
+    );
+  }
+  return (
+    <Callout
+      tone="warn"
+      title="Анкета не проходит условия турнира"
+      action={
+        lock ? undefined : (
+          <Button href={`/me/profile?next=${encodeURIComponent(`/tournaments/${t.slug}/register`)}`} size="sm">
+            Открыть анкету
+          </Button>
+        )
+      }
+    >
+      {check.issues.map((x) => x.replace(`${nickname}: `, "")).join("; ")}. Без этого капитан не сможет подать заявку с вами в составе.
+      {lock ? " Анкета зафиксирована — для исправления напишите администратору." : ""}
+    </Callout>
+  );
+}
 
 /** Время сервера на момент отрисовки (динамическая страница) */
 function serverNow() {

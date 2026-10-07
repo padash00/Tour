@@ -18,6 +18,8 @@ import type { TournamentStatus } from "@/lib/types";
 
 // ───────────────────────── выбор состава
 
+export type Slot = "main" | "sub" | "out";
+
 export type PickerMember = {
   player_id: string;
   nickname: string;
@@ -26,13 +28,30 @@ export type PickerMember = {
   banned: boolean;
   captain: boolean;
 };
-type Slot = "main" | "sub" | "out";
 
 const SLOT_LABEL: Record<Slot, string> = { main: "Основа", sub: "Запас", out: "Не играет" };
 
 /** Капитан распределяет игроков: основа ровно под режим, запас — до лимита, остальные не играют */
-export function RosterPicker({ members, size, subs, initial }: { members: PickerMember[]; size: number; subs: number; initial: Record<string, Slot> }) {
-  const [slots, setSlots] = useState<Record<string, Slot>>(initial);
+export function RosterPicker({
+  members,
+  size,
+  subs,
+  initial,
+  onChange,
+}: {
+  members: PickerMember[];
+  size: number;
+  subs: number;
+  initial: Record<string, Slot>;
+  /** выбор изменился — для проверок заявки до отправки (официальный турнир) */
+  onChange?: (slots: Record<string, Slot>) => void;
+}) {
+  const [slots, setSlotsState] = useState<Record<string, Slot>>(initial);
+  const setSlots = (update: (cur: Record<string, Slot>) => Record<string, Slot>) => {
+    const next = update(slots);
+    setSlotsState(next);
+    onChange?.(next);
+  };
   const count = (s: Slot) => members.filter((m) => !m.banned && (slots[m.player_id] ?? "out") === s).length;
   const mains = count("main");
   const benched = count("sub");

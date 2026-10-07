@@ -11,6 +11,10 @@ export function registrationError(error: { code?: string; message: string }): st
     tournament_full: "Все места в турнире уже заняты",
     registration_missing: "Одобренная заявка не найдена. Обновите страницу.",
     checkin_closed: "Check-in сейчас закрыт",
+    not_official: "Условия турнира изменились. Обновите страницу.",
+    profile_incomplete: "У кого-то из игроков не заполнена анкета. Обновите страницу и проверьте заявку.",
+    age_out_of_range: "Кто-то из игроков не проходит по возрасту. Обновите страницу и проверьте заявку.",
+    application_incomplete: "Заполните данные организации, ответственного лица и тренера.",
   };
   if (messages[error.message]) return messages[error.message];
   console.error("registration transaction failed", error.code, error.message);
