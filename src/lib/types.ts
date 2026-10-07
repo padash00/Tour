@@ -41,6 +41,18 @@ export type Tournament = Narrow<
 
 export type Registration = Tables<"tournament_registrations">;
 
+/** Анкета игрока — персональные данные: только владельцу и админам, никогда в публичные страницы */
+export type PlayerProfile = Narrow<
+  Tables<"player_profiles">,
+  {
+    /** CHECK player_profiles_occupation_known */
+    occupation: "works" | "studies" | "other" | null;
+  }
+>;
+
+/** Заявка организации на официальный турнир (Приложение №1) */
+export type TournamentApplication = Tables<"tournament_applications">;
+
 export type RosterPlayer = Tables<"tournament_roster_players">;
 
 export type Notification = Tables<"notifications">;

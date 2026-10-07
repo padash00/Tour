@@ -1230,6 +1230,84 @@ export type Database = {
           },
         ]
       }
+      player_profiles: {
+        Row: {
+          birth_date: string | null
+          city: string | null
+          consent_at: string | null
+          consent_version: string | null
+          course: string | null
+          created_at: string
+          first_name: string | null
+          last_name: string | null
+          occupation: string | null
+          organization: string | null
+          patronymic: string | null
+          phone: string | null
+          player_id: string
+          position: string | null
+          prompted_at: string | null
+          study_group: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          city?: string | null
+          consent_at?: string | null
+          consent_version?: string | null
+          course?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          occupation?: string | null
+          organization?: string | null
+          patronymic?: string | null
+          phone?: string | null
+          player_id: string
+          position?: string | null
+          prompted_at?: string | null
+          study_group?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          city?: string | null
+          consent_at?: string | null
+          consent_version?: string | null
+          course?: string | null
+          created_at?: string
+          first_name?: string | null
+          last_name?: string | null
+          occupation?: string | null
+          organization?: string | null
+          patronymic?: string | null
+          phone?: string | null
+          player_id?: string
+          position?: string | null
+          prompted_at?: string | null
+          study_group?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_profiles_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           avatar_url: string | null
@@ -1579,6 +1657,122 @@ export type Database = {
           },
         ]
       }
+      tournament_applications: {
+        Row: {
+          captain_phone: string | null
+          coach_birth_date: string | null
+          coach_documents_at: string | null
+          coach_documents_by: string | null
+          coach_name: string | null
+          coach_position: string | null
+          coach_workplace: string | null
+          created_at: string
+          organization: string
+          registration_id: string
+          responsible_name: string | null
+          responsible_phone: string | null
+          tournament_id: string
+          updated_at: string
+        }
+        Insert: {
+          captain_phone?: string | null
+          coach_birth_date?: string | null
+          coach_documents_at?: string | null
+          coach_documents_by?: string | null
+          coach_name?: string | null
+          coach_position?: string | null
+          coach_workplace?: string | null
+          created_at?: string
+          organization: string
+          registration_id: string
+          responsible_name?: string | null
+          responsible_phone?: string | null
+          tournament_id: string
+          updated_at?: string
+        }
+        Update: {
+          captain_phone?: string | null
+          coach_birth_date?: string | null
+          coach_documents_at?: string | null
+          coach_documents_by?: string | null
+          coach_name?: string | null
+          coach_position?: string | null
+          coach_workplace?: string | null
+          created_at?: string
+          organization?: string
+          registration_id?: string
+          responsible_name?: string | null
+          responsible_phone?: string | null
+          tournament_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_applications_coach_documents_by_fkey"
+            columns: ["coach_documents_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_applications_registration_fkey"
+            columns: ["registration_id", "tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_registrations"
+            referencedColumns: ["id", "tournament_id"]
+          },
+          {
+            foreignKeyName: "tournament_applications_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_participant_documents: {
+        Row: {
+          marked_by: string | null
+          player_id: string
+          submitted_at: string
+          tournament_id: string
+        }
+        Insert: {
+          marked_by?: string | null
+          player_id: string
+          submitted_at?: string
+          tournament_id: string
+        }
+        Update: {
+          marked_by?: string | null
+          player_id?: string
+          submitted_at?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_participant_documents_marked_by_fkey"
+            columns: ["marked_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_participant_documents_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_participant_documents_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_registrations: {
         Row: {
           checked_in_at: string | null
@@ -1709,12 +1903,14 @@ export type Database = {
       tournaments: {
         Row: {
           advance_per_group: number
+          allow_substitutes: boolean
           auto_approve: boolean
           autopilot: boolean
           bracket_published_at: string | null
           bracket_type: string
           checkin_closes_at: string | null
           checkin_opens_at: string | null
+          city: string
           contact: string | null
           cover_url: string | null
           created_at: string
@@ -1728,11 +1924,14 @@ export type Database = {
           groups_count: number
           id: string
           is_lan: boolean
+          is_official: boolean
           knife_round: boolean
           location: string | null
           map_pool: string[]
           match_format: string | null
+          max_age: number
           max_teams: number
+          min_age: number
           name: string
           overtime: boolean
           playoff_created_at: string | null
@@ -1741,6 +1940,7 @@ export type Database = {
           prize_pool: string | null
           registration_closes_at: string | null
           registration_opens_at: string | null
+          require_coach: boolean
           requirements: string | null
           rules: string | null
           slug: string
@@ -1751,18 +1951,21 @@ export type Database = {
           swiss_wins: number
           tech_pause_seconds: number
           tech_pauses: number
+          third_place_match: boolean
           timeout_seconds: number
           timeouts_per_team: number
           updated_at: string
         }
         Insert: {
           advance_per_group?: number
+          allow_substitutes?: boolean
           auto_approve?: boolean
           autopilot?: boolean
           bracket_published_at?: string | null
           bracket_type?: string
           checkin_closes_at?: string | null
           checkin_opens_at?: string | null
+          city?: string
           contact?: string | null
           cover_url?: string | null
           created_at?: string
@@ -1776,11 +1979,14 @@ export type Database = {
           groups_count?: number
           id?: string
           is_lan?: boolean
+          is_official?: boolean
           knife_round?: boolean
           location?: string | null
           map_pool?: string[]
           match_format?: string | null
+          max_age?: number
           max_teams?: number
+          min_age?: number
           name: string
           overtime?: boolean
           playoff_created_at?: string | null
@@ -1789,6 +1995,7 @@ export type Database = {
           prize_pool?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
+          require_coach?: boolean
           requirements?: string | null
           rules?: string | null
           slug: string
@@ -1799,18 +2006,21 @@ export type Database = {
           swiss_wins?: number
           tech_pause_seconds?: number
           tech_pauses?: number
+          third_place_match?: boolean
           timeout_seconds?: number
           timeouts_per_team?: number
           updated_at?: string
         }
         Update: {
           advance_per_group?: number
+          allow_substitutes?: boolean
           auto_approve?: boolean
           autopilot?: boolean
           bracket_published_at?: string | null
           bracket_type?: string
           checkin_closes_at?: string | null
           checkin_opens_at?: string | null
+          city?: string
           contact?: string | null
           cover_url?: string | null
           created_at?: string
@@ -1824,11 +2034,14 @@ export type Database = {
           groups_count?: number
           id?: string
           is_lan?: boolean
+          is_official?: boolean
           knife_round?: boolean
           location?: string | null
           map_pool?: string[]
           match_format?: string | null
+          max_age?: number
           max_teams?: number
+          min_age?: number
           name?: string
           overtime?: boolean
           playoff_created_at?: string | null
@@ -1837,6 +2050,7 @@ export type Database = {
           prize_pool?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
+          require_coach?: boolean
           requirements?: string | null
           rules?: string | null
           slug?: string
@@ -1847,6 +2061,7 @@ export type Database = {
           swiss_wins?: number
           tech_pause_seconds?: number
           tech_pauses?: number
+          third_place_match?: boolean
           timeout_seconds?: number
           timeouts_per_team?: number
           updated_at?: string
@@ -2002,12 +2217,20 @@ export type Database = {
         Args: { p_actor: string; p_member: string; p_team: string }
         Returns: string
       }
+      player_profile_complete: {
+        Args: { p: Database["public"]["Tables"]["player_profiles"]["Row"] }
+        Returns: boolean
+      }
       prune_old_rows: {
         Args: {
           p_audit_days?: number
           p_command_days?: number
           p_event_days?: number
         }
+        Returns: Json
+      }
+      purge_official_application_data: {
+        Args: { p_tournament: string }
         Returns: Json
       }
       rate_limit_claim: {
@@ -2026,6 +2249,17 @@ export type Database = {
           p_match: string
           p_score1: number
           p_score2: number
+        }
+        Returns: Json
+      }
+      save_official_registration: {
+        Args: {
+          p_actor: string
+          p_application: Json
+          p_main: string[]
+          p_sub: string[]
+          p_team: string
+          p_tournament: string
         }
         Returns: Json
       }
