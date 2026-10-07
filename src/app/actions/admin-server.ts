@@ -83,7 +83,8 @@ export async function serverCommand(_prev: ActionResult, formData: FormData): Pr
 }
 
 /** Отложенные буфером агента события (сайт раз за разом не смог их обработать) — снова в очередь досылки */
-export async function replayRelayEvents(): Promise<ActionResult> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- сигнатура useActionState
+export async function replayRelayEvents(_prev?: ActionResult): Promise<ActionResult> {
   const admin = await requireAdmin();
   const { online, host } = await getServerState();
   if (!online) return { error: "Server Agent не на связи" };

@@ -55,7 +55,8 @@ export type AgentCommand = {
     | "update_plugins"
     | "restart_all"
     | "prefetch_maps"
-    | "self_check";
+    | "self_check"
+    | "replay_failed_events";
   payload: Record<string, unknown>;
   status: "pending" | "sent" | "done" | "error";
   result: string | null;

@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { isAdmin, requireAdmin, requirePlayer } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { BANNED_ERROR, isRateLimited } from "@/lib/data";
-import { env } from "@/lib/env";
 import { getMatch } from "@/lib/matches";
+import { adminIds } from "@/lib/server/admins";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -16,16 +16,6 @@ const snapshot = (m: { status: string; winner_id: string | null; team1_score: nu
   team2_score: m.team2_score,
   is_walkover: m.is_walkover,
 });
-
-/** Администраторы: флаг is_admin или SteamID из ADMIN_STEAM_IDS — фильтр в SQL, без чтения всех игроков */
-async function adminIds() {
-  const steamIds = env.adminSteamIds.filter((id) => /^\d{17}$/.test(id));
-  const { data } = await db()
-    .from("players")
-    .select("id")
-    .or(steamIds.length ? `is_admin.eq.true,steam_id.in.(${steamIds.join(",")})` : "is_admin.eq.true");
-  return (data ?? []).map((p) => p.id as string);
-}
 
 /** Открыть спор по матчу: капитан одной из команд или админ */
 export async function openDispute(_prev: ActionResult, formData: FormData): Promise<ActionResult> {

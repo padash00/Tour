@@ -13,6 +13,7 @@ const TITLE: Record<AgentCommand["type"], string> = {
   load_match: "Загрузка матча", end_match: "Завершение матча", rcon: "Команда консоли",
   update_cs2: "Обновление CS2", update_plugins: "Обновление плагинов", restart_all: "Перезапуск всех серверов",
   prefetch_maps: "Подготовка карт", self_check: "Проверка перед турниром",
+  replay_failed_events: "Повтор отложенных событий",
 };
 
 export function CommandLog({ commands }: { commands: AgentCommand[] }) {

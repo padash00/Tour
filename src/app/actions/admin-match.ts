@@ -1,6 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { AWARDS_TAG } from "@/lib/awards";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
@@ -12,6 +13,8 @@ import { VETO_STEP_SECONDS } from "@/lib/veto";
 import type { ActionResult } from "@/components/forms";
 
 function revalidateMatch(matchId: string, tournamentSlug?: string) {
+  // правка результата завершённого турнира меняет награды игроков
+  updateTag(AWARDS_TAG);
   revalidatePath(`/matches/${matchId}`);
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath("/admin/matches");

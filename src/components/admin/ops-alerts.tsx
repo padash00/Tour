@@ -1,5 +1,6 @@
 import type { Cs2UpdateCheck } from "@/lib/server/ops";
 import { AlertRow } from "./control";
+import { ReplayRelayButton } from "./replay-relay-button";
 
 /** Что агент сообщает о защите от сбоев (server_host.info) */
 export type OpsInfo = {
@@ -9,7 +10,7 @@ export type OpsInfo = {
   cs2_patch?: string | null;
 };
 
-type Alert = { key: string; tone: "danger" | "warn" | "accent"; title: string; text: string };
+type Alert = { key: string; tone: "danger" | "warn" | "accent"; title: string; text: string; replay?: boolean };
 
 function opsAlerts(info: OpsInfo, cs2: Cs2UpdateCheck | null): Alert[] {
   const list: Alert[] = [];
@@ -49,7 +50,8 @@ function opsAlerts(info: OpsInfo, cs2: Cs2UpdateCheck | null): Alert[] {
       key: "relay-failed",
       tone: "accent",
       title: `Сайт отклонил событий: ${r.failed}`,
-      text: "Они отложены на серверном ПК в D:\\cs2server\\f16\\outbox\\failed — обычно это события снятых или удалённых матчей.",
+      text: "Они отложены на серверном ПК (outboxailed) и не держат очередь. Если сайт отклонял их из-за сбоя — верните в очередь, счёт и статистика допишутся.",
+      replay: true,
     });
   }
   return list;
@@ -65,7 +67,7 @@ export function OpsAlerts({ info, cs2 }: { info: OpsInfo; cs2: Cs2UpdateCheck | 
   return (
     <>
       {list.map((a) => (
-        <AlertRow key={a.key} tone={a.tone} title={a.title} action={{ href: "/admin/servers", label: "Серверы" }}>
+        <AlertRow key={a.key} tone={a.tone} title={a.title} action={{ href: "/admin/servers", label: "Серверы" }} extra={a.replay ? <ReplayRelayButton /> : undefined}>
           {a.text}
         </AlertRow>
       ))}

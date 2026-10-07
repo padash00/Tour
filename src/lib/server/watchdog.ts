@@ -1,6 +1,7 @@
 import "server-only";
 import { notify } from "../audit";
 import { db } from "../supabase";
+import { syncBracket } from "../matches";
 import { adminIds } from "./admins";
 import { MAP_LOAD_TIMEOUT_MS } from "./workshop";
 
@@ -138,4 +139,13 @@ export async function reconcileLiveMatches() {
   if (JSON.stringify(next) !== JSON.stringify(seen)) {
     await db().from("app_settings").upsert({ key: MISMATCH_KEY, value: JSON.stringify(next), updated_at: new Date().toISOString() }).throwOnError();
   }
+}
+
+/**
+ * Сетка продвигается после map_result/series_end «по возможности»: если тот шаг сорвался, событие уже принято
+ * и повторно не придёт. Раз в тик обслуживания пересверяем сетки идущих турниров — без изменений это одно чтение.
+ */
+export async function resyncLiveBrackets() {
+  const { data } = await db().from("tournaments").select("id").eq("status", "live");
+  for (const t of data ?? []) await syncBracket(t.id as string);
 }

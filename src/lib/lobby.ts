@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { db } from "./supabase";
+import { AGENT_OFFLINE_AFTER_MS } from "./server/state";
 import { modeOf } from "./modes";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
@@ -560,7 +561,7 @@ export async function pickLobbyInstance() {
     db().from("matches").select("server_instance").not("server_instance", "is", null).in("status", ["ready", "live"]),
     db().from("lobby_games").select("server_instance").not("server_instance", "is", null).in("status", ["waiting", "live"]),
   ]);
-  const online = !!host?.last_seen_at && Date.now() - new Date(host.last_seen_at).getTime() < 30_000;
+  const online = !!host?.last_seen_at && Date.now() - new Date(host.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
   if (!online || (host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[] };
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));
   const list = (insts ?? []).filter((i) => !taken.has(i.name));
@@ -854,7 +855,7 @@ export async function lobbyGameWatchdog() {
     const g = row as LobbyGame;
     const readyFor = g.server_ready_at ? now - new Date(g.server_ready_at).getTime() : 0;
     const inst = byName.get(g.server_instance!);
-    const fresh = inst?.last_seen_at && now - new Date(inst.last_seen_at).getTime() < 30_000;
+    const fresh = inst?.last_seen_at && now - new Date(inst.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
     const gone =
       fresh && inst.running && readyFor > 60_000 && (inst.gamestate === "none" || (inst.matchzy_match_id != null && Number(inst.matchzy_match_id) !== Number(g.matchzy_id)));
     if (gone) {

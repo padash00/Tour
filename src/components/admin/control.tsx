@@ -121,12 +121,15 @@ export function AlertRow({
   title,
   children,
   action,
+  extra,
 }: {
   tone: "danger" | "warn" | "accent";
   title: ReactNode;
   children: ReactNode;
   /** главная ссылка-действие справа */
   action?: { href: string; label: string };
+  /** дополнительная кнопка перед ссылкой */
+  extra?: ReactNode;
 }) {
   return (
     <div
@@ -143,6 +146,7 @@ export function AlertRow({
         {title}
       </span>
       <span className="text-fg-2 min-w-0 flex-1">{children}</span>
+      {extra}
       {action && (
         <Link
           href={action.href}

@@ -30,7 +30,7 @@ export function ServerActions({
 
   const types = running ? (["end_match", "restart", "stop"] as const) : (["start"] as const);
   const confirm: Record<string, string | undefined> = {
-    stop: `Остановить ${instance}? Матч на нём прервётся.`,
+    stop: `Остановить ${instance}? Идущий матч прервётся и получит статус «ошибка сервера».`,
     restart: `Перезапустить ${instance}?`,
     end_match: `Снять матч с ${instance}?`,
   };
@@ -38,6 +38,8 @@ export function ServerActions({
   return (
     <form action={action} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending || undefined} className={cn("flex flex-wrap gap-1", align === "end" ? "justify-end" : "justify-start", className)}>
       <input type="hidden" name="instance" value={instance} />
+      {/* остановку подтверждает модальное окно кнопки — для живого матча сервер требует этот флаг */}
+      <input type="hidden" name="confirm" value="1" />
       {types.map((type) => (
         <SubmitButton
           key={type}

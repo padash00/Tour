@@ -42,6 +42,8 @@ export async function completeIngest(key: string, token: string) {
 export async function pruneIngest() {
   if (Math.random() > 0.01) return; // примерно раз в 100 синхронизаций
   await db().from("ingest_dedupe").delete().lt("created_at", new Date(Date.now() - 3 * 86_400_000).toISOString());
+  // журналы: аудит 180 дней, сырые события матчей 365, команды агента 30 (prune_old_rows в миграции integrity_rpcs)
+  await db().rpc("prune_old_rows").throwOnError();
 }
 
 // ───────────────────────── обновление CS2
