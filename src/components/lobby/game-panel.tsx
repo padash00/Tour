@@ -4,9 +4,33 @@ import * as A from "@/app/actions/lobby";
 import type { LobbyView } from "@/lib/lobby-view";
 import { mapLabel } from "@/lib/maps";
 import { MapThumb } from "./settings";
-import { Button, CriticalSurface, FeatureSurface, buttonClass as btnClass, cn } from "@/components/ds";
+import { Button, CriticalSurface, FeatureSurface, cn } from "@/components/ds";
 import { Countdown } from "./countdown";
+import { useToast } from "../toast";
 import type { Run } from "./use-lobby-view";
+
+/** Адрес сервера: видно и копируется одной кнопкой — игрок вставляет в консоль CS2 */
+function ConnectBox({ address, label = "Сервер" }: { address: string; label?: string }) {
+  const toast = useToast();
+  const command = `connect ${address}`;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-meta text-fg-3">{label}</span>
+      <code className="num select-all rounded-control border border-line bg-shell px-3 py-2 text-[16px] font-semibold text-fg">{command}</code>
+      <Button
+        size="md"
+        onClick={() =>
+          navigator.clipboard.writeText(command).then(
+            () => toast.success("Скопировано — вставьте в консоль CS2 (~)"),
+            () => toast.error("Не удалось скопировать — выделите адрес вручную"),
+          )
+        }
+      >
+        Скопировать
+      </Button>
+    </div>
+  );
+}
 
 // ───────────────────────── игра: вето, сервер, LIVE
 
@@ -105,16 +129,8 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         </div>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {game.server_address && (
-            <a href={`steam://connect/${game.server_address}`} className={btnClass("secondary", "md")}>
-              Подключиться
-            </a>
-          )}
-          {game.gotv_address && (
-            <a href={`steam://connect/${game.gotv_address}`} className={btnClass("secondary", "md")}>
-              Смотреть GOTV
-            </a>
-          )}
+          {game.server_address && <ConnectBox address={game.server_address} />}
+          {game.gotv_address && <ConnectBox address={game.gotv_address} label="GOTV" />}
           {me?.isAdmin && (
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
               Остановить матч
@@ -132,20 +148,12 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         <h2 className="mt-2 text-heading text-fg">{game.server_address ? "Подключайтесь к матчу" : "Игроки подключаются"}</h2>
         <p className="mt-2 max-w-read text-[14px] text-fg-2">
           {game.server_address
-            ? "Откройте сервер кнопкой ниже. В разминке напишите .r — матч начнётся после готовности всех игроков."
+            ? "Скопируйте адрес и вставьте в консоль CS2 (~). В разминке напишите .r — матч начнётся после готовности всех игроков."
             : "Адрес сервера доступен только игрокам матча и наблюдателям лобби."}
         </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {game.server_address && (
-            <a href={`steam://connect/${game.server_address}`} className={btnClass("primary", "lg")}>
-              Подключиться
-            </a>
-          )}
-          {game.gotv_address && (
-            <a href={`steam://connect/${game.gotv_address}`} className={btnClass("secondary", "lg")}>
-              Смотреть GOTV
-            </a>
-          )}
+        <div className="mt-5 flex flex-col items-start gap-3">
+          {game.server_address && <ConnectBox address={game.server_address} />}
+          {game.gotv_address && <ConnectBox address={game.gotv_address} label="GOTV" />}
           {isHost && (
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
               Отменить игру

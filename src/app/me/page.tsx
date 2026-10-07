@@ -15,12 +15,11 @@ import { getTeamMatches } from "@/lib/matches";
 import { tournamentEta } from "@/lib/schedule";
 import { getPlayerActivity, type Activity } from "@/lib/activity";
 import { modeOf } from "@/lib/modes";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
 import { MatchListRow } from "@/components/match-row";
 import { NotificationItem } from "@/components/public/notification-feed";
 import {
   Avatar,
-  buttonClass,
   Button,
   Container,
   CriticalSurface,
@@ -378,12 +377,7 @@ function CurrentActivity({ c }: { c: Current }) {
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          {c.connect && (
-            <a href={`steam://connect/${c.connect}`} className={buttonClass("primary", "lg")}>
-              <Gamepad2 className="size-4" />
-              Подключиться
-            </a>
-          )}
+          {c.connect && <CopyField value={`connect ${c.connect}`} />}
           {c.cta && (
             <Button href={c.cta.href} size="lg" variant={c.connect ? "secondary" : "primary"} iconRight={<ArrowRight />}>
               {c.cta.label}

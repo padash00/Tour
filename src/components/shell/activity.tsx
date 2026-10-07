@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gamepad2 } from "lucide-react";
+import { Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Timer, Tooltip, cn } from "@/components/ds";
 import { useViewer, type Activity } from "../viewer";
+import { useToast } from "../toast";
 
 /*
  * Глобальная активность в шапке — одно самое срочное действие игрока (модель приоритетов — lib/activity.ts).
@@ -87,20 +88,28 @@ function useAlert(a: Activity | null) {
   }, [key, label]);
 }
 
-/** «Подключиться» — сервер готов: подключение в один клик с любой страницы */
+/** Сервер готов: копирует «connect адрес» — игрок вставляет в консоль CS2 (~) */
 function ConnectButton({ connect, compact }: { connect: string; compact?: boolean }) {
+  const toast = useToast();
   return (
-    <a
-      href={`steam://connect/${connect}`}
-      aria-label="Подключиться к серверу"
+    <button
+      type="button"
+      onClick={() =>
+        navigator.clipboard.writeText(`connect ${connect}`).then(
+          () => toast.success(`Скопировано: connect ${connect} — вставьте в консоль CS2 (~)`),
+          () => toast.error(`Адрес сервера: ${connect}`),
+        )
+      }
+      aria-label={`Скопировать адрес сервера ${connect}`}
+      title={`connect ${connect}`}
       className={cn(
         "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control bg-ok font-semibold text-ok-ink transition-opacity hover:opacity-90",
         compact ? "h-9 min-w-9 px-2 text-micro min-[370px]:px-2.5" : "h-9 px-3 text-meta",
       )}
     >
-      <Gamepad2 className="size-4" />
-      <span className={compact ? "hidden min-[370px]:inline" : undefined}>Подключиться</span>
-    </a>
+      <Copy className="size-4" />
+      <span className={cn("num", compact ? "hidden min-[370px]:inline" : undefined)}>{connect}</span>
+    </button>
   );
 }
 
