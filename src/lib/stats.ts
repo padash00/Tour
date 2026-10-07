@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { db } from "./supabase";
 import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
+import { isSniperWeapon } from "./nominations-core";
 import type { Tables } from "./database.types";
 import type { Narrow, Player, Team } from "./types";
 
@@ -37,6 +38,8 @@ export type PlayerAgg = {
   k4: number;
   k5: number;
   utilityDamage: number;
+  flashAssists: number;
+  enemiesFlashed: number;
   swingSum: number;
   swingRounds: number;
   // производные
@@ -120,6 +123,8 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
       k4: sum((r) => r.multi_kills?.["4k"] ?? 0),
       k5: sum((r) => r.multi_kills?.["5k"] ?? 0),
       utilityDamage: sum((r) => r.utility_damage),
+      flashAssists: sum((r) => r.flash_assists),
+      enemiesFlashed: sum((r) => r.enemies_flashed),
       swingSum: sum((r) => r.swing_sum ?? 0),
       swingRounds: sum((r) => r.swing_rounds ?? 0),
     };
@@ -416,6 +421,31 @@ export async function getPlayerWeapons(steamId: string, matchIds: string[]): Pro
     }
   }
   return [...by.values()].sort((a, b) => b.kills - a.kills);
+}
+
+/**
+ * Убийства игроков турнира из снайперских винтовок (AWP, SSG 08) и всего — по событиям раундов
+ * (лог сервера, match_rounds). Только убийства соперников. Ключ — SteamID64.
+ * Если лог не собирался — пустая карта (номинация «Лучший снайпер» тогда без кандидата).
+ */
+export async function getTournamentWeaponKills(tournamentId: string): Promise<Map<string, { sniper: number; total: number }>> {
+  const { data: ms } = await db().from("matches").select("id").eq("tournament_id", tournamentId).eq("status", "finished");
+  const ids = (ms ?? []).map((m) => m.id);
+  const out = new Map<string, { sniper: number; total: number }>();
+  if (!ids.length) return out;
+  const data = await fetchAllIn<{ events: LogEvent[] }>(ids, (chunk, from, to) =>
+    db().from("match_rounds").select("events").in("match_id", chunk).order("match_id").order("map_number").order("round_number").range(from, to),
+  );
+  for (const r of data) {
+    for (const e of r.events ?? []) {
+      if (e.type !== "kill" || !e.killer.steamId || !e.killer.side || e.killer.side === e.victim.side) continue;
+      const cur = out.get(e.killer.steamId) ?? { sniper: 0, total: 0 };
+      cur.total++;
+      if (isSniperWeapon(e.weapon)) cur.sniper++;
+      out.set(e.killer.steamId, cur);
+    }
+  }
+  return out;
 }
 
 export type HeadToHead = {

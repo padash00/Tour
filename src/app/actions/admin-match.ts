@@ -7,6 +7,7 @@ import { audit, notify } from "@/lib/audit";
 import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, syncBracket } from "@/lib/matches";
+import { drawOrder, type DrawRecord } from "@/lib/draw";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { SeriesResult } from "@/lib/types";
@@ -28,11 +29,19 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
   const admin = await requireAdmin();
   const tournamentId = String(formData.get("tournamentId"));
   const onlyCheckedIn = formData.get("onlyCheckedIn") === "on";
-  const seeding = String(formData.get("seeding") ?? "elo");
+  // «random» (старое название) — та же жеребьёвка: криптослучайный посев с записью в журнал
+  const rawSeeding = String(formData.get("seeding") ?? "elo");
+  const seeding = rawSeeding === "draw" || rawSeeding === "random" ? "draw" : "elo";
+  // повторная жеребьёвка: удалить текущую сетку (только пока ни один матч не начат) и провести заново
+  const redo = seeding === "draw" && formData.get("redo") === "on";
 
   const t = await getTournamentById(tournamentId);
   if (!t) return { error: "Турнир не найден" };
-  if (t.bracket_published_at) return { error: "Сетка уже создана. Сначала удалите её." };
+  if (t.bracket_published_at) {
+    if (!redo) return { error: "Сетка уже создана. Сначала удалите её." };
+    const blocked = await bracketDeleteBlocker(t.id);
+    if (blocked) return { error: `Повторная жеребьёвка невозможна: ${blocked}` };
+  }
 
   const regs = (await getTournamentRegistrations(t.id)).filter(
     (r) => r.status === "approved" && (!onlyCheckedIn || r.checked_in_at),
@@ -47,9 +56,10 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
     const elos = r.roster.filter((p) => p.role === "main").map((p) => p.player.faceit_elo ?? 0);
     return elos.length ? elos.reduce((a, b) => a + b, 0) / elos.length : 0;
   };
-  const shuffled = [...regs].sort(() => Math.random() - 0.5);
+  // перемешивание до сортировки: при равном ELO без ручного seed порядок случайный
+  const shuffled = drawOrder(regs);
   const ordered =
-    seeding === "random"
+    seeding === "draw"
       ? shuffled
       : shuffled.sort((a, b) => {
           // ручной seed админа — в приоритете, остальные по среднему FACEIT ELO
@@ -59,6 +69,7 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
           return avgElo(b) - avgElo(a);
         });
 
+  if (t.bracket_published_at) await clearBracket(t.id);
   for (const [i, r] of ordered.entries()) {
     await db().from("tournament_registrations").update({ seed: i + 1 }).eq("id", r.id);
   }
@@ -68,9 +79,42 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
     return { error: `Не удалось создать сетку: ${(e as Error).message}` };
   }
   await audit(admin.id, "bracket.generate", { type: "tournament", id: t.id }, { teams: ordered.length, seeding, onlyCheckedIn });
+  if (seeding === "draw") {
+    // протокол жеребьёвки: порядок посева (сид 1 первым) — показывается в админке и на странице турнира
+    const record: DrawRecord = {
+      order: ordered.map((r, i) => ({ seed: i + 1, team_id: r.team_id, name: r.team?.name ?? "—" })),
+      teams: ordered.length,
+      onlyCheckedIn,
+      redo,
+    };
+    await audit(admin.id, "bracket.draw", { type: "tournament", id: t.id }, record);
+  }
   revalidatePath(`/admin/tournaments/${t.id}`);
   revalidatePath(`/tournaments/${t.slug}`);
-  return { success: `Сетка создана: ${ordered.length} команд` };
+  return { success: seeding === "draw" ? `Жеребьёвка проведена: ${ordered.length} команд` : `Сетка создана: ${ordered.length} команд` };
+}
+
+/** Почему сетку нельзя удалить (есть начатые или сыгранные матчи); null — можно */
+async function bracketDeleteBlocker(tournamentId: string): Promise<string | null> {
+  const { count } = await db()
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .in("status", ["veto", "ready", "live"]);
+  const { count: played } = await db()
+    .from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", tournamentId)
+    .eq("status", "finished")
+    .eq("is_walkover", false);
+  if ((count ?? 0) > 0 || (played ?? 0) > 0) return "в сетке уже есть начатые или сыгранные матчи";
+  return null;
+}
+
+async function clearBracket(tournamentId: string) {
+  await db().from("matches").update({ winner_to_match: null, loser_to_match: null }).eq("tournament_id", tournamentId);
+  await db().from("matches").delete().eq("tournament_id", tournamentId);
+  await db().from("tournaments").update({ bracket_published_at: null, playoff_created_at: null }).eq("id", tournamentId);
 }
 
 export async function deleteBracketAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -79,24 +123,10 @@ export async function deleteBracketAction(_prev: ActionResult, formData: FormDat
   const t = await getTournamentById(tournamentId);
   if (!t) return { error: "Турнир не найден" };
 
-  const { count } = await db()
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", t.id)
-    .in("status", ["veto", "ready", "live"]);
-  const { count: played } = await db()
-    .from("matches")
-    .select("id", { count: "exact", head: true })
-    .eq("tournament_id", t.id)
-    .eq("status", "finished")
-    .eq("is_walkover", false);
-  if ((count ?? 0) > 0 || (played ?? 0) > 0) {
-    return { error: "В сетке уже есть начатые или сыгранные матчи — удалить нельзя" };
-  }
+  const blocked = await bracketDeleteBlocker(t.id);
+  if (blocked) return { error: "В сетке уже есть начатые или сыгранные матчи — удалить нельзя" };
 
-  await db().from("matches").update({ winner_to_match: null, loser_to_match: null }).eq("tournament_id", t.id);
-  await db().from("matches").delete().eq("tournament_id", t.id);
-  await db().from("tournaments").update({ bracket_published_at: null, playoff_created_at: null }).eq("id", t.id);
+  await clearBracket(t.id);
   await audit(admin.id, "bracket.delete", { type: "tournament", id: t.id });
   revalidatePath(`/admin/tournaments/${t.id}`);
   revalidatePath(`/tournaments/${t.slug}`);

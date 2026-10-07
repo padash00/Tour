@@ -103,9 +103,11 @@ function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
 
 /** Кнопки «Скачать картинку итогов» — PNG для ленты и для мессенджеров */
 export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
-  const { placements, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
+  const { placements, nominations, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
-  const rest = placements.filter((p) => p.place !== "1");
+  // на пьедестале — места 1–3; 4-е (проигравший матча за 3-е место) — строкой под ним
+  const rest = placements.filter((p) => p.place !== "1" && p.place !== "4");
+  const fourth = placements.find((p) => p.place === "4");
 
   if (!champion) {
     return (
@@ -139,6 +141,34 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
           })}
         </div>
       </section>
+
+      {fourth && (
+        <p className="-mt-10 text-[14px] text-fg-3">
+          4 место — <span className="text-fg-2">{fourth.team.name}</span> (проиграли матч за 3-е место)
+        </p>
+      )}
+
+      {/* номинации: решение судей или кандидат по статистике */}
+      {nominations.length > 0 && (
+        <section>
+          <Eyebrow className="mb-6">Номинации</Eyebrow>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {nominations.map((n) => (
+              <div key={n.key} className={cn(CARD, "p-6")}>
+                <div className="text-[13px] text-fg-3">{n.title}</div>
+                <div className="mt-3 flex items-center gap-3 min-w-0">
+                  {n.team && <TeamLogo src={n.team.logo_url} tag={n.team.tag} size="sm" />}
+                  <div className="min-w-0">
+                    <div className="truncate text-[18px] font-semibold">{n.name}</div>
+                    <div className="truncate text-[12px] text-fg-3">{n.team && n.team.name !== n.name ? n.team.name : ""}</div>
+                  </div>
+                </div>
+                <div className="mt-3 text-[12px] text-fg-3">{n.source === "judges" ? `решение судей${n.value ? ` · ${n.value}` : ""}` : n.value}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* путь чемпиона */}
       {championPath.length > 0 && (

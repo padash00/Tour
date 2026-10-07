@@ -35,6 +35,11 @@ import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
 import { requireAdmin } from "@/lib/auth";
 import { tournamentEta } from "@/lib/schedule";
+import { getLastDraw } from "@/lib/draw-log";
+import { getTournamentNominations, type Nomination } from "@/lib/nominations";
+import { getTournamentRecap } from "@/lib/recap";
+import { clearNomination, setNomination } from "@/app/actions/admin-nominations";
+import { drawOrderText } from "@/lib/draw";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
 
@@ -53,6 +58,7 @@ const TABS = [
   { key: "registration", label: "Регистрация" },
   { key: "bracket", label: "Сетка" },
   { key: "matches", label: "Матчи" },
+  { key: "awards", label: "Награды" },
   { key: "settings", label: "Настройки" },
   { key: "rules", label: "Правила" },
   { key: "servers", label: "Серверы" },
@@ -78,7 +84,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   return (
     <div className="space-y-6">
       {/* новые заявки, check-in, счёт матчей — без перезагрузки; на вкладке настроек не мешаем вводу */}
-      {tab !== "settings" && tab !== "rules" && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={4000} />}
+      {tab !== "settings" && tab !== "rules" && tab !== "awards" && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={4000} />}
       <AdminHeader
         back={{ href: "/admin/tournaments", label: "Турниры" }}
         title={
@@ -116,8 +122,9 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
-      {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} />}
+      {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />}
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}
+      {tab === "awards" && <AwardsTab t={t} regs={approved} />}
       {tab === "settings" && (
         <div className="space-y-8">
           <TournamentForm
@@ -329,7 +336,7 @@ function LifecyclePanel({
           {hint && <p className="mt-1 text-[13px] text-fg-2 leading-relaxed">{hint}</p>}
           {t.status === "checkin" && !hasBracket && (
             <Link href={`/admin/tournaments/${t.id}?tab=bracket`} className="mt-1 inline-block text-[12px] text-accent hover:underline">
-              Другой посев или все одобренные →
+              Жеребьёвка, другой посев или все одобренные →
             </Link>
           )}
         </div>
@@ -464,7 +471,45 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
 
 // ───────────────────────── Сетка
 
-function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string; bracket_published_at: string | null }; approved: number; checkedIn: number }) {
+/** Будет ли в сетке матч за 3-е место: Single Elimination (весь турнир или плей-офф) и флаг турнира */
+function hasThirdPlaceMatch(t: Pick<T, "bracket_type" | "playoff_type" | "third_place_match">) {
+  if (!t.third_place_match) return false;
+  if (t.bracket_type === "single_elimination") return true;
+  return FORMATS[t.bracket_type as FormatKind]?.playoff === true && t.playoff_type === "single_elimination";
+}
+
+function BracketTab({
+  t,
+  approved,
+  checkedIn,
+  draw,
+}: {
+  t: Pick<T, "id" | "slug" | "bracket_published_at" | "bracket_type" | "playoff_type" | "third_place_match">;
+  approved: number;
+  checkedIn: number;
+  draw: Awaited<ReturnType<typeof getLastDraw>>;
+}) {
+  const elimination = t.bracket_type === "single_elimination" || FORMATS[t.bracket_type as FormatKind]?.playoff;
+  const thirdPlaceNote =
+    elimination && t.bracket_type !== "double_elimination" ? (
+      <div className="text-[12px] text-fg-3">
+        Матч за 3-е место: {hasThirdPlaceMatch(t) ? "будет сыгран (проигравшие полуфиналов, от 4 команд)" : "не проводится"} — меняется в
+        «Настройках».
+      </div>
+    ) : null;
+  const drawInfo = draw ? (
+    <div className="rounded-[10px] border border-line-subtle bg-white/[0.02] px-4 py-3 text-[13px] text-fg-2 leading-relaxed">
+      <span className="text-fg">Жеребьёвка проведена {formatDateTime(draw.at)}</span>
+      {draw.redo && <span className="text-fg-3"> (повторная)</span>}, порядок: {drawOrderText(draw)}
+    </div>
+  ) : null;
+  const checkedInBox = (
+    <label className="flex items-center gap-2 text-[13px] text-fg-2">
+      <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-4 accent-[#8ab8ff]" />
+      Только прошедшие check-in ({checkedIn})
+    </label>
+  );
+
   return (
     <div className="max-w-3xl">
       {t.bracket_published_at ? (
@@ -473,6 +518,8 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
             <Dot tone="ok" />
             <span className="text-fg">Сетка опубликована {formatShortDateTime(t.bracket_published_at)}</span>
           </div>
+          {drawInfo}
+          {thirdPlaceNote}
           <div className="flex flex-wrap gap-4 text-[13px]">
             <Link href={`/tournaments/${t.slug}?tab=bracket`} className="text-accent hover:underline">
               Смотреть на сайте ↗
@@ -481,7 +528,20 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
               Матчи турнира
             </Link>
           </div>
-          <div className="pt-4 border-t border-white/[0.06]">
+          <div className="pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-3">
+            <ActionForm action={generateBracketAction} className="flex flex-wrap items-center gap-3">
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <input type="hidden" name="seeding" value="draw" />
+              <input type="hidden" name="redo" value="on" />
+              {checkedInBox}
+              <SubmitButton
+                size="sm"
+                variant="secondary"
+                confirm="Провести жеребьёвку заново? Текущая сетка удалится. Можно только пока ни один матч не начат."
+              >
+                Провести жеребьёвку заново
+              </SubmitButton>
+            </ActionForm>
             <ActionForm action={deleteBracketAction}>
               <input type="hidden" name="tournamentId" value={t.id} />
               <SubmitButton size="sm" variant="danger" confirm="Удалить сетку? Можно только пока ни один матч не начат.">
@@ -491,28 +551,40 @@ function BracketTab({ t, approved, checkedIn }: { t: { id: string; slug: string;
           </div>
         </div>
       ) : (
-        <ActionForm action={generateBracketAction}>
-          <div className="rounded-[12px] border border-line bg-surface p-5 space-y-4">
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <div className="text-[13px] text-fg-2">
-              Одобрено <span className="num text-fg">{approved}</span>, прошли check-in <span className="num text-fg">{checkedIn}</span>. Пустые места
-              заполнятся баями — команды проходят дальше автоматически.
-            </div>
-            <div className="flex flex-wrap items-center gap-4">
-              <select name="seeding" className="field w-auto">
-                <option value="elo">Посев: ручной seed, затем средний FACEIT ELO</option>
-                <option value="random">Посев: случайный</option>
-              </select>
-              <label className="flex items-center gap-2 text-[13px] text-fg-2">
-                <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-4 accent-[#8ab8ff]" />
-                Только прошедшие check-in ({checkedIn})
-              </label>
-            </div>
-            <SubmitButton size="sm" confirm="Создать и опубликовать сетку? Посев зафиксируется.">
-              Создать сетку
-            </SubmitButton>
+        <div className="space-y-4">
+          <div className="text-[13px] text-fg-2">
+            Одобрено <span className="num text-fg">{approved}</span>, прошли check-in <span className="num text-fg">{checkedIn}</span>. Пустые места
+            заполнятся баями — команды проходят дальше автоматически.
           </div>
-        </ActionForm>
+          {thirdPlaceNote}
+          <ActionForm action={generateBracketAction}>
+            <div className="rounded-[12px] border border-accent/25 bg-surface p-5 space-y-3">
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <input type="hidden" name="seeding" value="draw" />
+              <div className="text-[14px] font-semibold text-fg">Жеребьёвка</div>
+              <p className="text-[13px] text-fg-3 leading-relaxed">
+                Случайный посев: порядок команд определяет криптографически стойкий генератор. Результат записывается в журнал,
+                показывается здесь и на странице турнира. Переиграть жеребьёвку можно, пока ни один матч не начат.
+              </p>
+              {checkedInBox}
+              <SubmitButton size="sm" confirm="Провести жеребьёвку и опубликовать сетку?">
+                Провести жеребьёвку
+              </SubmitButton>
+            </div>
+          </ActionForm>
+          <ActionForm action={generateBracketAction}>
+            <div className="rounded-[12px] border border-line bg-surface p-5 space-y-3">
+              <input type="hidden" name="tournamentId" value={t.id} />
+              <input type="hidden" name="seeding" value="elo" />
+              <div className="text-[14px] font-semibold text-fg">Посев по рейтингу</div>
+              <p className="text-[13px] text-fg-3">Ручной seed из «Регистрации», затем средний FACEIT ELO основного состава.</p>
+              {checkedInBox}
+              <SubmitButton size="sm" variant="secondary" confirm="Создать и опубликовать сетку? Посев зафиксируется.">
+                Создать сетку по рейтингу
+              </SubmitButton>
+            </div>
+          </ActionForm>
+        </div>
       )}
     </div>
   );
@@ -557,6 +629,127 @@ async function MatchesTab({ tournamentId }: { tournamentId: string }) {
         ))}
       </tbody>
     </TableBox>
+  );
+}
+
+// ───────────────────────── Награды: места, номинации, дипломы
+
+async function AwardsTab({ t, regs }: { t: T; regs: RegistrationWithTeam[] }) {
+  const [recap, nominations] = await Promise.all([getTournamentRecap(t), getTournamentNominations(t.id)]);
+  const podium = recap.placements;
+  return (
+    <div className="space-y-8 max-w-4xl">
+      <Panel
+        title="Места"
+        action={
+          <Link href={`/admin/tournaments/${t.id}/diplomas`} className="text-[12px] text-accent hover:underline">
+            Дипломы для печати →
+          </Link>
+        }
+      >
+        {podium.length ? (
+          <div className={`${CARD} divide-y divide-white/[0.06]`}>
+            {podium.map((p) => (
+              <div key={`${p.place}-${p.team.id}`} className="flex items-center gap-3 px-4 h-11 text-[13px]">
+                <span className="num w-10 text-fg-3">{p.place}</span>
+                <TeamLogo src={p.team.logo_url} tag={p.team.tag} size={20} />
+                <span className="font-medium text-fg">{p.team.name}</span>
+                {p.place === "1" && <span className="text-[12px] text-fg-3">«Лучшая команда»</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState compact title="Мест пока нет" description="Места появятся после финала (и матча за 3-е место, если он есть)." />
+        )}
+      </Panel>
+
+      <Panel title="Номинации">
+        <p className="mb-3 text-[13px] text-fg-3 leading-relaxed max-w-3xl">
+          Кандидат по статистике — подсказка. Решение судей (Положение, п. 5.5) заменяет его и попадает в итоги и дипломы. Снять
+          решение — снова действует расчёт.
+        </p>
+        <div className="space-y-3">
+          {nominations.map((n) => (
+            <NominationCard key={n.key} t={t} n={n} regs={regs} />
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function NominationCard({ t, n, regs }: { t: T; n: Nomination; regs: RegistrationWithTeam[] }) {
+  const players = regs.flatMap((r) =>
+    r.roster.filter((x) => x.player).map((x) => ({ id: x.player!.id, nickname: x.player!.nickname, team: r.team.name })),
+  );
+  const person = (p: { name: string; team: { name: string } | null }) => (
+    <>
+      <span className="font-medium text-fg">{p.name}</span>
+      {p.team && <span className="text-fg-3"> · {p.team.name}</span>}
+    </>
+  );
+  return (
+    <div className={`${CARD} p-4 space-y-3`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[14px] font-semibold text-fg">{n.title}</div>
+          <div className="mt-0.5 text-[12px] text-fg-3">{n.rule}</div>
+        </div>
+        {n.winner ? (
+          <div className="text-right text-[13px]">
+            <div>{person(n.winner)}</div>
+            <div className="text-[11px] text-fg-3">{n.winner.source === "judges" ? "решение судей" : "по статистике"}</div>
+          </div>
+        ) : (
+          <div className="text-[13px] text-fg-3">не определён</div>
+        )}
+      </div>
+      {n.auto && (
+        <div className="text-[12px] text-fg-2">
+          Кандидат по статистике: {n.computed ? <>{person(n.computed)} <span className="text-fg-3">({n.computed.value})</span></> : <span className="text-fg-3">нет данных</span>}
+        </div>
+      )}
+      <ActionForm action={setNomination} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="tournamentId" value={t.id} />
+        <input type="hidden" name="key" value={n.key} />
+        <select name="playerId" defaultValue={n.decision?.playerId ?? ""} className="field h-9 w-auto text-[13px]" aria-label="Игрок">
+          <option value="">{n.freeText ? "— не пользователь сайта —" : "— игрок —"}</option>
+          {players.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nickname} · {p.team}
+            </option>
+          ))}
+        </select>
+        <input
+          name="name"
+          defaultValue={n.decision && (!n.decision.playerId || n.freeText) ? n.decision.name : ""}
+          placeholder={n.freeText ? "ФИО тренера" : "ФИО (необязательно)"}
+          maxLength={120}
+          className="field h-9 w-56 text-[13px]"
+        />
+        <select name="teamId" defaultValue={n.decision?.team?.id ?? ""} className="field h-9 w-auto text-[13px]" aria-label="Команда">
+          <option value="">— команда игрока —</option>
+          {regs.map((r) => (
+            <option key={r.team_id} value={r.team_id}>
+              {r.team.name}
+            </option>
+          ))}
+        </select>
+        <input name="note" defaultValue={n.decision?.note ?? ""} placeholder="Примечание" maxLength={300} className="field h-9 w-48 text-[13px]" />
+        <SubmitButton size="sm" variant="secondary">
+          Решение судей
+        </SubmitButton>
+      </ActionForm>
+      {n.decision && (
+        <ActionForm action={clearNomination}>
+          <input type="hidden" name="tournamentId" value={t.id} />
+          <input type="hidden" name="key" value={n.key} />
+          <SubmitButton size="sm" variant="ghost">
+            Снять решение судей
+          </SubmitButton>
+        </ActionForm>
+      )}
+    </div>
   );
 }
 

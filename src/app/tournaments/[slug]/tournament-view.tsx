@@ -22,6 +22,8 @@ import { RecapView } from "@/components/competition/recap-view";
 import { AdminControlLink, HeroCta, MobileCta, MyRequirements, ParticipationPanel, type TournamentLite } from "@/components/competition/tournament-viewer";
 import { ClientTabs, TabPanel } from "@/components/public/client-tabs";
 import { getTournamentRecap } from "@/lib/recap";
+import { getLastDraw } from "@/lib/draw-log";
+import { drawOrderText } from "@/lib/draw";
 import { TournamentLifecycle, nextStepText } from "@/components/competition/tournament-lifecycle";
 import {
   Avatar,
@@ -58,11 +60,12 @@ export async function TournamentView({ t }: { t: Tournament }) {
   // у завершённого турнира по умолчанию открываются итоги
   const defaultTab = finished ? "recap" : "overview";
 
-  const [regs, matches, mapImages, recap] = await Promise.all([
+  const [regs, matches, mapImages, recap, draw] = await Promise.all([
     getTournamentRegistrations(t.id),
     getTournamentMatches(t.id),
     getMapImages(),
     finished ? getTournamentRecap(t) : Promise.resolve(null),
+    t.bracket_published_at ? getLastDraw(t.id) : Promise.resolve(null),
   ]);
   const approved = regs.filter((r) => r.status === "approved");
   const pending = regs.filter((r) => r.status === "pending");
@@ -253,6 +256,11 @@ export async function TournamentView({ t }: { t: Tournament }) {
             <TeamsTab approved={approved} pendingCount={pending.length} solo={solo} />
           </TabPanel>
           <TabPanel tab="bracket" defaultKey={defaultTab}>
+            {matches.length > 0 && draw && (
+              <p className="mb-8 max-w-read text-meta text-fg-3">
+                Посев определён жеребьёвкой {formatDateTime(draw.at)}. Порядок: {drawOrderText(draw)}.
+              </p>
+            )}
             {matches.length ? (
               <StagesTab t={t} matches={matches} />
             ) : (

@@ -2,6 +2,7 @@ import "server-only";
 import { roundTitle } from "./bracket";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
+import { getTournamentNominations } from "./nominations";
 import { getPlayerLeaderboard, mvpOf } from "./stats";
 import { db } from "./supabase";
 import type { MatchMap, Player, Team, Tournament } from "./types";
@@ -14,7 +15,7 @@ import type { MatchMap, Player, Team, Tournament } from "./types";
 export type RecapPlayer = Pick<Player, "id" | "nickname" | "avatar_url" | "steam_id">;
 
 export type Placement = {
-  /** «1», «2», «3» или «3–4» (два полуфиналиста без матча за 3-е место) */
+  /** «1», «2», «3», «4» (по матчу за 3-е место) или «3–4» (два полуфиналиста без матча за 3-е место) */
   place: string;
   team: Team;
   roster: (RecapPlayer & { role: string })[];
@@ -35,8 +36,19 @@ export type StatLeader = {
 
 export type MapHighlight = { match: MatchWithTeams; map: MatchMap; rounds: number; diff: number };
 
+/** Номинация в итогах: итог (решение судей или кандидат по статистике) */
+export type RecapNomination = {
+  key: string;
+  title: string;
+  name: string;
+  team: Pick<Team, "id" | "name" | "tag" | "logo_url"> | null;
+  value: string | null;
+  source: "judges" | "stats";
+};
+
 export type TournamentRecap = {
   placements: Placement[];
+  nominations: RecapNomination[];
   championPath: PathStep[];
   mvp: ReturnType<typeof mvpOf>;
   leaders: StatLeader[];
@@ -48,7 +60,10 @@ export type TournamentRecap = {
 const winnerOf = (m: MatchWithTeams) => (m.winner_id && m.winner_id === m.team1_id ? m.team1 : m.winner_id && m.winner_id === m.team2_id ? m.team2 : null);
 const loserOf = (m: MatchWithTeams) => (m.winner_id && m.winner_id === m.team1_id ? m.team2 : m.winner_id && m.winner_id === m.team2_id ? m.team1 : null);
 
-/** Призёры: Double — по гранд-финалу и финалу нижней сетки; Single — по финалу и полуфиналам; круговая — по таблице */
+/**
+ * Призёры: Double — по гранд-финалу и финалу нижней сетки; Single — по финалу и матчу за 3-е место
+ * (если его нет — оба полуфиналиста делят 3–4 место); круговая — по таблице.
+ */
 async function placementsOf(t: Tournament, matches: MatchWithTeams[]): Promise<{ place: string; team: Team }[]> {
   const fin = matches.filter((m) => m.status === "finished" && m.winner_id);
   const gf = fin.find((m) => m.bracket === "grand_final");
@@ -67,6 +82,17 @@ async function placementsOf(t: Tournament, matches: MatchWithTeams[]): Promise<{
     const top = Math.max(...upper.map((m) => m.round));
     const final = upper.find((m) => m.round === top && m.status === "finished" && m.winner_id);
     if (final) {
+      // матч за 3-е место: 3 — его победитель, 4 — проигравший; пока не сыгран — только 1 и 2
+      const third = matches.find((m) => m.bracket === "third_place");
+      if (third) {
+        const done = third.status === "finished" && third.winner_id;
+        return [
+          { place: "1", team: winnerOf(final) },
+          { place: "2", team: loserOf(final) },
+          { place: "3", team: done ? winnerOf(third) : null },
+          { place: "4", team: done ? loserOf(third) : null },
+        ].filter((x): x is { place: string; team: Team } => !!x.team);
+      }
       const semis = fin.filter((m) => m.bracket === "upper" && m.round === top - 1 && m.team1_id && m.team2_id);
       const thirds = semis.map(loserOf).filter((x): x is Team => !!x);
       return [
@@ -88,12 +114,19 @@ async function placementsOf(t: Tournament, matches: MatchWithTeams[]): Promise<{
 }
 
 export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap> {
-  const [matches, regs, board] = await Promise.all([
+  const [matches, regs, board, allNominations] = await Promise.all([
     getTournamentMatches(t.id),
     getTournamentRegistrations(t.id),
     getPlayerLeaderboard(t.id),
+    getTournamentNominations(t.id),
   ]);
-  const mvp = mvpOf(board);
+  const nominations: RecapNomination[] = allNominations
+    .filter((n) => n.winner)
+    .map((n) => ({ key: n.key, title: n.title, name: n.winner!.name, team: n.winner!.team, value: n.winner!.value, source: n.winner!.source }));
+  // MVP решением судей (Положение 5.5) главнее расчёта: блок MVP показывает выбранного игрока
+  const judgedMvp = allNominations.find((n) => n.key === "mvp")?.decision;
+  const judgedRow = judgedMvp?.playerId ? board.find((p) => p.player_id === judgedMvp.playerId) : null;
+  const mvp = judgedMvp ? (judgedRow ? { ...judgedRow, by: "rating" as const } : null) : mvpOf(board);
   const played = matches.filter((m) => m.status === "finished" && m.team1_id && m.team2_id);
 
   // ── призёры с составами на турнир
@@ -188,6 +221,7 @@ export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap
 
   return {
     placements,
+    nominations,
     championPath,
     mvp,
     leaders,
