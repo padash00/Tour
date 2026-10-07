@@ -3,7 +3,9 @@ import { Link2Off } from "lucide-react";
 import { joinTeam } from "@/app/actions/team";
 import { getCurrentPlayer } from "@/lib/auth";
 import { MAX_MAIN, MAX_SUBS, getActiveMembership, getLockingTournament, getTeamByInvite, getTeamMembers } from "@/lib/data";
+import { needsProfile } from "@/lib/profiles";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { ProfileRequired } from "@/components/profile/profile-required";
 import { Avatar, Button, Callout, Container, EmptyState, Eyebrow, TeamLogo } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 
@@ -39,6 +41,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
 
   const [player, members, locked] = await Promise.all([getCurrentPlayer(), getTeamMembers(team.id), getLockingTournament(team.id)]);
   const membership = player ? await getActiveMembership(player.id) : null;
+  const gated = player && !membership ? await needsProfile(player.id) : false;
   const mains = members.filter((m) => m.role !== "substitute").length;
   const full = members.length >= MAX_MAIN + MAX_SUBS;
   const captain = members.find((m) => m.role === "captain");
@@ -103,6 +106,8 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
             <Callout tone="warn" title={blocker.title}>
               {blocker.text}
             </Callout>
+          ) : gated ? (
+            <ProfileRequired next={next} action="вступить в команду" />
           ) : (
             <ActionForm action={joinTeam}>
               <input type="hidden" name="code" value={code} />

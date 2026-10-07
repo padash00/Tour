@@ -53,5 +53,25 @@ export async function GET(request: NextRequest) {
   if (profile.ok) await markLoginRefreshed(player.id);
   await createSession({ playerId: player.id, steamId: player.steam_id });
   const next = safeNext(url.searchParams.get("next"));
+  if (await firstProfilePrompt(player.id)) {
+    return NextResponse.redirect(new URL(`/me/profile?welcome=1&next=${encodeURIComponent(next)}`, url.origin));
+  }
   return NextResponse.redirect(new URL(next, url.origin));
+}
+
+/**
+ * Мягкое знакомство с анкетой: после входа один раз отправляем на анкету (prompted_at),
+ * дальше — только напоминание в шапке. Ошибка базы вход не ломает.
+ */
+async function firstProfilePrompt(playerId: string): Promise<boolean> {
+  try {
+    const { data, error } = await db()
+      .from("player_profiles")
+      .upsert({ player_id: playerId, prompted_at: new Date().toISOString() }, { onConflict: "player_id", ignoreDuplicates: true })
+      .select("player_id");
+    // строка создана сейчас — значит, анкету ещё не показывали
+    return !error && (data?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }

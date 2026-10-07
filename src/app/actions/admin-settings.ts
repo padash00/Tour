@@ -39,6 +39,21 @@ export async function saveSetting(_prev: ActionResult, formData: FormData): Prom
   return { success: clear ? "Удалено" : "Сохранено" };
 }
 
+/** Анкета игрока обязательна для команды и заявок (app_settings.PROFILE_REQUIRED: «1» / «0», по умолчанию — да) */
+export async function setProfileRequired(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const value = formData.get("on");
+  if (value !== "0" && value !== "1") return { error: "Не удалось определить новое состояние" };
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: "PROFILE_REQUIRED", value, updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.profile_required", undefined, { on: value === "1" });
+  revalidatePath("/admin/settings");
+  revalidatePath("/team/create");
+  return { success: value === "1" ? "Анкета обязательна для команды и заявок" : "Анкета необязательна — только напоминание" };
+}
+
 /** Добавить / убрать карту из библиотеки Workshop */
 export async function editWorkshopMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();

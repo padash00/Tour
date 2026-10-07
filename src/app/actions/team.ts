@@ -20,6 +20,7 @@ import {
   sniffImage,
   syncOpenRosters,
 } from "@/lib/data";
+import { profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -69,6 +70,9 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
   const player = await requirePlayer("/team/create");
   if (player.is_banned) return { error: BANNED_ERROR };
   if (await getActiveMembership(player.id)) return { error: "Вы уже состоите в команде" };
+  // анкета игрока обязательна для команды (настройка PROFILE_REQUIRED)
+  const gate = await profileGateError(player);
+  if (gate) return { error: gate };
   if (await isRateLimited(player.id, "team.create", 30)) return { error: "Слишком часто — попробуйте через несколько секунд" };
 
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
@@ -176,6 +180,8 @@ export async function joinTeam(_prev: ActionResult, formData: FormData): Promise
   const code = String(formData.get("code") ?? "");
   const player = await requirePlayer(`/join/${code}`);
   if (player.is_banned) return { error: BANNED_ERROR };
+  const gate = await profileGateError(player);
+  if (gate) return { error: gate };
   if (await isRateLimited(player.id, "team.join", 5)) return { error: "Слишком часто — попробуйте через пару секунд" };
 
   const team = await getTeamByInvite(code);

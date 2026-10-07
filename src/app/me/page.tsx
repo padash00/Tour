@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Gamepad2, RefreshCw, Trophy, User, Users } from "lucide-react";
+import { ArrowRight, Gamepad2, IdCard, RefreshCw, Trophy, User, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { refreshProfile } from "@/app/actions/profile";
@@ -227,6 +227,9 @@ export default async function MyGamePage() {
                 Обновить Steam и FACEIT
               </SubmitButton>
             </ActionForm>
+            <Button href="/me/profile" variant="secondary" size="sm" icon={<IdCard />}>
+              Анкета игрока
+            </Button>
             <Button href={`/players/${player.steam_id}`} variant="secondary" size="sm" icon={<User />}>
               Публичный профиль
             </Button>

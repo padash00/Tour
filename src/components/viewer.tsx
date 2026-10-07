@@ -17,9 +17,10 @@ export type Viewer = {
   isAdmin: boolean;
 };
 export type { Activity };
-type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; activity: Activity | null; moreActivity: number };
+/** profileIncomplete — анкета игрока не заполнена (напоминание под шапкой) */
+type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; activity: Activity | null; moreActivity: number; profileIncomplete: boolean };
 
-const EMPTY: State = { status: "loading", player: null, unread: 0, activity: null, moreActivity: 0 };
+const EMPTY: State = { status: "loading", player: null, unread: 0, activity: null, moreActivity: 0, profileIncomplete: false };
 let state: State = EMPTY;
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
@@ -29,14 +30,21 @@ function emit(next: State) {
   listeners.forEach((l) => l());
 }
 
-type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number } };
+type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number }; profileIncomplete?: boolean };
 
 export function refreshViewer() {
   if (inflight) return inflight;
   inflight = fetch("/api/me", { cache: "no-store", credentials: "same-origin" })
     .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : { player: null, unread: 0 }))
     .then((d: MeResponse) =>
-      emit({ status: "ready", player: d.player, unread: d.unread ?? 0, activity: d.activity?.top ?? null, moreActivity: d.activity?.more ?? 0 }),
+      emit({
+        status: "ready",
+        player: d.player,
+        unread: d.unread ?? 0,
+        activity: d.activity?.top ?? null,
+        moreActivity: d.activity?.more ?? 0,
+        profileIncomplete: !!d.player && !!d.profileIncomplete,
+      }),
     )
     .catch(() => emit({ ...state, status: "ready" }))
     .finally(() => {

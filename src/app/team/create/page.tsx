@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { createTeam } from "@/app/actions/team";
 import { requirePlayer } from "@/lib/auth";
 import { getActiveMembership } from "@/lib/data";
+import { needsProfile } from "@/lib/profiles";
+import { ProfileRequired } from "@/components/profile/profile-required";
 import { TeamEditor } from "@/components/team/team-editor";
 import { Container, PageTitle } from "@/components/ds";
 
@@ -13,6 +15,7 @@ export const metadata: Metadata = { title: "Создать команду" };
 export default async function CreateTeamPage() {
   const player = await requirePlayer("/team/create");
   if (await getActiveMembership(player.id)) redirect("/team");
+  const gated = await needsProfile(player.id);
 
   return (
     <Container className="pt-8 sm:pt-10">
@@ -22,7 +25,7 @@ export default async function CreateTeamPage() {
       <PageTitle className="mt-2">Создать команду</PageTitle>
       <p className="mt-2 text-[15px] text-fg-2">Название и тег — обязательно, остальное можно заполнить позже.</p>
       <div className="mt-8">
-        <TeamEditor action={createTeam} mode="create" />
+        {gated ? <ProfileRequired next="/team/create" action="создать команду" className="max-w-2xl" /> : <TeamEditor action={createTeam} mode="create" />}
       </div>
     </Container>
   );

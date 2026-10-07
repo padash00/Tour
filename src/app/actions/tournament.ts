@@ -15,6 +15,9 @@ import {
 } from "@/lib/data";
 import { registrationError } from "@/lib/registration-errors";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
+import { checkPlayer, officialRoster, parseApplication, type ApplicationInput } from "@/lib/official";
+import { tournamentDay } from "@/lib/profile";
+import { getProfiles, profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { SaveRegistrationResult, Tournament } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
@@ -45,6 +48,9 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const ctx = await captainContext(`/tournaments/${tournament.slug}/register`, tournament, true);
   if ("error" in ctx) return { error: ctx.error };
   const { player, team } = ctx;
+  // анкета капитана (настройка PROFILE_REQUIRED); в официальном турнире ниже проверяются анкеты всех игроков
+  const gate = await profileGateError(player);
+  if (gate) return { error: gate };
   if (await isRateLimited(player.id, "registration.create", 5)) return { error: "Слишком часто — попробуйте через пару секунд" };
 
   // состав на турнир выбирает капитан: основа ровно под режим, запасные — до лимита режима
@@ -68,9 +74,28 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const banned = chosen.find((m) => m.player.is_banned);
   if (banned) return { error: `Игрок ${banned.player.nickname} заблокирован на платформе` };
 
-  const { data: saved, error } = await db().rpc("save_registration", {
-    p_tournament: tournament.id, p_team: team.id, p_actor: player.id, p_main: mainIds, p_sub: subIds,
-  });
+  let application: ApplicationInput | null = null;
+  if (tournament.is_official) {
+    // официальный турнир: без запасных (если не разрешены), анкеты и возраст каждого игрока, данные организации и тренера
+    const { subs: maxSubs } = officialRoster(tournament);
+    if (subIds.length > maxSubs) return { error: maxSubs ? `Запасных можно не больше ${maxSubs}` : "В этом турнире запасные не допускаются — состав в заявке окончательный" };
+    const profiles = await getProfiles(chosen.map((m) => m.player_id));
+    const day = tournamentDay(tournament);
+    const issues = chosen.flatMap((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, tournament, day).issues);
+    if (issues.length) return { error: issues.join(". ") };
+    const parsed = parseApplication((k) => formData.get(k), tournament.require_coach);
+    const firstError = Object.values(parsed.errors)[0];
+    if (firstError) return { error: firstError };
+    application = parsed.value;
+  }
+
+  const { data: saved, error } = application
+    ? await db().rpc("save_official_registration", {
+        p_tournament: tournament.id, p_team: team.id, p_actor: player.id, p_main: mainIds, p_sub: subIds, p_application: application,
+      })
+    : await db().rpc("save_registration", {
+        p_tournament: tournament.id, p_team: team.id, p_actor: player.id, p_main: mainIds, p_sub: subIds,
+      });
   if (error) return { error: registrationError(error) };
   const { updated: isUpdate, approved: auto } = saved as SaveRegistrationResult;
 

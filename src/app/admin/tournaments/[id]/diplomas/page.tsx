@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth";
 import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
 import { CITY_TOURNAMENT, nominationDiploma, placeDiploma, registrationOrganization, type Diploma } from "@/lib/diplomas";
 import { getTournamentNominations } from "@/lib/nominations";
+import { documentNames } from "@/lib/person-name";
+import { db } from "@/lib/supabase";
 import { getTournamentRecap } from "@/lib/recap";
 import { PrintButton } from "@/components/admin/print-button";
 import { AdminHeader } from "@/components/admin/control";
@@ -36,17 +38,25 @@ export default async function DiplomasPage(props: PageProps<"/admin/tournaments/
   const signer = param("signer", DEFAULT_SIGNER);
   const signerName = param("signerName", "");
 
-  const [recap, nominations, regs] = await Promise.all([getTournamentRecap(t), getTournamentNominations(t.id), getTournamentRegistrations(t.id)]);
+  const [recap, nominations, regs, { data: applications }] = await Promise.all([
+    getTournamentRecap(t),
+    getTournamentNominations(t.id),
+    getTournamentRegistrations(t.id),
+    db().from("tournament_applications").select("registration_id, organization").eq("tournament_id", t.id),
+  ]);
+  // в дипломе — ФИО из анкеты (на сайте у номинантов только никнеймы) и организация из заявки
+  const realNames = await documentNames(nominations.map((n) => n.winner?.playerId).filter((x): x is string => !!x));
+  const organizationOf = new Map((applications ?? []).map((a) => [a.registration_id, a.organization]));
 
   const diplomas: Diploma[] = [];
   for (const p of recap.placements) {
     const reg = regs.find((r) => r.team_id === p.team.id);
-    const d = placeDiploma(`place-${p.place}-${p.team.id}`, p.place, p.team.name, registrationOrganization(reg), t.name, CITY_TOURNAMENT);
+    const d = placeDiploma(`place-${p.place}-${p.team.id}`, p.place, p.team.name, registrationOrganization(reg ? { organization: organizationOf.get(reg.id) } : null), t.name, CITY_TOURNAMENT);
     if (d) diplomas.push(d);
   }
   for (const n of nominations) {
     if (!n.winner) continue;
-    diplomas.push(nominationDiploma(`nom-${n.key}`, n.title, n.winner.name, n.winner.team?.name ?? null, t.name, CITY_TOURNAMENT));
+    diplomas.push(nominationDiploma(`nom-${n.key}`, n.title, (n.winner.playerId && realNames.get(n.winner.playerId)) || n.winner.name, n.winner.team?.name ?? null, t.name, CITY_TOURNAMENT));
   }
 
   return (
