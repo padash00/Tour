@@ -289,7 +289,7 @@ async function createEliminationStage(tournament: Tournament, seededTeamIds: str
 
 /** Строки матчей сетки на выбывание для create_stage_matches (чистая функция, номера относительные) */
 export function eliminationStageRows(
-  tournament: Pick<Tournament, "default_best_of" | "final_best_of">,
+  tournament: Pick<Tournament, "default_best_of" | "final_best_of"> & Partial<Pick<Tournament, "third_place_match">>,
   seededTeamIds: string[],
   double: boolean,
 ) {
@@ -298,6 +298,8 @@ export function eliminationStageRows(
     double,
     bestOf: tournament.default_best_of ?? 1,
     finalBestOf: tournament.final_best_of ?? 3,
+    // матч за 3-е место — только в Single Elimination (весь турнир или плей-офф после групп/швейцарки)
+    thirdPlace: !double && !!tournament.third_place_match,
   });
   const ids = new Map(generated.map((m) => [m.key, randomUUID()]));
   const finishedAt = new Date().toISOString();

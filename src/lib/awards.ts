@@ -4,7 +4,7 @@ import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
 import { getStandings } from "./matches";
 import { getPlayerLeaderboard, mvpOf } from "./stats";
-import { bestBy, computePlacements, type PlacementMatch } from "./awards-core";
+import { bestBy, computePlacements, isPlayoffSide, type PlacementMatch } from "./awards-core";
 import type { Tournament } from "./types";
 
 /**
@@ -34,7 +34,7 @@ async function tournamentAwards(t: Tournament): Promise<Award[]> {
     .select("bracket, round, status, team1_id, team2_id, winner_id")
     .eq("tournament_id", t.id);
   const list = (matches ?? []) as PlacementMatch[];
-  const hasPlayoff = list.some((m) => m.bracket === "upper" || m.bracket === "lower" || m.bracket === "grand_final");
+  const hasPlayoff = list.some((m) => isPlayoffSide(m.bracket));
   let ranking: string[] = [];
   if (!hasPlayoff) {
     const groups = await getStandings(t);

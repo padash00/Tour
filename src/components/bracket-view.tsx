@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MoveHorizontal } from "lucide-react";
-import { roundTitle } from "@/lib/bracket";
+import { THIRD_PLACE_TITLE, roundTitle } from "@/lib/bracket";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
@@ -189,12 +189,13 @@ function BracketSection({
   );
 }
 
-/** Сетка на выбывание: верхняя, нижняя и гранд-финал показываются как отдельные понятные области. */
+/** Сетка на выбывание: верхняя, нижняя, гранд-финал и матч за 3-е место — отдельные понятные области. */
 export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const playoff = matches.filter((m) => (m.stage ?? "playoff") === "playoff");
   const upper = playoff.filter((m) => m.bracket === "upper");
   const lower = playoff.filter((m) => m.bracket === "lower");
   const grandFinal = playoff.filter((m) => m.bracket === "grand_final");
+  const thirdPlace = playoff.filter((m) => m.bracket === "third_place");
   const totalUpper = Math.max(0, ...upper.map((m) => m.round));
   const totalLower = Math.max(0, ...lower.map((m) => m.round));
 
@@ -225,6 +226,11 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
 
         {grandFinal.length > 0 && (
           <BracketSection title="Гранд-финал" matches={grandFinal} totalUpper={totalUpper} totalLower={totalLower} />
+        )}
+
+        {/* проигравшие полуфиналов играют за 3-е место */}
+        {thirdPlace.length > 0 && (
+          <BracketSection title={THIRD_PLACE_TITLE} matches={thirdPlace} totalUpper={totalUpper} totalLower={totalLower} />
         )}
       </div>
     </BracketHover>

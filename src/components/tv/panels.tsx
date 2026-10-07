@@ -123,8 +123,14 @@ export function BracketPanel({ matches }: { matches: MatchWithTeams[] }) {
   const upper = playoff.filter((m) => m.bracket === "upper");
   const lower = playoff.filter((m) => m.bracket === "lower");
   const gf = playoff.filter((m) => m.bracket === "grand_final");
+  // матч за 3-е место — отдельной колонкой после финала
+  const third = playoff.filter((m) => m.bracket === "third_place");
   const totalUpper = Math.max(0, ...upper.map((m) => m.round));
-  const upperCols = groupRounds([...upper, ...gf.map((m) => ({ ...m, round: totalUpper + 1 }))]);
+  const upperCols = groupRounds([
+    ...upper,
+    ...gf.map((m) => ({ ...m, round: totalUpper + 1 })),
+    ...third.map((m) => ({ ...m, round: totalUpper + 2 })),
+  ]);
   const lowerCols = groupRounds(lower);
   return (
     <div className="h-full flex flex-col gap-[2.4vh]">

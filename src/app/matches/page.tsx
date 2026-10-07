@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Gamepad2 } from "lucide-react";
 import { getUpcomingMatches, type MatchWithTeams } from "@/lib/matches";
+import { THIRD_PLACE_TITLE } from "@/lib/bracket";
 import { db } from "@/lib/supabase";
 import type { Tournament } from "@/lib/types";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -31,6 +32,7 @@ async function recentFinished(limit = 20) {
 
 function stageLabel(m: MatchWithTeams) {
   if (m.bracket === "grand_final") return "Гранд-финал";
+  if (m.bracket === "third_place") return THIRD_PLACE_TITLE;
   if (m.bracket === "lower") return `Нижняя сетка · раунд ${m.round}`;
   if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
   if (m.bracket === "swiss") return `Швейцарка · раунд ${m.round}`;

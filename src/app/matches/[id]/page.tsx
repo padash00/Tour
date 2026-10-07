@@ -69,7 +69,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const [player, stageRounds, rosters, statRows] = await Promise.all([
     getCurrentPlayer(),
     // для подписи стадии нужны только раунды сетки, а не все матчи турнира
-    ["group", "swiss", "grand_final"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
+    ["group", "swiss", "grand_final", "third_place"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
   ]);

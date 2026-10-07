@@ -97,7 +97,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/admin/tourna
       ["Матч", "Стадия", "Раунд", "Группа", "Формат", "Команда 1", "Команда 2", "Счёт", "Победитель", "Статус", "Тех. результат", "Карты", "Начало", "Завершён"],
       ...(data ?? []).map((m) => [
         m.number,
-        m.bracket === "grand_final" ? "гранд-финал" : m.bracket === "upper" ? "верхняя" : m.bracket === "lower" ? "нижняя" : m.bracket === "group" ? "группа" : m.bracket === "swiss" ? "швейцарка" : m.bracket,
+        m.bracket === "grand_final" ? "гранд-финал" : m.bracket === "third_place" ? "матч за 3-е место" : m.bracket === "upper" ? "верхняя" : m.bracket === "lower" ? "нижняя" : m.bracket === "group" ? "группа" : m.bracket === "swiss" ? "швейцарка" : m.bracket,
         m.round,
         m.group_label,
         `BO${m.best_of}`,

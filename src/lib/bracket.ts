@@ -1,5 +1,5 @@
 /**
- * Сетка Double Elimination / Single Elimination.
+ * Сетка Double Elimination / Single Elimination (с матчем за 3-е место по желанию).
  * Чистые функции: генерация структуры и «разрешение» сетки (баи, продвижение по результатам).
  */
 
@@ -7,7 +7,7 @@
 export const GRAND_FINAL_BEST_OF = 5;
 export const GRAND_FINAL_ADVANTAGE = 1;
 
-export type Side = "upper" | "lower" | "grand_final" | "group" | "swiss";
+export type Side = "upper" | "lower" | "grand_final" | "third_place" | "group" | "swiss";
 export type MatchStatus = "pending" | "upcoming" | "veto" | "ready" | "live" | "finished" | "cancelled";
 
 export type BracketMatch = {
@@ -25,6 +25,8 @@ export type BracketMatch = {
   winner_to: { key: string; slot: 1 | 2 } | null;
   loser_to: { key: string; slot: 1 | 2 } | null;
 };
+
+export const THIRD_PLACE_TITLE = "Матч за 3-е место";
 
 export const matchKey = (bracket: Side, round: number, position: number) => `${bracket}:${round}:${position}`;
 
@@ -58,13 +60,18 @@ export type GenerateOptions = {
   /** формат обычных матчей и финальной стадии (последние 4 команды) */
   bestOf?: number;
   finalBestOf?: number;
+  /**
+   * Single Elimination: матч за 3-е место между проигравшими полуфиналов (от 4 команд).
+   * Проигравшие полуфиналов попадают в него через loser_to — так же, как в нижнюю сетку Double Elimination.
+   */
+  thirdPlace?: boolean;
 };
 
 /**
  * Генерирует структуру сетки. best_of по умолчанию: BO1, а финальная стадия (последние 4 команды) — BO3:
  * финал верхней сетки, два последних раунда нижней и гранд-финал (в SE — полуфиналы и финал).
  */
-export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }: GenerateOptions): BracketMatch[] {
+export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3, thirdPlace = false }: GenerateOptions): BracketMatch[] {
   const size = bracketSize(Math.max(seeded.length, double ? 4 : 2));
   const k = Math.log2(size);
   const matches: BracketMatch[] = [];
@@ -106,6 +113,9 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }:
     // гранд-финал — BO5, команда из верхней сетки (слот 1) начинает со счётом 1:0 (GRAND_FINAL_ADVANTAGE)
     matches.push(blank("grand_final", 1, 0, GRAND_FINAL_BEST_OF));
   }
+  // матч за 3-е место: раунд — как у финала (идёт в одно время с ним), формат — как у полуфиналов
+  const withThird = !double && thirdPlace && seeded.length >= 4 && k >= 2;
+  if (withThird) matches.push(blank("third_place", k, 0, finalBestOf));
 
   const get = (b: Side, r: number, p: number) => matches.find((x) => x.key === matchKey(b, r, p))!;
 
@@ -115,6 +125,10 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }:
         m.winner_to = { key: matchKey("upper", m.round + 1, Math.floor(m.position / 2)), slot: m.position % 2 === 0 ? 1 : 2 };
       } else if (double) {
         m.winner_to = { key: matchKey("grand_final", 1, 0), slot: 1 };
+      }
+      if (withThird && m.round === k - 1) {
+        // проигравший левого полуфинала — слот 1, правого — слот 2
+        m.loser_to = { key: matchKey("third_place", k, 0), slot: m.position % 2 === 0 ? 1 : 2 };
       }
       if (double) {
         if (m.round === 1) {
@@ -142,6 +156,8 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3 }:
   // сквозная нумерация: по раундам, чередуя верхнюю и нижнюю сетку
   const sortKey = (m: BracketMatch) => {
     if (m.bracket === "grand_final") return [1e6, 0, 0];
+    // матч за 3-е место — перед финалом
+    if (m.bracket === "third_place") return [m.round * 2 - 1, -1, 0];
     // UB раунд r ≈ LB раунды 2r-2..2r-1
     const stage = m.bracket === "upper" ? m.round * 2 - 1 : m.round + 1;
     return [stage, m.bracket === "upper" ? 0 : 1, m.position];
@@ -235,6 +251,7 @@ export function resolveBracket(matches: BracketMatch[]): Set<string> {
 
 export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number) {
   if (bracket === "grand_final") return "Гранд-финал · фора 1:0";
+  if (bracket === "third_place") return THIRD_PLACE_TITLE;
   if (bracket === "group") return `Тур ${round}`;
   if (bracket === "swiss") return `Раунд ${round}`;
   if (bracket === "upper") {

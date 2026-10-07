@@ -4,7 +4,7 @@
  */
 
 export type PlacementMatch = {
-  bracket: "upper" | "lower" | "grand_final" | "group" | "swiss";
+  bracket: "upper" | "lower" | "grand_final" | "third_place" | "group" | "swiss";
   round: number;
   status: string;
   team1_id: string | null;
@@ -14,18 +14,23 @@ export type PlacementMatch = {
 
 export type Placement = { teamId: string; place: 1 | 2 | 3 };
 
+/** Стороны сетки на выбывание (плей-офф) */
+export const isPlayoffSide = (bracket: string) =>
+  bracket === "upper" || bracket === "lower" || bracket === "grand_final" || bracket === "third_place";
+
 const loserOf = (m: PlacementMatch) =>
   m.winner_id && m.team1_id && m.team2_id ? (m.winner_id === m.team1_id ? m.team2_id : m.team1_id) : null;
 
 /**
  * Места по завершённому турниру.
  * - Double Elimination: 1 — победитель гранд-финала, 2 — проигравший, 3 — проигравший финала нижней сетки.
- * - Single Elimination: 1/2 — финал (последний раунд верхней сетки), 3 — оба проигравших полуфинала (делят место).
+ * - Single Elimination: 1/2 — финал (последний раунд верхней сетки); 3 — победитель матча за 3-е место,
+ *   если он есть в сетке (пока не сыгран — 3-го места нет), иначе оба проигравших полуфинала (делят место).
  * - Без плей-офф (круговая, швейцарка): первые три строки итоговой таблицы `ranking`.
  * Если финал не сыгран — мест нет.
  */
 export function computePlacements(matches: PlacementMatch[], ranking: string[] = []): Placement[] {
-  const playoff = matches.filter((m) => m.bracket === "upper" || m.bracket === "lower" || m.bracket === "grand_final");
+  const playoff = matches.filter((m) => isPlayoffSide(m.bracket));
   const out: Placement[] = [];
   const push = (teamId: string | null | undefined, place: 1 | 2 | 3) => {
     if (teamId && !out.some((p) => p.teamId === teamId)) out.push({ teamId, place });
@@ -53,6 +58,12 @@ export function computePlacements(matches: PlacementMatch[], ranking: string[] =
   if (!final || final.status !== "finished" || !final.winner_id) return [];
   push(final.winner_id, 1);
   push(loserOf(final), 2);
+  const third = playoff.find((m) => m.bracket === "third_place");
+  if (third) {
+    // техническая победа без соперника (второй полуфиналист снялся) — тоже 3-е место
+    if (third.status === "finished" && third.winner_id) push(third.winner_id, 3);
+    return out;
+  }
   for (const semi of upper.filter((m) => m.round === lastRound - 1 && m.status === "finished")) push(loserOf(semi), 3);
   return out;
 }

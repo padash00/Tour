@@ -85,7 +85,8 @@ export default async function TournamentTvPage(props: PageProps<"/tournaments/[s
     // в таблице лидеров — игроки, сыгравшие хотя бы 2 карты (иначе одна удачная карта занимает весь топ)
     leaders: board.filter((p) => p.maps >= Math.min(2, Math.max(...board.map((b) => b.maps), 0))).map(toLeader),
     mvp: mvp ? { ...toLeader(mvp), by: mvp.by, swing: mvp.swing } : null,
-    places: (recap?.placements ?? []).map((p) => ({ place: p.place, team: p.team, roster: p.roster.map((r) => r.nickname) })),
+    // 4-е место (проигравший матча за 3-е) на пьедестал ТВ не выводится
+    places: (recap?.placements ?? []).filter((p) => p.place !== "4").map((p) => ({ place: p.place, team: p.team, roster: p.roster.map((r) => r.nickname) })),
     liveRounds,
   };
 

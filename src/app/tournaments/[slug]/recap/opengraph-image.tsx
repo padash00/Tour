@@ -15,7 +15,7 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
   const fonts = await ogFonts();
   const recap = t && t.status === "finished" ? await getTournamentRecap(t) : null;
   const champ = recap?.placements.find((p) => p.place === "1");
-  const others = recap?.placements.filter((p) => p.place !== "1").slice(0, 3) ?? [];
+  const others = recap?.placements.filter((p) => p.place !== "1" && p.place !== "4").slice(0, 3) ?? [];
   const mvp = recap?.mvp;
 
   return new ImageResponse(

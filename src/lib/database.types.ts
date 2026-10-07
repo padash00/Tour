@@ -1579,6 +1579,68 @@ export type Database = {
           },
         ]
       }
+      tournament_nominations: {
+        Row: {
+          decided_at: string
+          decided_by: string | null
+          key: string
+          name: string | null
+          note: string | null
+          player_id: string | null
+          team_id: string | null
+          tournament_id: string
+        }
+        Insert: {
+          decided_at?: string
+          decided_by?: string | null
+          key: string
+          name?: string | null
+          note?: string | null
+          player_id?: string | null
+          team_id?: string | null
+          tournament_id: string
+        }
+        Update: {
+          decided_at?: string
+          decided_by?: string | null
+          key?: string
+          name?: string | null
+          note?: string | null
+          player_id?: string | null
+          team_id?: string | null
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_nominations_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_nominations_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_nominations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_nominations_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_registrations: {
         Row: {
           checked_in_at: string | null
@@ -1751,6 +1813,7 @@ export type Database = {
           swiss_wins: number
           tech_pause_seconds: number
           tech_pauses: number
+          third_place_match: boolean
           timeout_seconds: number
           timeouts_per_team: number
           updated_at: string
@@ -1799,6 +1862,7 @@ export type Database = {
           swiss_wins?: number
           tech_pause_seconds?: number
           tech_pauses?: number
+          third_place_match?: boolean
           timeout_seconds?: number
           timeouts_per_team?: number
           updated_at?: string
@@ -1847,6 +1911,7 @@ export type Database = {
           swiss_wins?: number
           tech_pause_seconds?: number
           tech_pauses?: number
+          third_place_match?: boolean
           timeout_seconds?: number
           timeouts_per_team?: number
           updated_at?: string
@@ -2064,7 +2129,7 @@ export type Database = {
       }
     }
     Enums: {
-      bracket_side: "upper" | "lower" | "grand_final" | "group" | "swiss"
+      bracket_side: "upper" | "lower" | "grand_final" | "group" | "swiss" | "third_place"
       match_status:
         | "pending"
         | "upcoming"
@@ -2211,7 +2276,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      bracket_side: ["upper", "lower", "grand_final", "group", "swiss"],
+      bracket_side: ["upper", "lower", "grand_final", "group", "swiss", "third_place"],
       match_status: [
         "pending",
         "upcoming",
