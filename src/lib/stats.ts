@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "./supabase";
 import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
 import type { Match, MatchMap, Player, Team, VetoActionRow } from "./types";
@@ -147,19 +148,61 @@ export function aggregatePlayers(rows: MapStatRow[]): PlayerAgg[] {
 
 // ───────────────────────── выборки
 
-/** Статистика по завершённым и идущим матчам опубликованных турниров (или одного турнира) */
-export async function getStatRows(filter: { tournamentId?: string; playerId?: string; matchId?: string } = {}) {
-  let q = db()
-    .from("player_map_stats")
-    .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status, format))")
-    .neq("match.tournament.status", "draft")
-    .gt("rounds_played", 0);
-  if (filter.tournamentId) q = q.eq("match.tournament_id", filter.tournamentId);
-  if (filter.playerId) q = q.eq("player_id", filter.playerId);
-  if (filter.matchId) q = q.eq("match_id", filter.matchId);
-  const { data } = await q.limit(5000);
-  return attachLogFacts(await attachSwing((data ?? []) as MapStatRow[]));
+/** PostgREST отдаёт не больше max_rows (по умолчанию 1000) строк за запрос — длинные выборки читаем страницами */
+const PAGE = 1000;
+/** Сколько id за раз передаём в .in(...) — чтобы не упереться в длину URL */
+const IN_CHUNK = 150;
+
+/**
+ * Читает выборку целиком страницами по PAGE строк. page(from, to) должен каждый раз строить НОВЫЙ запрос
+ * со стабильным .order(...) (иначе страницы могут пересекаться) и вызывать .range(from, to).
+ */
+async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) {
+      console.error("stats: fetchAll", error);
+      break;
+    }
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
 }
+
+/** fetchAll по кускам списка id (для .in(...)) */
+async function fetchAllIn<T>(ids: string[], page: (chunk: string[], from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>) {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) chunks.push(ids.slice(i, i + IN_CHUNK));
+  const parts = await Promise.all(chunks.map((c) => fetchAll<T>((from, to) => page(c, from, to))));
+  return parts.flat();
+}
+
+/** Статистика по завершённым и идущим матчам опубликованных турниров (или одного турнира) */
+export function getStatRows(filter: { tournamentId?: string; playerId?: string; matchId?: string } = {}) {
+  // cache() сравнивает аргументы по ссылке — разворачиваем фильтр в примитивы
+  return statRowsCached(filter.tournamentId, filter.playerId, filter.matchId);
+}
+
+const statRowsCached = cache(async (tournamentId?: string, playerId?: string, matchId?: string) => {
+  const rows = await fetchAll<MapStatRow & { updated_at?: string }>((from, to) => {
+    let q = db()
+      .from("player_map_stats")
+      .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status, format))")
+      .neq("match.tournament.status", "draft")
+      .gt("rounds_played", 0);
+    if (tournamentId) q = q.eq("match.tournament_id", tournamentId);
+    if (playerId) q = q.eq("player_id", playerId);
+    if (matchId) q = q.eq("match_id", matchId);
+    return q.order("match_id").order("map_number").order("steam_id").range(from, to);
+  });
+  // постранично читаем по первичному ключу (стабильно), а для агрегации — по времени обновления:
+  // имя и команда игрока берутся из последней строки
+  rows.sort((a, b) => (a.updated_at ?? "").localeCompare(b.updated_at ?? ""));
+  return attachLogFacts(await attachSwing(rows));
+});
 
 /**
  * MatchZy присылает KAST и первые фраги нулями — считаем их сами по сохранённым событиям раундов
@@ -176,14 +219,17 @@ async function attachLogFacts(rows: MapStatRow[]) {
   for (const [k, list] of byMap) if (list.every((r) => !r.kast && !r.first_kills && !r.first_deaths)) empty.add(k);
   if (empty.size === 0) return rows;
   const matchIds = [...new Set([...empty].map((k) => k.split(":")[0]))];
-  const { data } = await db()
-    .from("match_rounds")
-    .select("match_id, map_number, round_number, events")
-    .in("match_id", matchIds)
-    .order("match_id")
-    .order("map_number")
-    .order("round_number")
-    .limit(10000);
+  const data = await fetchAllIn<{ match_id: string; map_number: number; round_number: number; events: LogEvent[] }>(matchIds, (ids, from, to) =>
+    db()
+      .from("match_rounds")
+      .select("match_id, map_number, round_number, events")
+      .in("match_id", ids)
+      .order("match_id")
+      .order("map_number")
+      .order("round_number")
+      .range(from, to),
+  );
+  // куски по match_id приходят независимо — карты одного матча всегда в одном куске, порядок внутри сохранён
   const facts = new Map<string, { kast: number; fk: number; fd: number }>();
   const bump = (key: string, f: "kast" | "fk" | "fd") => {
     const cur = facts.get(key) ?? { kast: 0, fk: 0, fd: 0 };
@@ -192,7 +238,7 @@ async function attachLogFacts(rows: MapStatRow[]) {
   };
   let roster = new Map<string, Side>();
   let mapKey = "";
-  for (const r of (data ?? []) as { match_id: string; map_number: number; events: LogEvent[] }[]) {
+  for (const r of data) {
     const k = `${r.match_id}:${r.map_number}`;
     if (!empty.has(k)) continue;
     if (k !== mapKey) {
@@ -219,9 +265,18 @@ async function attachLogFacts(rows: MapStatRow[]) {
 async function attachSwing(rows: MapStatRow[]) {
   const matchIds = [...new Set(rows.map((r) => r.match_id))];
   if (matchIds.length === 0) return rows;
-  const { data } = await db().from("player_map_swing").select("*").in("match_id", matchIds);
+  const data = await fetchAllIn<{ match_id: string; map_number: number; steam_id: string; swing_sum: number; rounds: number }>(matchIds, (ids, from, to) =>
+    db()
+      .from("player_map_swing")
+      .select("match_id, map_number, steam_id, swing_sum, rounds")
+      .in("match_id", ids)
+      .order("match_id")
+      .order("map_number")
+      .order("steam_id")
+      .range(from, to),
+  );
   const key = (m: string, n: number, s: string) => `${m}:${n}:${s}`;
-  const swing = new Map((data ?? []).map((r) => [key(r.match_id, r.map_number, r.steam_id), r]));
+  const swing = new Map(data.map((r) => [key(r.match_id, r.map_number, r.steam_id), r]));
   for (const r of rows) {
     const s = swing.get(key(r.match_id, r.map_number, r.steam_id));
     if (s) {
@@ -232,7 +287,10 @@ async function attachSwing(rows: MapStatRow[]) {
   return rows;
 }
 
-export async function getPlayerLeaderboard(tournamentId?: string) {
+export type LeaderboardRow = Awaited<ReturnType<typeof getPlayerLeaderboard>>[number];
+
+/** Таблица игроков (по рейтингу). В пределах запроса считается один раз на турнир */
+export const getPlayerLeaderboard = cache(async (tournamentId?: string) => {
   const rows = await getStatRows({ tournamentId });
   const agg = aggregatePlayers(rows);
   const ids = [...new Set(agg.map((a) => a.team_id).filter(Boolean))] as string[];
@@ -250,14 +308,18 @@ export async function getPlayerLeaderboard(tournamentId?: string) {
       player: a.player_id ? (playerById.get(a.player_id) ?? null) : null,
     }))
     .sort((a, b) => b.rating - a.rating);
-}
+});
 
 /**
  * MVP турнира: лучший Swing (средний вклад в шанс победы раунда) среди игроков, сыгравших
  * не меньше половины карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.
  */
-export async function getTournamentMvp(tournamentId: string) {
-  const board = await getPlayerLeaderboard(tournamentId);
+export async function getTournamentMvp(tournamentId: string, precomputed?: LeaderboardRow[]) {
+  return mvpOf(precomputed ?? (await getPlayerLeaderboard(tournamentId)));
+}
+
+/** MVP по готовой таблице игроков турнира (без лишних запросов) */
+export function mvpOf(board: LeaderboardRow[]) {
   if (board.length === 0) return null;
   const teamMaps = new Map<string, number>();
   for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));
@@ -332,8 +394,8 @@ export type TeamStatRow = TeamAgg & {
  * Статистика команд: результаты серий/карт/раундов + сумма по игрокам (K, D, урон, хедшоты).
  * Порядок: победы → разница карт → разница раундов.
  */
-export async function getTeamStats(tournamentId?: string): Promise<TeamStatRow[]> {
-  const [players, table] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamTable(tournamentId)]);
+export async function getTeamStats(tournamentId?: string, precomputed?: LeaderboardRow[]): Promise<TeamStatRow[]> {
+  const [players, table] = await Promise.all([precomputed ?? getPlayerLeaderboard(tournamentId), getTeamTable(tournamentId)]);
   const zero = { kills: 0, deaths: 0, damage: 0, hs: 0, players: 0, rounds: 0 };
   const sums = new Map<string, typeof zero>();
   for (const p of players) {
@@ -363,9 +425,11 @@ export type WeaponStat = { weapon: string; kills: number; hs: number };
 /** Убийства игрока по оружию — из событий раундов (лог сервера); только убийства соперников */
 export async function getPlayerWeapons(steamId: string, matchIds: string[]): Promise<WeaponStat[]> {
   if (!matchIds.length) return [];
-  const { data } = await db().from("match_rounds").select("events").in("match_id", matchIds).limit(10000);
+  const data = await fetchAllIn<{ events: LogEvent[] }>([...new Set(matchIds)], (ids, from, to) =>
+    db().from("match_rounds").select("events").in("match_id", ids).order("match_id").order("map_number").order("round_number").range(from, to),
+  );
   const by = new Map<string, WeaponStat>();
-  for (const r of (data ?? []) as { events: LogEvent[] }[]) {
+  for (const r of data) {
     for (const e of r.events ?? []) {
       if (e.type !== "kill" || e.killer.steamId !== steamId || !e.killer.side || e.killer.side === e.victim.side) continue;
       const w = (e.weapon || "unknown").replace(/^weapon_/, "");

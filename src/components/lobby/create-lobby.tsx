@@ -92,7 +92,7 @@ export function CreateLobbyButton({
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
               Отмена
             </Button>
-            <Button onClick={submit} loading={pending} disabled={type !== "public" && password.trim().length < 3} data-autofocus>
+            <Button onClick={submit} loading={pending} disabled={type !== "public" && password.trim().length < 4} data-autofocus>
               Создать лобби
             </Button>
           </>
@@ -132,7 +132,7 @@ export function CreateLobbyButton({
             className="mt-5"
             label="Пароль"
             required
-            hint="От 3 до 32 символов. Игроки смогут войти по нему или по действующей ссылке-приглашению."
+            hint="От 4 до 32 символов. Игроки смогут войти по нему или по действующей ссылке-приглашению."
           >
             {(field) => (
               <Input
@@ -140,7 +140,7 @@ export function CreateLobbyButton({
                 type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                minLength={3}
+                minLength={4}
                 maxLength={32}
                 autoComplete="off"
                 placeholder="Введите пароль"

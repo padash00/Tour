@@ -6,7 +6,7 @@ import { modeOf } from "@/lib/modes";
 import type { MapRounds } from "@/lib/rounds";
 import { getMatchRounds } from "@/lib/rounds-data";
 import { getTournamentRecap } from "@/lib/recap";
-import { getPlayerLeaderboard, getTournamentMvp } from "@/lib/stats";
+import { getPlayerLeaderboard, mvpOf } from "@/lib/stats";
 import { db } from "@/lib/supabase";
 import { TvView, type TvData } from "@/components/tv/tv-view";
 
@@ -35,15 +35,16 @@ export default async function TournamentTvPage(props: PageProps<"/tournaments/[s
   const liveIds = matches.filter((m) => m.status === "live").map((m) => m.id);
   const hasStage = matches.some((m) => m.stage === "group" || m.stage === "swiss");
 
-  const [liveMaps, groups, board, mvp, recap] = await Promise.all([
+  const [liveMaps, groups, board, recap] = await Promise.all([
     liveIds.length
       ? db().from("match_maps").select("match_id, map_number, map_name, status, team1_score, team2_score").in("match_id", liveIds).then((r) => r.data ?? [])
       : Promise.resolve([]),
     hasStage ? getStandings(t) : Promise.resolve([]),
     getPlayerLeaderboard(t.id),
-    getTournamentMvp(t.id),
     t.status === "finished" ? getTournamentRecap(t) : Promise.resolve(null),
   ]);
+
+  const mvp = mvpOf(board);
 
   // лента раундов идущей карты каждого live-матча
   const teamSize = modeOf(t.format).size;

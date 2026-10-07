@@ -88,6 +88,16 @@ async function writeJson(key: string, value: unknown, adminId: string) {
     .upsert({ key, value: JSON.stringify(value), updated_by: adminId, updated_at: new Date().toISOString() });
 }
 
+/** Картинки карт видны на страницах турниров, статистики, матчей и в админке — только их и обновляем */
+function revalidateMapImages() {
+  revalidatePath("/tournaments/[slug]", "page");
+  revalidatePath("/stats");
+  revalidatePath("/stats/[slug]", "page");
+  revalidatePath("/matches/[id]", "page");
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/tournaments", "layout");
+}
+
 const MAP_KEY = /^([a-z0-9_]+|[^@\s]+@\d+)$/;
 
 export async function uploadMapImage(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -109,7 +119,7 @@ export async function uploadMapImage(_prev: ActionResult, formData: FormData): P
   images[map] = url;
   await writeJson("MAP_IMAGES", images, admin.id);
   await audit(admin.id, "settings.map_image", undefined, { map });
-  revalidatePath("/", "layout");
+  revalidateMapImages();
   return { success: "Картинка сохранена" };
 }
 
@@ -119,7 +129,7 @@ export async function removeMapImage(_prev: ActionResult, formData: FormData): P
   const images = await readJson<Record<string, string>>("MAP_IMAGES", {});
   delete images[map];
   await writeJson("MAP_IMAGES", images, admin.id);
-  revalidatePath("/", "layout");
+  revalidateMapImages();
   return { success: "Картинка убрана" };
 }
 

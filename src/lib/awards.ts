@@ -1,15 +1,16 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
 import { getStandings } from "./matches";
-import { getPlayerLeaderboard, getTournamentMvp } from "./stats";
+import { getPlayerLeaderboard, mvpOf } from "./stats";
 import { bestBy, computePlacements, type PlacementMatch } from "./awards-core";
 import type { Tournament } from "./types";
 
 /**
  * Награды считаются из результатов завершённых турниров (никаких выдуманных данных):
  * места 1–3, MVP турнира, лучший клатч, лучший ADR. Хранить отдельно не нужно — пересчёт дешёвый,
- * завершённых турниров единицы; в пределах запроса результат кэшируется.
+ * завершённых турниров единицы; результат кэшируется (см. getAllAwards).
  */
 
 export type AwardKind = "place" | "mvp" | "clutch" | "adr";
@@ -54,7 +55,8 @@ async function tournamentAwards(t: Tournament): Promise<Award[]> {
 
   const awards: Award[] = placements.map((p) => ({ kind: "place", place: p.place, tournament: meta, teamId: p.teamId, playerIds: playersOf(p.teamId) }));
 
-  const [board, mvp] = await Promise.all([getPlayerLeaderboard(t.id), getTournamentMvp(t.id)]);
+  const board = await getPlayerLeaderboard(t.id);
+  const mvp = mvpOf(board);
   if (mvp?.player_id) {
     awards.push({
       kind: "mvp",
@@ -80,12 +82,25 @@ async function tournamentAwards(t: Tournament): Promise<Award[]> {
   return awards;
 }
 
-/** Все награды по завершённым турнирам (новые сверху) */
-export const getAllAwards = cache(async (): Promise<Award[]> => {
-  const { data } = await db().from("tournaments").select("*").eq("status", "finished").order("starts_at", { ascending: false });
-  const all = await Promise.all(((data ?? []) as Tournament[]).map(tournamentAwards));
-  return all.flat();
-});
+/** Тег кэша наград: сбрасывать, когда турнир завершается/переоткрывается или меняются его результаты */
+export const AWARDS_TAG = "awards";
+
+/**
+ * Все награды по завершённым турнирам (новые сверху).
+ * Пересчёт трогает каждый завершённый турнир, поэтому результат кэшируется между запросами (тег AWARDS_TAG)
+ * и на всякий случай обновляется раз в час; в пределах запроса — один вызов (cache).
+ */
+export const getAllAwards = cache(
+  unstable_cache(
+    async (): Promise<Award[]> => {
+      const { data } = await db().from("tournaments").select("*").eq("status", "finished").order("starts_at", { ascending: false });
+      const all = await Promise.all(((data ?? []) as Tournament[]).map(tournamentAwards));
+      return all.flat();
+    },
+    ["awards", "v1"],
+    { tags: [AWARDS_TAG], revalidate: 3600 },
+  ),
+);
 
 export async function getPlayerAwards(playerId: string) {
   return (await getAllAwards()).filter((a) => a.playerIds.includes(playerId));

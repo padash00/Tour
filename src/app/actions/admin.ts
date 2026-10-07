@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
+import { AWARDS_TAG } from "@/lib/awards";
 import { getPlayerBySteamId, getTournamentById } from "@/lib/data";
 import { registrationError } from "@/lib/registration-errors";
 import { fromLocalInput } from "@/lib/format";
@@ -72,6 +73,26 @@ const tournamentSchema = z.object({
   checkin_opens_at: z.string().optional(),
   checkin_closes_at: z.string().optional(),
 });
+
+/**
+ * Турнир изменился — обновляем только страницы, где он виден (а не весь сайт через revalidatePath("/", "layout")):
+ * главная, списки, страницы турнира (старый и новый адрес), статистика, матчи, ТВ и админка.
+ * awards — турнир завершён/переоткрыт: пересчитать награды (профили игроков и команд).
+ */
+function revalidateTournament(slugs: (string | null | undefined)[], opts: { awards?: boolean } = {}) {
+  for (const path of ["/", "/tournaments", "/matches", "/stats", "/tv"]) revalidatePath(path);
+  revalidatePath("/stats/[slug]", "page");
+  revalidatePath("/matches/[id]", "page");
+  for (const slug of new Set(slugs.filter((s): s is string => !!s))) {
+    for (const sub of ["", "/recap", "/tv", "/checkin", "/register", "/preview"]) revalidatePath(`/tournaments/${slug}${sub}`);
+  }
+  revalidatePath("/admin/tournaments", "layout");
+  if (opts.awards) {
+    updateTag(AWARDS_TAG);
+    revalidatePath("/players/[steamId]", "page");
+    revalidatePath("/teams/[tag]", "page");
+  }
+}
 
 function parsePrizes(text: string): PrizeRow[] {
   // строки вида "1 место — 300 000 ₸"
@@ -219,13 +240,15 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
   if (row.map_pool.length === 0) return { error: "Выберите хотя бы одну карту" };
   const datesError = checkDates(row);
   if (datesError) return { error: datesError };
+  const before = await getTournamentById(id);
   const { error } = await db().from("tournaments").update(row).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось сохранить" };
   if (formData.get("removeCover") === "on") await db().from("tournaments").update({ cover_url: null }).eq("id", id);
   const cover = await uploadCover(id, formData);
   if (cover && typeof cover === "object") return cover;
   await audit(admin.id, "tournament.update", { type: "tournament", id });
-  revalidatePath("/", "layout");
+  // название/даты завершённого турнира видны в наградах
+  revalidateTournament([before?.slug, row.slug], { awards: before?.status === "finished" });
   return { success: "Сохранено" };
 }
 
@@ -243,7 +266,7 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
   if (status === "finished" || status === "cancelled") {
     const closed = await closeMatchesOfEndedTournaments(id, admin.id);
     if (closed) {
-      revalidatePath("/", "layout");
+      revalidateTournament([before.slug], { awards: true });
       return { success: `Статус обновлён. Несыгранные матчи отменены: ${closed}, серверы освобождены.` };
     }
   }
@@ -259,7 +282,7 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
     await notify(captains, `Check-in на «${before.name}» открыт`, "Подтвердите участие команды.", `/tournaments/${before.slug}/checkin`);
   }
 
-  revalidatePath("/", "layout");
+  revalidateTournament([before.slug], { awards: status === "finished" || before.status === "finished" });
   return { success: "Статус обновлён" };
 }
 
@@ -287,7 +310,7 @@ export async function deleteTournament(_prev: ActionResult, formData: FormData):
   const { error } = await db().from("tournaments").delete().eq("id", id);
   if (error) return { error: `Не удалось удалить: ${error.message}` };
   await audit(admin.id, "tournament.delete", { type: "tournament", id }, { name: t.name, status: t.status });
-  revalidatePath("/", "layout");
+  revalidateTournament([t.slug], { awards: t.status === "finished" });
   redirect("/admin/tournaments");
 }
 

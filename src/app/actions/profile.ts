@@ -43,7 +43,8 @@ export async function refreshProfile(): Promise<ActionResult> {
 export async function markNotificationsRead(): Promise<ActionResult> {
   const player = await requirePlayer();
   await db().from("notifications").update({ read_at: new Date().toISOString() }).eq("player_id", player.id).is("read_at", null);
-  revalidatePath("/", "layout");
+  // только страница уведомлений этого игрока — не сбрасывать кэш всего сайта
+  revalidatePath("/notifications");
   return null;
 }
 

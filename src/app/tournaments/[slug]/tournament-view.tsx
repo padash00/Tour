@@ -480,6 +480,7 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
 }
 
 async function StatsTab({ tournamentId, solo }: { tournamentId: string; solo: boolean }) {
+  // getPlayerLeaderboard кэширован на запрос — getTeamStats и MvpBlock берут ту же таблицу, а не считают заново
   const [rows, teams] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId)]);
   return (
     <div className="space-y-10">

@@ -1,9 +1,10 @@
 "use server";
 
 import { randomInt } from "node:crypto";
+import { z } from "zod";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { BANNED_ERROR } from "@/lib/data";
+import { BANNED_ERROR, isRateLimited } from "@/lib/data";
 import { db } from "@/lib/supabase";
 import {
   badMaps,
@@ -44,6 +45,53 @@ import type { Player } from "@/lib/types";
 export type LobbyResult = { error?: string; ok?: true; code?: string } | null;
 
 const SLOTS: Slot[] = ["team1", "team2", "wait", "spec"];
+
+// ───────────────────────── проверка аргументов (server actions вызываются с любыми данными, не только из нашего UI)
+
+const Code = z.string().regex(/^[A-Za-z0-9]{3,16}$/);
+const Id = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+const SlotArg = z.enum(["team1", "team2", "wait", "spec"]);
+const TeamArg = z.enum(["team1", "team2"]);
+const Visibility = z.enum(["public", "closed", "private"]);
+const Password = z.string().max(64);
+const Text = (max: number) => z.string().max(max);
+const JoinOpts = z.object({ password: Password.optional(), invite: Text(64).optional(), slot: SlotArg.optional() });
+const SettingsPatch = z.record(z.string(), z.unknown());
+const TeamTool = z.enum(["balance", "shuffle", "swap", "clear"]);
+
+/** null — все аргументы в порядке, иначе ошибка для ответа */
+function invalid(...checks: [z.ZodType, unknown][]): LobbyResult {
+  for (const [schema, value] of checks) if (!schema.safeParse(value).success) return { error: "Некорректный запрос — обновите страницу" };
+  return null;
+}
+
+/** Пароль лобби: новый — от 4 символов; старые короткие пароли при входе по-прежнему принимаются */
+const PASSWORD_MIN = 4;
+const PASSWORD_ERROR = `Пароль — от ${PASSWORD_MIN} до 32 символов`;
+
+// подбор пароля: не чаще попытки в 3 с, не больше 10 неверных за 10 минут с игрока и 30 — к одному лобби
+const JOIN_FAILED = "lobby.join_failed";
+async function failedJoins(by: { actor?: string; lobby?: string }, seconds: number) {
+  let q = db()
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("action", JOIN_FAILED)
+    .gte("created_at", new Date(Date.now() - seconds * 1000).toISOString());
+  if (by.actor) q = q.eq("actor_id", by.actor);
+  if (by.lobby) q = q.eq("entity_id", by.lobby);
+  const { count } = await q;
+  return count ?? 0;
+}
+async function passwordThrottle(playerId: string, lobbyId: string): Promise<string | null> {
+  const [recent, mine, lobby] = await Promise.all([
+    isRateLimited(playerId, JOIN_FAILED, 3),
+    failedJoins({ actor: playerId }, 600),
+    failedJoins({ lobby: lobbyId }, 600),
+  ]);
+  if (recent) return "Слишком часто — подождите пару секунд";
+  if (mine >= 10 || lobby >= 30) return "Слишком много неверных паролей — попробуйте через несколько минут или войдите по ссылке-приглашению";
+  return null;
+}
 const touch = (id: string, patch: Record<string, unknown> = {}) => db().from("lobbies").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
 
 async function me(): Promise<Player | { error: string }> {
@@ -76,11 +124,13 @@ async function asMember(code: string): Promise<{ lobby: Lobby; player: Player; s
 // ───────────────────────── создание, вход, выход
 
 export async function createLobby(visibility: Lobby["visibility"], password: string): Promise<LobbyResult> {
+  const bad = invalid([Visibility, visibility], [Password, password]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   if (!["public", "closed", "private"].includes(visibility)) return { error: "Неизвестный тип лобби" };
   const pw = password.trim();
-  if (visibility !== "public" && (pw.length < 3 || pw.length > 32)) return { error: "Пароль — от 3 до 32 символов" };
+  if (visibility !== "public" && (pw.length < PASSWORD_MIN || pw.length > 32)) return { error: PASSWORD_ERROR };
   const other = await playerLobby(player.id);
   if (other) return { error: "Вы уже в другом лобби — выйдите из него", code: other.code };
 
@@ -95,7 +145,7 @@ export async function createLobby(visibility: Lobby["visibility"], password: str
         code,
         host_id: player.id,
         visibility,
-        password_hash: visibility === "public" ? null : hashPassword(pw),
+        password_hash: visibility === "public" ? null : await hashPassword(pw),
         invite_token: newToken(),
         settings,
         team1_name: `team_${player.nickname}`.replace(/[\u0000-\u001f";#|]/g, "").slice(0, 24),
@@ -116,6 +166,8 @@ export async function createLobby(visibility: Lobby["visibility"], password: str
 }
 
 export async function joinLobby(code: string, opts: { password?: string; invite?: string; slot?: Slot }): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [JoinOpts, opts]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
@@ -125,8 +177,13 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
 
   const { data: banned } = await db().from("lobby_bans").select("player_id").eq("lobby_id", lobby.id).eq("player_id", player.id).maybeSingle();
   if (banned) return { error: "Хост запретил вам вход в это лобби" };
-  if (lobby.visibility !== "public" && !checkInvite(opts.invite, lobby) && !checkPassword(opts.password ?? "", lobby.password_hash)) {
-    return { error: "Неверный пароль" };
+  if (lobby.visibility !== "public" && !checkInvite(opts.invite, lobby)) {
+    const throttled = await passwordThrottle(player.id, lobby.id);
+    if (throttled) return { error: throttled };
+    if (!(await checkPassword(opts.password ?? "", lobby.password_hash))) {
+      await audit(player.id, JOIN_FAILED, { type: "lobby", id: lobby.id });
+      return { error: "Неверный пароль" };
+    }
   }
   const filter = await filterProblem(lobby.settings, player);
   if (filter) return { error: filter };
@@ -164,6 +221,8 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
 }
 
 export async function leaveLobby(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
@@ -183,6 +242,8 @@ export async function leaveLobby(code: string): Promise<LobbyResult> {
 // ───────────────────────── слоты
 
 export async function moveSelf(code: string, slot: Slot): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [SlotArg, slot]);
+  if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
@@ -201,6 +262,8 @@ export async function moveSelf(code: string, slot: Slot): Promise<LobbyResult> {
 }
 
 export async function movePlayer(code: string, playerId: string, slot: Slot): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Id, playerId], [SlotArg, slot]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -215,6 +278,8 @@ export async function movePlayer(code: string, playerId: string, slot: Slot): Pr
 }
 
 export async function kickPlayer(code: string, playerId: string, ban: boolean): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Id, playerId], [z.boolean(), ban]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
@@ -230,6 +295,8 @@ export async function kickPlayer(code: string, playerId: string, ban: boolean): 
 }
 
 export async function unbanPlayer(code: string, playerId: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Id, playerId]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   await db().from("lobby_bans").delete().eq("lobby_id", ctx.lobby.id).eq("player_id", playerId);
@@ -237,6 +304,8 @@ export async function unbanPlayer(code: string, playerId: string): Promise<Lobby
 }
 
 export async function transferHost(code: string, playerId: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Id, playerId]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const members = await getMembers(ctx.lobby.id);
@@ -250,6 +319,8 @@ export async function transferHost(code: string, playerId: string): Promise<Lobb
 // ───────────────────────── команды: имена, боты, перемешать, баланс
 
 export async function setTeamName(code: string, team: "team1" | "team2", name: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [TeamArg, team], [Text(200), name]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const clean = name.replace(/[\u0000-\u001f";#|]/g, "").trim().slice(0, 24);
@@ -259,6 +330,8 @@ export async function setTeamName(code: string, team: "team1" | "team2", name: s
 }
 
 export async function addBot(code: string, team: "team1" | "team2"): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [TeamArg, team]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -271,6 +344,8 @@ export async function addBot(code: string, team: "team1" | "team2"): Promise<Lob
 }
 
 export async function removeBot(code: string, team: "team1" | "team2", name: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [TeamArg, team], [Text(64), name]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -281,6 +356,8 @@ export async function removeBot(code: string, team: "team1" | "team2", name: str
 
 /** Командные инструменты хоста: баланс по ELO, перемешать, поменять местами, очистить */
 export async function teamTool(code: string, tool: "balance" | "shuffle" | "swap" | "clear"): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [TeamTool, tool]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -331,6 +408,8 @@ export async function teamTool(code: string, tool: "balance" | "shuffle" | "swap
 // ───────────────────────── настройки
 
 export async function updateSettings(code: string, patch: Partial<LobbySettings>): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [SettingsPatch, patch]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -346,6 +425,8 @@ export async function updateSettings(code: string, patch: Partial<LobbySettings>
 }
 
 export async function setVisibility(code: string, visibility: Lobby["visibility"], password: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Visibility, visibility], [Password, password]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   if (!["public", "closed", "private"].includes(visibility)) return { error: "Неизвестный тип лобби" };
@@ -353,8 +434,8 @@ export async function setVisibility(code: string, visibility: Lobby["visibility"
   const patch: Record<string, unknown> = { visibility };
   if (visibility === "public") patch.password_hash = null;
   else if (pw) {
-    if (pw.length < 3 || pw.length > 32) return { error: "Пароль — от 3 до 32 символов" };
-    patch.password_hash = hashPassword(pw);
+    if (pw.length < PASSWORD_MIN || pw.length > 32) return { error: PASSWORD_ERROR };
+    patch.password_hash = await hashPassword(pw);
   } else if (!ctx.lobby.password_hash) return { error: "Задайте пароль" };
   await touch(ctx.lobby.id, patch);
   return { ok: true };
@@ -362,6 +443,8 @@ export async function setVisibility(code: string, visibility: Lobby["visibility"
 
 /** Новая ссылка-приглашение (старая перестаёт пускать) */
 export async function resetInvite(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   await touch(ctx.lobby.id, { invite_token: newToken() });
@@ -369,6 +452,8 @@ export async function resetInvite(code: string): Promise<LobbyResult> {
 }
 
 export async function saveTemplate(name: string, settings: Partial<LobbySettings>): Promise<LobbyResult> {
+  const bad = invalid([Text(200), name], [SettingsPatch, settings]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const clean = name.trim().slice(0, 40);
@@ -380,6 +465,8 @@ export async function saveTemplate(name: string, settings: Partial<LobbySettings
 }
 
 export async function deleteTemplate(id: string): Promise<LobbyResult> {
+  const bad = invalid([Id, id]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   await db().from("lobby_templates").delete().eq("id", id).eq("player_id", player.id);
@@ -395,6 +482,7 @@ export async function myTemplates(): Promise<{ id: string; name: string; setting
 
 /** Карта из мастерской по ссылке или ID: название и превью из Steam */
 export async function lookupWorkshop(input: string): Promise<{ error?: string; map?: string; title?: string; image?: string | null }> {
+  if (!Text(500).safeParse(input).success) return { error: "Вставьте ссылку на карту в мастерской Steam или её ID" };
   const id = /(?:id=)?(\d{6,12})/.exec(input.trim())?.[1];
   if (!id) return { error: "Вставьте ссылку на карту в мастерской Steam или её ID" };
   try {
@@ -424,6 +512,8 @@ export async function lookupWorkshop(input: string): Promise<{ error?: string; m
 // ───────────────────────── готовность и старт
 
 export async function toggleReady(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player, slot } = ctx;
@@ -437,6 +527,8 @@ export async function toggleReady(code: string): Promise<LobbyResult> {
 
 /** «Начать матч»: проверка готовности на 30 секунд; если в командах только хост — сразу */
 export async function startMatch(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
@@ -454,6 +546,8 @@ export async function startMatch(code: string): Promise<LobbyResult> {
 }
 
 export async function cancelReadyCheck(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   await touch(ctx.lobby.id, { ready_check_until: null });
@@ -463,6 +557,8 @@ export async function cancelReadyCheck(code: string): Promise<LobbyResult> {
 }
 
 export async function cancelCurrentGame(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const g = ctx.lobby.current_game_id ? await getGame(ctx.lobby.current_game_id) : null;
@@ -473,6 +569,8 @@ export async function cancelCurrentGame(code: string): Promise<LobbyResult> {
 }
 
 export async function closeLobbyAction(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   await closeLobby(ctx.lobby, `${ctx.player.nickname} закрыл лобби`);
@@ -482,6 +580,8 @@ export async function closeLobbyAction(code: string): Promise<LobbyResult> {
 // ───────────────────────── драфт и вето
 
 export async function beginDraft(code: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
@@ -501,6 +601,8 @@ export async function beginDraft(code: string): Promise<LobbyResult> {
 }
 
 export async function pickInDraft(code: string, playerId: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Id, playerId]);
+  if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
@@ -511,6 +613,8 @@ export async function pickInDraft(code: string, playerId: string): Promise<Lobby
 }
 
 export async function lobbyVeto(code: string, map: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Text(120), map]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
@@ -529,6 +633,8 @@ export async function lobbyVeto(code: string, map: string): Promise<LobbyResult>
 // ───────────────────────── чат
 
 export async function sendLobbyMessage(code: string, body: string): Promise<LobbyResult> {
+  const bad = invalid([Code, code], [Text(4000), body]);
+  if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);

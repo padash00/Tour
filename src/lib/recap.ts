@@ -2,7 +2,7 @@ import "server-only";
 import { roundTitle } from "./bracket";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
-import { getPlayerLeaderboard, getTournamentMvp } from "./stats";
+import { getPlayerLeaderboard, mvpOf } from "./stats";
 import { db } from "./supabase";
 import type { MatchMap, Player, Team, Tournament } from "./types";
 
@@ -38,7 +38,7 @@ export type MapHighlight = { match: MatchWithTeams; map: MatchMap; rounds: numbe
 export type TournamentRecap = {
   placements: Placement[];
   championPath: PathStep[];
-  mvp: Awaited<ReturnType<typeof getTournamentMvp>>;
+  mvp: ReturnType<typeof mvpOf>;
   leaders: StatLeader[];
   longestMap: MapHighlight | null;
   closestMap: MapHighlight | null;
@@ -88,12 +88,12 @@ async function placementsOf(t: Tournament, matches: MatchWithTeams[]): Promise<{
 }
 
 export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap> {
-  const [matches, regs, board, mvp] = await Promise.all([
+  const [matches, regs, board] = await Promise.all([
     getTournamentMatches(t.id),
     getTournamentRegistrations(t.id),
     getPlayerLeaderboard(t.id),
-    getTournamentMvp(t.id),
   ]);
+  const mvp = mvpOf(board);
   const played = matches.filter((m) => m.status === "finished" && m.team1_id && m.team2_id);
 
   // ── призёры с составами на турнир

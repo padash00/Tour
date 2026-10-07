@@ -1,5 +1,6 @@
 import "server-only";
-import { randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 import { db } from "./supabase";
 import { modeOf } from "./modes";
 import { getSetting } from "./settings";
@@ -86,15 +87,18 @@ export function newCode(len = 6) {
 }
 export const newToken = () => randomBytes(12).toString("base64url");
 
-export function hashPassword(pw: string) {
+// scrypt асинхронный: синхронный блокировал event loop функции на каждый ввод пароля
+const scryptAsync = promisify(scrypt) as (pw: string, salt: string, len: number) => Promise<Buffer>;
+
+export async function hashPassword(pw: string) {
   const salt = randomBytes(12).toString("hex");
-  return `${salt}:${scryptSync(pw, salt, 32).toString("hex")}`;
+  return `${salt}:${(await scryptAsync(pw, salt, 32)).toString("hex")}`;
 }
-export function checkPassword(pw: string, stored: string | null) {
+export async function checkPassword(pw: string, stored: string | null) {
   if (!stored) return true;
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
-  const a = scryptSync(pw, salt, 32);
+  const a = await scryptAsync(pw, salt, 32);
   const b = Buffer.from(hash, "hex");
   return a.length === b.length && timingSafeEqual(a, b);
 }

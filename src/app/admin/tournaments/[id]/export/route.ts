@@ -12,7 +12,10 @@ type Row = (string | number | null | undefined)[];
 
 function csv(rows: Row[]) {
   const cell = (v: string | number | null | undefined) => {
-    const s = v == null ? "" : String(v);
+    let s = v == null ? "" : String(v);
+    // защита от формул в Excel/Таблицах (CSV injection): ник «=HYPERLINK(...)» не должен выполниться.
+    // Числа не трогаем — отрицательный Swing остаётся числом
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return "﻿" + rows.map((r) => r.map(cell).join(";")).join("\r\n");
