@@ -6,6 +6,8 @@ import path from "node:path";
 export const AUTO_HALFTIME_VOICE = "sv_auto_full_alltalk_during_warmup_half_end";
 export const DEFAULT_VOICE = `${AUTO_HALFTIME_VOICE} 0;sv_voiceenable 1;sv_alltalk 0;sv_deadtalk 1;sv_full_alltalk 0;sv_talk_enemy_living 0;sv_talk_enemy_dead 0`;
 const ACTIVE = ["warmup", "knife", "waiting_for_knife_decision", "going_live", "live"];
+/** Во время игры настройки сверяем реже: каждый RCON-запрос выполняется в основном потоке сервера */
+const LIVE_CHECK_MS = 60_000;
 
 /**
  * ctx: { stateDir, instances, rc(inst, command) → Promise<string>, log }
@@ -14,6 +16,7 @@ const ACTIVE = ["warmup", "knife", "waiting_for_knife_decision", "going_live", "
 export function createEnforce({ stateDir, instances, rc, log }) {
   const file = path.join(stateDir, "enforce.json");
   let rules = {};
+  const lastCheck = new Map(); // инстанс → { at, state }
   try {
     rules = JSON.parse(readFileSync(file, "utf8"));
   } catch {}
@@ -61,6 +64,11 @@ export function createEnforce({ stateDir, instances, rc, log }) {
       if (get5 && (get5.gamestate === "none" || get5.matchid !== rule.matchid)) await clear(inst);
       return;
     }
+    // смена состояния (разминка → нож → игра, новая карта) — проверяем сразу; в самой игре — раз в минуту
+    const state = `${get5.gamestate}:${get5.map_number}`;
+    const prev = lastCheck.get(inst.name);
+    if (get5.gamestate === "live" && prev?.state === state && Date.now() - prev.at < LIVE_CHECK_MS) return;
+    lastCheck.set(inst.name, { at: Date.now(), state });
     const names = Object.keys(rule.cvars);
     const out = await rc(inst, names.join(";")).catch(() => null);
     if (out == null) return; // RCON не ответил — не гадаем, исправим на следующем тике

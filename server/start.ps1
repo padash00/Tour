@@ -29,7 +29,7 @@ foreach ($i in $targets) {
   if ($running) { Write-Host "SKIP $($i.name) уже запущен (pid $($running.ProcessId))"; continue }
 
   $argList = @(
-    "-dedicated", "-console", "-usercon", "-condebug",
+    "-dedicated", "-console", "-usercon",
     "-ip", "0.0.0.0",
     "-port", $port,
     "+tv_port", ($port + 5),
@@ -50,5 +50,7 @@ foreach ($i in $targets) {
   if (-not (Get-Process -Id $r.ProcessId -ErrorAction SilentlyContinue)) {
     throw "$($i.name) завершился сразу после запуска. Проверьте события Application Error для cs2.exe"
   }
+  # высокий приоритет: другие программы на этом ПК не отнимают у сервера время (меньше фризов у игроков)
+  try { (Get-Process -Id $r.ProcessId).PriorityClass = "High" } catch { Write-Host "приоритет $($i.name) не изменён: $_" }
   Write-Host "START $($i.name) :$port pid $($r.ProcessId)"
 }
