@@ -7,13 +7,12 @@ import * as A from "@/app/actions/lobby";
 import type { LobbyView, ViewMember } from "@/lib/lobby-view";
 import type { LobbySettings } from "@/lib/lobby-settings";
 import { mapLabel } from "@/lib/maps";
-import { MODES } from "@/lib/modes";
 import { useToast } from "../toast";
 import { AdvancedSettings, MapThumb, QuickSettings, type MapOption, type Template } from "./settings";
 import { Button, Status, Steps, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
 import { Icon } from "./ui";
 import { MobileStickyCta } from "@/components/public/callout";
-import { Center } from "./center";
+import { CenterColumn, StageBanner } from "./center";
 import { Chat } from "./chat";
 import { Countdown, LobbyClock } from "./countdown";
 import { Gate, JoinGate } from "./join-gate";
@@ -177,89 +176,117 @@ export function LobbyRoom({
     run(() => A.moveSelf(code, slot));
   };
 
+  const copyInvite = inviteUrl
+    ? () =>
+        navigator.clipboard
+          .writeText(inviteUrl)
+          .then(() => toast.success(lobby.visibility === "public" ? "Ссылка скопирована" : "Ссылка скопирована — по ней можно войти без пароля"))
+    : null;
+  const showProgress = phase !== "waiting" && phase !== "draft" && phase !== "closed";
+
   return (
     <LobbyClock value={offset}>
-      <div className="border-b border-line-subtle bg-shell">
-        <div className="mx-auto w-full max-w-wide px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <Link href="/lobbies" className={btnClass("ghost", "sm", "shrink-0")}>
-                {Icon.back("size-4")}
-                <span className="hidden sm:inline">Лобби</span>
-              </Link>
-              <MapThumb map={headMap} image={view.mapImages[headMap]} className="hidden h-14 w-24 shrink-0 rounded-control border border-line-subtle sm:block">
-                <span className="absolute bottom-1.5 left-2 max-w-[80px] truncate text-[11px] font-medium text-fg">{mapLabel(headMap)}</span>
-              </MapThumb>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">Лобби #{lobby.code}</h1>
-                  <Status info={lobbyStatus[phase]} size="sm" />
-                </div>
-                <p className="mt-1 truncate text-meta text-fg-3">
-                  Хост {lobby.host_name} · {MODES[s.mode].label.replace(" на ", "×")} · BO{s.best_of} · {s.network === "lan" ? "LAN" : "Интернет"} · {lobby.visibility === "public" ? "публичное" : lobby.visibility === "closed" ? "по паролю" : "приватное"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <span className="num rounded-control border border-line-subtle bg-surface px-3 py-2 text-meta text-fg-2">
-                {playersNow}/{s.team_size * 2} игроков
-              </span>
-              {inviteUrl && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    navigator.clipboard
-                      .writeText(inviteUrl)
-                      .then(() => toast.success(lobby.visibility === "public" ? "Ссылка скопирована" : "Ссылка скопирована — по ней можно войти без пароля"))
-                  }
-                >
-                  {Icon.link("size-4")} Пригласить
-                </Button>
-              )}
-              {isMember ? (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() =>
-                    run(async () => {
-                      const r = await A.leaveLobby(code);
-                      if (!r?.error) router.push("/lobbies");
-                      return r;
-                    })
-                  }
-                >
-                  Покинуть
-                </Button>
-              ) : (
-                lobby.status !== "closed" && (
-                  <Button size="sm" onClick={() => (me ? join() : clickEmpty("wait"))}>
-                    Войти
-                  </Button>
-                )
-              )}
-            </div>
-          </div>
-
-          <div className="mt-5 border-t border-line-subtle pt-4">
-            <LobbyProgress phase={phase} />
-          </div>
-        </div>
-      </div>
-
       <div className="mx-auto w-full max-w-wide px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <main className="min-w-0 space-y-6">
-            <Center
-              view={view}
-              isHost={isHost}
-              busy={busy}
-              run={run}
-              code={code}
-              hostName={lobby.host_name}
-              onInvite={() => inviteUrl && navigator.clipboard.writeText(inviteUrl).then(() => toast.success("Ссылка-приглашение скопирована"))}
-            />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <main className="min-w-0 space-y-5">
+            {/* баннер карты: навигация, число игроков, выход */}
+            <MapThumb map={headMap} image={view.mapImages[headMap]} className="rounded-surface border border-line-subtle">
+              <div className="relative flex min-h-[148px] flex-col justify-between gap-6 p-3 sm:p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-control bg-[#070b12b3] px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-[#070b12e6]">
+                      {Icon.back("size-4")}
+                      <span className="hidden sm:inline">К списку лобби</span>
+                    </Link>
+                    {copyInvite && (
+                      <button type="button" onClick={copyInvite} title="Скопировать ссылку-приглашение" aria-label="Скопировать ссылку-приглашение" className="grid size-10 place-items-center rounded-control bg-[#070b12b3] text-fg backdrop-blur-sm transition-colors hover:bg-[#070b12e6]">
+                        {Icon.link("size-[18px]")}
+                      </button>
+                    )}
+                  </div>
+                  <span className="num absolute left-1/2 top-0 hidden -translate-x-1/2 rounded-b-control bg-[#070b12cc] px-4 py-2 text-[13px] font-medium text-fg-2 backdrop-blur-sm sm:block">
+                    Игроков <span className="text-fg">{playersNow}/{s.team_size * 2}</span>
+                  </span>
+                  {isMember ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          const r = await A.leaveLobby(code);
+                          if (!r?.error) router.push("/lobbies");
+                          return r;
+                        })
+                      }
+                      className="inline-flex h-10 items-center gap-2 rounded-control border border-danger/40 bg-[#1a0b10cc] px-3 text-[14px] font-medium text-danger backdrop-blur-sm transition-colors hover:bg-danger/20 disabled:opacity-60"
+                    >
+                      Покинуть лобби {Icon.exit("size-4")}
+                    </button>
+                  ) : (
+                    lobby.status !== "closed" && (
+                      <Button size="sm" onClick={() => (me ? join() : clickEmpty("wait"))}>
+                        Войти в лобби
+                      </Button>
+                    )
+                  )}
+                </div>
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">Лобби #{lobby.code}</h1>
+                      <Status info={lobbyStatus[phase]} size="sm" />
+                    </div>
+                    <p className="mt-1 truncate text-meta text-fg-2">
+                      {mapLabel(headMap)} · {lobby.visibility === "public" ? "открытое" : lobby.visibility === "closed" ? "по паролю" : "приватное"}
+                    </p>
+                  </div>
+                  <span className="num rounded-control bg-[#070b12b3] px-3 py-1.5 text-meta text-fg-2 backdrop-blur-sm sm:hidden">
+                    {playersNow}/{s.team_size * 2}
+                  </span>
+                </div>
+              </div>
+            </MapThumb>
+
+            {showProgress && (
+              <div className="rounded-surface border border-line-subtle bg-shell px-4 py-3">
+                <LobbyProgress phase={phase} />
+              </div>
+            )}
+
+            <StageBanner view={view} isHost={isHost} busy={busy} run={run} code={code} />
+
+            {/* составы по бокам, в центре — главное действие и сводка, как в комнате матча */}
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)_minmax(0,1fr)]">
+              <TeamCard
+                team="team1"
+                name={lobby.team1_name}
+                members={team1}
+                bots={lobby.bots.team1}
+                size={s.team_size}
+                view={view}
+                isHost={isHost}
+                busy={busy}
+                run={run}
+                code={code}
+                onEmpty={() => clickEmpty("team1")}
+              />
+              <div className="order-first lg:order-none lg:pt-1">
+                <CenterColumn view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
+              </div>
+              <TeamCard
+                team="team2"
+                name={lobby.team2_name}
+                members={team2}
+                bots={lobby.bots.team2}
+                size={s.team_size}
+                view={view}
+                isHost={isHost}
+                busy={busy}
+                run={run}
+                code={code}
+                onEmpty={() => clickEmpty("team2")}
+              />
+            </div>
 
             {(game?.maps.length ?? 0) > 1 || (!game && s.map_choice === "host" && s.best_of > 1) ? (
               <section aria-label="Карты серии">
@@ -286,41 +313,6 @@ export function LobbyRoom({
                 </div>
               </section>
             ) : null}
-
-            <section>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-heading text-fg">Команды</h2>
-                <span className="text-meta text-fg-3">Займите слот или дождитесь распределения хостом</span>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                <TeamCard
-                  team="team1"
-                  name={lobby.team1_name}
-                  members={team1}
-                  bots={lobby.bots.team1}
-                  size={s.team_size}
-                  view={view}
-                  isHost={isHost}
-                  busy={busy}
-                  run={run}
-                  code={code}
-                  onEmpty={() => clickEmpty("team1")}
-                />
-                <TeamCard
-                  team="team2"
-                  name={lobby.team2_name}
-                  members={team2}
-                  bots={lobby.bots.team2}
-                  size={s.team_size}
-                  view={view}
-                  isHost={isHost}
-                  busy={busy}
-                  run={run}
-                  code={code}
-                  onEmpty={() => clickEmpty("team2")}
-                />
-              </div>
-            </section>
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               <Panel
