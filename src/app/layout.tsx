@@ -4,6 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { ToastProvider } from "@/components/toast";
 import { RouteTransition } from "@/components/route-transition";
 import { NavProgress } from "@/components/nav-progress";
+import { ProfileNudge } from "@/components/profile/profile-nudge";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             Перейти к содержимому
           </a>
           <SiteHeader />
+          <ProfileNudge />
           {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
           <main id="main-content" tabIndex={-1} className="flex-1 anim-in">
             <RouteTransition>{children}</RouteTransition>

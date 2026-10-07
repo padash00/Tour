@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { getUnreadCount } from "@/lib/data";
 import { getPlayerActivity } from "@/lib/activity";
+import { isProfileComplete } from "@/lib/profile";
+import { getProfile } from "@/lib/profiles";
 
 /**
  * Кто смотрит страницу. Публичные страницы отдаются из кэша CDN одинаковыми для всех,
@@ -20,7 +22,9 @@ export async function GET() {
         },
         unread: await getUnreadCount(player.id),
         activity: await getPlayerActivity(player.id).catch(() => ({ top: null, more: 0 })),
+        // только флаг для напоминания об анкете — сами данные анкеты сюда не попадают
+        profileIncomplete: await getProfile(player.id).then((p) => !isProfileComplete(p), () => false),
       }
-    : { player: null, unread: 0, activity: { top: null, more: 0 } };
+    : { player: null, unread: 0, activity: { top: null, more: 0 }, profileIncomplete: false };
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }

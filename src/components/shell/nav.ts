@@ -20,6 +20,7 @@ export const SECONDARY_NAV: { href: string; label: string }[] = [
   { href: "/about", label: "О платформе" },
   { href: "/rules", label: "Правила" },
   { href: "/rules#faq", label: "FAQ" },
+  { href: "/privacy", label: "Персональные данные" },
 ];
 
 export function isActive(pathname: string, item: NavItem) {

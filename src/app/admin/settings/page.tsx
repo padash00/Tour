@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting } from "@/app/actions/admin-settings";
+import { editWorkshopMaps, saveSetting, setProfileRequired } from "@/app/actions/admin-settings";
+import { ActionToggle } from "@/components/admin/action-toggle";
+import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
@@ -90,12 +92,13 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info, mapImages, disabledMaps] = await Promise.all([
+  const [settings, workshop, info, mapImages, disabledMaps, profileRequired] = await Promise.all([
     getSettingsStatus(),
     getWorkshopMaps(),
     workshopInfo(),
     getMapImages(),
     getDisabledMaps(),
+    isProfileRequired(),
   ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
@@ -137,6 +140,22 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
             <AdminLabel>Раздел</AdminLabel>
             <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.01em]">{TABS.find((t) => t.key === tab)?.label}</h2>
           </div>
+
+      {tab === "general" && (
+        <Panel title="Анкета игрока">
+          <div className={`${ADMIN_CARD} flex max-w-2xl flex-wrap items-start justify-between gap-4 p-5`}>
+            <div className="max-w-md">
+              <div className="text-[14px] font-semibold text-fg">Анкета обязательна</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-fg-3">
+                Без заполненной анкеты (ФИО, дата рождения, телефон, место учёбы или работы) игрок не может создать команду, вступить в
+                неё и подать заявку на турнир. Выключено — только напоминание. Смотреть сайт, лобби и матчи можно всегда; для
+                официальных турниров анкеты игроков обязательны в любом случае.
+              </p>
+            </div>
+            <ActionToggle action={setProfileRequired} fields={{}} on={profileRequired} label="Анкета обязательна" onLabel="Обязательна" offLabel="Напоминание" />
+          </div>
+        </Panel>
+      )}
 
       {tab === "general" && (
         <Panel title="Состояние">
