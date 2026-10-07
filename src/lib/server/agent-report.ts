@@ -26,6 +26,7 @@ export const agentReportSchema = z.object({
     matchzy_id: z.number().int().nullable().optional(),
     detail: z.string().max(4000).optional(),
     at: z.string().max(64).optional(),
+    id: z.string().max(64).optional(),
   })).max(500).optional(),
 });
 

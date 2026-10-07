@@ -1,12 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAgentBundle } from "@/lib/agent-bundle";
-import {
-  adminPlayers,
-  applyAgentReport,
-  checkBearer,
-  takePendingCommands,
-} from "@/lib/server-control";
+import { adminPlayers } from "@/lib/server/admins";
+import { applyAgentReport, takePendingCommands } from "@/lib/server/agent-sync";
 import { applyAgentEvents } from "@/lib/server/ops";
+import { checkBearer } from "@/lib/server/state";
 import { getSetting } from "@/lib/settings";
 import { runAgentJobs } from "@/lib/server/agent-jobs";
 import { agentReportSchema, type SyncMetrics } from "@/lib/server/agent-report";
@@ -41,8 +38,10 @@ export async function POST(request: NextRequest) {
   const parsed = agentReportSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "invalid agent report" }, { status: 400 });
   const report = parsed.data;
-  await applyAgentReport(report);
-  await safely("agent events", () => applyAgentEvents(report.events));
+  // Сбой записи отчёта не должен оставить агента без команд: команды выдаются всегда.
+  await safely("agent report", () => applyAgentReport(report));
+  let processedEvents: string[] = [];
+  await safely("agent events", async () => { processedEvents = await applyAgentEvents(report.events); });
   // Старый агент не вызывает /api/agent/jobs. Пока он не самообновится, сохраняем прежнее поведение.
   if ((report.protocol ?? 1) < 3) {
     await runAgentJobs("dispatch", safely, report.info?.cs2_patch);
@@ -61,5 +60,5 @@ export async function POST(request: NextRequest) {
   metrics.duration_ms = Math.round(performance.now() - started);
   const { error } = await db().from("app_settings").upsert({ key: "AGENT_SYNC_METRICS", value: JSON.stringify(metrics), updated_at: metrics.at });
   if (error) console.error("agent sync metrics could not be saved", error.code);
-  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days });
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days, processed_events: processedEvents });
 }

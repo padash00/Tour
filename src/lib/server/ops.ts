@@ -2,6 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { notify } from "../audit";
 import { db } from "../supabase";
+import { adminIds } from "./admins";
+import { enqueueAutoPrefetch } from "./workshop";
 
 /*
  * Защита от сбоев в день турнира и «Проверка перед турниром».
@@ -99,28 +101,56 @@ export type AgentEvent = {
   matchzy_id?: number | null;
   detail?: string;
   at?: string;
+  /** id события у агента: агент удаляет событие, только когда сайт вернул его id в processed_events */
+  id?: string;
 };
 
-/** Агент сам поднял упавший сервер (или не смог) — сообщаем админам и пишем в журнал */
-export async function applyAgentEvents(events: unknown) {
-  if (!Array.isArray(events) || events.length === 0) return;
-  const admins = await adminIds();
+/** Ключ повтора события агента: тип, инстанс и время (одно событие могло прийти в двух синхронизациях) */
+export const agentEventKey = (e: AgentEvent) =>
+  e.at ? `agent-event:${e.type}:${e.instance}:${e.at}` : ingestKey("agent-event", JSON.stringify(e));
+
+/**
+ * Агент сам поднял упавший сервер (или не смог) — сообщаем админам и пишем в журнал.
+ * Повтор (агент не получил ответ и прислал снова) отбрасывается. Возвращает id обработанных событий:
+ * агент удаляет у себя только их, остальные пришлёт снова.
+ */
+export async function applyAgentEvents(events: unknown): Promise<string[]> {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  const processed: string[] = [];
+  let admins: string[] | null = null;
   for (const raw of events.slice(0, 20) as AgentEvent[]) {
     if (!raw || typeof raw.instance !== "string" || typeof raw.type !== "string") continue;
-    const { data: match } = raw.matchzy_id
-      ? await db().from("matches").select("id, number").eq("matchzy_id", raw.matchzy_id).maybeSingle()
-      : { data: null };
-    const where = match ? `матч #${match.number}` : raw.instance;
-    const detail = String(raw.detail ?? "").slice(0, 400);
-    if (raw.type === "recovered") {
-      await notify(admins, `${raw.instance} упал и поднят автоматически (${where})`, detail || "Матч загружен заново.", match ? `/admin/matches/${match.id}` : "/admin/servers");
-    } else if (raw.type === "recovery_failed") {
-      await notify(admins, `${raw.instance} упал — поднять не удалось (${where})`, detail || "Перенесите матч на другой сервер вручную.", match ? `/admin/matches/${match.id}` : "/admin/servers");
+    const key = agentEventKey(raw);
+    const claim = await claimIngest(key);
+    if (claim.status === "done") {
+      if (raw.id) processed.push(raw.id);
+      continue;
     }
-    await db()
-      .from("audit_logs")
-      .insert({ action: `server.${raw.type}`, entity_type: match ? "match" : "server", entity_id: match?.id ?? null, payload: { instance: raw.instance, detail } });
+    if (claim.status !== "claimed" || !claim.token) continue; // обрабатывается параллельно — агент пришлёт снова
+    try {
+      admins ??= await adminIds();
+      const { data: match } = raw.matchzy_id
+        ? await db().from("matches").select("id, number").eq("matchzy_id", raw.matchzy_id).maybeSingle()
+        : { data: null };
+      const where = match ? `матч #${match.number}` : raw.instance;
+      const detail = String(raw.detail ?? "").slice(0, 400);
+      if (raw.type === "recovered") {
+        await notify(admins, `${raw.instance} упал и поднят автоматически (${where})`, detail || "Матч загружен заново.", match ? `/admin/matches/${match.id}` : "/admin/servers");
+      } else if (raw.type === "recovery_failed") {
+        await notify(admins, `${raw.instance} упал — поднять не удалось (${where})`, detail || "Перенесите матч на другой сервер вручную.", match ? `/admin/matches/${match.id}` : "/admin/servers");
+      }
+      await db()
+        .from("audit_logs")
+        .insert({ action: `server.${raw.type}`, entity_type: match ? "match" : "server", entity_id: match?.id ?? null, payload: { instance: raw.instance, detail } })
+        .throwOnError();
+      await completeIngest(key, claim.token);
+      if (raw.id) processed.push(raw.id);
+    } catch (e) {
+      await releaseIngest(key, claim.token).catch(() => {});
+      throw e;
+    }
   }
+  return processed;
 }
 
 // ───────────────────────── проверка перед турниром
@@ -150,7 +180,7 @@ export type SelfCheckReport = {
     reboot_pending: boolean | null;
     versions: Record<string, string>;
     workshop: { id: string; cached: boolean }[];
-    relay: { running: boolean; queued: number; failed: number } | null;
+    relay: { running: boolean; queued: number; failed: number; failed_oldest_age_s?: number } | null;
     site_rtt_ms: number | null;
   };
   /** добавляет сайт: актуальна ли версия CS2 по Steam */
@@ -174,7 +204,7 @@ export async function saveSelfCheck(result: string) {
   await db().from("app_settings").upsert({ key: SELF_CHECK_KEY, value: JSON.stringify(report), updated_at: new Date().toISOString() });
   // Workshop-карт турниров нет в кэше — сразу ставим прогрев, чтобы к матчу они были скачаны
   const missing = (report.host?.workshop ?? []).filter((w) => !w.cached).map((w) => w.id);
-  if (missing.length) await db().from("agent_commands").insert({ instance: null, type: "prefetch_maps", payload: { workshop_ids: missing } });
+  if (missing.length) await enqueueAutoPrefetch(missing);
 }
 
 export async function getSelfCheck(): Promise<SelfCheckReport | null> {
@@ -249,15 +279,11 @@ export function selfCheckItems(r: SelfCheckReport): CheckItem[] {
       ? "агент старой версии — обновится сам"
       : !h.relay.running
         ? "не запущен — события идут на сайт напрямую и пропадут при обрыве связи"
-        : `работает · в очереди ${h.relay.queued}${h.relay.failed ? ` · отклонено сайтом ${h.relay.failed}` : ""}`,
+        : `работает · в очереди ${h.relay.queued}${h.relay.failed ? ` · отложено ${h.relay.failed}${h.relay.failed_oldest_age_s ? ` (старейшему ${Math.round(h.relay.failed_oldest_age_s / 60)} мин)` : ""} — после исправления причины верните их в очередь (команда агента replay_failed_events)` : ""}`,
   });
   return items;
 }
 
 // ───────────────────────── общее
 
-export async function adminIds() {
-  const { data } = await db().from("players").select("id, steam_id, is_admin");
-  const envAdmins = (process.env.ADMIN_STEAM_IDS ?? "").split(",").map((s) => s.trim());
-  return (data ?? []).filter((p) => p.is_admin || envAdmins.includes(p.steam_id)).map((p) => p.id);
-}
+export { adminIds } from "./admins";

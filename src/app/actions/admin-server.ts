@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { audit } from "@/lib/audit";
+import { audit, notify } from "@/lib/audit";
 import { getMatch } from "@/lib/matches";
 import { assignServer, enqueueCommand, enqueuePrefetch, getServerState, pickFreeInstance } from "@/lib/server-control";
+import { adminIds } from "@/lib/server/admins";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -34,6 +35,14 @@ export async function sendMatchToServer(_prev: ActionResult, formData: FormData)
   return { success: `Матч отправлен на ${target.name}. Адрес появится у игроков после проверки сервера.` };
 }
 
+/**
+ * Пуск / остановка / перезапуск / снятие матча с сервера.
+ * На сервере идёт матч (status live):
+ *  - перезапуск сохраняет матч за сервером: агент поднимает CS2, загружает матч заново и восстанавливает
+ *    последний раунд из бэкапа MatchZy (как при падении);
+ *  - остановка возможна только с подтверждением (поле confirm=1): матч переходит в «ошибку сервера»,
+ *    админам — уведомление, дальше матч переносят на другой сервер.
+ */
 export async function serverCommand(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
   const instance = String(formData.get("instance"));
@@ -42,7 +51,13 @@ export async function serverCommand(_prev: ActionResult, formData: FormData): Pr
   const { data } = await db().from("server_instances").select("name").eq("name", instance).maybeSingle();
   if (!data) return { error: "Инстанс не найден" };
 
-  await enqueueCommand(instance, type, {}, admin.id);
+  const { data: liveMatch } = await db().from("matches").select("id, number")
+    .eq("server_instance", instance).eq("status", "live").maybeSingle();
+  if (liveMatch && type === "stop" && formData.get("confirm") !== "1") {
+    return { error: `На ${instance} идёт матч #${liveMatch.number}. Остановка прервёт игру — подтвердите её или используйте перезапуск (матч восстановится из бэкапа).` };
+  }
+
+  await enqueueCommand(instance, type, liveMatch && type === "restart" ? { keep_match: true } : {}, admin.id);
   if (type === "stop" || type === "restart" || type === "end_match") {
     // матч, закреплённый за сервером, снова ждёт назначения
     await db()
@@ -51,9 +66,33 @@ export async function serverCommand(_prev: ActionResult, formData: FormData): Pr
       .eq("server_instance", instance)
       .in("status", ["ready"]);
   }
-  await audit(admin.id, `server.${type}`, undefined, { instance });
+  if (liveMatch && type === "stop") {
+    await db().from("matches").update({ server_state: "error" }).eq("id", liveMatch.id).eq("status", "live");
+    await notify(
+      await adminIds(),
+      `Матч #${liveMatch.number}: сервер ${instance} остановлен админом`,
+      "Матч шёл на этом сервере. Перенесите его на свободный сервер или запустите сервер и загрузите матч заново.",
+      `/admin/matches/${liveMatch.id}`,
+    );
+  }
+  await audit(admin.id, `server.${type}`, liveMatch ? { type: "match", id: liveMatch.id } : undefined, { instance, live_match: liveMatch?.number ?? null });
   revalidatePath("/admin/servers");
+  if (liveMatch) revalidatePath(`/admin/matches/${liveMatch.id}`);
+  if (liveMatch && type === "restart") return { success: `${instance}: перезапуск отправлен. Матч #${liveMatch.number} загрузится заново с последнего раунда.` };
   return { success: `${instance}: ${type} отправлено агенту` };
+}
+
+/** Отложенные буфером агента события (сайт раз за разом не смог их обработать) — снова в очередь досылки */
+export async function replayRelayEvents(): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const { online, host } = await getServerState();
+  if (!online) return { error: "Server Agent не на связи" };
+  const failed = Number((host?.info as { relay?: { failed?: number } } | undefined)?.relay?.failed ?? 0);
+  if (!failed) return { error: "Отложенных событий нет" };
+  await enqueueCommand(null, "replay_failed_events", {}, admin.id);
+  await audit(admin.id, "server.replay_failed_events", undefined, { failed });
+  revalidatePath("/admin/servers");
+  return { success: `Агент вернёт в очередь ${failed} отложенных событий` };
 }
 
 export async function serverRcon(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -124,7 +163,9 @@ export async function hostCommand(_prev: ActionResult, formData: FormData): Prom
 
   const { online, host, instances } = await getServerState();
   if (!online) return { error: "Server Agent не на связи" };
-  if ((host?.info as { busy?: string } | undefined)?.busy) return { error: "Агент уже выполняет обновление" };
+  const info = host?.info as { busy?: string; busy_instances?: Record<string, string> } | undefined;
+  if (info?.busy) return { error: "Агент уже выполняет обновление" };
+  if (Object.keys(info?.busy_instances ?? {}).length) return { error: "Агент прогревает карты — обновление после прогрева" };
 
   const busy = instances.filter((i) => i.running && (i.gamestate ?? "none") !== "none");
   const { count } = await db()

@@ -8,11 +8,11 @@ import path from "node:path";
  * Агент сравнивает версию и сам обновляет себя, скрипты и конфиги CS2 — без ручного копирования.
  *
  * Пути в бандле — относительно server/:
- *   agent/*.mjs, start.ps1, service.ps1, launch-agent.ps1, watchdog.ps1, install.ps1, instances.csv → D:\cs2server\f16\
+ *   agent/*.mjs, start.ps1, service.ps1, launch-agent.ps1, watchdog.ps1, firewall.ps1, install.ps1, instances.csv → D:\cs2server\f16\
  *   cfg/**                                            → D:\cs2server\f16\cfg\ и game\csgo\cfg\
  */
 const ROOT = path.join(process.cwd(), "server");
-const INCLUDE = [/^agent\/[\w-]+\.mjs$/, /^start\.ps1$/, /^install\.ps1$/, /^service\.ps1$/, /^launch-agent\.ps1$/, /^watchdog\.ps1$/, /^instances\.csv$/, /^cfg\/.+\.(cfg|json)$/];
+const INCLUDE = [/^agent\/[\w-]+\.mjs$/, /^start\.ps1$/, /^install\.ps1$/, /^service\.ps1$/, /^launch-agent\.ps1$/, /^watchdog\.ps1$/, /^firewall\.ps1$/, /^instances\.csv$/, /^cfg\/.+\.(cfg|json)$/];
 
 function walk(dir: string, base = ""): string[] {
   return readdirSync(dir).flatMap((name) => {

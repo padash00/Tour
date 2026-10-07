@@ -1,5 +1,8 @@
 import "server-only";
-import { autoMaintenanceTick, autopilotTick, closeMatchesOfEndedTournaments, expireStaleWork, lobbyServersTick, verifyWorkshopLibrary } from "../server-control";
+import { autoMaintenanceTick } from "./auto-maintenance";
+import { autopilotTick, closeMatchesOfEndedTournaments, lobbyServersTick } from "./autopilot";
+import { expireStaleWork } from "./watchdog";
+import { verifyWorkshopLibrary } from "./workshop";
 import { applyDueVetoTimeouts } from "../matches";
 import { lobbyTick } from "../lobby";
 import { refreshStaleProfilesTick } from "../profile-sync";
