@@ -39,7 +39,10 @@ try {
   const a = (await row("insert into teams(name, tag, captain_id, invite_code, is_solo) values('One', 'ONE', $1, 'one', true) returning id", [p1])).id;
   const b = (await row("insert into teams(name, tag, captain_id, invite_code, is_solo) values('Two', 'TWO', $1, 'two', true) returning id", [p2])).id;
   await sql.query("insert into team_members(team_id, player_id, is_solo) values($1, $2, true), ($3, $4, true)", [a,p1,b,p2]);
-  const t = (await row("insert into tournaments(slug, name, format, status, max_teams, auto_approve) values('test','Test','1v1','registration',1,true) returning id")).id;
+  const t = (await row("insert into tournaments(slug, name, format, status, max_teams, auto_approve) values('test','Test','1v1','registration',2,true) returning id")).id;
+  // A third entrant already holds one of the two places, so a single place remains.
+  const c = (await row("insert into teams(name, tag, captain_id, invite_code, is_solo) values('Three', 'THR', $1, 'three', true) returning id", [admin])).id;
+  await sql.query("insert into tournament_registrations(tournament_id, team_id, status) values($1, $2, 'approved')", [t, c]);
   const save = (team, actor, main) => row("select save_registration($1,$2,$3,$4::uuid[],'{}'::uuid[]) as r", [t,team,actor,main]);
   let regA, regB;
   await test("First valid roster auto-approves; last place cannot be allocated twice", async () => {

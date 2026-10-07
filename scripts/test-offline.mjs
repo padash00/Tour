@@ -5,6 +5,7 @@ const env = { ...process.env, SUPABASE_URL: "http://127.0.0.1:9", SUPABASE_SERVI
 const cases = [
   "test-bracket-sizes.mts", "test-stage-formats.mts", "test-awards.mts", "test-lobby-settings.mts",
   "test-agent-relay.mjs", "test-reliability.mjs", "test-agent-report.mts", "test-deployment-gate.mjs",
+  "test-pure-logic.mts", "test-integrity.mts",
 ];
 for (const name of cases) {
   const args = name.endsWith(".mts") ? ["--conditions=react-server", "--import=tsx", `scripts/${name}`] : [`scripts/${name}`];

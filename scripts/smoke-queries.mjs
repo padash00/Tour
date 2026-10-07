@@ -1,6 +1,7 @@
 // Проверяет на живой базе select-запросы с вложенными связями (только чтение).
 // Запуск: node scripts/smoke-queries.mjs
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const env = Object.fromEntries(
@@ -9,6 +10,7 @@ const env = Object.fromEntries(
     .filter(Boolean)
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
+assertTestDatabase(env.SUPABASE_URL);
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const MATCH = "*, team1:teams!matches_team1_id_fkey(*), team2:teams!matches_team2_id_fkey(*)";
 

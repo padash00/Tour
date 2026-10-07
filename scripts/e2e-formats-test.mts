@@ -2,12 +2,14 @@
 // Создаёт скрытые черновики, отыгрывает матчи через ту же логику, что и сайт, печатает таблицы.
 // Запуск:  NODE_OPTIONS=--conditions=react-server npx tsx scripts/e2e-formats-test.mts [--keep] [--cleanup]
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 
 for (const l of readFileSync(".env.local", "utf8").split(/\r?\n/).filter(Boolean)) {
   const i = l.indexOf("=");
   process.env[l.slice(0, i)] ??= l.slice(i + 1);
 }
 
+assertTestDatabase(process.env.SUPABASE_URL);
 const { db } = await import("../src/lib/supabase");
 const { createBracket, getStandings, recomputeSeries } = await import("../src/lib/matches");
 const { getSoloTeam } = await import("../src/lib/data");

@@ -3,6 +3,7 @@
 // ждёт подтверждения загрузки и удаляет все тестовые данные.
 // Запуск: node scripts/e2e-server-test.mjs [CS2-01]
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const env = Object.fromEntries(
@@ -11,6 +12,7 @@ const env = Object.fromEntries(
     .filter(Boolean)
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
+assertTestDatabase(env.SUPABASE_URL);
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const INSTANCE = process.argv[2] ?? "CS2-01";
 const SLUG = "e2e-server-test";
