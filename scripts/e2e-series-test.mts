@@ -5,12 +5,14 @@
 // Ни одной команды агенту/серверу не отправляется. Тестовые данные удаляются.
 // Запуск: NODE_OPTIONS=--conditions=react-server npx tsx scripts/e2e-series-test.mts
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 
 for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
   const i = line.indexOf("=");
   if (i > 0 && !process.env[line.slice(0, i)]) process.env[line.slice(0, i)] = line.slice(i + 1);
 }
 
+assertTestDatabase(process.env.SUPABASE_URL);
 const { db } = await import("../src/lib/supabase");
 const { getMatch, insertVetoAction } = await import("../src/lib/matches");
 const { vetoState } = await import("../src/lib/veto");

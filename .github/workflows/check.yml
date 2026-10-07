@@ -22,8 +22,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Типы маршрутов Next.js
-        run: npx next typegen
       - name: TypeScript и ESLint
         run: npm run check
       - name: Логика, миграции, заявки и доставка команд (изолированно)

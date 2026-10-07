@@ -12,6 +12,7 @@
 // Все тестовые данные удаляются, сервер возвращается в исходное состояние.
 // Запуск: node scripts/e2e-series-live-test.mjs [CS2-01] [--players=7656...,7656...]
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const env = Object.fromEntries(
@@ -20,6 +21,7 @@ const env = Object.fromEntries(
     .filter(Boolean)
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
+assertTestDatabase(env.SUPABASE_URL);
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const INSTANCE = process.argv.find((a) => /^CS2-\d+$/.test(a)) ?? "CS2-01";
 const HUMANS = (process.argv.find((a) => a.startsWith("--players=")) ?? "").slice(10).split(",").filter((x) => /^\d{17}$/.test(x));

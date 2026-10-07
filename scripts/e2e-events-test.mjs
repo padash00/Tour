@@ -2,6 +2,7 @@
 // и проверяет, что матч, карта и статистика обновились. Тестовые данные удаляются.
 // Запуск: node scripts/e2e-events-test.mjs
 import { readFileSync } from "node:fs";
+import { assertTestDatabase } from "./lib/prod-guard.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const env = Object.fromEntries(
@@ -11,6 +12,7 @@ const env = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
 const SITE = process.env.SITE ?? "https://tournament.f16-arena.kz";
+assertTestDatabase(env.SUPABASE_URL);
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const SLUG = "e2e-events-test";
 const must = ({ data, error }, what) => {
