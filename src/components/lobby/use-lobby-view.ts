@@ -8,6 +8,8 @@ import type { LobbyView } from "@/lib/lobby-view";
 export type Run = (fn: () => Promise<A.LobbyResult>, ok?: string) => void;
 
 const POLL_MS = 1500;
+/** Скрытая вкладка (игрок в CS2): редкий опрос — держит «в лобби» (онлайн 45 с) и ловит проверку готовности */
+const HIDDEN_POLL_MS = 15_000;
 
 /**
  * Состояние лобби: опрос /api/lobbies/[code] раз в 1,5 с, пока вкладка видна.
@@ -73,7 +75,7 @@ export function useLobbyView(code: string, initial: LobbyView) {
     const schedule = () => {
       clearTimeout(t);
       t = undefined;
-      if (!stop && document.visibilityState === "visible") t = setTimeout(loop, POLL_MS);
+      if (!stop) t = setTimeout(loop, document.visibilityState === "visible" ? POLL_MS : HIDDEN_POLL_MS);
     };
     const loop = async () => {
       await load();
@@ -82,9 +84,8 @@ export function useLobbyView(code: string, initial: LobbyView) {
     schedule();
     const onVisible = () => {
       if (document.visibilityState !== "visible") {
-        // вкладка скрыта — опрос останавливаем
-        clearTimeout(t);
-        t = undefined;
+        // вкладка скрыта — опрашиваем редко, но не перестаём: иначе игрок «уходит» из лобби
+        schedule();
         return;
       }
       clearTimeout(t);

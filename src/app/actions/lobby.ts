@@ -538,8 +538,7 @@ export async function startMatch(code: string): Promise<LobbyResult> {
   const members = await getMembers(lobby.id);
   const problem = startProblem(lobby, members);
   if (problem) return { error: problem };
-  const offline = members.filter((m) => (m.slot === "team1" || m.slot === "team2") && !isOnline(m));
-  if (offline.length) return { error: `Не на странице лобби: ${offline.map((m) => m.player.nickname).join(", ")}` };
+  // кто не на странице — не блокирует старт: не подтвердил готовность за 30 с — уходит в ожидание
   await db().from("lobby_members").update({ ready: false }).eq("lobby_id", lobby.id);
   await db().from("lobby_members").update({ ready: true }).eq("lobby_id", lobby.id).eq("player_id", player.id);
   await touch(lobby.id, { ready_check_until: new Date(Date.now() + READY_CHECK_SECONDS * 1000).toISOString() });

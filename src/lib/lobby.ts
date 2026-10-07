@@ -531,20 +531,30 @@ export async function maybeStartOnReady(lobbyId: string) {
 
 // ───────────────────────── сервер
 
-/** Инстанс для игры лобби: только помеченные «для лобби», запущенные, свободные */
+/**
+ * Инстанс для игры лобби: помеченные «для лобби», запущенные, свободные.
+ * Если ни один не помечен — любой свободный, пока нет турнира в check-in или «идёт» (серверы нужны турниру).
+ */
 export async function pickLobbyInstance() {
-  const [{ data: insts }, { data: host }, { data: m1 }, { data: m2 }] = await Promise.all([
-    db().from("server_instances").select("name, running, gamestate, for_lobby").eq("for_lobby", true).order("name"),
+  const [{ data: all }, { data: host }, { data: m1 }, { data: m2 }, { count: activeTournaments }] = await Promise.all([
+    db().from("server_instances").select("name, running, gamestate, for_lobby").order("name"),
     db().from("server_host").select("last_seen_at, info").eq("id", "main").maybeSingle(),
     db().from("matches").select("server_instance").not("server_instance", "is", null).in("status", ["ready", "live"]),
     db().from("lobby_games").select("server_instance").not("server_instance", "is", null).in("status", ["waiting", "live"]),
+    db().from("tournaments").select("id", { count: "exact", head: true }).in("status", ["checkin", "live"]),
   ]);
   const online = !!host?.last_seen_at && Date.now() - new Date(host.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
-  if (!online || (host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[] };
+  if (!online) return { inst: null, stopped: [] as string[], reason: "агент серверного ПК не на связи" };
+  if ((host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[], reason: "идёт обслуживание серверов" };
+  const marked = (all ?? []).filter((i) => i.for_lobby);
+  if (!marked.length && (activeTournaments ?? 0) > 0) {
+    return { inst: null, stopped: [] as string[], reason: "идёт турнир, а серверов «для лобби» нет — включите в F16 Control → Серверы" };
+  }
+  const insts = marked.length ? marked : (all ?? []);
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));
-  const list = (insts ?? []).filter((i) => !taken.has(i.name));
+  const list = insts.filter((i) => !taken.has(i.name));
   const free = list.find((i) => i.running && (i.gamestate ?? "none") === "none") ?? null;
-  return { inst: free?.name ?? null, stopped: list.filter((i) => !i.running).map((i) => i.name) };
+  return { inst: free?.name ?? null, stopped: list.filter((i) => !i.running).map((i) => i.name), reason: null };
 }
 
 /** Игры, которые ждут сервер, → на свободный инстанс лобби. Выключенный инстанс лобби агент запускает сам. */
@@ -571,7 +581,7 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
       await setNote(g, "карта из мастерской прогревается на сервере…");
       continue;
     }
-    const { inst, stopped } = await pickLobbyInstance();
+    const { inst, stopped, reason } = await pickLobbyInstance();
     if (!inst) {
       if (stopped.length) {
         // свободный инстанс выключен — запускаем (не чаще раза в 3 минуты)
@@ -585,7 +595,7 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
         if (!count) await db().from("agent_commands").insert({ instance: stopped[0], type: "start", payload: { lobby: true } });
         await setNote(g, `запускаем сервер ${stopped[0]}…`);
       } else {
-        await setNote(g, "все серверы для лобби заняты — ждём, когда освободится");
+        await setNote(g, reason ?? "все серверы для лобби заняты — ждём, когда освободится");
       }
       return; // по одному за тик
     }
