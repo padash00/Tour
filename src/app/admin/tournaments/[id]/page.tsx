@@ -35,6 +35,8 @@ import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
 import { requireAdmin } from "@/lib/auth";
 import { tournamentEta } from "@/lib/schedule";
+import { approveWarningOf, loadOfficial } from "@/lib/official-data";
+import { OfficialTab } from "./official-tab";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
 
@@ -51,6 +53,8 @@ const FLOW: { status: TournamentStatus; hint: string }[] = [
 const TABS = [
   { key: "overview", label: "Обзор" },
   { key: "registration", label: "Регистрация" },
+  // только у официального турнира: анкеты участников, документы, выгрузки
+  { key: "official", label: "Участники" },
   { key: "bracket", label: "Сетка" },
   { key: "matches", label: "Матчи" },
   { key: "settings", label: "Настройки" },
@@ -60,14 +64,15 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default async function AdminTournamentPage(props: PageProps<"/admin/tournaments/[id]">) {
-  await requireAdmin(`/admin/tournaments/${(await props.params).id}`); // права проверяются в каждой странице, не только в layout
+  const admin = await requireAdmin(`/admin/tournaments/${(await props.params).id}`); // права проверяются в каждой странице, не только в layout
   const { id } = await props.params;
   const sp = await props.searchParams;
-  // старые ссылки ?tab=registrations ведут на регистрацию
-  const raw = sp.tab === "registrations" ? "registration" : String(sp.tab ?? "overview");
-  const tab: TabKey = (TABS.find((x) => x.key === raw)?.key ?? "overview") as TabKey;
   const t = await getTournamentById(id);
   if (!t) notFound();
+  const tabs = TABS.filter((x) => x.key !== "official" || t.is_official);
+  // старые ссылки ?tab=registrations ведут на регистрацию
+  const raw = sp.tab === "registrations" ? "registration" : String(sp.tab ?? "overview");
+  const tab: TabKey = (tabs.find((x) => x.key === raw)?.key ?? "overview") as TabKey;
   const regs = await getTournamentRegistrations(t.id);
 
   const pendingRegs = regs.filter((r) => r.status === "pending");
@@ -78,7 +83,8 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   return (
     <div className="space-y-6">
       {/* новые заявки, check-in, счёт матчей — без перезагрузки; на вкладке настроек не мешаем вводу */}
-      {tab !== "settings" && tab !== "rules" && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={4000} />}
+      {/* на вкладке участников — персональные данные: без живого обновления (каждый показ пишется в журнал) */}
+      {tab !== "settings" && tab !== "rules" && tab !== "official" && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={4000} />}
       <AdminHeader
         back={{ href: "/admin/tournaments", label: "Турниры" }}
         title={
@@ -99,7 +105,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
       <SubTabs
         active={tab}
-        items={TABS.map((x) => ({
+        items={tabs.map((x) => ({
           key: x.key,
           href: tabHref(x.key),
           label:
@@ -116,6 +122,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
 
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
+      {tab === "official" && <OfficialTab t={t} admin={admin} />}
       {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} />}
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}
       {tab === "settings" && (
@@ -622,7 +629,7 @@ async function RegistrationTab({
   t,
   regs,
 }: {
-  t: { status: TournamentStatus };
+  t: T;
   regs: RegistrationWithTeam[];
 }) {
   if (regs.length === 0) {
@@ -630,6 +637,9 @@ async function RegistrationTab({
   }
   const { data: playersData } = await db().from("players").select("steam_id, nickname").eq("is_banned", false).order("nickname").limit(1000);
   const players = (playersData ?? []) as PickPlayer[];
+  // официальный турнир: одобрение без полного комплекта документов — только после подтверждения
+  const official = t.is_official ? await loadOfficial(t) : null;
+  const approveWarning = new Map((official?.teams ?? []).map((x) => [x.registration.id, approveWarningOf(x)]));
   const groups: { key: string; title: string; items: RegistrationWithTeam[] }[] = [
     { key: "pending", title: "На рассмотрении", items: regs.filter((r) => r.status === "pending") },
     { key: "approved", title: "Одобрены", items: regs.filter((r) => r.status === "approved") },
@@ -644,7 +654,7 @@ async function RegistrationTab({
             <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
               <RegistrationHead />
               {g.items.map((r) => (
-                <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} />
+                <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} approveWarning={approveWarning.get(r.id)} />
               ))}
             </div>
           </Panel>
@@ -673,10 +683,13 @@ function RegistrationRow({
   r,
   tournamentStatus,
   players,
+  approveWarning,
 }: {
   r: RegistrationWithTeam;
   tournamentStatus: TournamentStatus;
   players: PickPlayer[];
+  /** официальный турнир: чего не хватает команде — одобрение спросит подтверждение */
+  approveWarning?: string;
 }) {
   const mains = r.roster.filter((p) => p.role === "main");
   const elo = averageElo(r.roster);
@@ -734,7 +747,9 @@ function RegistrationRow({
             <ActionForm action={decideRegistration}>
               <input type="hidden" name="registrationId" value={r.id} />
               <input type="hidden" name="decision" value="approve" />
-              <SubmitButton size="sm">Одобрить</SubmitButton>
+              <SubmitButton size="sm" confirm={approveWarning}>
+                Одобрить
+              </SubmitButton>
             </ActionForm>
           )}
           {r.status === "approved" && (

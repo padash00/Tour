@@ -102,6 +102,9 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                   </td>
                   <td>
                     <div className="flex justify-end items-center gap-1">
+                      <Link href={`/admin/players/${p.id}/profile`} className="px-2 text-[12px] text-accent hover:underline">
+                        Анкета
+                      </Link>
                       {!envAdmin && (
                         <ActionForm action={togglePlayerFlag}>
                           <input type="hidden" name="playerId" value={p.id} />
