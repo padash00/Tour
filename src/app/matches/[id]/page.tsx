@@ -9,7 +9,8 @@ import { db } from "@/lib/supabase";
 import type { Dispute } from "@/lib/types";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { formatDateTime, mapName } from "@/lib/format";
-import { applyVetoTimeouts, getMatch, getMatchRosters, getTournamentMatches } from "@/lib/matches";
+import { applyVetoTimeouts, getMatch, getMatchRosters } from "@/lib/matches";
+import { getStageRounds } from "@/lib/match-stage";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
 import { modeOf } from "@/lib/modes";
@@ -65,9 +66,10 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   const serverNow = serverTime();
   const mapImages = await getMapImages();
-  const [player, all, rosters, statRows] = await Promise.all([
+  const [player, stageRounds, rosters, statRows] = await Promise.all([
     getCurrentPlayer(),
-    getTournamentMatches(m.tournament_id),
+    // для подписи стадии нужны только раунды сетки, а не все матчи турнира
+    ["group", "swiss", "grand_final"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
   ]);
@@ -90,7 +92,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
   const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
   const myTurn = m.status === "veto" && isCaptain && turnTeam?.id === myTeam?.id;
-  const stage = matchStage(m, all);
+  const stage = matchStage(m, stageRounds);
   const serverPhase = ["ready", "live"].includes(m.status);
   const currentMap = m.maps.find((x) => x.status === "live") ?? m.maps.find((x) => x.status === "pending");
 

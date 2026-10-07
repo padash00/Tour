@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { buttonClass as btnClass } from "@/components/ds";
 
 /** Twitch / YouTube → адрес для встраивания; null — ссылку встроить нельзя */
@@ -10,7 +10,7 @@ export function streamEmbed(url: string, host: string): string | null {
     if (/twitch\.tv$/.test(u.hostname)) {
       const channel = u.pathname.split("/").filter(Boolean)[0];
       if (!channel) return null;
-      const parents = [host, "tournament.f16-arena.kz", "tour-tau-five.vercel.app"].map((p) => `parent=${p}`).join("&");
+      const parents = [host, DEFAULT_HOST, "tour-tau-five.vercel.app"].map((p) => `parent=${p}`).join("&");
       return `https://player.twitch.tv/?channel=${channel}&${parents}&muted=true`;
     }
     if (/youtu\.?be/.test(u.hostname)) {
@@ -23,8 +23,13 @@ export function streamEmbed(url: string, host: string): string | null {
   return null;
 }
 
+const DEFAULT_HOST = "tournament.f16-arena.kz";
+const noSubscribe = () => () => {};
+
 export function StreamEmbed({ url }: { url: string }) {
-  const host = typeof window !== "undefined" ? window.location.hostname : "tournament.f16-arena.kz";
+  // адрес сайта — не читаем window при рендере: на сервере и при гидрации — основной домен,
+  // после гидрации — фактический (превью Vercel и т.п.), без расхождения разметки
+  const host = useSyncExternalStore(noSubscribe, () => window.location.hostname, () => DEFAULT_HOST);
   const src = streamEmbed(url, host);
   if (!src) {
     return (

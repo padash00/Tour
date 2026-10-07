@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
   if (k.startsWith("match:") && UUID.test(k.slice(6))) {
     const id = k.slice(6);
     const { data: head } = await db().from("matches").select("status, veto_deadline").eq("id", id).maybeSingle();
+    // несуществующий матч — сразу 404, без шести запросов на каждый случайный ключ (кэш CDN гасит повторы)
+    if (!head) return NextResponse.json({ error: "not found" }, { status: 404, headers: { "Cache-Control": "public, max-age=0, s-maxage=60" } });
     if (head?.status === "veto") {
       noStore = true;
       // время хода вышло — авто-бан/пик сразу, не дожидаясь перезагрузки страницы

@@ -5,9 +5,35 @@ import { logSiteError } from "@/lib/site-errors";
  * Ошибки, которые случились в браузере (страница «Что-то пошло не так»).
  * Принимаем только с нашего сайта и коротко — это журнал, не хранилище.
  */
-export async function POST(request: NextRequest) {
+// не больше LIMIT отчётов в минуту с одного адреса (в пределах инстанса функции — от спама, не от DDoS)
+const LIMIT = 10;
+const WINDOW_MS = 60_000;
+const hits = new Map<string, { count: number; reset: number }>();
+
+function throttled(ip: string) {
+  const now = Date.now();
+  if (hits.size > 5000) for (const [k, v] of hits) if (v.reset <= now) hits.delete(k);
+  const cur = hits.get(ip);
+  if (!cur || cur.reset <= now) {
+    hits.set(ip, { count: 1, reset: now + WINDOW_MS });
+    return false;
+  }
+  cur.count++;
+  return cur.count > LIMIT;
+}
+
+/** Запрос со страниц нашего сайта: браузер ставит Sec-Fetch-Site, старые браузеры — Origin. Без обоих — отказ */
+function sameOrigin(request: NextRequest) {
+  const site = request.headers.get("sec-fetch-site");
+  if (site) return site === "same-origin" || site === "same-site";
   const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ ok: false }, { status: 403 });
+  return !!origin && origin === request.nextUrl.origin;
+}
+
+export async function POST(request: NextRequest) {
+  if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
+  const ip = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (throttled(ip)) return NextResponse.json({ ok: false }, { status: 429 });
   let body: { message?: unknown; digest?: unknown; path?: unknown };
   try {
     body = await request.json();
