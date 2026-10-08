@@ -22,7 +22,8 @@ import type { Dispute, Player } from "@/lib/types";
 import { formatDateTime, formatShortDateTime, mapName, toLocalInput } from "@/lib/format";
 import { getServerState } from "@/lib/server-control";
 import { applyVetoTimeouts, getMatch } from "@/lib/matches";
-import { ActionForm, SubmitButton } from "@/components/forms";
+import { ActionForm, CopyField, SubmitButton } from "@/components/forms";
+import { ObsHowTo, overlayUrl } from "@/components/admin/obs-overlay";
 import { ChipInput, PlayerPicker, Stepper } from "@/components/pickers";
 import { LiveRefresh } from "@/components/live-refresh";
 import { Avatar, Field, FaceitLevel, TeamLogo, cn } from "@/components/ui";
@@ -411,6 +412,12 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               </span>
               {m.server_address && <span className="num">адрес у игроков: {m.server_address}</span>}
               {m.server_state === "error" && <span className="text-danger">ошибка загрузки — журнал команд на странице «Серверы»</span>}
+            </div>
+            {/* трансляция: оверлей именно этого матча — не зависит от того, на каком инстансе он идёт */}
+            <div className={`${ADMIN_CARD} mt-3 space-y-3 p-4`}>
+              <div className="text-[13px] font-medium">Оверлей для трансляции (OBS)</div>
+              <CopyField value={overlayUrl({ match: m.id })} />
+              <ObsHowTo />
             </div>
           </Section>
           )}

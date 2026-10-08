@@ -27,7 +27,9 @@ export function isActive(pathname: string, item: NavItem) {
   return item.match.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-/** Страницы без шапки и подвала сайта: F16 Control и режим ТВ */
+/** Страницы без шапки и подвала сайта: F16 Control, режим ТВ и оверлей трансляции (OBS) */
 export function noChrome(pathname: string) {
-  return pathname.startsWith("/admin") || pathname === "/tv" || pathname.startsWith("/tv/") || pathname.endsWith("/tv");
+  return (
+    pathname.startsWith("/admin") || pathname === "/tv" || pathname.startsWith("/tv/") || pathname.endsWith("/tv") || pathname === "/overlay"
+  );
 }
