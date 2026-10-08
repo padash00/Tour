@@ -42,6 +42,7 @@ import { clearNomination, setNomination } from "@/app/actions/admin-nominations"
 import { drawOrderText } from "@/lib/draw";
 import { approveWarningOf, loadOfficial } from "@/lib/official-data";
 import { OfficialTab } from "./official-tab";
+import { BroadcastPanel } from "@/components/admin/obs-overlay";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
 
@@ -439,6 +440,11 @@ function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: numb
               ))}
             </div>
           </div>
+        </div>
+        <div className="mt-3 rounded-[12px] border border-line bg-surface p-5 shadow-[0_1px_0_0_#ffffff08_inset]">
+          <div className="text-[14px] font-semibold text-fg">Трансляция</div>
+          <p className="mt-1 mb-4 text-[13px] text-fg-3">Ссылки для OBS: OBS → Браузер → 1920×1080.</p>
+          <BroadcastPanel slug={t.slug} />
         </div>
       </Panel>
 
