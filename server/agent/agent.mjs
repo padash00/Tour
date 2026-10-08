@@ -119,7 +119,13 @@ const housekeeping = createHousekeeping({
   rc,
   log,
   activeMatchIds: () => new Set(Object.values(recovery.assignments).map((a) => String(a.matchid))),
+  rconPassword: secrets.rcon,
 });
+try {
+  housekeeping.ensureInstanceCfgs();
+} catch (e) {
+  log(`конфиги инстансов: ${e.message}`);
+}
 
 // ───────────────────────── процессы CS2
 

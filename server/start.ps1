@@ -13,7 +13,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
 $instances = Import-Csv (Join-Path $repo "instances.csv")
 $targets = if ($Active) { $instances | Where-Object role -eq "active" } else { $instances | Where-Object name -eq $Name }
-if (-not $targets) { throw "Укажите -Name (CS2-01..CS2-05) или -Active" }
+if (-not $targets) { throw "Укажите -Name (CS2-01..CS2-07) или -Active" }
 
 $exe = Join-Path $ServerDir "game\bin\win64\cs2.exe"
 $secrets = Get-Content (Join-Path $ServerDir "f16-secrets.json") -Raw | ConvertFrom-Json
