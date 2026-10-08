@@ -20,7 +20,7 @@ import { OpsAlerts, type OpsInfo } from "@/components/admin/ops-alerts";
 import { SelfCheckPanel } from "@/components/admin/self-check";
 import { AgentHealth } from "@/components/admin/agent-health";
 import { CommandLog } from "@/components/admin/command-log";
-import { ObsOverlayPanel } from "@/components/admin/obs-overlay";
+import { F16HudPanel, ObsOverlayPanel } from "@/components/admin/obs-overlay";
 import type { SyncMetrics } from "@/lib/server/agent-report";
 import { getSetting } from "@/lib/settings";
 
@@ -230,12 +230,15 @@ export default async function ServersPage() {
 
       {/* ── оверлей трансляции: ссылка для OBS на каждый инстанс ── */}
       <Section title="Трансляция в OBS">
+        <div className="space-y-4">
+        <F16HudPanel />
         <ObsOverlayPanel
           instances={instances.map((s) => {
             const m = assigned.get(s.name);
             return { name: s.name, match: m ? `#${m.number} ${m.team1?.tag ?? "TBD"} vs ${m.team2?.tag ?? "TBD"}` : null };
           })}
         />
+        </div>
       </Section>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8">

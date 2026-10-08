@@ -1,4 +1,6 @@
+import { Download } from "lucide-react";
 import { CopyField } from "@/components/forms";
+import { buttonClass } from "@/components/ds";
 import { SITE_URL } from "@/lib/site";
 import { ADMIN_CARD } from "./control";
 
@@ -26,6 +28,33 @@ export function ObsHowTo() {
       <span className="num">&amp;theme=clear</span> — полупрозрачные панели, <span className="num">&amp;idle=hide</span> — без
       «Скоро» между матчами, <span className="num">&amp;scale=1.25</span> — крупнее.
     </p>
+  );
+}
+
+/** F16 HUD (интерфейс трансляции для ПК трансляции) — релиз на GitHub: 160+ МБ не помещаются на Vercel/Supabase */
+export const F16_HUD_DOWNLOAD = "https://github.com/padash00/Tour/releases/download/f16-hud/F16-HUD.exe";
+
+/** Скачать F16 HUD и как им пользоваться */
+export function F16HudPanel() {
+  return (
+    <div className={`${ADMIN_CARD} flex flex-wrap items-start justify-between gap-4 p-4`}>
+      <div className="max-w-2xl">
+        <div className="text-[14px] font-semibold text-fg">F16 HUD — интерфейс трансляции</div>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-[12px] leading-relaxed text-fg-3">
+          <li>Скачайте и запустите на ПК трансляции (не на серверном) — пульт откроется в браузере, CS2 настроится сам.</li>
+          <li>Перезапустите CS2. В пульте выберите сервер и нажмите «Смотреть через GOTV».</li>
+          <li>
+            OBS → Браузер → <span className="num text-fg-2">http://localhost:31982/hud?transparent</span>, 1920×1080, поверх захвата CS2.
+          </li>
+        </ol>
+        <p className="mt-2 text-[11px] text-fg-4">
+          ПК в сети игроков (192.168.100.*) подключаются к серверам через 192.168.100.210 — пульт подставляет адрес сам.
+        </p>
+      </div>
+      <a href={F16_HUD_DOWNLOAD} className={buttonClass("primary", "md", "shrink-0")}>
+        <Download className="size-4" aria-hidden /> Скачать F16 HUD
+      </a>
+    </div>
   );
 }
 
