@@ -4,7 +4,7 @@ import { adminPlayers } from "@/lib/server/admins";
 import { applyAgentReport, takePendingCommands } from "@/lib/server/agent-sync";
 import { applyAgentEvents } from "@/lib/server/ops";
 import { checkBearer } from "@/lib/server/state";
-import { getSetting } from "@/lib/settings";
+import { getSetting, isServerOpenJoin } from "@/lib/settings";
 import { runAgentJobs } from "@/lib/server/agent-jobs";
 import { agentReportSchema, type SyncMetrics } from "@/lib/server/agent-report";
 import { db } from "@/lib/supabase";
@@ -48,9 +48,10 @@ export async function POST(request: NextRequest) {
     await runAgentJobs("maintenance", safely, report.info?.cs2_patch);
   }
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
-  const [admins, retention] = await Promise.all([
+  const [admins, retention, openJoin] = await Promise.all([
     adminPlayers().then((a) => a.map((x) => x.steam_id)).catch(() => null),
     getSetting("BACKUP_RETENTION_DAYS").catch(() => null),
+    isServerOpenJoin().catch(() => true),
   ]);
   // срок хранения бэкапов и демо на серверном ПК (дней), по умолчанию 1
   const days = Number(retention ?? "");
@@ -60,5 +61,7 @@ export async function POST(request: NextRequest) {
   metrics.duration_ms = Math.round(performance.now() - started);
   const { error } = await db().from("app_settings").upsert({ key: "AGENT_SYNC_METRICS", value: JSON.stringify(metrics), updated_at: metrics.at });
   if (error) console.error("agent sync metrics could not be saved", error.code);
-  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days, processed_events: processedEvents });
+  // вход на серверы для всех (по умолчанию открыт)
+  const open_join = openJoin;
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days, open_join, processed_events: processedEvents });
 }

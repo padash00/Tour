@@ -54,6 +54,20 @@ export async function setProfileRequired(_prev: ActionResult, formData: FormData
   return { success: value === "1" ? "Анкета обязательна для команды и заявок" : "Анкета необязательна — только напоминание" };
 }
 
+/** Открытый вход на игровые серверы (app_settings.SERVER_OPEN_JOIN: «1» / «0», по умолчанию — открыт). Агент применяет сам */
+export async function setServerOpenJoin(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const value = formData.get("on");
+  if (value !== "0" && value !== "1") return { error: "Не удалось определить новое состояние" };
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: "SERVER_OPEN_JOIN", value, updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.server_open_join", undefined, { on: value === "1" });
+  revalidatePath("/admin/settings");
+  return { success: value === "1" ? "На серверы может зайти любой — применится за несколько секунд" : "На серверы пускаем только игроков матча" };
+}
+
 /** Добавить / убрать карту из библиотеки Workshop */
 export async function editWorkshopMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();

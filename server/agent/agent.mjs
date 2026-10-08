@@ -170,11 +170,23 @@ const isRunning = (procs, inst) => procs.some((p) => new RegExp(`-port ${inst.po
 // ───────────────────────── опрос инстансов
 
 const snapshots = {}; // { [instance]: { at, report } }
+// Вход на серверы для всех (настройка сайта «Пускать на серверы всех»). Применяем при изменении,
+// после перезапуска сервера и раз в 5 минут (MatchZy может вернуть значения из своего конфига)
+let openJoin = true;
+const openJoinApplied = new Map(); // инстанс → { value, at, uptime }
+async function applyOpenJoin(inst) {
+  const prev = openJoinApplied.get(inst.name);
+  if (prev && prev.value === openJoin && Date.now() - prev.at < 5 * 60_000) return;
+  await rc(inst, `matchzy_kick_when_no_match_loaded ${openJoin ? "false" : "true"};mp_allowspectators 1`);
+  openJoinApplied.set(inst.name, { value: openJoin, at: Date.now() });
+  if (prev?.value !== undefined && prev.value !== openJoin) log(`вход на ${inst.name}: ${openJoin ? "для всех" : "только матч"}`);
+}
 
 async function probeInstance(inst) {
   const procs = await cs2Processes();
   let running = procs ? isRunning(procs, inst) : null;
   if (running === false) {
+    openJoinApplied.delete(inst.name);
     recovery.track(inst, false, null);
     snapshots[inst.name] = { at: Date.now(), report: { name: inst.name, running: false } };
     return;
@@ -193,6 +205,7 @@ async function probeInstance(inst) {
   // get5_status не ответил, идёт команда сайта или подъём — лишних RCON-запросов не шлём
   const quiet = status == null || laneActive.has(inst.name) || recovery.recovering.has(inst.name) || !!maintenance;
   if (!quiet) await enforce.apply(inst, get5).catch(() => {});
+  if (!quiet) await applyOpenJoin(inst).catch(() => {});
   recovery.track(inst, true, get5);
   if (!quiet) await autostart.tick(inst, recovery.assignments[inst.name], info, get5).catch((e) => log(`автостарт ${inst.name}: ${e.message}`));
   snapshots[inst.name] = {
@@ -544,6 +557,7 @@ async function syncOnce() {
   // события удаляем только те, что сайт подтвердил (старый сайт без processed_events — все отправленные)
   recovery.ackEvents(Array.isArray(res.processed_events) ? res.processed_events : events.map((e) => e.id));
   await housekeeping.syncMatchzyAdmins(res.admins).catch((e) => log(`MatchZy admins: ${e.message}`));
+  if (typeof res.open_join === "boolean") openJoin = res.open_join;
   try {
     housekeeping.cleanupBackups(Number(res.backup_days ?? 1));
   } catch (e) {

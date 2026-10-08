@@ -83,3 +83,9 @@ export async function getDisabledMaps(): Promise<string[]> {
     return [];
   }
 }
+
+/** Вход на игровые серверы для всех (наблюдатели, трансляция, тренировка). app_settings.SERVER_OPEN_JOIN «0» — только матч */
+export async function isServerOpenJoin(): Promise<boolean> {
+  const { data } = await db().from("app_settings").select("value").eq("key", "SERVER_OPEN_JOIN").maybeSingle();
+  return data?.value !== "0";
+}

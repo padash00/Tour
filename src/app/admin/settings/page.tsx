@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting, setProfileRequired } from "@/app/actions/admin-settings";
+import { editWorkshopMaps, saveSetting, setProfileRequired, setServerOpenJoin } from "@/app/actions/admin-settings";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
 import { formatShortDateTime } from "@/lib/format";
-import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, type SettingKey } from "@/lib/settings";
+import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, isServerOpenJoin, type SettingKey } from "@/lib/settings";
 import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -92,13 +92,14 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info, mapImages, disabledMaps, profileRequired] = await Promise.all([
+  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin] = await Promise.all([
     getSettingsStatus(),
     getWorkshopMaps(),
     workshopInfo(),
     getMapImages(),
     getDisabledMaps(),
     isProfileRequired(),
+    isServerOpenJoin(),
   ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
@@ -153,6 +154,22 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
               </p>
             </div>
             <ActionToggle action={setProfileRequired} fields={{}} on={profileRequired} label="Анкета обязательна" onLabel="Обязательна" offLabel="Напоминание" />
+          </div>
+        </Panel>
+      )}
+
+      {tab === "general" && (
+        <Panel title="Игровые серверы">
+          <div className={`${ADMIN_CARD} flex max-w-2xl flex-wrap items-start justify-between gap-4 p-5`}>
+            <div className="max-w-md">
+              <div className="text-[14px] font-semibold text-fg">Пускать на серверы всех</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-fg-3">
+                Включено — зайти на сервер может любой: наблюдатели, оператор трансляции, тренировка с ботами. Во время матча
+                играют только составы с сайта, остальные смотрят. Выключено — без загруженного матча сервер никого не пускает.
+                GOTV (порт игры + 5) открыт всегда.
+              </p>
+            </div>
+            <ActionToggle action={setServerOpenJoin} fields={{}} on={openJoin} label="Пускать на серверы всех" onLabel="Всех" offLabel="Только матч" />
           </div>
         </Panel>
       )}

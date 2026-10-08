@@ -33,7 +33,7 @@ foreach ($i in $targets) {
     "-ip", "0.0.0.0",
     "-port", $port,
     "+tv_port", ($port + 5),
-    "-maxplayers", "12",
+    "-maxplayers", "20",
     "+game_type", "0", "+game_mode", "1",
     "+map", $Map,
     "+exec", "f16/$($i.name.ToLower()).cfg"
