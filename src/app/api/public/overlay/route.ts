@@ -56,9 +56,60 @@ async function findMatch(query: OverlayQuery): Promise<Row | null> {
   return pickOverlayMatch((data ?? []) as Row[]);
 }
 
+type LobbyMap = { map: string; status: string; winner: 1 | 2 | null; team1_score: number; team2_score: number };
+
+/** Игра лобби на инстансе (в том числе с ботами) — оверлей показывает её так же, как матч турнира */
+async function lobbySource(server: string): Promise<OverlaySource | null> {
+  const { data: g } = await db()
+    .from("lobby_games")
+    .select("id, status, best_of, team1, team2, team1_score, team2_score, maps, created_at")
+    .eq("server_instance", server)
+    .in("status", ["waiting", "live"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!g) return null;
+  const t1 = g.team1 as { name?: string } | null;
+  const t2 = g.team2 as { name?: string } | null;
+  const tag = (n: string) => n.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 3).toUpperCase() || "TBD";
+  const name1 = t1?.name || "Команда A";
+  const name2 = t2?.name || "Команда B";
+  const maps = ((g.maps ?? []) as LobbyMap[]).map((x, i) => ({
+    map_number: i + 1,
+    map_name: x.map,
+    status: x.status,
+    team1_score: x.team1_score ?? 0,
+    team2_score: x.team2_score ?? 0,
+    winner_id: x.winner === 1 ? "t1" : x.winner === 2 ? "t2" : null,
+    picked_by: null,
+  }));
+  return {
+    match: {
+      id: g.id,
+      status: g.status === "live" ? "live" : "ready",
+      bracket: "lobby",
+      round: 1,
+      best_of: g.best_of,
+      team1_id: "t1",
+      team2_id: "t2",
+      team1_score: g.team1_score,
+      team2_score: g.team2_score,
+      scheduled_at: null,
+    },
+    tournament: { name: "F16 Arena · Лобби" },
+    teams: [
+      { id: "t1", name: name1, tag: tag(name1), logo_url: null },
+      { id: "t2", name: name2, tag: tag(name2), logo_url: null },
+    ],
+    maps,
+    rounds: [],
+    stage: "Лобби",
+  };
+}
+
 async function load(query: OverlayQuery): Promise<OverlaySource | null> {
   const m = await findMatch(query);
-  if (!m) return null;
+  if (!m) return "server" in query ? lobbySource(query.server) : null;
   const teamIds = [m.team1_id, m.team2_id].filter((x): x is string => !!x);
   const [tournament, teams, maps, rounds] = await Promise.all([
     db().from("tournaments").select("name").eq("id", m.tournament_id).maybeSingle(),

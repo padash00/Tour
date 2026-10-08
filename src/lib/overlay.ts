@@ -108,6 +108,8 @@ export type OverlaySource = {
   maps: { map_number: number; map_name: string; status: string; team1_score: number; team2_score: number; winner_id: string | null; picked_by: string | null }[];
   /** bracket/round всех матчей турнира — для «Финал верхней сетки» и т.п. */
   rounds: { bracket: string; round: number }[];
+  /** готовая подпись этапа (игра лобби — не матч сетки) */
+  stage?: string;
 };
 
 const TBD: OverlayTeam = { name: "TBD", tag: "TBD", logo: null };
@@ -154,7 +156,7 @@ export function shapeOverlay(src: OverlaySource | null, now = new Date()): Overl
       id: m.id,
       status,
       tournament: src.tournament?.name ?? "F16 Arena",
-      stage: overlayStage(m, src.rounds),
+      stage: src.stage ?? overlayStage(m, src.rounds),
       bestOf: m.best_of,
       team1: team(m.team1_id),
       team2: team(m.team2_id),
