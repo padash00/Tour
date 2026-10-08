@@ -32,6 +32,7 @@ import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
 import { CommandJournal } from "./command-journal.mjs";
 import { createEnforce } from "./enforce.mjs";
 import { createHousekeeping } from "./housekeeping.mjs";
+import { createCsHud } from "./cshud.mjs";
 import { createHud } from "./hud.mjs";
 import { a2sInfo, parseGet5, rcon } from "./lib.mjs";
 import { cs2Build, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
@@ -111,6 +112,7 @@ const recovery = createRecovery({
 });
 const hud = createHud({ serverDir: SERVER_DIR, stateDir: STATE_DIR, siteUrl: config.siteUrl, instances: INSTANCES, rc, log });
 const autostart = createAutostart({ stateDir: STATE_DIR, rc, log, hud });
+const csHud = createCsHud({ siteUrl: config.siteUrl, stateDir: STATE_DIR, instances: INSTANCES, log, dir: config.csHudDir });
 const housekeeping = createHousekeeping({
   serverDir: SERVER_DIR,
   f16Dir: F16_DIR,
@@ -583,6 +585,21 @@ async function syncLoop() {
   }
 }
 
+/** Логотипы команд для cs-hud (интерфейс трансляции на этом ПК), если он установлен */
+async function csHudLoop() {
+  for (;;) {
+    try {
+      if (csHud.enabled) {
+        const running = new Set(Object.values(snapshots).filter((x) => x.report?.running).map((x) => x.report.name));
+        await csHud.sync(running);
+      }
+    } catch (e) {
+      log(`cs-hud: ${e.message}`);
+    }
+    await sleep(20_000);
+  }
+}
+
 /** Обслуживание ПК раз в минуту: не на пути отчёта сайту */
 async function housekeepingLoop() {
   for (;;) {
@@ -606,4 +623,5 @@ log(`F16 Server Agent → ${config.siteUrl} · инстансов: ${INSTANCES.l
 await refreshHostInfo(true).catch(() => {});
 for (const inst of INSTANCES) probeLoop(inst);
 housekeepingLoop();
+csHudLoop();
 await syncLoop();
