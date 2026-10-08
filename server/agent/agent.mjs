@@ -494,7 +494,8 @@ async function refreshUpnp() {
   if (Date.now() - upnpAt < 10 * 60_000 && upnpState) return;
   upnpAt = Date.now();
   const prev = upnpState?.ip;
-  upnpState = await ensureUpnp(config.lanIp, INSTANCES.map((i) => i.port));
+  // игровые порты и GOTV (порт + 5): зрители и ПК трансляции из сети игроков смотрят матч через GOTV
+  upnpState = await ensureUpnp(config.lanIp, INSTANCES.flatMap((i) => [i.port, i.port + 5]));
   if (upnpState.error) log(`UPnP: ${upnpState.error}`);
   else if (upnpState.ip !== prev) log(`UPnP: роутер ${upnpState.model ?? ""} внешний адрес ${upnpState.ip}, проброшены UDP ${upnpState.mapped.join(", ")}`);
 }
