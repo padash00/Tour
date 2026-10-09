@@ -6,6 +6,7 @@ import { FINDER_MODES, FINDER_ROLES, getOwnPost, listFinderPosts } from "@/lib/f
 import { PlayerPostCard, PostForm, TeamPostCard } from "@/components/public/finder";
 import { Button, Container, ContextNav, EmptyState, PageTitle, Select } from "@/components/ds";
 import { TeamsNav } from "@/components/team/teams-nav";
+import { HelpHint } from "@/components/help-hint";
 
 export const metadata: Metadata = { title: "Поиск команды" };
 
@@ -60,6 +61,8 @@ export default async function FindPage(props: PageProps<"/find">) {
       <div className="mt-6">
         <TeamsNav />
       </div>
+
+      <HelpHint topics={isCaptain ? ["find-players"] : ["join-team"]} className="mt-6 max-w-[760px]" />
 
       <ContextNav
         className="mt-6"

@@ -11,6 +11,7 @@ import { MatchListRow } from "@/components/match-row";
 import { InviteButton } from "@/components/team/invite";
 import { Roster, type RosterMember } from "@/components/team/roster";
 import { TeamHeader } from "@/components/team/team-header";
+import { HelpHint } from "@/components/help-hint";
 import {
   Button,
   Callout,
@@ -51,6 +52,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
             Найти команду
           </Button>
         </div>
+        <HelpHint topics={["create-team", "join-team"]} className="mt-10" />
       </Container>
     );
   }
@@ -177,6 +179,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
               action={isCaptain && !locked && freeSlots > 0 ? <InviteButton url={inviteUrl} freeSlots={freeSlots} variant="secondary" size="sm" /> : undefined}
             >
               <Roster members={roster} isCaptain={isCaptain} locked={locked?.name ?? null} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} />
+              <HelpHint topics={isCaptain ? ["manage-roster", "find-players"] : ["leave-team"]} className="mt-6" />
             </Section>
           )}
 
@@ -236,6 +239,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                   action={<Button href="/tournaments" variant="secondary" size="sm">Смотреть турниры</Button>}
                 />
               )}
+              <HelpHint topics={["register-tournament", "change-application", "checkin"]} className="mt-6" />
             </Section>
           )}
 

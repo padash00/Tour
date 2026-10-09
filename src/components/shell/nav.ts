@@ -18,6 +18,7 @@ export const SECONDARY_NAV: { href: string; label: string }[] = [
   { href: "/players", label: "Игроки" },
   { href: "/find", label: "Поиск команды" },
   { href: "/about", label: "О платформе" },
+  { href: "/help", label: "Как это работает" },
   { href: "/rules", label: "Правила" },
   { href: "/rules#faq", label: "FAQ" },
   { href: "/privacy", label: "Персональные данные" },

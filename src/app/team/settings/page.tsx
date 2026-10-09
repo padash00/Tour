@@ -8,6 +8,7 @@ import { DangerZone, type DangerBlock } from "@/components/team/danger-zone";
 import { InviteButton } from "@/components/team/invite";
 import { TeamEditor } from "@/components/team/team-editor";
 import { TeamHeader } from "@/components/team/team-header";
+import { HelpHint } from "@/components/help-hint";
 import { Container, Panel, Section, Stack } from "@/components/ds";
 
 export const metadata: Metadata = { title: "Настройки команды" };
@@ -64,6 +65,7 @@ export default async function TeamSettingsPage() {
           <p className="text-[14px] text-fg-2">Название, логотип и приглашения меняет капитан команды.</p>
         )}
         <DangerZone isCaptain={isCaptain} teamName={team.name} blocked={blocked} />
+        <HelpHint topics={isCaptain ? ["leave-team", "manage-roster"] : ["leave-team"]} />
       </Stack>
     </Container>
   );

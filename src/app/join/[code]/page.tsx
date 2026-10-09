@@ -8,6 +8,7 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { Avatar, Button, Callout, Container, EmptyState, Eyebrow, TeamLogo } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
+import { HelpHint } from "@/components/help-hint";
 
 export const metadata: Metadata = { title: "Приглашение в команду" };
 
@@ -120,6 +121,7 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
           <Button href="/" variant="ghost" block className="mt-2">
             Отказаться
           </Button>
+          <HelpHint topics={["join-team"]} className="mt-6" />
         </div>
       </div>
     </Container>

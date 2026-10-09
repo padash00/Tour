@@ -8,6 +8,7 @@ import { getActiveMembership } from "@/lib/data";
 import { needsProfile } from "@/lib/profiles";
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { TeamEditor } from "@/components/team/team-editor";
+import { HelpHint } from "@/components/help-hint";
 import { Container, PageTitle } from "@/components/ds";
 
 export const metadata: Metadata = { title: "Создать команду" };
@@ -27,6 +28,7 @@ export default async function CreateTeamPage() {
       <div className="mt-8">
         {gated ? <ProfileRequired next="/team/create" action="создать команду" className="max-w-2xl" /> : <TeamEditor action={createTeam} mode="create" />}
       </div>
+      <HelpHint topics={["create-team", "join-team"]} className="mt-10 max-w-2xl" />
     </Container>
   );
 }

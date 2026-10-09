@@ -17,6 +17,7 @@ import { Button, Callout, Container, EmptyState, Eyebrow, FaceitLevel, PageTitle
 import { RegisterForm, RosterPicker, WithdrawApplication, type PickerMember } from "@/components/competition/registration";
 import { OfficialApplicationForm, type ApplicationValues } from "@/components/competition/official-application";
 import { ProfileRequired } from "@/components/profile/profile-required";
+import { HelpHint } from "@/components/help-hint";
 
 export const metadata: Metadata = { title: "Регистрация на турнир" };
 
@@ -342,6 +343,7 @@ function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; ste
         </Callout>
       )}
       <div className="mt-6 space-y-5">{children}</div>
+      {mode.size > 1 && <HelpHint topics={["register-tournament", "change-application", "checkin"]} className="mt-10" />}
     </Container>
   );
 }

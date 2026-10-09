@@ -9,6 +9,7 @@ import { formatDateTime, formatTime } from "@/lib/format";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { Button, Container, EmptyState, Eyebrow, FaceitLevel, PageTitle, Panel, PlayerIdentity, TeamIdentity } from "@/components/ds";
 import { CheckinTask, type CheckItem } from "@/components/competition/registration";
+import { HelpHint } from "@/components/help-hint";
 
 export const metadata: Metadata = { title: "Check-in" };
 
@@ -61,6 +62,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
             </Button>
           }
         />
+        <HelpHint topics={["checkin"]} className="mt-6" />
       </Container>
     );
   }
@@ -156,6 +158,7 @@ export default async function CheckinPage(props: PageProps<"/tournaments/[slug]/
             </Panel>
           </section>
         )}
+        <HelpHint topics={["checkin"]} />
       </div>
     </Container>
   );

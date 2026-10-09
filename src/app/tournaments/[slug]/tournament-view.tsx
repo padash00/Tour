@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, ExternalLink, Gamepad2, Swords, Users } from "lucide-react";
+import { HelpHint } from "@/components/help-hint";
 import { LiveRefresh } from "@/components/live-refresh";
 import { getTournamentRegistrations } from "@/lib/data";
 import { getMapImages } from "@/lib/settings";
@@ -293,6 +294,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                   }
                 />
               )}
+              <HelpHint topics={["register-tournament", "change-application", "checkin"]} className="mt-8" />
             </div>
           </TabPanel>
         </div>
