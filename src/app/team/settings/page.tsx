@@ -6,6 +6,7 @@ import { MAX_MAIN, MAX_SUBS, getActiveMembership, getLockingTournament, getTeamM
 import { siteOrigin } from "@/lib/origin";
 import { DangerZone, type DangerBlock } from "@/components/team/danger-zone";
 import { InviteButton } from "@/components/team/invite";
+import { ApplicationsToggle } from "@/components/team/applications-toggle";
 import { TeamEditor } from "@/components/team/team-editor";
 import { TeamHeader } from "@/components/team/team-header";
 import { HelpHint } from "@/components/help-hint";
@@ -60,12 +61,21 @@ export default async function TeamSettingsPage() {
                 <InviteButton url={`${origin}/join/${team.invite_code}`} freeSlots={MAX_MAIN + MAX_SUBS - members.length} variant="secondary" label="Открыть приглашение" />
               </Panel>
             </Section>
+            <Section title="Заявки на вступление" description="Игроки подают заявки со страницы команды и из «Поиска команды», вы принимаете или отклоняете их во вкладке «Заявки».">
+              <Panel className="flex items-center justify-between gap-4 p-5">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-medium text-fg">Принимать заявки</div>
+                  <div className="mt-0.5 text-meta text-fg-3">{team.accepts_applications ? "Кнопка «Подать заявку» видна на странице команды." : "Приём закрыт — вступить можно только по ссылке-приглашению."}</div>
+                </div>
+                <ApplicationsToggle accepts={team.accepts_applications} />
+              </Panel>
+            </Section>
           </>
         ) : (
           <p className="text-[14px] text-fg-2">Название, логотип и приглашения меняет капитан команды.</p>
         )}
         <DangerZone isCaptain={isCaptain} teamName={team.name} blocked={blocked} />
-        <HelpHint topics={isCaptain ? ["leave-team", "manage-roster"] : ["leave-team"]} />
+        <HelpHint topics={isCaptain ? ["leave-team", "team-applications", "manage-roster"] : ["leave-team"]} />
       </Stack>
     </Container>
   );

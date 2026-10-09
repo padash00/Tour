@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { closePost, invitePlayer, respondToTeam, savePlayerPost, saveTeamPost } from "@/app/actions/social";
+import { applyToTeam } from "@/app/actions/applications";
+import { closePost, invitePlayer, savePlayerPost, saveTeamPost } from "@/app/actions/social";
 import { formatDate } from "@/lib/format";
 import { FINDER_MODES, FINDER_ROLES, roleLabel, type FinderPost } from "@/lib/finder";
 import { ActionForm, SubmitButton } from "../forms";
@@ -160,11 +161,11 @@ export function TeamPostCard({ post, canRespond, own }: { post: FinderPost; canR
         {own ? (
           <span className="text-meta text-accent">Ваша команда</span>
         ) : canRespond ? (
-          <ActionForm action={respondToTeam} className="flex flex-col gap-2 sm:flex-row">
-            <input type="hidden" name="postId" value={post.id} />
+          <ActionForm action={applyToTeam} className="flex flex-col gap-2 sm:flex-row">
+            <input type="hidden" name="teamId" value={team.id} />
             <Input name="message" maxLength={200} placeholder="Пара слов капитану (необязательно)" className="h-10 flex-1" aria-label="Сообщение капитану" />
             <SubmitButton size="sm" className="h-10" pendingText="Отправляем…">
-              Откликнуться
+              Подать заявку
             </SubmitButton>
           </ActionForm>
         ) : (

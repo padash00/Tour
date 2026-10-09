@@ -20,6 +20,7 @@ import {
   sniffImage,
   syncOpenRosters,
 } from "@/lib/data";
+import { cancelPlayerApplications, cancelTeamApplications } from "@/lib/applications";
 import { profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
@@ -105,6 +106,7 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
   if (typeof logo === "string") await db().from("teams").update({ logo_url: logo }).eq("id", team.id);
   // если логотип не подошёл — команда всё равно создана, логотип можно загрузить в настройках
 
+  await cancelPlayerApplications(player.id);
   await audit(player.id, "team.create", { type: "team", id: team.id }, { name, tag });
   // экран успеха в штабе: «Команда создана — пригласите игроков»
   redirect("/team?created=1");
@@ -203,6 +205,7 @@ export async function joinTeam(_prev: ActionResult, formData: FormData): Promise
   if (error || !role) return { error: "Не удалось вступить — возможно, вы уже в другой команде" };
 
   await syncOpenRosters(team.id);
+  await cancelPlayerApplications(player.id);
   await notify([team.captain_id], `${player.nickname} вступил в ${team.name}`, undefined, "/team");
   await audit(player.id, "team.join", { type: "team", id: team.id }, { role });
   redirect("/team");
@@ -319,6 +322,7 @@ export async function disbandTeam(): Promise<ActionResult> {
   const members = await getTeamMembers(team.id);
   await db().from("team_members").update({ left_at: now }).eq("team_id", team.id).is("left_at", null);
   await db().from("teams").update({ disbanded_at: now }).eq("id", team.id);
+  await cancelTeamApplications(team.id);
   await notify(
     members.filter((m) => m.player_id !== player.id).map((m) => m.player_id),
     `Команда ${team.name} распущена`,

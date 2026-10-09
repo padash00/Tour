@@ -1536,6 +1536,61 @@ export type Database = {
           },
         ]
       }
+      team_applications: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          message: string | null
+          player_id: string
+          status: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          player_id: string
+          status?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          message?: string | null
+          player_id?: string
+          status?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_applications_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_applications_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_applications_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           id: string
@@ -1609,6 +1664,7 @@ export type Database = {
       }
       teams: {
         Row: {
+          accepts_applications: boolean
           captain_id: string
           created_at: string
           description: string | null
@@ -1622,6 +1678,7 @@ export type Database = {
           tag: string
         }
         Insert: {
+          accepts_applications?: boolean
           captain_id: string
           created_at?: string
           description?: string | null
@@ -1635,6 +1692,7 @@ export type Database = {
           tag: string
         }
         Update: {
+          accepts_applications?: boolean
           captain_id?: string
           created_at?: string
           description?: string | null
@@ -2193,6 +2251,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_team_application: {
+        Args: {
+          p_actor: string
+          p_application: string
+          p_max_main: number
+          p_max_subs: number
+          p_ttl_days: number
+        }
+        Returns: string
+      }
+      apply_to_team: {
+        Args: {
+          p_cooldown_hours: number
+          p_limit: number
+          p_message: string
+          p_player: string
+          p_team: string
+          p_ttl_days: number
+        }
+        Returns: string
+      }
       assign_game_server: {
         Args: {
           p_actor?: string

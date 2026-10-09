@@ -138,31 +138,3 @@ export async function invitePlayer(_prev: ActionResult, formData: FormData): Pro
   return { success: "Приглашение отправлено — игрок получит уведомление" };
 }
 
-/** Игрок откликается на «ищем игрока» — уведомление капитану со ссылкой на профиль */
-export async function respondToTeam(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  const player = await requirePlayer("/find?tab=teams");
-  if (player.is_banned) return { error: BANNED_ERROR };
-  const id = String(formData.get("postId") ?? "");
-  const { data: post } = await db()
-    .from("finder_posts")
-    .select("id, team_id, active, expires_at, team:teams(id, name, captain_id)")
-    .eq("id", id)
-    .eq("kind", "team")
-    .maybeSingle();
-  const team = post?.team;
-  if (!post || !team || !post.active || new Date(post.expires_at).getTime() < Date.now()) return { error: "Объявление уже неактуально" };
-  const membership = await getActiveMembership(player.id);
-  if (membership?.team.id === team.id) return { error: "Вы уже в этой команде" };
-  if (await isRateLimited(player.id, `finder.respond:${team.id}`, 3600)) return { error: "Вы уже откликались — капитан увидит уведомление" };
-  const note = clean(formData.get("message"), 200);
-
-  await notify(
-    [team.captain_id],
-    `${player.nickname} откликнулся на объявление ${team.name}`,
-    `${note ? `«${note}» · ` : ""}FACEIT ${player.faceit_level ?? "—"} · ${player.faceit_elo ?? "—"} ELO. Откройте профиль игрока.`,
-    `/players/${player.steam_id}`,
-  );
-  await audit(player.id, `finder.respond:${team.id}`, { type: "team", id: team.id });
-  return { success: "Отклик отправлен капитану" };
-}
-

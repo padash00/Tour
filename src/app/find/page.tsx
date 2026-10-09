@@ -48,7 +48,7 @@ export default async function FindPage(props: PageProps<"/find">) {
         <div>
           <PageTitle>Поиск команды</PageTitle>
           <p className="mt-1 max-w-read text-meta text-fg-3">
-            Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, отклик и приглашение приходят уведомлением.
+            Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, заявки и приглашения приходят уведомлением.
           </p>
         </div>
         {!player && (
@@ -62,7 +62,7 @@ export default async function FindPage(props: PageProps<"/find">) {
         <TeamsNav />
       </div>
 
-      <HelpHint topics={isCaptain ? ["find-players"] : ["join-team"]} className="mt-6 max-w-[760px]" />
+      <HelpHint topics={isCaptain ? ["find-players", "team-applications"] : ["join-team"]} className="mt-6 max-w-[760px]" />
 
       <ContextNav
         className="mt-6"
@@ -138,7 +138,7 @@ export default async function FindPage(props: PageProps<"/find">) {
                 tab === "players" ? (
                   <PlayerPostCard key={p.id} post={p} own={p.player_id === player?.id} canInvite={isCaptain && !membership!.team.is_solo} />
                 ) : (
-                  <TeamPostCard key={p.id} post={p} own={!!membership && membership.team.id === p.team_id} canRespond={!!player && !player.is_banned} />
+                  <TeamPostCard key={p.id} post={p} own={!!membership && membership.team.id === p.team_id} canRespond={!!player && !player.is_banned && !membership} />
                 ),
               )}
             </div>

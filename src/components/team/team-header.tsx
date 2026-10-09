@@ -13,6 +13,7 @@ export function TeamHeader({
   maxMain,
   actions,
   active,
+  applications,
 }: {
   team: Team;
   isCaptain: boolean;
@@ -22,6 +23,8 @@ export function TeamHeader({
   actions?: ReactNode;
   /** settings — отдельная страница настроек, иначе вкладки штаба */
   active: "tabs" | "settings";
+  /** капитану — вкладка «Заявки» с числом ожидающих */
+  applications?: number;
 }) {
   return (
     <>
@@ -64,6 +67,7 @@ export function TeamHeader({
               { key: "roster", label: "Состав", href: "/team?tab=roster" },
               { key: "matches", label: "Матчи", href: "/team?tab=matches" },
               { key: "tournaments", label: "Турниры", href: "/team?tab=tournaments" },
+              ...(applications !== undefined ? [{ key: "applications", label: "Заявки", href: "/team?tab=applications", count: applications || undefined }] : []),
             ]}
           />
         </Suspense>

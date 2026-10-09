@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { ArrowLeft, Gamepad2, Trophy } from "lucide-react";
-import { MAX_MAIN, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations, getTeamTagByAlias } from "@/lib/data";
+import { ArrowLeft, Gamepad2, Trophy, UserPlus } from "lucide-react";
+import { MAX_MAIN, MAX_SUBS, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations, getTeamTagByAlias } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
 import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
@@ -13,6 +13,7 @@ import { FormStrip } from "@/components/public/form-strip";
 import { ratingColor } from "@/components/stats-format";
 import { MatchListRow } from "@/components/match-row";
 import {
+  Button,
   Container,
   EmptyState,
   Eyebrow,
@@ -130,6 +131,11 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                 ))}
             </div>
             {team.description && <p className="mt-3 max-w-read text-[14px] leading-relaxed text-fg-2">{team.description}</p>}
+            {!team.is_solo && team.accepts_applications && members.length < MAX_MAIN + MAX_SUBS && (
+              <Button href={`/teams/${encodeURIComponent(team.tag)}/apply`} size="sm" icon={<UserPlus />} className="mt-4">
+                Подать заявку
+              </Button>
+            )}
           </div>
         </div>
         <div className="shrink-0">

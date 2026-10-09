@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Gamepad2, Lock, Trophy, Users } from "lucide-react";
+import { ArrowRight, Gamepad2, Inbox, Lock, Trophy, Users } from "lucide-react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { requirePlayer } from "@/lib/auth";
+import { getPlayerApplications, getTeamApplications } from "@/lib/applications";
 import { MAX_MAIN, MAX_SUBS, averageElo, getActiveMembership, getLockingTournament, getTeamMembers, getTeamRegistrations } from "@/lib/data";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { siteOrigin } from "@/lib/origin";
@@ -12,6 +13,8 @@ import { InviteButton } from "@/components/team/invite";
 import { Roster, type RosterMember } from "@/components/team/roster";
 import { TeamHeader } from "@/components/team/team-header";
 import { HelpHint } from "@/components/help-hint";
+import { ApplicationsInbox } from "@/components/team/applications";
+import { MyApplications } from "@/components/team/my-applications";
 import {
   Button,
   Callout,
@@ -30,7 +33,7 @@ import {
 
 export const metadata: Metadata = { title: "Моя команда" };
 
-type Tab = "overview" | "roster" | "matches" | "tournaments";
+type Tab = "overview" | "roster" | "matches" | "tournaments" | "applications";
 
 export default async function MyTeamPage(props: PageProps<"/team">) {
   const player = await requirePlayer("/team");
@@ -38,6 +41,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   const membership = await getActiveMembership(player.id);
 
   if (!membership) {
+    const applications = await getPlayerApplications(player.id);
     return (
       <Container width="read" className="pt-12 sm:pt-16">
         <PageTitle>У вас пока нет команды</PageTitle>
@@ -52,21 +56,23 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
             Найти команду
           </Button>
         </div>
+        {applications.length > 0 && <MyApplications items={applications} className="mt-10" />}
         <HelpHint topics={["create-team", "join-team"]} className="mt-10" />
       </Container>
     );
   }
 
-  const tab: Tab = (["roster", "matches", "tournaments"] as const).find((t) => t === sp.tab) ?? "overview";
+  const tab: Tab = (["roster", "matches", "tournaments", "applications"] as const).find((t) => t === sp.tab) ?? "overview";
   const created = sp.created === "1";
   const { team } = membership;
   const isCaptain = team.captain_id === player.id;
-  const [members, regs, locked, origin, matches] = await Promise.all([
+  const [members, regs, locked, origin, matches, applications] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getLockingTournament(team.id),
     siteOrigin(),
     getTeamMatches(team.id),
+    isCaptain ? getTeamApplications(team.id) : Promise.resolve(null),
   ]);
   const order = { live: 0, ready: 1, veto: 2, upcoming: 3, pending: 4, finished: 5, cancelled: 6 } as const;
   const active = matches.filter((m) => !["finished", "cancelled"].includes(m.status)).sort((a, b) => order[a.status] - order[b.status] || a.number - b.number);
@@ -93,6 +99,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
           mains={mains}
           maxMain={MAX_MAIN}
           active="tabs"
+          applications={applications?.length}
           actions={isCaptain && !locked ? <InviteButton url={inviteUrl} freeSlots={freeSlots} variant={created ? "secondary" : "primary"} /> : undefined}
         />
 
@@ -118,6 +125,16 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                     <InviteButton url={inviteUrl} freeSlots={freeSlots} size="lg" label="Пригласить игроков" />
                   </div>
                 </CriticalSurface>
+              )}
+
+              {isCaptain && applications && applications.length > 0 && tab === "overview" && (
+                <Callout
+                  tone="info"
+                  title={`Новые заявки на вступление: ${applications.length}`}
+                  action={<Button href="/team?tab=applications" size="sm" variant="secondary">Посмотреть</Button>}
+                >
+                  Игроки хотят в команду — примите или отклоните заявки.
+                </Callout>
               )}
 
               {needsCheckin && isCaptain && (
@@ -179,7 +196,40 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
               action={isCaptain && !locked && freeSlots > 0 ? <InviteButton url={inviteUrl} freeSlots={freeSlots} variant="secondary" size="sm" /> : undefined}
             >
               <Roster members={roster} isCaptain={isCaptain} locked={locked?.name ?? null} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} />
-              <HelpHint topics={isCaptain ? ["manage-roster", "find-players"] : ["leave-team"]} className="mt-6" />
+              <HelpHint topics={isCaptain ? ["manage-roster", "find-players", "team-applications"] : ["leave-team"]} className="mt-6" />
+            </Section>
+          )}
+
+          {tab === "applications" && applications && (
+            <Section
+              title="Заявки на вступление"
+              description="Игроки, которые хотят в команду. Принятый игрок попадает в основу, если там есть место, иначе — в запас."
+            >
+              {!team.accepts_applications && (
+                <Callout tone="warn" title="Приём заявок закрыт" className="mb-4" action={<Button href="/team/settings" size="sm" variant="secondary">Открыть в настройках</Button>}>
+                  Новые заявки не приходят. Уже поданные можно рассмотреть.
+                </Callout>
+              )}
+              {locked && (
+                <Callout tone="warn" className="mb-4">
+                  Состав заблокирован турниром «{locked.name}» — принять игрока сейчас нельзя.
+                </Callout>
+              )}
+              {applications.length ? (
+                <ApplicationsInbox
+                  locked={locked?.name ?? null}
+                  items={applications.map((a) => ({ id: a.id, message: a.message, date: formatDate(a.created_at), player: a.player }))}
+                />
+              ) : (
+                <EmptyState
+                  compact
+                  icon={<Inbox />}
+                  title="Новых заявок нет"
+                  text="Игроки подают заявки со страницы команды и из «Поиска команды». Заявка живёт 7 дней."
+                  action={<Button href="/find?tab=teams" variant="secondary" size="sm">Разместить объявление</Button>}
+                />
+              )}
+              <HelpHint topics={["team-applications"]} className="mt-6" />
             </Section>
           )}
 
