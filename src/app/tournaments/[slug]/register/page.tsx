@@ -10,7 +10,7 @@ import { getPreviousRoster } from "@/lib/progress";
 import { formatDateTime, formatTime } from "@/lib/format";
 import type { Registration, TeamMemberWithPlayer, Tournament } from "@/lib/types";
 import { ageRangeLabel, checkPlayer, officialRoster } from "@/lib/official";
-import { formatPhone, tournamentDay } from "@/lib/profile";
+import { formatPhone, isProfileComplete, tournamentDay } from "@/lib/profile";
 import { getOrganizationSuggestions, getProfile, getProfiles, needsProfile, profileLock } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import { Button, Callout, Container, EmptyState, Eyebrow, FaceitLevel, PageTitle, Panel, PlayerIdentity, Status, Steps, TeamIdentity, registrationStatus, type StepState } from "@/components/ds";
@@ -213,7 +213,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
 
   // капитан, официальный турнир: состав без запасных, организация, тренер и чек-лист
   if (t.is_official) {
-    const form = await officialForm(t, members, team.captain_id, player.id, regShown, active);
+    const form = await officialForm(t, members, team.captain_id, player.id, regShown, active, team.coach_id);
     return (
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
@@ -472,14 +472,17 @@ function WithdrawRow({ tournamentId, solo }: { tournamentId: string; solo?: bool
  * Форма заявки на официальный турнир. Анкеты игроков читаются на сервере, в браузер капитана уходит
  * только итог проверки (ник, что не заполнено, возраст при несоответствии) — не сами данные товарищей.
  */
-async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], captainId: string, meId: string, reg: Reg | null, active: Reg | null) {
+async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], captainId: string, meId: string, reg: Reg | null, active: Reg | null, coachId: string | null) {
   const day = tournamentDay(t);
   const { size, subs } = officialRoster(t);
-  const [profiles, suggestions, app] = await Promise.all([
-    getProfiles(members.map((m) => m.player_id)),
+  const [profiles, suggestions, app, coach] = await Promise.all([
+    getProfiles([...members.map((m) => m.player_id), ...(coachId ? [coachId] : [])]),
     getOrganizationSuggestions(),
     reg ? db().from("tournament_applications").select("*").eq("registration_id", reg.id).maybeSingle().then((r) => r.data) : Promise.resolve(null),
+    coachId ? db().from("players").select("nickname").eq("id", coachId).maybeSingle().then((r) => r.data) : Promise.resolve(null),
   ]);
+  // в браузер — только ник тренера и готова ли анкета, сами данные подставит сервер
+  const teamCoach = coach ? { nickname: coach.nickname, ready: isProfileComplete(profiles.get(coachId!) ?? null) } : null;
   const checks = members.map((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, t, day));
 
   const initial: Record<string, "main" | "sub" | "out"> = {};
@@ -523,6 +526,7 @@ async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], capt
       suggestions={suggestions}
       update={!!active}
       label={active ? "Сохранить заявку" : reg?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
+      teamCoach={teamCoach}
       footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}
     />
   );

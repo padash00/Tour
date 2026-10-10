@@ -35,7 +35,10 @@ export function OfficialApplicationForm({
   update,
   label,
   footer,
+  teamCoach,
 }: {
+  /** тренер команды на сайте: ready — анкета заполнена, данные подставит сервер (в браузер они не уходят) */
+  teamCoach?: { nickname: string; ready: boolean } | null;
   tournamentId: string;
   settings: OfficialSettings;
   /** день турнира YYYY-MM-DD — возраст считается на него */
@@ -67,7 +70,8 @@ export function OfficialApplicationForm({
 
   const chosen = members.filter((m) => !m.banned && (slots[m.player_id] === "main" || slots[m.player_id] === "sub"));
   const subCount = chosen.filter((m) => slots[m.player_id] === "sub").length;
-  const { errors } = useMemo(() => parseApplication((k) => v[k as keyof ApplicationValues], settings.require_coach), [v, settings.require_coach]);
+  const coachFromTeam = settings.require_coach && !!teamCoach?.ready;
+  const { errors } = useMemo(() => parseApplication((k) => v[k as keyof ApplicationValues], settings.require_coach && !coachFromTeam), [v, settings.require_coach, coachFromTeam]);
   const items = officialChecklist({
     t: settings,
     players: chosen.map(
@@ -77,7 +81,7 @@ export function OfficialApplicationForm({
     subs: subCount,
     application: errors,
   });
-  const coachWarning = settings.require_coach ? coachAgeWarning(settings, parseDay(v.coach_birth_date), day) : null;
+  const coachWarning = settings.require_coach && !coachFromTeam ? coachAgeWarning(settings, parseDay(v.coach_birth_date), day) : null;
   const blocked = items.filter((i) => !i.ok);
   const set = (k: keyof ApplicationValues) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [k]: e.target.value }));
   const show = (k: keyof ApplicationValues) => (touched && errors[k] ? errors[k] : undefined);
@@ -137,11 +141,24 @@ export function OfficialApplicationForm({
       </div>
 
       {/* тренер */}
-      {settings.require_coach && (
+      {coachFromTeam && (
+        <div className="border-t border-line-subtle px-4 py-5 sm:px-5">
+          <input type="hidden" name="coach_from_team" value="1" />
+          <h3 className="text-title text-fg">Тренер</h3>
+          <p className="mt-0.5 text-meta text-fg-3">
+            Тренер команды — <span className="text-fg-2">{teamCoach!.nickname}</span>. ФИО, дата рождения, место работы и должность попадут в заявку из его анкеты.
+          </p>
+        </div>
+      )}
+      {settings.require_coach && !coachFromTeam && (
         <div className="space-y-5 border-t border-line-subtle px-4 py-5 sm:px-5">
           <div>
             <h3 className="text-title text-fg">Тренер</h3>
-            <p className="mt-0.5 text-meta text-fg-3">Шестой участник команды. Аккаунт на сайте тренеру не нужен.</p>
+            <p className="mt-0.5 text-meta text-fg-3">
+              {teamCoach
+                ? `У тренера команды ${teamCoach.nickname} не заполнена анкета — попросите его заполнить её или впишите данные вручную.`
+                : "Шестой участник команды. Можно вписать вручную или пригласить тренера в команду на сайте — тогда данные подставятся из его анкеты."}
+            </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             {text("coach_name", "ФИО тренера", { placeholder: "Сидоров Сидор Сидорович", max: 120 })}

@@ -1591,6 +1591,61 @@ export type Database = {
           },
         ]
       }
+      team_invites: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          id: string
+          invited_by: string | null
+          player_id: string
+          role: string
+          status: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          invited_by?: string | null
+          player_id: string
+          role: string
+          status?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          invited_by?: string | null
+          player_id?: string
+          role?: string
+          status?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_invites_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_invites_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           id: string
@@ -1666,6 +1721,7 @@ export type Database = {
         Row: {
           accepts_applications: boolean
           captain_id: string
+          coach_id: string | null
           created_at: string
           description: string | null
           disbanded_at: string | null
@@ -1680,6 +1736,7 @@ export type Database = {
         Insert: {
           accepts_applications?: boolean
           captain_id: string
+          coach_id?: string | null
           created_at?: string
           description?: string | null
           disbanded_at?: string | null
@@ -1694,6 +1751,7 @@ export type Database = {
         Update: {
           accepts_applications?: boolean
           captain_id?: string
+          coach_id?: string | null
           created_at?: string
           description?: string | null
           disbanded_at?: string | null
@@ -1706,6 +1764,13 @@ export type Database = {
           tag?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "teams_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teams_captain_id_fkey"
             columns: ["captain_id"]
@@ -2261,6 +2326,16 @@ export type Database = {
         }
         Returns: string
       }
+      accept_team_invite: {
+        Args: {
+          p_invite: string
+          p_max_main: number
+          p_max_subs: number
+          p_player: string
+          p_ttl_days: number
+        }
+        Returns: string
+      }
       apply_to_team: {
         Args: {
           p_cooldown_hours: number
@@ -2340,6 +2415,17 @@ export type Database = {
       create_stage_matches: {
         Args: { p_mode: string; p_rows: Json; p_tournament: string }
         Returns: boolean
+      }
+      create_team_invite: {
+        Args: {
+          p_actor: string
+          p_max_total: number
+          p_player: string
+          p_role: string
+          p_team: string
+          p_ttl_days: number
+        }
+        Returns: string
       }
       finish_veto: {
         Args: { p_match: string; p_single_map?: string }

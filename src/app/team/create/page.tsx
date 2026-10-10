@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createTeam } from "@/app/actions/team";
 import { requirePlayer } from "@/lib/auth";
-import { getActiveMembership } from "@/lib/data";
+import { MAX_MAIN, MAX_SUBS, getActiveMembership } from "@/lib/data";
 import { needsProfile } from "@/lib/profiles";
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { TeamEditor } from "@/components/team/team-editor";
 import { HelpHint } from "@/components/help-hint";
-import { Container, PageTitle } from "@/components/ds";
+import { RosterStrip } from "@/components/team/roster-strip";
+import { Container, Eyebrow, PageTitle, Panel } from "@/components/ds";
 
 export const metadata: Metadata = { title: "Создать команду" };
 
@@ -25,6 +26,14 @@ export default async function CreateTeamPage() {
       </Link>
       <PageTitle className="mt-2">Создать команду</PageTitle>
       <p className="mt-2 text-[15px] text-fg-2">Название и тег — обязательно, остальное можно заполнить позже.</p>
+      <Panel className="mt-6 max-w-2xl">
+        <Eyebrow>Состав команды</Eyebrow>
+        <RosterStrip members={[{ id: "me", role: "captain", player: { nickname: player.nickname, avatar_url: player.avatar_url } }]} coach={null} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} className="mt-4" />
+        <p className="mt-4 text-meta leading-relaxed text-fg-3">
+          {MAX_MAIN} основных (вы — капитан), до {MAX_SUBS} запасных и тренер, если нужен. После создания найдите игроков и тренера по нику — они подтвердят
+          приглашение, — или отправьте ссылку-приглашение.
+        </p>
+      </Panel>
       <div className="mt-8">
         {gated ? <ProfileRequired next="/team/create" action="создать команду" className="max-w-2xl" /> : <TeamEditor action={createTeam} mode="create" />}
       </div>

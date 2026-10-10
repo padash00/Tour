@@ -21,6 +21,7 @@ import {
   syncOpenRosters,
 } from "@/lib/data";
 import { cancelPlayerApplications, cancelTeamApplications } from "@/lib/applications";
+import { cancelPlayerInvites, cancelTeamInvites } from "@/lib/invites";
 import { profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
@@ -107,6 +108,7 @@ export async function createTeam(_prev: ActionResult, formData: FormData): Promi
   // если логотип не подошёл — команда всё равно создана, логотип можно загрузить в настройках
 
   await cancelPlayerApplications(player.id);
+  await cancelPlayerInvites(player.id);
   await audit(player.id, "team.create", { type: "team", id: team.id }, { name, tag });
   // экран успеха в штабе: «Команда создана — пригласите игроков»
   redirect("/team?created=1");
@@ -189,6 +191,7 @@ export async function joinTeam(_prev: ActionResult, formData: FormData): Promise
   const team = await getTeamByInvite(code);
   if (!team) return { error: "Ссылка недействительна" };
   if (await getActiveMembership(player.id)) return { error: "Вы уже состоите в команде. Сначала покиньте её." };
+  if (team.coach_id === player.id) return { error: "Вы тренер этой команды — игроком быть нельзя. Сначала уйдите с поста тренера." };
 
   const locked = await lockedError(team.id);
   if (locked) return { error: locked };
@@ -206,6 +209,7 @@ export async function joinTeam(_prev: ActionResult, formData: FormData): Promise
 
   await syncOpenRosters(team.id);
   await cancelPlayerApplications(player.id);
+  await cancelPlayerInvites(player.id);
   await notify([team.captain_id], `${player.nickname} вступил в ${team.name}`, undefined, "/team");
   await audit(player.id, "team.join", { type: "team", id: team.id }, { role });
   redirect("/team");
@@ -323,6 +327,7 @@ export async function disbandTeam(): Promise<ActionResult> {
   await db().from("team_members").update({ left_at: now }).eq("team_id", team.id).is("left_at", null);
   await db().from("teams").update({ disbanded_at: now }).eq("id", team.id);
   await cancelTeamApplications(team.id);
+  await cancelTeamInvites(team.id);
   await notify(
     members.filter((m) => m.player_id !== player.id).map((m) => m.player_id),
     `Команда ${team.name} распущена`,

@@ -16,8 +16,8 @@ import {
 import { registrationError } from "@/lib/registration-errors";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { checkPlayer, officialRoster, parseApplication, type ApplicationInput } from "@/lib/official";
-import { tournamentDay } from "@/lib/profile";
-import { getProfiles, profileGateError } from "@/lib/profiles";
+import { fullName, isProfileComplete, positionOf, tournamentDay, workplaceOf } from "@/lib/profile";
+import { getProfile, getProfiles, profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { SaveRegistrationResult, Tournament } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
@@ -83,7 +83,19 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     const day = tournamentDay(tournament);
     const issues = chosen.flatMap((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, tournament, day).issues);
     if (issues.length) return { error: issues.join(". ") };
-    const parsed = parseApplication((k) => formData.get(k), tournament.require_coach);
+    // тренер команды на сайте: его данные берутся из анкеты на сервере (капитан их не видит и не вводит)
+    let coach: Record<string, string> | null = null;
+    if (tournament.require_coach && formData.get("coach_from_team") === "1") {
+      const profile = team.coach_id ? await getProfile(team.coach_id) : null;
+      if (!profile || !isProfileComplete(profile)) return { error: "У тренера команды не заполнена анкета — обновите страницу и впишите данные тренера вручную" };
+      coach = {
+        coach_name: fullName(profile),
+        coach_birth_date: profile.birth_date ?? "",
+        coach_workplace: workplaceOf(profile),
+        coach_position: positionOf(profile),
+      };
+    }
+    const parsed = parseApplication((k) => coach?.[k] ?? formData.get(k), tournament.require_coach);
     const firstError = Object.values(parsed.errors)[0];
     if (firstError) return { error: firstError };
     application = parsed.value;

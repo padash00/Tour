@@ -1,4 +1,4 @@
-import { Crown } from "lucide-react";
+import { Crown, GraduationCap } from "lucide-react";
 import { Avatar, cn } from "@/components/ds";
 
 export type StripMember = { id: string; role: string; player: { nickname: string; avatar_url: string | null } };
@@ -11,10 +11,13 @@ export function RosterStrip({
   members,
   maxMain,
   maxSubs,
+  coach,
   center,
   className,
 }: {
   members: StripMember[];
+  /** тренер команды; undefined — слот тренера не показывать */
+  coach?: { nickname: string; avatar_url: string | null } | null;
   maxMain: number;
   maxSubs: number;
   center?: boolean;
@@ -56,6 +59,20 @@ export function RosterStrip({
           <div className={cn("num mt-1.5 text-micro text-fg-3", center && "text-center")}>
             Запас {subs.length}/{maxSubs}
           </div>
+        </div>
+      )}
+      {coach !== undefined && (
+        <div>
+          {coach ? (
+            <span className="block" title={`${coach.nickname} · тренер`}>
+              <Avatar src={coach.avatar_url} name={coach.nickname} size="sm" className="ring-2 ring-surface" />
+            </span>
+          ) : (
+            <span aria-hidden className="grid size-8 place-items-center rounded-full border border-dashed border-line-strong bg-surface text-fg-3 [&>svg]:size-3.5">
+              <GraduationCap />
+            </span>
+          )}
+          <div className={cn("mt-1.5 text-micro text-fg-3", center && "text-center")}>Тренер</div>
         </div>
       )}
     </div>

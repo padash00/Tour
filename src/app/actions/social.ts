@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePlayer } from "@/lib/auth";
-import { audit, notify } from "@/lib/audit";
-import { BANNED_ERROR, getActiveMembership, getTeamMembers, isRateLimited } from "@/lib/data";
+import { audit } from "@/lib/audit";
+import { BANNED_ERROR, getActiveMembership, isRateLimited } from "@/lib/data";
+import { sendInvite } from "./invites";
 import { FINDER_MODES, FINDER_ROLES, FINDER_TTL_DAYS, closeExpired } from "@/lib/finder";
 import type { Tables } from "@/lib/database.types";
 import { db } from "@/lib/supabase";
@@ -124,16 +125,14 @@ export async function invitePlayer(_prev: ActionResult, formData: FormData): Pro
     .maybeSingle();
   if (!post || !post.active || new Date(post.expires_at).getTime() < Date.now()) return { error: "Объявление уже неактуально" };
   if (post.player_id === player.id) return { error: "Это ваше объявление" };
-  const members = await getTeamMembers(team.id);
-  if (members.some((m) => m.player_id === post.player_id)) return { error: "Игрок уже в вашей команде" };
   if (await isRateLimited(player.id, `finder.invite:${post.player_id}`, 3600)) return { error: "Вы уже приглашали этого игрока — подождите ответа" };
 
-  await notify(
-    [post.player_id],
-    `${team.name} приглашает вас в команду`,
-    `Капитан ${player.nickname} увидел ваше объявление. Нажмите, чтобы вступить в [${team.tag}].`,
-    `/join/${team.invite_code}`,
-  );
+  // то же личное приглашение, что и по нику: игрок увидит его в «Моя команда» и подтвердит
+  const fd = new FormData();
+  fd.set("playerId", post.player_id);
+  fd.set("role", "player");
+  const r = await sendInvite(null, fd);
+  if (r?.error) return r;
   await audit(player.id, `finder.invite:${post.player_id}`, { type: "team", id: team.id }, { to: post.player_id });
   return { success: "Приглашение отправлено — игрок получит уведомление" };
 }

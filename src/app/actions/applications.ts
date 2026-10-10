@@ -34,6 +34,7 @@ export async function applyToTeam(_prev: ActionResult, formData: FormData): Prom
   if (player.is_banned) return { error: BANNED_ERROR };
   const membership = await getActiveMembership(player.id);
   if (membership) return { error: membership.team.id === team.id ? "Вы уже в этой команде" : "Вы уже состоите в команде. Сначала покиньте её." };
+  if (team.coach_id === player.id) return { error: "Вы тренер этой команды — игроком быть нельзя" };
   const gate = await profileGateError(player);
   if (gate) return { error: gate };
   if (await isRateLimited(player.id, "team.apply", 5)) return { error: "Слишком часто — попробуйте через пару секунд" };

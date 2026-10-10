@@ -4,6 +4,7 @@ import { ArrowRight, Gamepad2, Inbox, Lock, Trophy, Users } from "lucide-react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { requirePlayer } from "@/lib/auth";
 import { getPlayerApplications, getTeamApplications } from "@/lib/applications";
+import { getCoach, getCoachedTeams, getPlayerInvites, getTeamInvites } from "@/lib/invites";
 import { MAX_MAIN, MAX_SUBS, averageElo, getActiveMembership, getLockingTournament, getTeamMembers, getTeamRegistrations, listPublicTournaments } from "@/lib/data";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { siteOrigin } from "@/lib/origin";
@@ -16,6 +17,9 @@ import { RosterStrip } from "@/components/team/roster-strip";
 import { HelpHint } from "@/components/help-hint";
 import { ApplicationsInbox } from "@/components/team/applications";
 import { MyApplications } from "@/components/team/my-applications";
+import { CoachedTeams, MyInvites } from "@/components/team/my-invites";
+import { InviteByNick } from "@/components/team/invite-by-nick";
+import { CoachSlot, PendingInvites } from "@/components/team/staff";
 import {
   Button,
   Callout,
@@ -43,7 +47,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   const membership = await getActiveMembership(player.id);
 
   if (!membership) {
-    const applications = await getPlayerApplications(player.id);
+    const [applications, invites, coached] = await Promise.all([getPlayerApplications(player.id), getPlayerInvites(player.id), getCoachedTeams(player.id)]);
     return (
       <Container width="read" className="pt-12 sm:pt-16">
         <PageTitle>У вас пока нет команды</PageTitle>
@@ -58,6 +62,8 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
             Найти команду
           </Button>
         </div>
+        <MyInvites items={invites} inTeam={false} className="mt-10" />
+        <CoachedTeams teams={coached} className="mt-10" />
         {applications.length > 0 && <MyApplications items={applications} className="mt-10" />}
         <HelpHint topics={["create-team", "join-team"]} className="mt-10" />
       </Container>
@@ -68,7 +74,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   const created = sp.created === "1";
   const { team } = membership;
   const isCaptain = team.captain_id === player.id;
-  const [members, regs, locked, origin, matches, applications, tournaments] = await Promise.all([
+  const [members, regs, locked, origin, matches, applications, tournaments, teamInvites, myInvites, coached, coach] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getLockingTournament(team.id),
@@ -76,7 +82,12 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
     getTeamMatches(team.id),
     isCaptain ? getTeamApplications(team.id) : Promise.resolve(null),
     listPublicTournaments(),
+    getTeamInvites(team.id),
+    getPlayerInvites(player.id),
+    getCoachedTeams(player.id),
+    getCoach(team),
   ]);
+  const pendingInvites = teamInvites.map((i) => ({ id: i.id, role: i.role, date: formatDate(i.created_at), player: i.player }));
   const order = { live: 0, ready: 1, veto: 2, upcoming: 3, pending: 4, finished: 5, cancelled: 6 } as const;
   const active = matches.filter((m) => !["finished", "cancelled"].includes(m.status)).sort((a, b) => order[a.status] - order[b.status] || a.number - b.number);
   const played = matches.filter((m) => m.status === "finished").reverse();
@@ -108,19 +119,16 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
       ? isCaptain && !locked
         ? {
             title: `Наберите основу: не хватает ${MAX_MAIN - mains}`,
-            text: "Отправьте игрокам ссылку-приглашение или примите заявки тех, кто хочет в команду.",
+            text: "Найдите игроков по нику, отправьте ссылку или примите заявки тех, кто хочет в команду.",
             action: (
               <>
-                <InviteButton url={inviteUrl} freeSlots={freeSlots} size="sm" />
+                <InviteByNick size="sm" variant="primary" />
+                <InviteButton url={inviteUrl} freeSlots={freeSlots} size="sm" variant="secondary" label="Ссылка" />
                 {applications && applications.length > 0 ? (
                   <Button href="/team?tab=applications" variant="secondary" size="sm">
                     Заявки · {applications.length}
                   </Button>
-                ) : (
-                  <Button href="/find" variant="ghost" size="sm">
-                    Поиск игроков
-                  </Button>
-                )}
+                ) : null}
               </>
             ),
           }
@@ -161,6 +169,8 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
 
           {tab === "overview" && (
             <Stack>
+              <MyInvites items={myInvites} inTeam />
+              <CoachedTeams teams={coached} />
               {created && (
                 <CriticalSurface tone="ok">
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -168,10 +178,13 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                       <Eyebrow tone="ok">Команда создана</Eyebrow>
                       <div className="mt-2 text-heading text-fg">{team.name}</div>
                       <p className="mt-1 text-[14px] text-fg-2">
-                        Следующий шаг — пригласите игроков. В основе {mains} из {MAX_MAIN}.
+                        Следующий шаг — соберите состав: {MAX_MAIN} основных, до {MAX_SUBS} запасных и, если нужен, тренер. Найдите игроков по нику или отправьте ссылку.
                       </p>
                     </div>
-                    <InviteButton url={inviteUrl} freeSlots={freeSlots} size="lg" label="Пригласить игроков" />
+                    <div className="flex flex-wrap gap-2">
+                      <InviteByNick size="lg" variant="primary" />
+                      <InviteButton url={inviteUrl} freeSlots={freeSlots} size="lg" variant="secondary" label="Ссылка-приглашение" />
+                    </div>
                   </div>
                 </CriticalSurface>
               )}
@@ -208,7 +221,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                       <Eyebrow>Состав</Eyebrow>
                       <Status info={ready ? { label: "Основа собрана", tone: "ok" } : { label: `Нужно ещё ${MAX_MAIN - mains}`, tone: "warn" }} size="sm" />
                     </div>
-                    <RosterStrip members={members} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} className="mt-4" />
+                    <RosterStrip members={members} coach={coach} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} className="mt-4" />
                     <dl className="mt-6 grid grid-cols-3 gap-4 border-t border-line-subtle pt-4 text-meta">
                       <div className="min-w-0">
                         <dt className="text-fg-3">Капитан</dt>
@@ -266,10 +279,21 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
             <Section
               title="Состав"
               description={isCaptain ? "Основа — до 5 игроков, запас — до 2. Действия с игроком — в меню «⋯»." : "Составом управляет капитан."}
-              action={isCaptain && !locked && freeSlots > 0 ? <InviteButton url={inviteUrl} freeSlots={freeSlots} variant="secondary" size="sm" /> : undefined}
+              action={
+                isCaptain && !locked && freeSlots > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    <InviteByNick size="sm" />
+                    <InviteButton url={inviteUrl} freeSlots={freeSlots} variant="secondary" size="sm" label="Ссылка" />
+                  </div>
+                ) : undefined
+              }
             >
               <Roster members={roster} isCaptain={isCaptain} locked={locked?.name ?? null} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} />
-              <HelpHint topics={isCaptain ? ["manage-roster", "find-players", "team-applications"] : ["leave-team"]} className="mt-6" />
+              <div className="mt-8 grid gap-8 lg:grid-cols-2">
+                <CoachSlot coach={coach} invited={pendingInvites.find((i) => i.role === "coach") ?? null} isCaptain={isCaptain} />
+                <PendingInvites items={pendingInvites.filter((i) => i.role === "player")} isCaptain={isCaptain} />
+              </div>
+              <HelpHint topics={isCaptain ? ["find-players", "team-coach", "manage-roster", "team-applications"] : ["leave-team", "team-coach"]} className="mt-6" />
             </Section>
           )}
 
