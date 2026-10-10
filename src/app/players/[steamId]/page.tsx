@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { snippet } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import { getActiveMembership, getPlayerBySteamId } from "@/lib/data";
 import { aggregatePlayers, getHeadToHead, getPlayerMapHistory, getPlayerWeapons, getStatRows } from "@/lib/stats";
@@ -20,7 +21,16 @@ export async function generateStaticParams() {
 export async function generateMetadata(props: PageProps<"/players/[steamId]">): Promise<Metadata> {
   const { steamId } = await props.params;
   const p = await getPlayerBySteamId(steamId);
-  return { title: p?.nickname ?? "Игрок" };
+  if (!p) return { title: "Игрок" };
+  const description = snippet(
+    `${p.nickname} — игрок CS2 на F16 Arena${p.faceit_level ? `, FACEIT ${p.faceit_level} уровень${p.faceit_elo ? ` (${p.faceit_elo} ELO)` : ""}` : ""}: статистика, F16 Rating, матчи, команды и турниры.`,
+  );
+  return {
+    title: `${p.nickname} — статистика CS2`,
+    description,
+    alternates: { canonical: `/players/${p.steam_id}` },
+    openGraph: { title: p.nickname, description, ...(p.avatar_url ? { images: [{ url: p.avatar_url }] } : {}) },
+  };
 }
 
 export default async function PlayerPage(props: PageProps<"/players/[steamId]">) {

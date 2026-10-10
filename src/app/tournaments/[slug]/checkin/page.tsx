@@ -11,7 +11,7 @@ import { Button, Container, EmptyState, Eyebrow, FaceitLevel, PageTitle, Panel, 
 import { CheckinTask, type CheckItem } from "@/components/competition/registration";
 import { HelpHint } from "@/components/help-hint";
 
-export const metadata: Metadata = { title: "Check-in" };
+export const metadata: Metadata = { title: "Check-in", robots: { index: false } };
 
 const STEAM_ID = /^\d{17}$/;
 

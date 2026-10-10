@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { Button, Container, Facts, PageTitle, Panel, Region, Section, cn } from "@/components/ds";
 
 export const revalidate = 30;
-export const metadata: Metadata = { title: "О платформе" };
+export const metadata: Metadata = {
+  title: "О платформе",
+  description: "F16 Arena — турнирная платформа компьютерного клуба F16 Arena в Усть-Каменогорске: турниры по CS2, лобби, рейтинг и статистика.",
+  alternates: { canonical: "/about" },
+};
 
 const FACTS = [
   { label: "Игра", value: "Counter-Strike 2" },

@@ -15,7 +15,7 @@ import { ProfileRequired } from "@/components/profile/profile-required";
 import { Button, Callout, Container, Field, Textarea } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 
-export const metadata: Metadata = { title: "Заявка в команду" };
+export const metadata: Metadata = { title: "Заявка в команду", robots: { index: false } };
 
 export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) {
   const { tag } = await props.params;

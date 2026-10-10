@@ -8,7 +8,11 @@ import { DATA_TABLE, NUM_CELL, tableBox } from "@/components/public/data-table";
 import { Avatar, Container, EmptyState, FaceitLevel, PageTitle, cn } from "@/components/ds";
 import { ClientFilter } from "@/components/public/client-filter";
 
-export const metadata: Metadata = { title: "Игроки" };
+export const metadata: Metadata = {
+  title: "Игроки",
+  description: "Игроки CS2 на F16 Arena: ники, уровни FACEIT, F16 Rating и статистика матчей турниров в Усть-Каменогорске.",
+  alternates: { canonical: "/players" },
+};
 export const revalidate = 30;
 
 const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "игрока" : "игроков");

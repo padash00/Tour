@@ -7,7 +7,11 @@ import { TeamCta } from "@/components/public/team-cta";
 import { TeamsNav } from "@/components/team/teams-nav";
 import { Container, EmptyState, PageTitle, TeamLogo } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Команды" };
+export const metadata: Metadata = {
+  title: "Команды",
+  description: "Команды по CS2 на F16 Arena: составы, средний ELO, рейтинг и результаты. Создайте свою команду или найдите ту, которой нужен игрок.",
+  alternates: { canonical: "/teams" },
+};
 
 // поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
 export const revalidate = 30;

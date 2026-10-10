@@ -11,7 +11,7 @@ import { SteamMark } from "@/components/ds/icons";
 import { HelpHint } from "@/components/help-hint";
 import { TeamOfferCard } from "@/components/team/team-offer";
 
-export const metadata: Metadata = { title: "Приглашение в команду" };
+export const metadata: Metadata = { title: "Приглашение в команду", robots: { index: false } };
 
 export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const { code } = await props.params;

@@ -39,7 +39,7 @@ import {
   type Tone,
 } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Моя игра" };
+export const metadata: Metadata = { title: "Моя игра", robots: { index: false } };
 
 /** Блок «Текущее действие»: одно состояние, всегда с ответом «что дальше» */
 type Current = {

@@ -12,7 +12,7 @@ import { HelpHint } from "@/components/help-hint";
 import { RosterStrip } from "@/components/team/roster-strip";
 import { Container, Eyebrow, PageTitle, Panel } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Создать команду" };
+export const metadata: Metadata = { title: "Создать команду", robots: { index: false } };
 
 export default async function CreateTeamPage() {
   const player = await requirePlayer("/team/create");

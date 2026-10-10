@@ -7,6 +7,7 @@ import { NavProgress } from "@/components/nav-progress";
 import { ProfileNudge } from "@/components/profile/profile-nudge";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
 
 // Onest — гротеск с полноценной кириллицей: интерфейс и заголовки
@@ -25,11 +26,21 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "F16 Arena — турниры по CS2", template: "%s · F16 Arena" },
-  description: "Турнирная платформа F16 Arena: регистрация через Steam, команды, сетки, матчи и статистика CS2.",
-  applicationName: "F16 Arena",
-  openGraph: { type: "website", siteName: "F16 Arena", locale: "ru_RU" },
+  title: { default: "Турниры по CS2 в Усть-Каменогорске — F16 Arena", template: "%s · F16 Arena" },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  applicationName: SITE_NAME,
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "esports",
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "ru_RU", description: SITE_DESCRIPTION },
   twitter: { card: "summary_large_image" },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
+  // коды подтверждения Google Search Console и Яндекс.Вебмастера — переменные окружения в Vercel
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    yandex: process.env.YANDEX_VERIFICATION || undefined,
+  },
 };
 
 export const viewport: Viewport = {

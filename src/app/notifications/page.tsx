@@ -8,7 +8,7 @@ import { MarkAllReadButton } from "@/components/notifications/actions";
 import { NotificationFeed } from "@/components/public/notification-feed";
 import { Container, EmptyState, Meta, PageTitle, cn } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Уведомления" };
+export const metadata: Metadata = { title: "Уведомления", robots: { index: false } };
 
 const PAGE = 30;
 

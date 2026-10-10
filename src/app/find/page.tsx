@@ -8,7 +8,11 @@ import { Button, Container, ContextNav, EmptyState, PageTitle, Select } from "@/
 import { TeamsNav } from "@/components/team/teams-nav";
 import { HelpHint } from "@/components/help-hint";
 
-export const metadata: Metadata = { title: "Поиск команды" };
+export const metadata: Metadata = {
+  title: "Поиск команды",
+  description: "Поиск команды и игроков CS2 в Усть-Каменогорске: объявления игроков и команд на F16 Arena, заявки и приглашения.",
+  alternates: { canonical: "/find" },
+};
 
 type Tab = "players" | "teams";
 

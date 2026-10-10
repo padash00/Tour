@@ -37,7 +37,7 @@ import {
   tournamentStatus,
 } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Моя команда" };
+export const metadata: Metadata = { title: "Моя команда", robots: { index: false } };
 
 type Tab = "overview" | "roster" | "matches" | "tournaments" | "applications";
 

@@ -47,15 +47,20 @@ export async function generateMetadata(props: PageProps<"/matches/[id]">): Promi
   const { id } = await props.params;
   const m = await getMatch(id);
   const title = m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : "Матч";
+  const description = m
+    ? `${title} — матч турнира «${m.tournament.name}» по CS2 на F16 Arena${m.status === "finished" ? `, счёт ${m.team1_score}:${m.team2_score}` : ""}: карты, раунды и статистика игроков.`
+    : undefined;
   if (m?.status === "finished" && m.team1 && m.team2) {
     const image = { url: `/matches/${id}/image?f=wide`, width: 1200, height: 630 };
     return {
       title,
+      description,
+      alternates: { canonical: `/matches/${id}` },
       openGraph: { title: `${title} · ${m.team1_score}:${m.team2_score}`, images: [image] },
       twitter: { card: "summary_large_image", images: [image.url] },
     };
   }
-  return { title };
+  return { title, description, alternates: { canonical: `/matches/${id}` } };
 }
 
 export default async function MatchPage(props: PageProps<"/matches/[id]">) {

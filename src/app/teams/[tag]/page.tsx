@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
 import { getOwnPost, roleLabel } from "@/lib/finder";
 import { getCoach } from "@/lib/invites";
+import { ORGANIZER, absolute, snippet } from "@/lib/seo";
+import { JsonLd } from "@/components/json-ld";
 import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
 import { HeadToHeadList } from "@/components/head-to-head";
 import { getTeamAwards } from "@/lib/awards";
@@ -43,7 +45,16 @@ export async function generateStaticParams() {
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
-  return { title: team?.name ?? "Команда" };
+  if (!team) return { title: "Команда" };
+  const description = snippet(
+    `${team.name} [${team.tag}] — команда по CS2${team.region ? ` из ${team.region}` : ""} на F16 Arena: состав, матчи, турниры и статистика игроков.${team.description ? ` ${team.description}` : ""}`,
+  );
+  return {
+    title: `${team.name} [${team.tag}] — команда CS2`,
+    description,
+    alternates: { canonical: `/teams/${encodeURIComponent(team.tag)}` },
+    openGraph: { title: team.name, description, ...(team.logo_url ? { images: [{ url: team.logo_url }] } : {}) },
+  };
 }
 
 const ROLE: Record<string, string> = { captain: "Капитан", player: "Основа", substitute: "Запас" };
@@ -142,6 +153,20 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
 
   return (
     <Container className="pb-16 pt-8 sm:pt-10">
+      <JsonLd
+        data={{
+          "@type": "SportsTeam",
+          name: team.name,
+          alternateName: team.tag,
+          sport: "Counter-Strike 2",
+          url: absolute(`/teams/${encodeURIComponent(team.tag)}`),
+          ...(team.logo_url ? { logo: team.logo_url } : {}),
+          ...(team.description ? { description: team.description } : {}),
+          memberOf: ORGANIZER,
+          athlete: members.map((m) => ({ "@type": "Person", name: m.player.nickname, url: absolute(`/players/${m.player.steam_id}`) })),
+          ...(coach ? { coach: { "@type": "Person", name: coach.nickname } } : {}),
+        }}
+      />
       <Link href="/teams" className="inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
         <ArrowLeft className="size-4" /> Команды
       </Link>

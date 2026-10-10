@@ -12,7 +12,7 @@ import { TeamHeader } from "@/components/team/team-header";
 import { HelpHint } from "@/components/help-hint";
 import { Container, Panel, Section, Stack } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Настройки команды" };
+export const metadata: Metadata = { title: "Настройки команды", robots: { index: false } };
 
 export default async function TeamSettingsPage() {
   const player = await requirePlayer("/team/settings");

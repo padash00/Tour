@@ -19,7 +19,7 @@ import { OfficialApplicationForm, type ApplicationValues } from "@/components/co
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { HelpHint } from "@/components/help-hint";
 
-export const metadata: Metadata = { title: "Регистрация на турнир" };
+export const metadata: Metadata = { title: "Регистрация на турнир", robots: { index: false } };
 
 type Reg = Registration & { roster: RosterEntry[] };
 const activeOf = (r: Reg | null) => (r && (r.status === "pending" || r.status === "approved") ? r : null);

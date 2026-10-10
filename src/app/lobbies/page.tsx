@@ -24,7 +24,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Лобби" };
+export const metadata: Metadata = {
+  title: "Лобби",
+  description: "Лобби F16 Arena: игры на серверах клуба CS2 — собирайтесь и играйте без турнира.",
+  alternates: { canonical: "/lobbies" },
+};
 
 type Filter = "all" | "waiting" | "playing";
 

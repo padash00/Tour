@@ -7,7 +7,11 @@ import { Container, PageTitle } from "@/components/ds";
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const revalidate = 30;
 
-export const metadata: Metadata = { title: "Турниры" };
+export const metadata: Metadata = {
+  title: "Турниры",
+  description: "Турниры по CS2 в Усть-Каменогорске: открытая регистрация, ближайшие и прошедшие турниры F16 Arena, сетки и результаты.",
+  alternates: { canonical: "/tournaments" },
+};
 
 const ORDER: Record<string, number> = { live: 0, checkin: 1, registration: 2, registration_closed: 3, finished: 4, cancelled: 5, draft: 6 };
 

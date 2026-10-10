@@ -6,7 +6,7 @@ import { BrandLogo } from "@/components/brand";
 import { Callout } from "@/components/ds";
 import { SteamLoginButton } from "@/components/auth/steam-login";
 
-export const metadata: Metadata = { title: "Вход" };
+export const metadata: Metadata = { title: "Вход", robots: { index: false } };
 
 const ERRORS: Record<string, { title: string; text: string }> = {
   steam: { title: "Steam не подтвердил вход", text: "Возможно, вход отменили или Steam не ответил. Попробуйте ещё раз." },

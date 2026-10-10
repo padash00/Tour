@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
@@ -7,6 +8,9 @@ import { Avatar, cn } from "@/components/ui";
 import { AdminCrumbs, AdminMobileNav, AdminRail, CommandPalette, type PaletteItem } from "@/components/admin/shell";
 import { serverNow } from "@/components/admin/kit";
 import { recentSiteErrors } from "@/lib/site-errors";
+
+// пульт организатора не индексируется
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
  * F16 Control — отдельный «режим пульта»: иконочная панель, командная строка с поиском (Ctrl+K)
