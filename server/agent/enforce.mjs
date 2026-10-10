@@ -76,11 +76,17 @@ export function createEnforce({ stateDir, instances, rc, log }) {
       ? rule.halftimeVoiceActiveMap === get5.map_number && ["going_live", "live"].includes(get5.gamestate) ? 1 : 0
       : rule.cvars[name];
     const fix = names.filter((n) => {
+      const want = expected(n);
+      // строковые cvars (bot_quota_mode): MatchZy при загрузке матча возвращает «competitive» — боты занимают все слоты
+      if (typeof want === "string") {
+        const m = new RegExp(`${n} = (\\S+)`, "i").exec(out);
+        return !!m && m[1].toLowerCase() !== want.toLowerCase();
+      }
       const m = new RegExp(`${n} = (true|false|[-+]?\\d+(?:\\.\\d+)?)`, "i").exec(out);
       if (!m) return false;
       const value = m[1].toLowerCase();
       const current = value === "true" ? 1 : value === "false" ? 0 : Number(value);
-      return current !== Number(expected(n));
+      return current !== Number(want);
     });
     if (fix.length) {
       await rc(inst, fix.map((n) => `${n} ${expected(n)}`).join(";")).catch(() => {});

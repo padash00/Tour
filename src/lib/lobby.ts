@@ -654,7 +654,7 @@ export async function buildLobbyConfig(gameId: string, observers: [string, strin
   };
 }
 
-/** cvars, которые агент держит весь матч (только числа) */
+/** cvars, которые агент держит весь матч: числа и однословные строки (bot_quota_mode — MatchZy сбрасывает его в competitive) */
 export async function lobbyEnforce(gameId: string) {
   const g = await getGame(gameId);
   if (!g) return null;
@@ -663,12 +663,14 @@ export async function lobbyEnforce(gameId: string) {
   const all = lobbyCvars(g.settings, bots, humans);
   const keep = [
     "mp_maxrounds", "mp_freezetime", "mp_startmoney", "mp_maxmoney", "mp_damage_headshot_only",
-    "sv_gravity", "sv_infinite_ammo", "bot_quota", "bot_difficulty", "tv_delay", "mp_match_restart_delay",
+    "sv_gravity", "sv_infinite_ammo", "bot_quota", "bot_quota_mode", "bot_join_after_player", "bot_difficulty", "tv_delay", "mp_match_restart_delay",
     // MatchZy загружает warmup/live.cfg после конфига матча и сбрасывает голосовые cvars.
     "sv_voiceenable", "sv_alltalk", "sv_deadtalk", "sv_full_alltalk",
     "sv_talk_enemy_living", "sv_talk_enemy_dead",
   ];
-  const cvars = Object.fromEntries(keep.filter((k) => typeof all[k] === "number").map((k) => [k, all[k] as number]));
+  const cvars = Object.fromEntries(
+    keep.filter((k) => typeof all[k] === "number" || (typeof all[k] === "string" && /^[a-z_]+$/i.test(String(all[k])))).map((k) => [k, all[k] as number | string]),
+  );
   return { matchid: g.matchzy_id, cvars };
 }
 
