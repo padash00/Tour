@@ -79,7 +79,6 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
   return (
     <div className="space-y-6">
       <AdminHeader
-        eyebrow="F16 Control"
         title="Журнал"
         description="Действия администраторов, участников, автопилота и серверов. Ответы агента — на странице «Серверы»."
       />
@@ -140,7 +139,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
           <div className="min-w-[820px] font-mono text-[12px] leading-[22px]">
             {[...days.entries()].map(([day, rows]) => (
               <div key={day}>
-                <div className="sticky left-0 px-4 pt-3 pb-1 text-[10px] font-sans font-medium uppercase tracking-[0.24em] text-[#7f93b0]">
+                <div className="sticky left-0 px-4 pt-3 pb-1 text-[12px] font-sans font-medium text-fg-3">
                   {day} <span className="num tracking-normal text-fg-3">· {rows.length}</span>
                 </div>
                 {rows.map((l) => {

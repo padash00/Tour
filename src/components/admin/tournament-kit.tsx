@@ -13,9 +13,9 @@ export const CARD = "rounded-surface border border-line bg-surface shadow-[0_1px
 /** Карточка-список со строками */
 export const CARD_LIST = `${CARD} divide-y divide-white/[0.06]`;
 
-/** Подпись-надзаголовок: капс с разрядкой, как Eyebrow на сайте */
+/** Подпись-надзаголовок раздела: обычный регистр, без разрядки */
 export function Label({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-[11px] font-medium uppercase tracking-[0.26em] text-eyebrow", className)}>{children}</div>;
+  return <div className={cn("text-[13px] font-semibold text-fg-2", className)}>{children}</div>;
 }
 
 const TONE: Partial<Record<TournamentStatus, string>> = {

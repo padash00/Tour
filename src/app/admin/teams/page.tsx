@@ -30,7 +30,6 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
   return (
     <div className="space-y-6">
       <AdminHeader
-        eyebrow="F16 Control"
         title="Команды"
         description={`${all.length} активных`}
         actions={

@@ -91,7 +91,7 @@ export function ActionToggle({
           )}
         />
       </button>
-      <span className={cn("text-meta font-medium", value ? "text-ok" : "text-fg-3")}>{value ? onLabel : offLabel}</span>
+      <span className={cn("whitespace-nowrap text-meta font-medium", value ? "text-ok" : "text-fg-3")}>{value ? onLabel : offLabel}</span>
       <span className="grid size-4 place-items-center">
         {pending && <Spinner className="size-3.5 text-fg-3" />}
       </span>

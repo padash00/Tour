@@ -866,7 +866,7 @@ const REG_GRID = "grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr
 
 function RegistrationHead() {
   return (
-    <div className={cn(REG_GRID, "hidden md:grid px-4 h-9 text-[10px] font-medium uppercase tracking-[0.2em] text-[#7f93b0]")}>
+    <div className={cn(REG_GRID, "hidden md:grid px-4 h-9 text-[12px] font-medium text-[#7f93b0]")}>
       <span>Команда</span>
       <span className="text-right">Состав</span>
       <span className="text-right">Avg ELO</span>

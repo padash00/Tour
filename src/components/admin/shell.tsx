@@ -350,7 +350,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                     onClick={() => go(r.href)}
                     className={cn("flex w-full items-center gap-3 px-4 py-2.5 text-left text-[14px]", i === idx ? "bg-accent/[0.1] text-fg" : "text-fg-2")}
                   >
-                    <span className="w-20 shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-fg-3">{r.group}</span>
+                    <span className="w-20 shrink-0 text-[12px] font-medium text-fg-3">{r.group}</span>
                     <span className="truncate">{r.label}</span>
                     {r.hint && <span className="ml-auto shrink-0 font-mono text-[12px] text-fg-3">{r.hint}</span>}
                   </button>

@@ -58,7 +58,6 @@ export default async function AdminTournamentsPage() {
     <div className="space-y-6">
       <LiveRefresh watch="matches" intervalMs={8000} />
       <AdminHeader
-        eyebrow="F16 Control"
         title="Турниры"
         description={`${tournaments.length} всего · ${tournaments.filter((t) => !["finished", "cancelled", "draft"].includes(t.status)).length} в работе`}
         actions={

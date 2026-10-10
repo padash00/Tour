@@ -166,7 +166,7 @@ function NextStep({
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", label)}>Сейчас</div>
+        <div className={cn("text-[12px] font-medium", label)}>Сейчас</div>
         <div className="mt-1.5 text-[17px] font-semibold tracking-[-0.01em]">{title}</div>
         {text && <div className="mt-0.5 text-[13px] text-fg-3">{text}</div>}
       </div>

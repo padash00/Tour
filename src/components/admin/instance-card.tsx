@@ -76,7 +76,7 @@ export function InstanceCard({
         </div>
         <span
           className={cn(
-            "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 font-mono text-[10px] uppercase tracking-[0.12em]",
+            "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 text-[12px] font-medium",
             toneText[st.tone],
             "border-current/30 bg-current/[0.06]",
           )}
@@ -89,7 +89,7 @@ export function InstanceCard({
       <div className={cn("flex-1 space-y-2", hero ? "px-5 pt-4 pb-4" : "px-4 pt-3 pb-3 text-[13px]")}>
         {match ? (
           <Link href={`/admin/matches/${match.id}`} className="group block">
-            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fg-3">Матч #{match.number}</div>
+            <div className="text-[12px] font-medium text-fg-3">Матч #{match.number}</div>
             <div className="mt-1 flex items-center justify-between gap-3">
               <span className={cn("truncate font-semibold group-hover:text-accent", hero ? "text-[20px]" : "text-[14px]")}>
                 {match.team1?.tag ?? "TBD"} <span className="font-normal text-fg-3">vs</span> {match.team2?.tag ?? "TBD"}

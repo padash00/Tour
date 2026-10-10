@@ -683,12 +683,8 @@ html[data-navigating] main > * {
   --color-line: #ffffff20;
   --color-line-strong: #ffffff32;
   --color-line-hover: #ffffff48;
+  /* ровный фон без сетки: в пульте и так много данных */
   background-color: var(--color-bg);
-  background-image:
-    linear-gradient(to right, #6ea8ff05 1px, transparent 1px),
-    linear-gradient(to bottom, #6ea8ff05 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-attachment: fixed;
 }
 
 /* Публичная палитра внутри F16 Control — для витрины дизайн-системы (/admin/design-system) */

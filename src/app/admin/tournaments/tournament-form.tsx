@@ -81,7 +81,7 @@ function OptionCard({
 }
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-[#7f93b0]">{children}</div>;
+  return <div className="mb-2 text-[12px] font-medium text-[#7f93b0]">{children}</div>;
 }
 
 function Section({ show, title, hint, children }: { show: boolean; title: string; hint?: string; children: ReactNode }) {
@@ -971,7 +971,7 @@ export function TournamentForm({
 
         {/* сводка */}
         <aside className="xl:sticky xl:top-8 rounded-[12px] border border-line bg-surface p-5">
-          <div className="text-[11px] font-medium uppercase tracking-[0.26em] text-[#7f93b0]">Сводка</div>
+          <div className="text-[12px] font-medium text-[#7f93b0]">Сводка</div>
           <div className="mt-2 text-[18px] font-semibold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
           <div className="mt-4">
             <SummaryRow label="Режим" value={MODES[format as ModeKey]?.title ?? format} />

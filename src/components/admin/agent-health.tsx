@@ -39,12 +39,16 @@ export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics, 
   ];
   return (
     <section aria-label="Состояние управления серверами" className="space-y-3">
-      <div className="grid gap-3 lg:grid-cols-3">
+      {/* одна полоса на все показатели — без «сирот» в последнем ряду */}
+      <div
+        className="grid overflow-hidden rounded-surface border border-line bg-surface max-lg:divide-y max-lg:divide-white/[0.06] sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] lg:divide-x lg:divide-white/[0.06]"
+        style={{ "--n": cards.length } as React.CSSProperties}
+      >
         {cards.map(({ icon: Icon, ...card }) => (
-          <div key={card.label} className="rounded-surface border border-line bg-surface p-5">
-            <div className="flex items-center gap-2 text-xs text-fg-3"><Icon size={15} aria-hidden />{card.label}</div>
-            <div className={cn("mt-3 text-lg font-semibold", card.tone)}>{card.value}</div>
-            <p className="mt-1.5 text-xs leading-relaxed text-fg-3">{card.hint}</p>
+          <div key={card.label} className="min-w-0 p-4">
+            <div className="flex items-center gap-2 text-xs text-fg-3"><Icon size={14} aria-hidden />{card.label}</div>
+            <div className={cn("mt-2 text-base font-semibold", card.tone)}>{card.value}</div>
+            <p className="mt-1 text-xs leading-relaxed text-fg-3">{card.hint}</p>
           </div>
         ))}
       </div>

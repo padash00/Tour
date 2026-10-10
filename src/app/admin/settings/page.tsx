@@ -110,7 +110,6 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   return (
     <div className="space-y-6">
       <AdminHeader
-        eyebrow="F16 Control"
         title="Настройки"
         description="Ключи хранятся в базе и читаются только сервером сайта. Значения не показываются целиком и не пишутся в журнал."
       />

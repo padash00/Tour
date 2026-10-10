@@ -12,13 +12,13 @@ import { cn } from "@/components/ui";
 /** Карточка админки — общая поверхность F16 DS */
 export const ADMIN_CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
 
-/** Заголовки колонок таблиц: капс с разрядкой, как подписи сайта */
+/** Заголовки колонок таблиц: спокойные, без капса — данные важнее подписей */
 export const TH =
-  "[&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-[0.2em] [&_th]:font-medium [&_th]:text-eyebrow [&_th]:h-10";
+  "[&_th]:text-[12px] [&_th]:font-medium [&_th]:text-fg-3 [&_th]:h-10";
 
-/** Подпись раздела: капс с разрядкой, холодный серо-синий */
+/** Подпись раздела: обычный регистр, без разрядки — меньше визуального шума */
 export function AdminLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-[11px] font-medium uppercase tracking-[0.28em] text-eyebrow", className)}>{children}</div>;
+  return <div className={cn("text-[13px] font-semibold text-fg-2", className)}>{children}</div>;
 }
 
 export function AdminHeader({
@@ -134,7 +134,8 @@ export function AlertRow({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-[10px] border text-[13px]",
+        // текст — отдельным блоком на всю ширину, кнопки — строкой под ним (в узкой колонке текст не сжимается в столбик)
+        "flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 rounded-[10px] border text-[13px]",
         tone === "danger"
           ? "border-danger/30 bg-danger/[0.06]"
           : tone === "warn"
@@ -142,26 +143,28 @@ export function AlertRow({
             : "border-accent/30 bg-accent/[0.06]",
       )}
     >
-      <span className={cn("font-semibold", tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "text-accent")}>
-        {title}
-      </span>
-      <span className="text-fg-2 min-w-0 flex-1">{children}</span>
-      {extra}
-      {action && (
-        <Link
-          href={action.href}
-          className={cn(
-            "ml-auto inline-flex h-9 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-            tone === "danger"
-              ? "border-danger/40 text-danger hover:bg-danger/[0.1]"
-              : tone === "warn"
-                ? "border-warn/40 text-warn hover:bg-warn/[0.1]"
-                : "border-accent/40 text-accent hover:bg-accent/[0.1]",
-          )}
-        >
-          {action.label} →
-        </Link>
-      )}
+      <div className="min-w-0 flex-1 basis-72">
+        <div className={cn("font-semibold", tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "text-accent")}>{title}</div>
+        <div className="mt-0.5 text-fg-2">{children}</div>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {extra}
+        {action && (
+          <Link
+            href={action.href}
+            className={cn(
+              "inline-flex h-9 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+              tone === "danger"
+                ? "border-danger/40 text-danger hover:bg-danger/[0.1]"
+                : tone === "warn"
+                  ? "border-warn/40 text-warn hover:bg-warn/[0.1]"
+                  : "border-accent/40 text-accent hover:bg-accent/[0.1]",
+            )}
+          >
+            {action.label} →
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -170,7 +173,7 @@ export function AlertRow({
 export function Metric({ label, value, tone, hint }: { label: ReactNode; value: ReactNode; tone?: DotTone; hint?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <AdminLabel className="text-[10px] tracking-[0.22em]">{label}</AdminLabel>
+      <AdminLabel className="text-[12px] font-medium text-fg-3">{label}</AdminLabel>
       <div
         className={cn(
           "mt-2 text-[22px] font-semibold tracking-[-0.02em] num",

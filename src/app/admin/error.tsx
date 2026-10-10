@@ -20,7 +20,7 @@ export default function AdminError({ error, retry }: { error: Error & { digest?:
 
   return (
     <div className="max-w-2xl rounded-[12px] border border-danger/30 bg-danger/[0.05] p-8">
-      <div className="text-[11px] font-medium uppercase tracking-[0.3em] text-danger">Ошибка раздела</div>
+      <div className="text-[12px] font-medium text-danger">Ошибка раздела</div>
       <h1 className="mt-3 text-[22px] font-semibold">Раздел не загрузился</h1>
       <p className="mt-3 text-[14px] leading-relaxed text-fg-2">
         Чаще всего причина — недоступна база (Supabase) или в базе не применена новая миграция. Данные и сервера это не затрагивает.

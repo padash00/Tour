@@ -56,7 +56,7 @@ export function StripCell({
     <>
       <div className="flex items-center gap-2 min-w-0">
         {tone && <span className={cn("size-1.5 shrink-0 rounded-full", toneBar[tone], pulse && "animate-pulse")} />}
-        <AdminLabel className="text-[10px] tracking-[0.22em] truncate">{label}</AdminLabel>
+        <AdminLabel className="truncate text-[12px] font-medium text-fg-3">{label}</AdminLabel>
       </div>
       <div className={cn("mt-2.5 num text-[24px] font-semibold leading-none tracking-[-0.02em]", tone ? toneText[tone] : "text-fg")}>
         {value}
@@ -94,9 +94,10 @@ export function Section({
   return (
     <section id={id} className={cn("min-w-0 scroll-mt-6", className)}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <AdminLabel>
+        {/* заголовок и счётчик — в одну строку, даже если заголовок сам flex-блок */}
+        <AdminLabel className="flex items-center gap-2">
           {title}
-          {count != null && <span className="ml-2 num text-fg-3 tracking-normal">{count}</span>}
+          {count != null && <span className="num font-medium text-fg-3">{count}</span>}
         </AdminLabel>
         {action}
       </div>
@@ -162,7 +163,7 @@ export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; cu
             <div className={cn("mt-2.5 text-[13px] font-semibold leading-tight", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
               {s.label}
             </div>
-            {now && <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-accent">сейчас</div>}
+            {now && <div className="mt-0.5 text-[12px] font-medium text-accent">сейчас</div>}
             {s.hint && <div className="mt-1 text-[11px] leading-snug text-fg-3">{s.hint}</div>}
           </li>
         );
@@ -206,7 +207,7 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
           />
           <div
             className={cn(
-              "text-[11px] font-medium uppercase tracking-[0.18em]",
+              "text-[12px] font-medium",
               it.state === "done" ? "text-accent" : it.state === "active" ? "text-warn" : it.state === "error" ? "text-danger" : "text-fg-3",
             )}
           >
@@ -226,7 +227,7 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
 export function RailGroup({ title, children, tone }: { title: string; children: ReactNode; tone?: "danger" }) {
   return (
     <div className={cn("p-4 space-y-2.5", tone === "danger" && "bg-danger/[0.04]")}>
-      <div className={cn("text-[10px] font-medium uppercase tracking-[0.24em]", tone === "danger" ? "text-danger" : "text-[#7f93b0]")}>
+      <div className={cn("text-[12px] font-medium", tone === "danger" ? "text-danger" : "text-[#7f93b0]")}>
         {title}
       </div>
       {children}
@@ -240,7 +241,7 @@ export function FactRow({ items, className }: { items: { label: ReactNode; value
     <div className={cn(ADMIN_CARD, "grid divide-white/[0.06] max-md:divide-y md:grid-flow-col md:auto-cols-fr md:divide-x", className)}>
       {items.map((it, i) => (
         <div key={i} className="px-4 py-3 min-w-0">
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-fg-3">{it.label}</div>
+          <div className="text-[12px] font-medium text-fg-3">{it.label}</div>
           <div className="mt-1 text-[13px] text-fg truncate">{it.value}</div>
         </div>
       ))}
@@ -273,6 +274,7 @@ export const INSTANCE_STATE: Record<string, { text: string; tone: KitTone }> = {
 
 export function instanceState(i: { running: boolean; role: string; gamestate: string | null }, online: boolean) {
   if (!online) return { text: "Агент офлайн", tone: "muted" as KitTone };
-  if (!i.running) return i.role === "reserve" ? { text: "Резерв", tone: "muted" as KitTone } : { text: "Выключен", tone: "danger" as KitTone };
+  // выключенный сервер — обычное состояние, не тревога: красный только для сбоев
+  if (!i.running) return i.role === "reserve" ? { text: "Резерв", tone: "muted" as KitTone } : { text: "Выключен", tone: "muted" as KitTone };
   return INSTANCE_STATE[i.gamestate ?? "none"] ?? { text: i.gamestate ?? "?", tone: "muted" as KitTone };
 }

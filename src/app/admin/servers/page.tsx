@@ -4,7 +4,7 @@ import { hostCommand, serverRcon, toggleLobbyServer } from "@/app/actions/admin-
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import type { LobbyGame } from "@/lib/lobby";
-import { formatShortDateTime, formatTime } from "@/lib/format";
+import { formatShortDateTime } from "@/lib/format";
 import { getServerState, type AgentCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import { ServerActions } from "@/components/admin/server-actions";
@@ -78,7 +78,6 @@ export default async function ServersPage() {
     <div className="space-y-8">
       <LiveRefresh watch="servers" intervalMs={5000} />
       <AdminHeader
-        eyebrow="F16 Control"
         title="Серверы"
         description={host?.lan_ip ? `Серверный ПК ${host.lan_ip} · обновляется каждые 5 секунд` : "Серверный ПК ещё не выходил на связь"}
         actions={
@@ -119,12 +118,7 @@ export default async function ServersPage() {
 
       {/* ── хост ── */}
       <Strip className="grid-cols-2 md:grid-cols-4 lg:[&>*:nth-child(n+5)]:border-t lg:[&>*:nth-child(n+5)]:border-white/[0.06]">
-        <StripCell
-          label="Синхронизация"
-          value={host?.last_seen_at ? formatTime(host.last_seen_at) : "—"}
-          tone={online ? "ok" : "danger"}
-          hint={online ? "агент на связи" : "нет сигнала"}
-        />
+        {/* связь с агентом — в блоке выше; здесь только железо и версии: ровно 8 ячеек, 2 ряда по 4 */}
         <StripCell label="CPU" value={cpu != null ? `${cpu}%` : "—"} tone={cpu == null ? undefined : cpu > 85 ? "danger" : cpu > 65 ? "warn" : undefined} />
         <StripCell label="RAM" value={info.ram_used_gb ?? "—"} hint={info.ram_total_gb ? `из ${info.ram_total_gb} GB` : undefined} />
         <StripCell label="Диск D" value={info.disk_free_gb ?? "—"} hint="GB свободно" />

@@ -38,7 +38,6 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
   return (
     <div className="space-y-6">
       <AdminHeader
-        eyebrow="F16 Control"
         title="Игроки"
         description={`${all.length} зарегистрировано`}
         actions={

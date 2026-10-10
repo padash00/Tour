@@ -10,10 +10,11 @@ import type { MatchWithTeams } from "@/lib/matches";
 import { getServerState } from "@/lib/server-control";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
-import { ButtonLink } from "@/components/ui";
+import { ButtonLink, cn } from "@/components/ui";
 import { MatchStatusChip, TournamentStatusChip } from "@/components/primitives";
 import { ADMIN_CARD, AdminHeader, AlertRow } from "@/components/admin/control";
 import { InstanceCard, type InstanceMatch } from "@/components/admin/instance-card";
+import { ServerActions } from "@/components/admin/server-actions";
 import { Quiet, Section, SectionLink, Strip, StripCell, minutesSince, serverNow } from "@/components/admin/kit";
 import { requireAdmin } from "@/lib/auth";
 import { getCs2UpdateCheck } from "@/lib/server/ops";
@@ -81,7 +82,6 @@ export default async function AdminOverview() {
     <div className="space-y-8">
       <LiveRefresh intervalMs={10000} />
       <AdminHeader
-        eyebrow="F16 Control"
         title="Пульт турнира"
         description={`${players.count ?? 0} игроков · ${teams.count ?? 0} команд · обновляется каждые 10 секунд`}
         actions={
@@ -131,7 +131,7 @@ export default async function AdminOverview() {
 
       {/* ── серверы — главный блок пульта; тревоги и очередь рядом ── */}
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,1fr)]">
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-8">
         {/* ── живая сетка серверов ── */}
         {running.length > 0 && servers.online && (
           <Section title="Сообщение в чат игры">
@@ -144,10 +144,32 @@ export default async function AdminOverview() {
           {servers.instances.length === 0 ? (
             <Quiet>Инстансы появятся, когда агент на серверном ПК выйдет на связь.</Quiet>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {servers.instances.map((i) => (
-                <InstanceCard key={i.name} i={i} match={byInstance.get(i.name)} online={servers.online} now={now} hero />
-              ))}
+            <div className="space-y-4">
+              {/* работающие — карточками с матчем и управлением; выключенные — одним списком, чтобы не забивали экран */}
+              {servers.instances.some((i) => i.running || byInstance.has(i.name)) && (
+                <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                  {servers.instances
+                    .filter((i) => i.running || byInstance.has(i.name))
+                    .map((i) => (
+                      <InstanceCard key={i.name} i={i} match={byInstance.get(i.name)} online={servers.online} now={now} hero />
+                    ))}
+                </div>
+              )}
+              {servers.instances.some((i) => !i.running && !byInstance.has(i.name)) && (
+                <div className={cn(ADMIN_CARD, "divide-y divide-white/[0.06]")}>
+                  {servers.instances
+                    .filter((i) => !i.running && !byInstance.has(i.name))
+                    .map((i) => (
+                      <div key={i.name} className="flex items-center gap-4 px-4 py-2">
+                        <span className="num w-16 text-[14px] font-semibold text-fg">{i.name}</span>
+                        <span className="num flex-1 text-[12px] text-fg-3">
+                          :{i.port} · {i.role === "reserve" ? "резерв" : "выключен"}
+                        </span>
+                        {servers.online && <ServerActions instance={i.name} running={false} align="end" />}
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
         </Section>
