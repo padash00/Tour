@@ -10,7 +10,8 @@ import { cn } from "./cn";
  * Не путать с главным меню сайта. На телефоне прокручивается по горизонтали.
  * Активный пункт: по пути (match="path") или по ?tab= (match="tab").
  */
-export type NavItem = { key: string; label: ReactNode; href: string; count?: number };
+/** alert — счётчик требует внимания (новые заявки): акцентный цвет */
+export type NavItem = { key: string; label: ReactNode; href: string; count?: number; alert?: boolean };
 
 export function ContextNav({ items, match = "path", sticky, className }: { items: NavItem[]; match?: "path" | "tab"; sticky?: boolean; className?: string }) {
   const pathname = usePathname();
@@ -33,7 +34,7 @@ export function ContextNav({ items, match = "path", sticky, className }: { items
               )}
             >
               {it.label}
-              {it.count != null && <span className="num rounded-chip bg-white/[0.06] px-1.5 py-px text-micro text-fg-2">{it.count}</span>}
+              {it.count != null && <span className={cn("num rounded-chip px-1.5 py-px text-micro", it.alert ? "bg-accent font-semibold text-accent-ink" : "bg-white/[0.06] text-fg-2")}>{it.count}</span>}
             </Link>
           );
         })}

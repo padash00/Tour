@@ -5,6 +5,7 @@ import { ArrowLeft, Gamepad2, Trophy, UserPlus } from "lucide-react";
 import { MAX_MAIN, MAX_SUBS, averageElo, getTeamByTag, getTeamMembers, getTeamRegistrations, getTeamTagByAlias } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { getTeamMatches } from "@/lib/matches";
+import { getOwnPost, roleLabel } from "@/lib/finder";
 import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
 import { HeadToHeadList } from "@/components/head-to-head";
 import { getTeamAwards } from "@/lib/awards";
@@ -57,14 +58,16 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
     notFound();
   }
 
-  const [members, regs, matches, board, awards, h2h] = await Promise.all([
+  const [members, regs, matches, board, awards, h2h, recruiting] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getTeamMatches(team.id),
     getPlayerLeaderboard(),
     getTeamAwards(team.id),
     getHeadToHead({ teamIds: [team.id] }),
+    team.is_solo ? Promise.resolve(null) : getOwnPost("team", team.id),
   ]);
+  const canApply = !team.is_solo && team.accepts_applications && members.length < MAX_MAIN + MAX_SUBS;
   const finished = matches.filter((m) => m.status === "finished").reverse();
   const recent = finished.slice(0, 10);
   const participations = regs.filter((r) => r.status === "approved");
@@ -131,10 +134,22 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                 ))}
             </div>
             {team.description && <p className="mt-3 max-w-read text-[14px] leading-relaxed text-fg-2">{team.description}</p>}
-            {!team.is_solo && team.accepts_applications && members.length < MAX_MAIN + MAX_SUBS && (
-              <Button href={`/teams/${encodeURIComponent(team.tag)}/apply`} size="sm" icon={<UserPlus />} className="mt-4">
-                Подать заявку
-              </Button>
+            {canApply && (
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+                <Button href={`/teams/${encodeURIComponent(team.tag)}/apply`} size="lg" icon={<UserPlus />}>
+                  Подать заявку в команду
+                </Button>
+                <span className="text-meta text-fg-3">
+                  {recruiting ? (
+                    <>
+                      <span className="font-medium text-accent">Ищет игроков</span>
+                      {recruiting.roles.length ? ` · ${recruiting.roles.map(roleLabel).join(", ")}` : ""}
+                    </>
+                  ) : (
+                    `Свободных мест: ${MAX_MAIN + MAX_SUBS - members.length}`
+                  )}
+                </span>
+              </div>
             )}
           </div>
         </div>

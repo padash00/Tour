@@ -10,8 +10,9 @@ import { formatDateTime } from "@/lib/format";
 import { needsProfile } from "@/lib/profiles";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { HelpHint } from "@/components/help-hint";
+import { TeamOfferCard } from "@/components/team/team-offer";
 import { ProfileRequired } from "@/components/profile/profile-required";
-import { Avatar, Button, Callout, Container, Eyebrow, Field, TeamLogo, Textarea } from "@/components/ds";
+import { Button, Callout, Container, Field, Textarea } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 
 export const metadata: Metadata = { title: "Заявка в команду" };
@@ -27,7 +28,6 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
     : [null, null, [], false];
   const mains = members.filter((m) => m.role !== "substitute").length;
   const full = members.length >= MAX_MAIN + MAX_SUBS;
-  const captain = members.find((m) => m.role === "captain");
   const next = `/teams/${encodeURIComponent(team.tag)}/apply`;
   const pending = own?.status === "pending" && own.created_at > freshSince() ? own : null;
   const cooldownUntil =
@@ -56,29 +56,8 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
       <Link href={`/teams/${encodeURIComponent(team.tag)}`} className="-ml-1 inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
         <ArrowLeft className="size-4" /> {team.name}
       </Link>
-      <div className="mt-3 rounded-feature border border-line-subtle bg-surface p-6 sm:p-8">
-        <div className="flex items-center gap-4">
-          <TeamLogo src={team.logo_url} tag={team.tag} size="lg" />
-          <div className="min-w-0">
-            <Eyebrow>Заявка на вступление</Eyebrow>
-            <h1 className="mt-1 break-words text-page text-fg">{team.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-meta text-fg-3">
-              {captain && (
-                <>
-                  <Avatar src={captain.player.avatar_url} name={captain.player.nickname} size="xs" />
-                  Капитан <span className="text-fg-2">{captain.player.nickname}</span>
-                  <span aria-hidden>·</span>
-                </>
-              )}
-              <span className="num">
-                Основа {mains}/{MAX_MAIN}
-                {members.length > mains ? ` · запас ${members.length - mains}` : ""}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8">
+      <div className="mt-3">
+        <TeamOfferCard team={team} members={members} eyebrow="Заявка на вступление" maxMain={MAX_MAIN} maxSubs={MAX_SUBS}>
           {!player ? (
             <>
               <a href={`/api/auth/steam?next=${encodeURIComponent(next)}`} className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-control bg-accent px-6 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong">
@@ -119,7 +98,7 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
               </p>
             </ActionForm>
           )}
-        </div>
+        </TeamOfferCard>
       </div>
       <HelpHint topics={["join-team"]} className="mt-6" />
       {player && !membership && (

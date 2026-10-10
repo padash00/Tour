@@ -5,27 +5,38 @@ import { cn } from "@/components/ds";
 
 /**
  * Свёрнутая подсказка «как это работает» на странице. Без JS — нативный <details>.
- * Несколько тем — несколько блоков подряд; полный список — /help.
+ * Одна тема — заголовок темы; несколько — один блок «Как это работает» с темами внутри. Полный список — /help.
  */
 export function HelpHint({ topics, open, className }: { topics: HelpTopicId[]; open?: boolean; className?: string }) {
+  const single = topics.length === 1;
   return (
-    <div className={cn("space-y-2", className)}>
-      {topics.map((id) => (
-        <details key={id} open={open} className="group rounded-control border border-line-subtle bg-surface">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 text-[14px] font-medium text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
-            <CircleHelp className="size-4 shrink-0 text-accent" aria-hidden />
-            <span className="flex-1">{HELP[id].title}</span>
-            <ChevronDown className="size-4 shrink-0 text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
-          </summary>
-          <div className="border-t border-line-subtle px-4 pb-4 pt-3">
-            <HelpBody id={id} />
-            <Link href={`/help#${id}`} className="mt-3 inline-block text-meta font-medium text-accent hover:text-accent-strong">
-              Все подсказки →
-            </Link>
+    <details open={open} className={cn("group rounded-control border border-line-subtle bg-surface", className)}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-4 py-2.5 text-[14px] font-medium text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
+        <CircleHelp className="size-4 shrink-0 text-accent" aria-hidden />
+        <span className="min-w-0 flex-1">
+          {single ? HELP[topics[0]].title : "Как это работает"}
+          {!single && <span className="ml-2 font-normal text-fg-3">· {topics.length} {topics.length < 5 ? "темы" : "тем"}</span>}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="border-t border-line-subtle px-4 pb-4 pt-3">
+        {single ? (
+          <HelpBody id={topics[0]} />
+        ) : (
+          <div className="divide-y divide-line-subtle">
+            {topics.map((id) => (
+              <section key={id} className="py-4 first:pt-1">
+                <h3 className="mb-3 text-[14px] font-semibold text-fg">{HELP[id].title}</h3>
+                <HelpBody id={id} />
+              </section>
+            ))}
           </div>
-        </details>
-      ))}
-    </div>
+        )}
+        <Link href={`/help#${topics[0]}`} className="mt-3 inline-block text-meta font-medium text-accent hover:text-accent-strong">
+          Все подсказки →
+        </Link>
+      </div>
+    </details>
   );
 }
 

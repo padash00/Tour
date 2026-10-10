@@ -4,7 +4,7 @@ import { ArrowRight, Gamepad2, Inbox, Lock, Trophy, Users } from "lucide-react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { requirePlayer } from "@/lib/auth";
 import { getPlayerApplications, getTeamApplications } from "@/lib/applications";
-import { MAX_MAIN, MAX_SUBS, averageElo, getActiveMembership, getLockingTournament, getTeamMembers, getTeamRegistrations } from "@/lib/data";
+import { MAX_MAIN, MAX_SUBS, averageElo, getActiveMembership, getLockingTournament, getTeamMembers, getTeamRegistrations, listPublicTournaments } from "@/lib/data";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { siteOrigin } from "@/lib/origin";
 import { getTeamMatches } from "@/lib/matches";
@@ -12,6 +12,7 @@ import { MatchListRow } from "@/components/match-row";
 import { InviteButton } from "@/components/team/invite";
 import { Roster, type RosterMember } from "@/components/team/roster";
 import { TeamHeader } from "@/components/team/team-header";
+import { RosterStrip } from "@/components/team/roster-strip";
 import { HelpHint } from "@/components/help-hint";
 import { ApplicationsInbox } from "@/components/team/applications";
 import { MyApplications } from "@/components/team/my-applications";
@@ -22,6 +23,7 @@ import {
   CriticalSurface,
   EmptyState,
   Eyebrow,
+  FeatureSurface,
   PageTitle,
   RowList,
   Section,
@@ -66,13 +68,14 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   const created = sp.created === "1";
   const { team } = membership;
   const isCaptain = team.captain_id === player.id;
-  const [members, regs, locked, origin, matches, applications] = await Promise.all([
+  const [members, regs, locked, origin, matches, applications, tournaments] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getLockingTournament(team.id),
     siteOrigin(),
     getTeamMatches(team.id),
     isCaptain ? getTeamApplications(team.id) : Promise.resolve(null),
+    listPublicTournaments(),
   ]);
   const order = { live: 0, ready: 1, veto: 2, upcoming: 3, pending: 4, finished: 5, cancelled: 6 } as const;
   const active = matches.filter((m) => !["finished", "cancelled"].includes(m.status)).sort((a, b) => order[a.status] - order[b.status] || a.number - b.number);
@@ -80,13 +83,59 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   const next = active.find((m) => m.team1_id && m.team2_id) ?? null;
   const needsCheckin = regs.find((r) => r.tournament.status === "checkin" && r.status === "approved" && !r.checked_in_at);
   const mains = members.filter((m) => m.role !== "substitute").length;
-  const subs = members.length - mains;
   const ready = mains >= MAX_MAIN;
   const freeSlots = MAX_MAIN + MAX_SUBS - members.length;
   const captain = members.find((m) => m.role === "captain");
   const current = regs.find((r) => ["pending", "approved"].includes(r.status) && !["finished", "cancelled"].includes(r.tournament.status));
   const inviteUrl = `${origin}/join/${team.invite_code}`;
   const roster: RosterMember[] = members.map((m) => ({ id: m.id, role: m.role, player: m.player }));
+  const openTournament = tournaments.find((t) => t.status === "registration");
+
+  // главное действие для команды прямо сейчас — одно, с кнопкой
+  const step: { title: string; text: string; action?: React.ReactNode } = current
+    ? current.status === "approved"
+      ? {
+          title: `Вы в турнире «${current.tournament.name}»`,
+          text: `Старт ${formatDateTime(current.tournament.starts_at)}. Перед стартом капитан проходит check-in.`,
+          action: <Button href={`/tournaments/${current.tournament.slug}`} variant="secondary" size="sm" iconRight={<ArrowRight />}>Открыть турнир</Button>,
+        }
+      : {
+          title: `Заявка на «${current.tournament.name}» на рассмотрении`,
+          text: "Решение администратора придёт уведомлением всей команде.",
+          action: <Button href={`/tournaments/${current.tournament.slug}`} variant="secondary" size="sm" iconRight={<ArrowRight />}>Открыть турнир</Button>,
+        }
+    : !ready
+      ? isCaptain && !locked
+        ? {
+            title: `Наберите основу: не хватает ${MAX_MAIN - mains}`,
+            text: "Отправьте игрокам ссылку-приглашение или примите заявки тех, кто хочет в команду.",
+            action: (
+              <>
+                <InviteButton url={inviteUrl} freeSlots={freeSlots} size="sm" />
+                {applications && applications.length > 0 ? (
+                  <Button href="/team?tab=applications" variant="secondary" size="sm">
+                    Заявки · {applications.length}
+                  </Button>
+                ) : (
+                  <Button href="/find" variant="ghost" size="sm">
+                    Поиск игроков
+                  </Button>
+                )}
+              </>
+            ),
+          }
+        : { title: "Капитан набирает состав", text: `В основе ${mains} из ${MAX_MAIN}. Знаете игрока — попросите капитана отправить ему приглашение.` }
+      : openTournament
+        ? {
+            title: "Состав готов — можно в турнир",
+            text: isCaptain ? `Открыта регистрация на «${openTournament.name}».` : `Открыта регистрация на «${openTournament.name}». Заявку подаёт капитан.`,
+            action: <Button href={isCaptain ? `/tournaments/${openTournament.slug}/register` : `/tournaments/${openTournament.slug}`} size="sm" iconRight={<ArrowRight />}>{isCaptain ? "Подать заявку" : "Открыть турнир"}</Button>,
+          }
+        : {
+            title: "Состав готов",
+            text: "Открытых турниров сейчас нет. Как только откроется регистрация, здесь появится кнопка заявки.",
+            action: <Button href="/tournaments" variant="secondary" size="sm">Все турниры</Button>,
+          };
 
   return (
     <>
@@ -152,20 +201,37 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                 </CriticalSurface>
               )}
 
-              <Section title="Состояние команды">
-                <RowList>
-                  <StatusRow label="Основной состав" value={`${mains} из ${MAX_MAIN}`} status={ready ? { label: "Готово", tone: "ok" } : { label: `Нужно ещё ${MAX_MAIN - mains}`, tone: "warn" }} />
-                  <StatusRow label="Запасные" value={`${subs} из ${MAX_SUBS}`} />
-                  <StatusRow label="Капитан" value={captain?.player.nickname ?? "—"} />
-                  <StatusRow label="Средний ELO основы" value={averageElo(members.filter((m) => m.role !== "substitute")) ?? "—"} />
-                  <StatusRow
-                    label="Турнир"
-                    value={current ? <Link href={`/tournaments/${current.tournament.slug}`} className="hover:text-accent">{current.tournament.name}</Link> : "Нет активной заявки"}
-                    status={current ? registrationStatus[current.status] : undefined}
-                  />
-                  <StatusRow label="Команда создана" value={formatDate(team.created_at)} />
-                </RowList>
-              </Section>
+              <FeatureSurface>
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] lg:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <Eyebrow>Состав</Eyebrow>
+                      <Status info={ready ? { label: "Основа собрана", tone: "ok" } : { label: `Нужно ещё ${MAX_MAIN - mains}`, tone: "warn" }} size="sm" />
+                    </div>
+                    <RosterStrip members={members} maxMain={MAX_MAIN} maxSubs={MAX_SUBS} className="mt-4" />
+                    <dl className="mt-6 grid grid-cols-3 gap-4 border-t border-line-subtle pt-4 text-meta">
+                      <div className="min-w-0">
+                        <dt className="text-fg-3">Капитан</dt>
+                        <dd className="mt-0.5 truncate font-medium text-fg">{captain?.player.nickname ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-fg-3">Средний ELO</dt>
+                        <dd className="num mt-0.5 font-medium text-fg">{averageElo(members.filter((m) => m.role !== "substitute")) ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-fg-3">Создана</dt>
+                        <dd className="mt-0.5 font-medium text-fg">{formatDate(team.created_at)}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className="rounded-surface border border-line-subtle bg-white/[0.02] p-4 sm:p-5">
+                    <Eyebrow tone="accent">Следующий шаг</Eyebrow>
+                    <div className="mt-2 text-title text-fg">{step.title}</div>
+                    <p className="mt-1 text-[14px] leading-relaxed text-fg-2">{step.text}</p>
+                    {step.action && <div className="mt-4 flex flex-wrap gap-2">{step.action}</div>}
+                  </div>
+                </div>
+              </FeatureSurface>
 
               {next && (
                 <Section title="Ближайший матч">
@@ -183,7 +249,14 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                     ))}
                   </RowList>
                 ) : (
-                  <EmptyState compact icon={<Gamepad2 />} title="Сыгранных матчей пока нет" text="Результаты появятся после первого турнира." />
+                  <EmptyState
+                    compact
+                    icon={<Gamepad2 />}
+                    title="Сыгранных матчей пока нет"
+                    text="Результаты появятся после первого турнира."
+                    next={openTournament ? `регистрация на «${openTournament.name}»` : undefined}
+                    action={<Button href={openTournament ? `/tournaments/${openTournament.slug}` : "/tournaments"} variant="secondary" size="sm">{openTournament ? "Открыть турнир" : "Смотреть турниры"}</Button>}
+                  />
                 )}
               </Section>
             </Stack>
@@ -243,7 +316,13 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                     ))}
                   </RowList>
                 ) : (
-                  <EmptyState compact icon={<Gamepad2 />} title="Матчей впереди нет" text="Матч появится, когда в сетке определится соперник." />
+                  <EmptyState
+                    compact
+                    icon={<Gamepad2 />}
+                    title="Матчей впереди нет"
+                    text={current ? "Матч появится, когда в сетке определится соперник." : "Матчи появятся, когда команда попадёт в турнир."}
+                    action={current ? undefined : <Button href="/tournaments" variant="secondary" size="sm">Смотреть турниры</Button>}
+                  />
                 )}
               </Section>
               <Section title="Сыгранные">
@@ -309,12 +388,3 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
   );
 }
 
-function StatusRow({ label, value, status }: { label: string; value: React.ReactNode; status?: { label: string; tone: "neutral" | "accent" | "ok" | "warn" | "danger" | "live" } }) {
-  return (
-    <div className="flex min-h-12 flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5">
-      <span className="w-44 shrink-0 text-meta text-fg-3">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-fg">{value}</span>
-      {status && <Status info={status} size="sm" />}
-    </div>
-  );
-}

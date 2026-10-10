@@ -65,9 +65,10 @@ export function TeamHeader({
             items={[
               { key: "overview", label: "Обзор", href: "/team" },
               { key: "roster", label: "Состав", href: "/team?tab=roster" },
+              // сразу за составом — на телефоне вкладка видна без прокрутки
+              ...(applications !== undefined ? [{ key: "applications", label: "Заявки", href: "/team?tab=applications", count: applications || undefined, alert: true }] : []),
               { key: "matches", label: "Матчи", href: "/team?tab=matches" },
               { key: "tournaments", label: "Турниры", href: "/team?tab=tournaments" },
-              ...(applications !== undefined ? [{ key: "applications", label: "Заявки", href: "/team?tab=applications", count: applications || undefined }] : []),
             ]}
           />
         </Suspense>
