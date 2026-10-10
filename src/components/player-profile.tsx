@@ -195,8 +195,9 @@ export function PlayerProfile({
         </Container>
       </div>
 
-      <Container width="wide" className="py-10 sm:py-12">
-        {agg && (
+      {/* без сыгранных карт блока нет вовсе — иначе пустой отступ над матчами */}
+      {agg && (
+        <Container width="wide" className="py-10 sm:py-12">
           <Section title="Карьера">
             <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4 lg:grid-cols-6">
               {[
@@ -219,8 +220,8 @@ export function PlayerProfile({
               ))}
             </div>
           </Section>
-        )}
-      </Container>
+        </Container>
+      )}
 
       {progress.length > 0 && (
         <Region>

@@ -37,7 +37,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
     <div
       className={cn(
         CARD,
-        "relative flex flex-col items-center overflow-hidden px-5 text-center transition-transform duration-300 hover:-translate-y-0.5",
+        "relative flex flex-col items-center overflow-hidden px-3 text-center sm:px-5 transition-transform duration-300 hover:-translate-y-0.5",
         big ? "pt-8 pb-7 border-[#e8c27a]/35 shadow-[0_0_80px_-28px_rgba(232,194,122,0.55)]" : "pt-6 pb-6",
       )}
     >
@@ -53,7 +53,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
             <TeamLogo src={p.team.logo_url} tag={p.team.tag} size={size} />
           )}
         </span>
-        <span className={cn("max-w-full break-words font-semibold tracking-[-0.015em] group-hover:text-accent-strong", big ? "text-[24px] lg:text-[28px] leading-[1.1]" : "text-[18px] lg:text-[20px]")}>
+        <span className={cn("max-w-full break-words font-semibold tracking-[-0.015em] group-hover:text-accent-strong", big ? "text-[24px] lg:text-[28px] leading-[1.1]" : "text-[15px] sm:text-[18px] lg:text-[20px]")}>
           {p.team.name}
         </span>
       </Link>
@@ -102,12 +102,19 @@ function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
 }
 
 /** Кнопки «Скачать картинку итогов» — PNG для ленты и для мессенджеров */
+/** Сетка карточек без «сирот»: 4 — в ряд по 4, 5 — по 5, иначе по 3 */
+function cardGrid(n: number) {
+  return cn("grid gap-4", n >= 2 && "grid-cols-2", n === 4 ? "lg:grid-cols-4" : n >= 5 ? "lg:grid-cols-5" : n === 2 ? "" : "lg:grid-cols-3");
+}
+
 export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
   const { placements, nominations, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
   // на пьедестале — места 1–3; 4-е (проигравший матча за 3-е место) — строкой под ним
   const rest = placements.filter((p) => p.place !== "1" && p.place !== "4");
   const fourth = placements.find((p) => p.place === "4");
+  // автоматическая номинация MVP повторяет блок «MVP турнира» ниже — показываем её только как решение судей
+  const shownNominations = nominations.filter((n) => !(mvp && n.key === "mvp" && n.source !== "judges"));
 
   if (!champion) {
     return (
@@ -124,8 +131,8 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       {/* пьедестал */}
       <section>
         <Eyebrow className="mb-6">Призёры</Eyebrow>
-        {/* пьедестал: на десктопе 2 · 1 · 3 по нижнему краю, на телефоне — по порядку мест */}
-        <div className={cn("grid items-end gap-4", rest.length >= 3 ? "md:grid-cols-4" : rest.length === 2 ? "md:grid-cols-[1fr_1.18fr_1fr]" : "md:grid-cols-[1.18fr_1fr]")}>
+        {/* пьедестал: на десктопе 2 · 1 · 3 по нижнему краю, на телефоне — чемпион сверху, 2 и 3 рядом */}
+        <div className={cn("grid grid-cols-2 items-end gap-3 md:gap-4", rest.length >= 3 ? "md:grid-cols-4" : rest.length === 2 ? "md:grid-cols-[1fr_1.18fr_1fr]" : "md:grid-cols-[1.18fr_1fr]")}>
           {[champion, ...rest].map((p) => {
             const second = p.place === "2";
             const first = p.place === "1";
@@ -133,7 +140,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
             return (
               <div
                 key={`${p.place}-${p.team.id}`}
-                className={cn(rest.length >= 2 && (first ? "md:order-2" : second ? "md:order-1" : "md:order-3"))}
+                className={cn(first && "col-span-2 md:col-span-1", rest.length >= 2 && (first ? "md:order-2" : second ? "md:order-1" : "md:order-3"))}
               >
                 <PlaceCard p={p} big={first} mvpName={mvpHere} />
               </div>
@@ -149,12 +156,12 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       )}
 
       {/* номинации: решение судей или кандидат по статистике */}
-      {nominations.length > 0 && (
+      {shownNominations.length > 0 && (
         <section>
           <Eyebrow className="mb-6">Номинации</Eyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {nominations.map((n) => (
-              <div key={n.key} className={cn(CARD, "p-6")}>
+          <div className={cardGrid(shownNominations.length)}>
+            {shownNominations.map((n) => (
+              <div key={n.key} className={cn(CARD, "min-w-0 p-4 sm:p-6")}>
                 <div className="text-[13px] text-fg-3">{n.title}</div>
                 <div className="mt-3 flex items-center gap-3 min-w-0">
                   {n.team && <TeamLogo src={n.team.logo_url} tag={n.team.tag} size="sm" />}
@@ -167,30 +174,6 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
               </div>
             ))}
           </div>
-        </section>
-      )}
-
-      {/* путь чемпиона */}
-      {championPath.length > 0 && (
-        <section>
-          <Eyebrow className="mb-6">Путь чемпиона</Eyebrow>
-          <ol className={cn(CARD, "divide-y divide-white/[0.06]")}>
-            {championPath.map((s) => (
-              <li key={s.matchId}>
-                <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[220px_1fr_auto] items-center gap-x-6 gap-y-1 px-6 py-4 hover:bg-surface-2">
-                  <span className="text-[13px] text-fg-3">{s.stage}</span>
-                  <span className="order-3 sm:order-none col-span-2 sm:col-span-1 flex items-center gap-3 min-w-0">
-                    <span className="text-fg-3 text-[13px]">против</span>
-                    {s.opponent && <TeamLogo src={s.opponent.logo_url} tag={s.opponent.tag} size="xs" />}
-                    <span className="font-medium break-words">{s.opponent?.name ?? "—"}</span>
-                  </span>
-                  <span className={cn("num text-right text-[18px] font-semibold", s.won ? "text-ok" : "text-danger")}>
-                    {s.walkover ? "тех." : s.score}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ol>
         </section>
       )}
 
@@ -236,11 +219,11 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       {leaders.length > 0 && (
         <section>
           <Eyebrow className="mb-6">Лидеры турнира</Eyebrow>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={cardGrid(leaders.length)}>
             {leaders.map((l) => (
-              <div key={l.key} className={cn(CARD, "p-6")}>
+              <div key={l.key} className={cn(CARD, "min-w-0 p-4 sm:p-6")}>
                 <div className="text-[13px] text-fg-3">{l.label}</div>
-                <div className="num mt-3 text-[30px] font-semibold tracking-[-0.01em]">{l.value}</div>
+                <div className="num mt-3 text-[24px] font-semibold tracking-[-0.01em] sm:text-[30px]">{l.value}</div>
                 <div className="mt-4 flex items-center gap-3 min-w-0">
                   <Avatar src={l.player?.avatar_url} name={l.name} size="sm" />
                   <div className="min-w-0">
@@ -260,15 +243,42 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
         </section>
       )}
 
-      {/* карты-рекорды */}
-      {(longestMap || closestMap) && (
-        <section>
-          <Eyebrow className="mb-6">Карты турнира</Eyebrow>
-          <div className="grid gap-4 md:grid-cols-2">
-            {longestMap && <MapRecord label="Самая длинная карта" h={longestMap} />}
-            {closestMap && <MapRecord label="Самая напряжённая карта" h={closestMap} />}
-          </div>
-        </section>
+      {/* путь чемпиона и карты-рекорды — рядом, чтобы не было полупустых строк */}
+      {(championPath.length > 0 || longestMap || closestMap) && (
+        <div className={cn("grid items-start gap-14 lg:gap-6", championPath.length > 0 && (longestMap || closestMap) && "lg:grid-cols-2")}>
+          {championPath.length > 0 && (
+            <section>
+              <Eyebrow className="mb-6">Путь чемпиона</Eyebrow>
+              <ol className={cn(CARD, "divide-y divide-white/[0.06]")}>
+                {championPath.map((s) => (
+                  <li key={s.matchId}>
+                    <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[140px_1fr_auto] items-center gap-x-5 gap-y-1 px-5 py-4 hover:bg-surface-2">
+                      <span className="text-[13px] text-fg-3">{s.stage}</span>
+                      <span className="order-3 sm:order-none col-span-2 sm:col-span-1 flex items-center gap-3 min-w-0">
+                        <span className="text-fg-3 text-[13px]">против</span>
+                        {s.opponent && <TeamLogo src={s.opponent.logo_url} tag={s.opponent.tag} size="xs" />}
+                        <span className="font-medium break-words">{s.opponent?.name ?? "—"}</span>
+                      </span>
+                      <span className={cn("num text-right text-[18px] font-semibold", s.won ? "text-ok" : "text-danger")}>
+                        {s.walkover ? "тех." : s.score}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {(longestMap || closestMap) && (
+            <section>
+              <Eyebrow className="mb-6">Карты турнира</Eyebrow>
+              <div className={cn("grid gap-4", championPath.length === 0 && "md:grid-cols-2")}>
+                {longestMap && <MapRecord label="Самая длинная карта" h={longestMap} />}
+                {closestMap && <MapRecord label="Самая напряжённая карта" h={closestMap} />}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
       {/* цифры */}

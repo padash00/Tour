@@ -8,6 +8,8 @@ export const DEFAULT_VOICE = `${AUTO_HALFTIME_VOICE} 0;sv_voiceenable 1;sv_allta
 const ACTIVE = ["warmup", "knife", "waiting_for_knife_decision", "going_live", "live"];
 /** Во время игры настройки сверяем реже: каждый RCON-запрос выполняется в основном потоке сервера */
 const LIVE_CHECK_MS = 60_000;
+/** Сколько ждать после готовности всех людей, прежде чем стартовать игру с ботами самим */
+const READY_START_MS = 10_000;
 
 /**
  * ctx: { stateDir, instances, rc(inst, command) → Promise<string>, log }
@@ -17,6 +19,7 @@ export function createEnforce({ stateDir, instances, rc, log }) {
   const file = path.join(stateDir, "enforce.json");
   let rules = {};
   const lastCheck = new Map(); // инстанс → { at, state }
+  const readySince = new Map(); // инстанс → когда обе команды стали готовы (игра с ботами)
   try {
     rules = JSON.parse(readFileSync(file, "utf8"));
   } catch {}
@@ -63,6 +66,20 @@ export function createEnforce({ stateDir, instances, rc, log }) {
       // пока сервер меняет карту между картами серии — правило нужно сохранить для следующей карты.
       if (get5 && (get5.gamestate === "none" || get5.matchid !== rule.matchid)) await clear(inst);
       return;
+    }
+    // игра с ботами: MatchZy ждёт «.r» от всех на сервере, а боты его не пишут — разминка бесконечна.
+    // Когда обе команды готовы (люди нажали .r), а разминка держится дольше READY_START_MS — запускаем сами.
+    if (Number(rule.cvars?.bot_quota) > 0 && get5.gamestate === "warmup" && get5.team1?.ready && get5.team2?.ready) {
+      const since = readySince.get(inst.name) ?? Date.now();
+      readySince.set(inst.name, since);
+      if (Date.now() - since >= READY_START_MS) {
+        readySince.delete(inst.name);
+        await rc(inst, "css_start").catch(() => {});
+        log(`матч ${inst.name}: все люди готовы, боты не жмут .r — старт (css_start)`);
+        return;
+      }
+    } else {
+      readySince.delete(inst.name);
     }
     // смена состояния (разминка → нож → игра, новая карта) — проверяем сразу; в самой игре — раз в минуту
     const state = `${get5.gamestate}:${get5.map_number}`;

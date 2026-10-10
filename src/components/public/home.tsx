@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { bracketLabel, formatDate } from "@/lib/format";
+import { bracketLabel, formatDate, formatMoney } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import type { Tournament } from "@/lib/types";
 import { Button, Container, Eyebrow, Status, cn, tournamentStatus } from "@/components/ds";
@@ -128,7 +128,7 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
 
 export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
   const mode = modeOf(t.format);
-  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? t.prize_pool : null;
+  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
   const second =
     t.status === "registration"
       ? { href: `/tournaments/${t.slug}/register`, label: mode.size === 1 ? "Зарегистрироваться" : "Зарегистрировать команду" }
@@ -298,7 +298,7 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
         </ol>
       </Container></section>
 
-      <section><Container className="pt-16 md:pt-20">
+      <section><Container className="pb-20 pt-16 md:pb-28 md:pt-20">
         <Eyebrow className="mb-8 lg:mb-10">Почему F16 Arena</Eyebrow>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
           {WHY.map((w, i) => (

@@ -5,7 +5,7 @@ import { HelpHint } from "@/components/help-hint";
 import { LiveRefresh } from "@/components/live-refresh";
 import { getTournamentRegistrations } from "@/lib/data";
 import { getMapImages } from "@/lib/settings";
-import { bracketLabel, formatDate, formatDateTime, mapName } from "@/lib/format";
+import { bracketLabel, formatDate, formatDateTime, mapName, formatMoney } from "@/lib/format";
 import type { Tournament } from "@/lib/types";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
@@ -137,7 +137,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 {real(t.prize_pool) && (
                   <div>
                     <dt className="text-micro text-fg-3">Призовой фонд</dt>
-                    <dd className="text-[15px] font-medium text-fg">{t.prize_pool}</dd>
+                    <dd className="text-[15px] font-medium text-fg">{formatMoney(t.prize_pool)}</dd>
                   </div>
                 )}
               </dl>
@@ -211,7 +211,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 {hasPrize && (
                   <div>
                     <SubsectionTitle>Призовой фонд</SubsectionTitle>
-                    {real(t.prize_pool) && <div className="text-heading text-fg">{t.prize_pool}</div>}
+                    {real(t.prize_pool) && <div className="text-heading text-fg">{formatMoney(t.prize_pool)}</div>}
                     {places.length > 0 && (
                       <dl className="mt-2 divide-y divide-line-subtle text-[14px]">
                         {places.map((p) => (
@@ -231,7 +231,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                       {t.entry_fee && (
                         <div className="flex justify-between gap-4 py-2.5">
                           <dt className="text-fg-3">Взнос</dt>
-                          <dd className="text-fg">{t.entry_fee}</dd>
+                          <dd className="text-fg">{formatMoney(t.entry_fee)}</dd>
                         </div>
                       )}
                       {t.contact && (

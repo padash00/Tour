@@ -87,3 +87,10 @@ export function plural(n: number, one: string, few: string, many: string) {
   if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
   return many;
 }
+
+/** Деньги из свободного поля турнира: «800000» → «800 000 ₸»; текст («Кубок и мерч») — как есть */
+export function formatMoney(value: string | null | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!/^\d[\d\s]*$/.test(raw)) return raw;
+  return `${new Intl.NumberFormat("ru-RU").format(Number(raw.replace(/\s/g, "")))} ₸`;
+}

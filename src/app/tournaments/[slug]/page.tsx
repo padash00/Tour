@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTournamentBySlug } from "@/lib/data";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import { CLUB_CITY, ORGANIZER, absolute, snippet } from "@/lib/seo";
 import type { Tournament } from "@/lib/types";
@@ -15,7 +15,7 @@ function describe(t: Tournament) {
     t.starts_at ? `старт ${formatDateTime(t.starts_at)}` : null,
     t.city || t.is_lan ? `${t.is_lan ? "LAN, " : ""}${t.location ?? t.city ?? CLUB_CITY}` : null,
     modeOf(t.format).title,
-    t.prize_pool ? `призовой фонд ${t.prize_pool}` : null,
+    t.prize_pool ? `призовой фонд ${formatMoney(t.prize_pool)}` : null,
     t.status === "registration" ? "регистрация открыта" : null,
   ].filter(Boolean);
   return snippet(`${parts.join(", ")}. ${t.description ?? "Сетка, расписание и результаты матчей на F16 Arena."}`);

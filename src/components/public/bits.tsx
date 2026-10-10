@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { bracketLabel, formatDate, formatTime } from "@/lib/format";
+import { bracketLabel, formatDate, formatTime, formatMoney } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { MatchStatus, Tournament, TournamentStatus } from "@/lib/types";
@@ -38,7 +38,7 @@ function CoverImage({ url, className }: { url: string | null; className?: string
 export function TournamentLine({ t, approved }: { t: Tournament; approved: number }) {
   const solo = modeOf(t.format).size === 1;
   const fill = Math.min(100, (approved / Math.max(1, t.max_teams)) * 100);
-  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? t.prize_pool : null;
+  const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
   const facts = tournamentFacts(t).filter((_, i) => i !== 3);
 
   return (

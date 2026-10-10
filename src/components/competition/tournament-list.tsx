@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, ChevronRight, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
-import { bracketLabel, formatDateTime } from "@/lib/format";
+import { bracketLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
 import type { TournamentStatus } from "@/lib/types";
 import { Button, EmptyState, Status, cn, tournamentStatus } from "@/components/ds";
@@ -168,7 +168,7 @@ function Featured({ t }: { t: TournamentItem }) {
             {realPrize(t.prize_pool) && (
               <div>
                 <dt className="text-micro text-fg-3">Призовой фонд</dt>
-                <dd className="text-[14px] font-medium text-fg">{t.prize_pool}</dd>
+                <dd className="text-[14px] font-medium text-fg">{formatMoney(t.prize_pool)}</dd>
               </div>
             )}
           </dl>
