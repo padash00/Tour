@@ -9,6 +9,7 @@ import { runAgentJobs } from "@/lib/server/agent-jobs";
 import { agentReportSchema, type SyncMetrics } from "@/lib/server/agent-report";
 import { db } from "@/lib/supabase";
 import { logSiteError } from "@/lib/site-errors";
+import { DEMO_DAYS_DEFAULT, saveAgentDemos } from "@/lib/demos";
 
 export const maxDuration = 60;
 
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest) {
   const report = parsed.data;
   // Сбой записи отчёта не должен оставить агента без команд: команды выдаются всегда.
   await safely("agent report", () => applyAgentReport(report));
+  const demos = report.demos;
+  if (demos) await safely("agent demos", () => saveAgentDemos(demos));
   let processedEvents: string[] = [];
   await safely("agent events", async () => { processedEvents = await applyAgentEvents(report.events); });
   // Старый агент не вызывает /api/agent/jobs. Пока он не самообновится, сохраняем прежнее поведение.
@@ -48,14 +51,18 @@ export async function POST(request: NextRequest) {
     await runAgentJobs("maintenance", safely, report.info?.cs2_patch);
   }
   // агент сравнит версию и сам скачает новый код/конфиги с /api/agent/bundle
-  const [admins, retention, openJoin] = await Promise.all([
+  const [admins, retention, demoRetention, openJoin] = await Promise.all([
     adminPlayers().then((a) => a.map((x) => x.steam_id)).catch(() => null),
     getSetting("BACKUP_RETENTION_DAYS").catch(() => null),
+    getSetting("DEMO_RETENTION_DAYS").catch(() => null),
     isServerOpenJoin().catch(() => true),
   ]);
-  // срок хранения бэкапов и демо на серверном ПК (дней), по умолчанию 1
+  // срок хранения бэкапов раундов на серверном ПК (дней), по умолчанию 1
   const days = Number(retention ?? "");
   const backup_days = Number.isFinite(days) && days >= 1 ? Math.min(90, Math.floor(days)) : 1;
+  // демо скачивают со страницы матча — храним дольше, по умолчанию 30 дней
+  const demoDays = Number(demoRetention ?? "");
+  const demo_days = Number.isFinite(demoDays) && demoDays >= 1 ? Math.min(365, Math.floor(demoDays)) : DEMO_DAYS_DEFAULT;
   // Claim last: work done above cannot consume the delivery lease.
   const commands = await takePendingCommands(request.nextUrl.origin, (report.protocol ?? 1) >= 2);
   metrics.duration_ms = Math.round(performance.now() - started);
@@ -63,5 +70,5 @@ export async function POST(request: NextRequest) {
   if (error) console.error("agent sync metrics could not be saved", error.code);
   // вход на серверы для всех (по умолчанию открыт)
   const open_join = openJoin;
-  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days, open_join, processed_events: processedEvents });
+  return NextResponse.json({ commands, bundle_version: getAgentBundle().version, admins, backup_days, demo_days, open_join, processed_events: processedEvents });
 }

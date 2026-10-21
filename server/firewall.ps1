@@ -6,7 +6,9 @@
 #
 #   powershell -ExecutionPolicy Bypass -File firewall.ps1        (от администратора; агент вызывает сам)
 
-param([string]$Csv = (Join-Path $PSScriptRoot "instances.csv"))
+# Раздача демо (агент, demos.mjs): разрешить входящие TCP на -DemoPort (группа «F16 Arena Demos»).
+# Без -DemoPort правило раздачи убирается.
+param([string]$Csv = (Join-Path $PSScriptRoot "instances.csv"), [int]$DemoPort = 0)
 $ErrorActionPreference = "Stop"
 # агент читает вывод как UTF-8 (иначе в agent.log кириллица превращается в кракозябры)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
@@ -21,3 +23,12 @@ $remote = @("0.0.0.0-126.255.255.255", "128.0.0.0-255.255.255.255", "::2-ffff:ff
 New-NetFirewallRule -DisplayName "F16 Arena: RCON (TCP) только с этого ПК" -Group $group `
   -Direction Inbound -Protocol TCP -LocalPort $ports -RemoteAddress $remote -Action Block -Profile Any | Out-Null
 Write-Host "TCP $($ports -join ', ') закрыт для входящих из сети (UDP игры открыт)"
+
+$demoGroup = "F16 Arena Demos"
+Get-NetFirewallRule -Group $demoGroup -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+if ($DemoPort -gt 0) {
+  if ($ports -contains $DemoPort) { throw "Порт демо $DemoPort совпадает с игровым — RCON открылся бы" }
+  New-NetFirewallRule -DisplayName "F16 Arena: раздача демо (TCP $DemoPort)" -Group $demoGroup `
+    -Direction Inbound -Protocol TCP -LocalPort $DemoPort -Action Allow -Profile Any | Out-Null
+  Write-Host "TCP $DemoPort открыт для скачивания демо"
+}

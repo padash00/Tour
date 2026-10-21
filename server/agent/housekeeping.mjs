@@ -65,18 +65,20 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
   // Чистка бэкапов раундов и демо старше срока из настроек сайта (раз в час). Файлы матчей,
   // которые сейчас на серверах, не трогаем — по ним может понадобиться откат раунда.
   let cleanupAt = 0;
-  function cleanupBackups(days) {
+  // У демо свой срок (настройка сайта «Сколько дней хранить демо») — их скачивают игроки со страницы матча.
+  function cleanupBackups(days, demoDays = days) {
     if (!Number.isFinite(days) || days < 1 || Date.now() - cleanupAt < 60 * 60_000) return;
+    if (!Number.isFinite(demoDays) || demoDays < 1) demoDays = days;
     cleanupAt = Date.now();
-    const cutoff = Date.now() - days * 86_400_000;
+    const backupCutoff = Date.now() - days * 86_400_000;
     const active = activeMatchIds();
     const targets = [
-      { dir: path.join(csgo, "MatchZyDataBackup"), re: /^matchzy_(\d+)_.*\.json$/ },
-      { dir: csgo, re: /^matchzy_(\d+)_.*\.txt$/ },
-      { dir: path.join(csgo, "MatchZy"), re: /_(\d+)_map\d+_.*\.dem$/ },
+      { dir: path.join(csgo, "MatchZyDataBackup"), re: /^matchzy_(\d+)_.*\.json$/, cutoff: backupCutoff },
+      { dir: csgo, re: /^matchzy_(\d+)_.*\.txt$/, cutoff: backupCutoff },
+      { dir: path.join(csgo, "MatchZy"), re: /_(\d+)_map\d+_.*\.dem$/, cutoff: Date.now() - demoDays * 86_400_000 },
     ];
     let removed = 0;
-    for (const { dir, re } of targets) {
+    for (const { dir, re, cutoff } of targets) {
       if (!existsSync(dir)) continue;
       for (const f of readdirSync(dir)) {
         const m = re.exec(f);
@@ -90,7 +92,7 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
         } catch {}
       }
     }
-    if (removed) log(`очистка: удалено ${removed} бэкапов/демо старше ${days} дн.`);
+    if (removed) log(`очистка: удалено ${removed} файлов (бэкапы старше ${days} дн., демо старше ${demoDays} дн.)`);
   }
 
   // RCON (TCP на игровом порту) — только с этого ПК: firewall.ps1 ставит запрещающее правило для входящих
@@ -99,18 +101,19 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
   const firewallState = path.join(stateDir, "firewall.json");
   let firewall = readJsonSafe(firewallState, null);
   let firewallAt = 0;
-  async function ensureFirewall() {
+  // demoPort — TCP раздачи демо (demos.mjs): разрешающее правило для входящих; null — правило убирается
+  async function ensureFirewall(demoPort = null) {
     if (process.platform !== "win32" || !existsSync(firewallScript)) return firewall;
-    const key = createHash("sha256").update(readFileSync(firewallScript)).update(instances.map((i) => i.port).join(",")).digest("hex").slice(0, 12);
+    const key = createHash("sha256").update(readFileSync(firewallScript)).update(instances.map((i) => i.port).join(",")).update(`demo:${demoPort ?? ""}`).digest("hex").slice(0, 12);
     if (firewall?.ok && firewall.key === key) return firewall;
     if (Date.now() - firewallAt < 30 * 60_000) return firewall; // ошибка — не повторяем на каждом тике
     firewallAt = Date.now();
     const result = await new Promise((resolve) => {
-      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", firewallScript], { windowsHide: true, timeout: 60_000 }, (err, out, stderr) =>
+      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", firewallScript, ...(demoPort ? ["-DemoPort", String(demoPort)] : [])], { windowsHide: true, timeout: 60_000 }, (err, out, stderr) =>
         resolve(err ? { ok: false, error: String(stderr || err.message).trim().slice(0, 300) } : { ok: true, detail: String(out).trim().slice(0, 300) }),
       );
     });
-    firewall = { ...result, key, ports: instances.map((i) => i.port), at: new Date().toISOString() };
+    firewall = { ...result, key, ports: instances.map((i) => i.port), demo_port: demoPort, at: new Date().toISOString() };
     writeFileSync(firewallState, JSON.stringify(firewall));
     log(firewall.ok ? `брандмауэр: ${firewall.detail}` : `брандмауэр: не удалось закрыть RCON — ${firewall.error}`);
     return firewall;

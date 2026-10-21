@@ -18,7 +18,8 @@
 //   - самообновление (bundle.mjs): проверка кода до установки, откат службой, не во время матча;
 //   - версия CS2 и ожидающая перезагрузка Windows уходят на сайт для предупреждений в F16 Control.
 //
-// Конфиг: D:\cs2server\f16\agent.json  { "siteUrl": "...", "token": "...", "lanIp": "192.168.0.159", "relayPort": 27099 }
+// Конфиг: D:\cs2server\f16\agent.json  { "siteUrl": "...", "token": "...", "lanIp": "192.168.0.159", "relayPort": 27099,
+//   "demoPort": 27100, "demoRateMbit": 40 }  — "demos": false выключает раздачу демо
 // Запуск:  node agent.mjs   (или D:\cs2server\F16-agent.bat)
 
 import { execFile, spawn } from "node:child_process";
@@ -27,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAutostart } from "./autostart.mjs";
+import { createDemos } from "./demos.mjs";
 import { UPDATE_EXIT_CODE, applyBundle, localBundleVersion, rejectedBundleVersion } from "./bundle.mjs";
 import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
 import { CommandJournal } from "./command-journal.mjs";
@@ -121,6 +123,18 @@ const housekeeping = createHousekeeping({
   activeMatchIds: () => new Set(Object.values(recovery.assignments).map((a) => String(a.matchid))),
   rconPassword: secrets.rcon,
 });
+// Демо карт: список для сайта и раздача игрокам по подписанным ссылкам (demos.mjs)
+const DEMO_PORT = Number(config.demoPort ?? 27100);
+const demos = config.demos === false ? null : createDemos({
+  dir: path.join(SERVER_DIR, "game", "csgo", "MatchZy"),
+  port: DEMO_PORT,
+  token: config.token,
+  rateMbit: config.demoRateMbit,
+  // карта ещё идёт на каком-то сервере — её запись не закончена
+  isLive: (matchid, map) => Object.values(snapshots).some((s) => s.report.get5?.matchid === matchid && s.report.get5?.map_number === map),
+  log,
+});
+let demosSent = { key: "", at: 0 };
 try {
   housekeeping.ensureInstanceCfgs();
 } catch (e) {
@@ -495,9 +509,10 @@ async function refreshUpnp() {
   upnpAt = Date.now();
   const prev = upnpState?.ip;
   // игровые порты и GOTV (порт + 5): зрители и ПК трансляции из сети игроков смотрят матч через GOTV
-  upnpState = await ensureUpnp(config.lanIp, INSTANCES.flatMap((i) => [i.port, i.port + 5]));
+  // и TCP-порт раздачи демо — игроки скачивают их прямо с этого ПК
+  upnpState = await ensureUpnp(config.lanIp, INSTANCES.flatMap((i) => [i.port, i.port + 5]), demos ? [DEMO_PORT] : []);
   if (upnpState.error) log(`UPnP: ${upnpState.error}`);
-  else if (upnpState.ip !== prev) log(`UPnP: роутер ${upnpState.model ?? ""} внешний адрес ${upnpState.ip}, проброшены UDP ${upnpState.mapped.join(", ")}`);
+  else if (upnpState.ip !== prev) log(`UPnP: роутер ${upnpState.model ?? ""} внешний адрес ${upnpState.ip}, проброшены UDP ${upnpState.mapped.join(", ")}${upnpState.mapped_tcp?.length ? `, TCP ${upnpState.mapped_tcp.join(", ")}` : ""}`);
 }
 
 /**
@@ -548,8 +563,20 @@ async function syncOnce() {
   const instances = INSTANCES.map((i) => snapshots[i.name]).filter((s) => s && now - s.at < SNAPSHOT_FRESH_MS).map((s) => s.report);
   const publicInfo = { ...hostReport(), upnp: upnpState, pending_results: commandJournal.pendingResults, protocol: 3 };
   const events = recovery.pendingEvents;
+  // список демо — только когда изменился (и раз в 10 минут на случай, если сайт его не сохранил)
+  const demoFiles = demos?.list() ?? null;
+  const demoKey = demoFiles ? demoFiles.map((d) => `${d.file}:${d.size}`).join("|") : "";
+  const sendDemos = demoFiles && (demoKey !== demosSent.key || now - demosSent.at > 10 * 60_000);
   const t0 = Date.now();
-  const res = await api("/api/agent/sync", { protocol: 3, lan_ip: config.lanIp, info: publicInfo, instances, events });
+  const res = await api("/api/agent/sync", {
+    protocol: 3,
+    lan_ip: config.lanIp,
+    info: publicInfo,
+    instances,
+    events,
+    ...(sendDemos ? { demos: { port: DEMO_PORT, files: demoFiles } } : {}),
+  });
+  if (sendDemos) demosSent = { key: demoKey, at: now };
   rtts.push(Date.now() - t0);
   if (rtts.length > 10) rtts.shift();
   commandJournal.accept(res.commands ?? []);
@@ -560,7 +587,7 @@ async function syncOnce() {
   await housekeeping.syncMatchzyAdmins(res.admins).catch((e) => log(`MatchZy admins: ${e.message}`));
   if (typeof res.open_join === "boolean") openJoin = res.open_join;
   try {
-    housekeeping.cleanupBackups(Number(res.backup_days ?? 1));
+    housekeeping.cleanupBackups(Number(res.backup_days ?? 1), Number(res.demo_days ?? res.backup_days ?? 1));
   } catch (e) {
     log(`очистка: ${e.message}`);
   }
@@ -595,7 +622,7 @@ async function housekeepingLoop() {
     }
     await hud.ensurePlugin(Object.keys(recovery.assignments).length > 0).catch((e) => log(`F16Hud: ${e.message}`));
     await refreshUpnp().catch(() => {});
-    await housekeeping.ensureFirewall().catch((e) => log(`брандмауэр: ${e.message}`));
+    await housekeeping.ensureFirewall(demos ? DEMO_PORT : null).catch((e) => log(`брандмауэр: ${e.message}`));
     await housekeeping.ensureHiddenTasks().catch((e) => log(`планировщик: ${e.message}`));
     await refreshHostInfo().catch(() => {});
     await sleep(60_000);
@@ -603,6 +630,7 @@ async function housekeepingLoop() {
 }
 
 await relay.start();
+demos?.start();
 log(`F16 Server Agent → ${config.siteUrl} · инстансов: ${INSTANCES.length} · LAN ${config.lanIp}`);
 await refreshHostInfo(true).catch(() => {});
 for (const inst of INSTANCES) probeLoop(inst);

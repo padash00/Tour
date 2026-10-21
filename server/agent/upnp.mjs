@@ -52,25 +52,38 @@ let gateway = null;
  * Проверить и при необходимости восстановить проброс UDP-портов инстансов на lanIp.
  * Возвращает состояние для сайта: { ip, model, mapped, error, at }.
  */
-export async function ensureUpnp(lanIp, ports) {
+export async function ensureUpnp(lanIp, ports, tcpPorts = []) {
   const at = new Date().toISOString();
   try {
     gateway ??= await discover(lanIp);
-    if (!gateway) return { ip: null, model: null, mapped: [], error: "роутер не отвечает по UPnP", at };
+    if (!gateway) return { ip: null, model: null, mapped: [], mapped_tcp: [], error: "роутер не отвечает по UPnP", at };
     const ip = /<NewExternalIPAddress>([^<]*)/.exec(await soap(gateway, "GetExternalIPAddress"))?.[1] || null;
-    const mapped = [];
-    for (const port of ports) {
-      // AddPortMapping идемпотентен: то же правило просто обновляется (lease 0 — без срока)
-      await soap(
+    // AddPortMapping идемпотентен: то же правило просто обновляется (lease 0 — без срока)
+    const map = (port, proto, what) =>
+      soap(
         gateway,
         "AddPortMapping",
-        `<NewRemoteHost></NewRemoteHost><NewExternalPort>${port}</NewExternalPort><NewProtocol>UDP</NewProtocol><NewInternalPort>${port}</NewInternalPort><NewInternalClient>${lanIp}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>F16 CS2 ${port}</NewPortMappingDescription><NewLeaseDuration>0</NewLeaseDuration>`,
+        `<NewRemoteHost></NewRemoteHost><NewExternalPort>${port}</NewExternalPort><NewProtocol>${proto}</NewProtocol><NewInternalPort>${port}</NewInternalPort><NewInternalClient>${lanIp}</NewInternalClient><NewEnabled>1</NewEnabled><NewPortMappingDescription>F16 ${what} ${port}</NewPortMappingDescription><NewLeaseDuration>0</NewLeaseDuration>`,
       );
+    const mapped = [];
+    for (const port of ports) {
+      await map(port, "UDP", "CS2");
       mapped.push(port);
     }
-    return { ip, model: gateway.model, mapped, error: null, at };
+    // раздача демо: без неё игры работают — её ошибка не отменяет игровые порты
+    const mapped_tcp = [];
+    let tcpError = null;
+    for (const port of tcpPorts) {
+      try {
+        await map(port, "TCP", "demos");
+        mapped_tcp.push(port);
+      } catch (e) {
+        tcpError = `TCP ${port}: ${e.message ?? e}`;
+      }
+    }
+    return { ip, model: gateway.model, mapped, mapped_tcp, tcp_error: tcpError, error: null, at };
   } catch (e) {
     gateway = null; // в следующий раз найти роутер заново
-    return { ip: null, model: null, mapped: [], error: String(e.message ?? e), at };
+    return { ip: null, model: null, mapped: [], mapped_tcp: [], error: String(e.message ?? e), at };
   }
 }

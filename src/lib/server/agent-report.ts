@@ -28,6 +28,17 @@ export const agentReportSchema = z.object({
     at: z.string().max(64).optional(),
     id: z.string().max(64).optional(),
   })).max(500).optional(),
+  // готовые демо карт на серверном ПК (приходят, только когда список изменился)
+  demos: z.object({
+    port: z.number().int().min(1).max(65535),
+    files: z.array(z.object({
+      file: z.string().max(256),
+      matchzy_id: z.number().int().nonnegative(),
+      map: z.number().int().min(0).max(16),
+      size: z.number().int().nonnegative(),
+      at: z.string().max(64),
+    })).max(500),
+  }).optional(),
 });
 
 export type SyncMetrics = {

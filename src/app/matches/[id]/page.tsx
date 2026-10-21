@@ -4,6 +4,7 @@ import { Gamepad2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { SocialDownloads } from "@/components/social-downloads";
 import { getMapImages } from "@/lib/settings";
+import { getMatchDemos } from "@/lib/demos";
 import { openDispute } from "@/app/actions/dispute";
 import { db } from "@/lib/supabase";
 import type { Dispute } from "@/lib/types";
@@ -71,12 +72,14 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   const serverNow = serverTime();
   const mapImages = await getMapImages();
-  const [player, stageRounds, rosters, statRows] = await Promise.all([
+  const [player, stageRounds, rosters, statRows, demoInfo] = await Promise.all([
     getCurrentPlayer(),
     // для подписи стадии нужны только раунды сетки, а не все матчи турнира
     ["group", "swiss", "grand_final", "third_place"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
+    // демо карт лежат на серверном ПК; у будущих матчей их нет
+    ["live", "finished"].includes(m.status) ? getMatchDemos(m.matchzy_id) : Promise.resolve({ demos: [], online: false }),
   ]);
 
   const roundMaps = ["live", "finished"].includes(m.status)
@@ -107,10 +110,26 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         {m.maps.map((map) => {
           const w1 = map.status === "finished" && map.team1_score > map.team2_score;
           const w2 = map.status === "finished" && map.team2_score > map.team1_score;
+          const mapDemos = map.status === "finished" ? demoInfo.demos.filter((d) => d.mapNumber === map.map_number) : [];
           return (
             <div key={map.id} className="grid min-h-14 grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[80px_minmax(0,1fr)_120px_auto] sm:px-5">
               <span className="text-meta text-fg-3">Карта {map.map_number}</span>
-              <span className="truncate text-[15px] font-medium text-fg">{mapName(map.map_name)}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-medium text-fg">{mapName(map.map_name)}</span>
+                {mapDemos.length > 0 && (
+                  <span className="mt-0.5 flex flex-wrap gap-x-3 text-meta">
+                    {mapDemos.map((d) =>
+                      demoInfo.online ? (
+                        <a key={d.file} href={`/matches/${m.id}/demo?f=${encodeURIComponent(d.file)}`} rel="nofollow" className="text-accent hover:underline">
+                          Демо{d.parts > 1 ? ` ч. ${d.part}` : ""} · {Math.max(1, Math.round(d.size / 1e6))} МБ
+                        </a>
+                      ) : (
+                        <span key={d.file} className="text-fg-4">Демо{d.parts > 1 ? ` ч. ${d.part}` : ""} — сервер выключен</span>
+                      ),
+                    )}
+                  </span>
+                )}
+              </span>
               <span className="hidden truncate text-meta text-fg-3 sm:block">
                 {map.picked_by ? `пик ${map.picked_by === m.team1_id ? m.team1?.tag : m.team2?.tag}` : "decider"}
               </span>
@@ -128,6 +147,12 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           );
         })}
       </RowList>
+      {demoInfo.online && demoInfo.demos.length > 0 && (
+        <p className="mt-3 text-meta text-fg-3">
+          Демо скачивается прямо с сервера клуба. Если браузер предупредит о небезопасной загрузке — выберите «Сохранить».
+          Открыть в CS2: положите файл в папку game\csgo и введите в консоли playdemo имя_файла.
+        </p>
+      )}
       {m.status === "finished" && m.team1 && m.team2 && (
         <div className="mt-5">
           <SocialDownloads base={`/matches/${m.id}/image`} title="Картинка матча" text="Счёт, карты и MVP — для поста, сторис или превью ссылки." />
