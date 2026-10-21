@@ -138,6 +138,27 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
     log(result.ok ? `планировщик: ${result.text}` : `планировщик: не удалось скрыть окно задач — ${result.text}`);
   }
 
+  // Windows не притормаживает скрытые серверы CS2 (tune.ps1: power throttling, точный таймер). Как hide-tasks:
+  // удачный результат запоминаем по хэшу скрипта, ошибку повторяем не чаще раза в 30 минут.
+  const tuneScript = path.join(f16Dir, "tune.ps1");
+  const tuneState = path.join(stateDir, "tune.json");
+  let tuneAt = 0;
+  async function ensureTuning() {
+    if (process.platform !== "win32" || !existsSync(tuneScript)) return;
+    const key = createHash("sha256").update(readFileSync(tuneScript)).digest("hex").slice(0, 12);
+    if (readJsonSafe(tuneState, null)?.key === key) return;
+    if (Date.now() - tuneAt < 30 * 60_000) return;
+    tuneAt = Date.now();
+    const cs2 = path.join(serverDir, "game", "bin", "win64", "cs2.exe");
+    const result = await new Promise((resolve) => {
+      execFile("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", tuneScript, "-Cs2", cs2], { windowsHide: true, timeout: 60_000 }, (err, out, stderr) =>
+        resolve(err ? { ok: false, text: String(stderr || err.message).trim().slice(0, 300) } : { ok: true, text: String(out).trim().slice(0, 300) }),
+      );
+    });
+    if (result.ok) writeFileSync(tuneState, JSON.stringify({ key, at: new Date().toISOString() }));
+    log(result.ok ? `настройка Windows: ${result.text}` : `настройка Windows: не удалось — ${result.text}`);
+  }
+
   // Конфиг инстанса (hostname, RCON) пишет install.ps1. Новый инстанс в instances.csv (пришёл с сайта
   // вместе с агентом) получает свой cfg здесь — без ручного запуска install.ps1 на ПК.
   function ensureInstanceCfgs() {
@@ -154,6 +175,7 @@ export function createHousekeeping({ serverDir, f16Dir, stateDir, instances, rc,
   return {
     ensureInstanceCfgs,
     ensureHiddenTasks,
+    ensureTuning,
     ensureServerLanguage,
     ensureMatchzyRu,
     syncMatchzyAdmins,

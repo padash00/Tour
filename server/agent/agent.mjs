@@ -624,6 +624,7 @@ async function housekeepingLoop() {
     await refreshUpnp().catch(() => {});
     await housekeeping.ensureFirewall(demos ? DEMO_PORT : null).catch((e) => log(`брандмауэр: ${e.message}`));
     await housekeeping.ensureHiddenTasks().catch((e) => log(`планировщик: ${e.message}`));
+    await housekeeping.ensureTuning().catch((e) => log(`настройка Windows: ${e.message}`));
     await refreshHostInfo().catch(() => {});
     await sleep(60_000);
   }
