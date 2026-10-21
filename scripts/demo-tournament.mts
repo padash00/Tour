@@ -3,6 +3,7 @@
 //
 //   npm run demo -- seed               16 команд × 5 игроков, анкеты, заявки, документы, одобрение, check-in
 //   npm run demo -- play [--fast]      жеребьёвка, сетка, вето и матчи (по умолчанию — вживую, ~10–12 минут)
+//   npm run demo -- play --servers     то же на настоящих серверах: автопилот, агент, MatchZy (прогон дня турнира)
 //   npm run demo -- status             статус турнира, матчи и счёт
 //   npm run demo -- cleanup            удалить все демо-данные и проверить, что ничего не осталось
 //
@@ -26,22 +27,23 @@ const { signedLogQuery } = await import("../src/lib/server/ingest-signature");
 
 const command = process.argv[2];
 const fast = process.argv.includes("--fast");
+const servers = process.argv.includes("--servers");
 const site = (process.env.DEMO_SITE_URL ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
 const token = process.env.MATCHZY_TOKEN ?? "";
 
-const options = { transport: httpTransport(site, token, signedLogQuery), fast, site };
+const options = { transport: httpTransport(site, token, signedLogQuery), fast, site, servers };
 try {
   if (command === "seed") await seedDemo(options);
   else if (command === "play") {
     if (!token) throw new Error("Нет MATCHZY_TOKEN в .env.local — без него сайт не примет события матчей");
-    console.log(`События → ${site} (${fast ? "быстро" : "вживую"})`);
+    console.log(`События → ${site} (${fast ? "быстро" : "вживую"}${servers ? ", на настоящих серверах" : ""})`);
     await playDemo(options);
   } else if (command === "status") await statusDemo(options);
   else if (command === "cleanup") {
     const { total } = await cleanupDemo(options);
     if (total) process.exitCode = 1;
   } else {
-    console.log("Команды: seed | play [--fast] | status | cleanup");
+    console.log("Команды: seed | play [--fast] [--servers] | status | cleanup");
     process.exitCode = 2;
   }
 } catch (e) {

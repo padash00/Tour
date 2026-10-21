@@ -2,8 +2,11 @@
 // заявки через save_official_registration, одобрение и check-in через change_registration / check_in_registration,
 // жеребьёвка drawOrder + createBracket (как «Провести жеребьёвку»), вето через insertVetoAction,
 // игра — события MatchZy и строки HTTP-лога CS2, отправленные на сайт (Sender), как это делают сервер и агент.
-// Реальные серверы не участвуют: autopilot = false, server_instance у матчей остаётся пустым,
+// Обычно реальные серверы не участвуют: autopilot = false, server_instance у матчей остаётся пустым,
 // команды агенту (agent_commands) не создаются.
+// Режим servers (play --servers) — прогон «как в день турнира» на настоящих серверах: автопилот включён, сайт сам
+// запускает серверы, отдаёт им матчи и ставит лишние в очередь; MatchZy грузит матч и ждёт игроков, а события
+// игры шлёт этот скрипт. После series_end скрипт снимает матч с сервера (end_match), как это делает MatchZy.
 import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -19,6 +22,7 @@ import { getProfiles } from "../../src/lib/profiles";
 import { getTournamentRecap } from "../../src/lib/recap";
 import { registrationError } from "../../src/lib/registration-errors";
 import { ingestKey } from "../../src/lib/server/ops";
+import { enqueueCommand } from "../../src/lib/server/state";
 import { db } from "../../src/lib/supabase";
 import type { Tournament } from "../../src/lib/types";
 import { VETO_STEP_SECONDS, vetoState } from "../../src/lib/veto";
@@ -46,6 +50,9 @@ export type Transport = {
 };
 
 /** Ключи ingest_dedupe отправленных событий MatchZy — их удалит cleanup (ключи лога удаляются по префиксу) */
+/** Настоящий турнир, с которого режим servers берёт карты */
+const REAL_SLUG = "oskemen-2026";
+
 export const DEFAULT_INGEST_JOURNAL = path.join(tmpdir(), `f16-${DEMO_SLUG}-ingest-keys.txt`);
 
 /** HTTP-транспорт: те же адреса, заголовок и подпись, что у MatchZy (matchzy_remote_log_url) и logaddress_add_http */
@@ -95,6 +102,8 @@ export type DemoOptions = {
   log?: (line: string) => void;
   /** файл журнала ключей принятых событий (для cleanup) */
   journal?: string;
+  /** прогон на настоящих серверах: автопилот, агент, MatchZy (см. начало файла) */
+  servers?: boolean;
 };
 
 type Ctx = Required<Omit<DemoOptions, "seed">> & { rng: Rng };
@@ -104,6 +113,7 @@ const context = (o: DemoOptions): Ctx => ({
   site: (o.site ?? "https://tournament.f16-arena.kz").replace(/\/$/, ""),
   log: o.log ?? ((s) => console.log(s)),
   journal: o.journal ?? DEFAULT_INGEST_JOURNAL,
+  servers: !!o.servers,
   rng: rngFrom(o.seed ?? Date.now() % 2 ** 31),
 });
 
@@ -372,11 +382,35 @@ async function simTeams(m: MatchFull): Promise<{ team1: SimTeam; team2: SimTeam 
   return { team1: build(m.team1, rosters.team1), team2: build(m.team2, rosters.team2) };
 }
 
+const SERVER_WAIT_MS = 30 * 60_000;
+
+/** Режим servers: ждём, пока автопилот отдаст матч серверу и MatchZy его загрузит (server_state = ready) */
+async function waitForServer(ctx: Ctx, matchId: string) {
+  const started = Date.now();
+  let last = "";
+  for (;;) {
+    const m = (await getMatch(matchId))!;
+    if (m.status === "live" || (m.server_instance && m.server_state === "ready")) {
+      const waited = Math.round((Date.now() - started) / 1000);
+      ctx.log(`  #${m.number} → ${m.server_instance} готов (${m.server_address ?? "без адреса"}), ждали ${waited} с`);
+      return m;
+    }
+    const state = m.server_instance ? `${m.server_instance}: ${m.server_state ?? "—"}` : "в очереди на сервер";
+    if (state !== last) {
+      ctx.log(`  #${m.number} ${state}`);
+      last = state;
+    }
+    if (Date.now() - started > SERVER_WAIT_MS) throw new Error(`Матч #${m.number}: за 30 минут не получил готовый сервер (${state})`);
+    await sleep(5000);
+  }
+}
+
 /** Серия: события MatchZy и лог CS2 по каждому раунду, итог карты, итог серии */
 async function playSeries(ctx: Ctx, matchId: string) {
   let m = (await getMatch(matchId))!;
   if (!["ready", "live"].includes(m.status)) return;
-  if (m.server_instance) throw new Error(`Матч #${m.number} назначен на сервер ${m.server_instance} — демо такие матчи не трогает`);
+  if (ctx.servers) m = await waitForServer(ctx, matchId);
+  else if (m.server_instance) throw new Error(`Матч #${m.number} назначен на сервер ${m.server_instance} — демо такие матчи не трогает`);
   const matchid = Number(m.matchzy_id);
   const { team1, team2 } = await simTeams(m);
   if (team1.players.length !== 5 || team2.players.length !== 5) throw new Error(`Матч #${m.number}: в составах не по 5 игроков`);
@@ -419,6 +453,8 @@ async function playSeries(ctx: Ctx, matchId: string) {
     if (wins.team1 >= need || wins.team2 >= need) {
       const winner: TeamKey = wins.team1 >= need ? "team1" : "team2";
       await sendEvent(ctx, { event: "series_end", matchid, team1_series_score: wins.team1, team2_series_score: wins.team2, winner: { side: "", team: winner }, time_until_restore: 0 });
+      // настоящий MatchZy после серии снимает матч сам; здесь игры на сервере не было — снимаем командой агенту
+      if (ctx.servers && m.server_instance) await enqueueCommand(m.server_instance, "end_match", {});
       break;
     }
     await sleep(ctx.fast ? 0 : 4000);
@@ -426,6 +462,43 @@ async function playSeries(ctx: Ctx, matchId: string) {
   m = (await getMatch(matchId))!;
   const winnerName = m.winner_id === m.team1_id ? m.team1?.name : m.team2?.name;
   ctx.log(`  #${m.number} ${stageOf(m)}: ${m.team1?.name} ${m.team1_score}:${m.team2_score} ${m.team2?.name} — ${m.status === "finished" ? `победа ${winnerName}` : `статус ${m.status}`}`);
+}
+
+/**
+ * Режим servers: как в день турнира — без волн. Вето открывает автопилот, когда соперники известны и свободны;
+ * капитаны (скрипт) сразу ходят, дальше матч ждёт сервер и играется. Следующий раунд начинается,
+ * как только его пара сложилась, не дожидаясь конца всего раунда.
+ */
+async function playOnServers(ctx: Ctx, tournamentId: string, organizer: string) {
+  const running = new Map<string, Promise<void>>();
+  let failure: Error | null = null;
+  for (;;) {
+    if (failure) throw failure;
+    const { data: list } = await db()
+      .from("matches")
+      .select("id, number, bracket, round, status")
+      .eq("tournament_id", tournamentId)
+      .not("status", "in", "(finished,cancelled)")
+      .order("number")
+      .throwOnError();
+    if (!list?.length && !running.size) return;
+    for (const row of list ?? []) {
+      if (running.has(row.id) || !["veto", "ready", "live"].includes(row.status)) continue;
+      ctx.log(`  #${row.number} ${stageOf(row)}: ${row.status === "veto" ? "вето началось" : row.status}`);
+      running.set(
+        row.id,
+        (async () => {
+          await runVeto(ctx, row.id, organizer);
+          await playSeries(ctx, row.id);
+        })()
+          .catch((e) => {
+            failure ??= e as Error;
+          })
+          .finally(() => running.delete(row.id)),
+      );
+    }
+    await sleep(3000);
+  }
 }
 
 async function finishTournament(ctx: Ctx, t: Tournament, organizer: string) {
@@ -442,8 +515,19 @@ export async function playDemo(o: DemoOptions) {
   const ctx = context(o);
   let t = await loadTournament();
   if (!t) throw new Error("Демо-турнира нет — сначала seed");
-  if (t.autopilot) throw new Error("У демо-турнира включён автопилот — матчи ушли бы на реальные серверы. Остановлено.");
+  if (t.autopilot && !ctx.servers) throw new Error("У демо-турнира включён автопилот — матчи ушли бы на реальные серверы. Остановлено.");
   const organizer = await organizerId();
+  let stoppedBefore: string[] = [];
+  if (ctx.servers) {
+    // карты и раунды — как у настоящего турнира, чтобы прогон грузил те же карты (в том числе Workshop)
+    const { data: real } = await db().from("tournaments").select("map_pool, knife_round, overtime").eq("slug", REAL_SLUG).maybeSingle().throwOnError();
+    await db().from("tournaments").update({ autopilot: true, ...(real ?? {}), updated_at: now() }).eq("id", t.id).throwOnError();
+    const { data: insts } = await db().from("server_instances").select("name, running").order("name").throwOnError();
+    stoppedBefore = (insts ?? []).filter((i) => !i.running).map((i) => i.name);
+    ctx.log(`Режим серверов: автопилот включён${real ? `, карты как у ${REAL_SLUG}: ${real.map_pool.map(mapLabel).join(", ")}` : ""}`);
+    ctx.log(`Серверы сейчас: запущены ${(insts ?? []).length - stoppedBefore.length} из ${(insts ?? []).length}`);
+    t = (await loadTournament())!;
+  }
   if (!t.bracket_published_at) await drawBracket(ctx, t, organizer);
   if (t.status !== "live" && t.status !== "finished") {
     await db().from("tournaments").update({ status: "live", updated_at: now() }).eq("id", t.id).throwOnError();
@@ -453,7 +537,8 @@ export async function playDemo(o: DemoOptions) {
   t = (await loadTournament())!;
   if (!ctx.fast) ctx.log("Темп: вето ~3 с на шаг, карта 60–90 с; весь турнир ≈ 12 минут (быстрее — play --fast)");
 
-  for (let wave = 1; wave <= 10; wave++) {
+  if (ctx.servers) await playOnServers(ctx, t.id, organizer);
+  for (let wave = 1; wave <= 10 && !ctx.servers; wave++) {
     const { data: list } = await db()
       .from("matches")
       .select("id, number, bracket, round, status, team1_id, team2_id")
@@ -475,6 +560,11 @@ export async function playDemo(o: DemoOptions) {
   }
   if (!(await finishTournament(ctx, t, organizer))) throw new Error("Остались несыгранные матчи — запустите play ещё раз");
   ctx.log("\nТурнир завершён (статус finished)");
+  if (ctx.servers && stoppedBefore.length) {
+    // серверы, выключенные до прогона, выключаем обратно
+    for (const name of stoppedBefore) await enqueueCommand(name, "stop", {});
+    ctx.log(`Серверы ${stoppedBefore.join(", ")} выключаются, как были до прогона`);
+  }
   return printSummary(ctx, (await loadTournament())!);
 }
 
@@ -548,6 +638,14 @@ export async function cleanupDemo(o: DemoOptions) {
   const entityIds = [...new Set([...tournamentIds, ...matchIds, ...allRegIds, ...teamIds, ...playerIds])];
   ctx.log(`Найдено: турнир ${tournamentIds.length}, матчей ${matchIds.length}, команд ${teamIds.length}, игроков ${playerIds.length}`);
 
+  // команды агенту по демо-матчам (режим servers)
+  if (matchIds.length) {
+    const ids = new Set(matchIds);
+    const { data: since } = await db().from("tournaments").select("created_at").in("id", tournamentIds).order("created_at").limit(1).throwOnError();
+    const { data: cmds } = await db().from("agent_commands").select("id, payload").gte("created_at", since?.[0]?.created_at ?? now()).throwOnError();
+    const demoCmds = (cmds ?? []).filter((c) => ids.has(String((c.payload as { match_id?: unknown } | null)?.match_id ?? ""))).map((c) => c.id);
+    await inChunks(demoCmds, async (c) => (await db().from("agent_commands").delete().in("id", c).throwOnError()).data);
+  }
   const byMatch = ["match_events", "match_rounds", "player_map_stats", "player_map_swing", "match_log_state", "match_maps", "veto_actions", "disputes"] as const;
   for (const table of byMatch) await inChunks(matchIds, async (c) => (await db().from(table).delete().in("match_id", c).throwOnError()).data);
   // статистика демо-игроков, попавшая в другие матчи (не должно быть)
