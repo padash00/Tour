@@ -60,7 +60,8 @@ export async function tournamentEta(tournamentId: string): Promise<TournamentEta
   // серия обычно короче best_of: BO3 в среднем ~2,5 карты, BO5 ~4
   const expectedMaps = (bo: number) => (bo <= 1 ? 1 : bo === 3 ? 2.5 : bo === 5 ? 4 : bo);
   const now = Date.now();
-  const servers = Math.max(1, (inst ?? []).filter((i) => i.role !== "reserve").length);
+  // в турнирное время турниру отданы все серверы (server-balance.ts)
+  const servers = Math.max(1, (inst ?? []).length);
   const serverFree: number[] = [];
   const teamFree = new Map<string, number>();
   const matchStart = new Map<string, number>();

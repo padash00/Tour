@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { hostCommand, serverRcon, toggleLobbyServer } from "@/app/actions/admin-server";
-import { ActionToggle } from "@/components/admin/action-toggle";
+import { hostCommand, serverRcon } from "@/app/actions/admin-server";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import type { LobbyGame } from "@/lib/lobby";
 import { formatShortDateTime } from "@/lib/format";
@@ -169,15 +168,10 @@ export default async function ServersPage() {
                       game :{s.port} · tv :{s.port + 5}
                       {s.role === "reserve" ? " · резерв" : ""}
                     </div>
-                    <ActionToggle
-                      action={toggleLobbyServer}
-                      fields={{ instance: s.name }}
-                      on={s.for_lobby ?? false}
-                      label={`Использовать ${s.name} для лобби`}
-                      onLabel="Для лобби"
-                      offLabel="Для турниров"
-                      className="mt-1"
-                    />
+                    {/* назначение выставляет сайт сам (server-balance.ts): турнирное время — турнирам, иначе — лобби */}
+                    <div className="mt-1 text-[11px] text-fg-3" title="Переключается автоматически: в день турнира — турниру, в остальное время — лобби">
+                      {s.for_lobby ? "для лобби" : "для турниров"} · авто
+                    </div>
                   </div>
                   <div className={cn("flex items-center gap-2 text-[13px] font-medium", toneText[st.tone])}>
                     <Dot tone={st.tone === "muted" ? "muted" : st.tone} pulse={live} />

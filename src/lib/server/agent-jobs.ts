@@ -7,6 +7,7 @@ import { applyDueVetoTimeouts } from "../matches";
 import { lobbyTick } from "../lobby";
 import { refreshStaleProfilesTick } from "../profile-sync";
 import { checkCs2UpToDate, pruneIngest } from "./ops";
+import { balanceServersTick } from "./server-balance";
 
 export type AgentJobLane = "dispatch" | "maintenance";
 export type SafeJob = (name: string, job: () => Promise<unknown>) => Promise<void>;
@@ -14,6 +15,8 @@ export type SafeJob = (name: string, job: () => Promise<unknown>) => Promise<voi
 /** Dispatch creates time-sensitive match commands; maintenance has no bearing on command delivery. */
 export async function runAgentJobs(lane: AgentJobLane, safely: SafeJob, cs2Patch: unknown) {
   if (lane === "dispatch") {
+    // сначала поделить свободные серверы между турнирами и лобби, затем назначать
+    await safely("server balance", balanceServersTick);
     await safely("veto timeouts", applyDueVetoTimeouts);
     await safely("autopilot", autopilotTick);
     await safely("lobby", lobbyTick);

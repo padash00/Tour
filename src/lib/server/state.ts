@@ -25,7 +25,7 @@ export function checkBearer(request: Request, envName: "AGENT_TOKEN" | "MATCHZY_
 
 // ───────────────────────── типы
 
-/** for_lobby: инстанс отдан под лобби — турниры его не берут */
+/** for_lobby: инстанс отдан под лобби — турниры его не берут. Выставляется автоматически (server-balance.ts) */
 export type ServerInstance = Narrow<Tables<"server_instances">, { role: "active" | "reserve"; info: Record<string, unknown> }>;
 
 export type ServerHost = Narrow<Tables<"server_host">, { info: Record<string, unknown> }>;

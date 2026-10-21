@@ -532,7 +532,7 @@ export async function maybeStartOnReady(lobbyId: string) {
 // ───────────────────────── сервер
 
 /**
- * Инстанс для игры лобби: помеченные «для лобби», запущенные, свободные.
+ * Инстанс для игры лобби: помеченные «для лобби» (флаг выставляет server-balance.ts), запущенные, свободные.
  * Если ни один не помечен — любой свободный, пока нет турнира в check-in или «идёт» (серверы нужны турниру).
  */
 export async function pickLobbyInstance() {
@@ -548,7 +548,7 @@ export async function pickLobbyInstance() {
   if ((host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[], reason: "идёт обслуживание серверов" };
   const marked = (all ?? []).filter((i) => i.for_lobby);
   if (!marked.length && (activeTournaments ?? 0) > 0) {
-    return { inst: null, stopped: [] as string[], reason: "идёт турнир, а серверов «для лобби» нет — включите в F16 Control → Серверы" };
+    return { inst: null, stopped: [] as string[], reason: "идёт турнир — серверы отданы турниру, лобби запустится после него" };
   }
   const insts = marked.length ? marked : (all ?? []);
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));

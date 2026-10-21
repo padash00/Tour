@@ -229,17 +229,3 @@ export async function sendChat(_prev: ActionResult, formData: FormData): Promise
   return { success: targets.length > 1 ? `Отправлено на ${targets.length} сервера` : `Отправлено на ${targets[0]}` };
 }
 
-/** Отдать сервер под лобби игроков (турниры его не берут) или вернуть турнирам */
-export async function toggleLobbyServer(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
-  const admin = await requireAdmin("/admin/servers");
-  const instance = String(formData.get("instance"));
-  const onValue = formData.get("on");
-  if (onValue !== "0" && onValue !== "1") return { error: "Не удалось определить назначение сервера" };
-  const on = onValue === "1";
-  const { data, error } = await db().from("server_instances").update({ for_lobby: on }).eq("name", instance).select("name");
-  if (error) return { error: "Не удалось сохранить назначение сервера" };
-  if (!data?.length) return { error: "Инстанс не найден" };
-  await audit(admin.id, "server.for_lobby", undefined, { instance, on });
-  revalidatePath("/admin/servers");
-  return { success: on ? `${instance} отдан под лобби` : `${instance} снова для турниров` };
-}
