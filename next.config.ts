@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // переименованные адреса турниров: старые ссылки (уведомления, посты) ведут на новый
+  async redirects() {
+    return [
+      { source: "/tournaments/oskemen-800-000tg", destination: "/tournaments/oskemen-2026", permanent: true },
+      { source: "/tournaments/oskemen-800-000tg/:path*", destination: "/tournaments/oskemen-2026/:path*", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

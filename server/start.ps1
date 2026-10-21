@@ -7,7 +7,8 @@ param(
   [switch]$Active,
   [switch]$Stop,
   [string]$ServerDir = "D:\cs2server",
-  [string]$Map = "de_mirage"
+  [string]$Map = "de_mirage",
+  [switch]$NoAffinity
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -52,5 +53,18 @@ foreach ($i in $targets) {
   }
   # высокий приоритет: другие программы на этом ПК не отнимают у сервера время (меньше фризов у игроков)
   try { (Get-Process -Id $r.ProcessId).PriorityClass = "High" } catch { Write-Host "приоритет $($i.name) не изменён: $_" }
-  Write-Host "START $($i.name) :$port pid $($r.ProcessId)"
+  # своё физическое ядро (оба его потока) на инстанс: два сервера не делят одно ядро. Ядро 0 остаётся Windows,
+  # агенту и остальным программам. Инстансов больше, чем ядер, — по кругу. -NoAffinity выключает.
+  $affinity = ""
+  $logical = [Environment]::ProcessorCount
+  $cores = [int]($logical / 2)
+  if (-not $NoAffinity -and $cores -ge 4 -and $logical -le 64) {
+    $k = [array]::IndexOf(@($instances.name), $i.name)
+    $core = 1 + ($k % ($cores - 1))
+    try {
+      (Get-Process -Id $r.ProcessId).ProcessorAffinity = [IntPtr]([int64]3 -shl (2 * $core))
+      $affinity = " ядро $core"
+    } catch { Write-Host "ядро $($i.name) не закреплено: $_" }
+  }
+  Write-Host "START $($i.name) :$port pid $($r.ProcessId)$affinity"
 }

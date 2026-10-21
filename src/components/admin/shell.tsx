@@ -32,6 +32,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M4 7h6M4 17h6M10 7v10M10 12h4M14 12h6" />
     </svg>
   ),
+  board: (
+    <svg viewBox="0 0 24 24" className="size-[19px]" {...stroke}>
+      <rect x="3.5" y="4.5" width="17" height="12" rx="1.5" />
+      <path d="M7 13v-3M11 13V8M15 13v-2M8.5 20h7M12 16.5V20" />
+    </svg>
+  ),
   servers: (
     <svg viewBox="0 0 24 24" className="size-[19px]" {...stroke}>
       <rect x="3.5" y="4" width="17" height="7" rx="1.5" />
@@ -71,6 +77,7 @@ export const ADMIN_SECTIONS = [
   { href: "/admin", label: "Обзор", short: "Обзор", icon: "overview", exact: true },
   { href: "/admin/tournaments", label: "Турниры", short: "Турниры", icon: "tournaments" },
   { href: "/admin/matches", label: "Матчи", short: "Матчи", icon: "matches" },
+  { href: "/admin/board", label: "Табло турнира", short: "Табло", icon: "board" },
   { href: "/admin/servers", label: "Серверы", short: "Серверы", icon: "servers" },
   { href: "/admin/teams", label: "Команды", short: "Команды", icon: "teams" },
   { href: "/admin/players", label: "Игроки", short: "Игроки", icon: "players" },
@@ -194,6 +201,7 @@ export function AdminMobileNav() {
 const SEGMENT_LABEL: Record<string, string> = {
   tournaments: "Турниры",
   matches: "Матчи",
+  board: "Табло",
   servers: "Серверы",
   teams: "Команды",
   players: "Игроки",

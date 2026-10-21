@@ -14,7 +14,7 @@ import { AdminHeader } from "@/components/admin/control";
 
 export const metadata: Metadata = { title: "Дипломы — F16 Control" };
 
-const DEFAULT_SIGNER = "Директор КГУ «Молодёжный ресурсный центр»";
+const DEFAULT_SIGNER = "Руководитель Jastar Oskemen";
 
 /*
  * Дипломы для печати: A4 альбомная, одна страница — один диплом.
