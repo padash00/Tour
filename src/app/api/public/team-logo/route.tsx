@@ -8,10 +8,12 @@ import { type NextRequest } from "next/server";
  */
 
 const ALLOWED = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\//i;
+// Своё хранилище (база на своём сервере): тот же путь на хосте SUPABASE_URL.
+const OWN_STORAGE = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/public/` : null;
 
 export async function GET(request: NextRequest) {
   const src = request.nextUrl.searchParams.get("src") ?? "";
-  if (!ALLOWED.test(src)) return new Response("bad src", { status: 400 });
+  if (!ALLOWED.test(src) && !(OWN_STORAGE && src.startsWith(OWN_STORAGE))) return new Response("bad src", { status: 400 });
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent" }}>

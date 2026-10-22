@@ -14,6 +14,15 @@ const securityHeaders = [
   },
 ];
 
+const ownStorageHost = (() => {
+  try {
+    const host = new URL(process.env.SUPABASE_URL ?? "").hostname;
+    return host && !host.endsWith(".supabase.co") ? host : null;
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   // выгрузка Excel (только сервер, админка) — пакет загружается Node.js как есть, без сборки в бандл
   serverExternalPackages: ["exceljs"],
@@ -39,6 +48,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "steamcdn-a.akamaihd.net" },
       // обложки турниров, логотипы команд, картинки карт (Supabase Storage)
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
+      // своё хранилище, если база не в облаке Supabase (хост из SUPABASE_URL)
+      ...(ownStorageHost ? [{ protocol: "https" as const, hostname: ownStorageHost, pathname: "/storage/v1/object/public/**" }] : []),
     ],
   },
   async headers() {
