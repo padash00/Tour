@@ -66,17 +66,25 @@ Write-Host "OK  конфиги инстансов: $($instances.name -join ', ')
 # 5. Скрипт запуска в путь без кириллицы — для F16-start-servers.bat / F16-stop-servers.bat
 $f16 = Join-Path $ServerDir "f16"
 New-Item -ItemType Directory -Force $f16 | Out-Null
-Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "service.ps1"), (Join-Path $repo "launch-agent.ps1"), (Join-Path $repo "watchdog.ps1"), (Join-Path $repo "firewall.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
-# F16 Server Agent
-New-Item -ItemType Directory -Force (Join-Path $f16 "agent") | Out-Null
-Copy-Item (Join-Path $repo "agent\*.mjs") (Join-Path $f16 "agent") -Force
+# Агент запускает этот скрипт из самой $f16 (после update_cs2) — копировать файлы в себя нельзя:
+# Copy-Item падает «Cannot overwrite the item with itself», и обновление CS2 считалось ошибкой.
+$fromF16 = (Resolve-Path $repo).Path.TrimEnd('\') -eq (Resolve-Path $f16).Path.TrimEnd('\')
+if (-not $fromF16) {
+  Copy-Item (Join-Path $repo "start.ps1"), (Join-Path $repo "service.ps1"), (Join-Path $repo "launch-agent.ps1"), (Join-Path $repo "watchdog.ps1"), (Join-Path $repo "firewall.ps1"), (Join-Path $repo "instances.csv") $f16 -Force
+  # F16 Server Agent
+  New-Item -ItemType Directory -Force (Join-Path $f16 "agent") | Out-Null
+  Copy-Item (Join-Path $repo "agent\*.mjs") (Join-Path $f16 "agent") -Force
+}
 if (-not (Test-Path (Join-Path $f16 "agent.json"))) {
   Write-Host "!!  Нет $f16\agent.json — создайте: { siteUrl, token (AGENT_TOKEN), lanIp }"
 }
 Write-Host "OK  $f16\start.ps1"
 
 # 6. RCON только с этого ПК: входящие TCP на игровые порты из сети закрыты, UDP игры открыт
-& (Join-Path $repo "firewall.ps1") -Csv (Join-Path $repo "instances.csv")
-Write-Host "OK  брандмауэр: RCON закрыт для LAN"
+# Из агента не трогаем: он сам держит правила (с портом раздачи демо — без него это правило снялось бы).
+if (-not $fromF16) {
+  & (Join-Path $repo "firewall.ps1") -Csv (Join-Path $repo "instances.csv")
+  Write-Host "OK  брандмауэр: RCON закрыт для LAN"
+}
 Write-Host ""
 Write-Host "Готово. Запуск: powershell -ExecutionPolicy Bypass -File server\start.ps1 -Name CS2-01"
