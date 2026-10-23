@@ -12,6 +12,7 @@ import path from "node:path";
 import { onlineRosterCount, rosterIds } from "../server/agent/autostart.mjs";
 import { installBundle, localBundleVersion, missingImports, rejectedBundleVersion, rollbackBundle } from "../server/agent/bundle.mjs";
 import { CommandJournal } from "../server/agent/command-journal.mjs";
+import { createEnforce } from "../server/agent/enforce.mjs";
 import { encodePacket, parseGet5, rcon, rconSession, steamIdsFromStatus, takePackets } from "../server/agent/lib.mjs";
 
 let checks = 0;
@@ -232,6 +233,28 @@ try {
     assert.equal(localBundleVersion(f16), "v1");
     assert.equal(rejectedBundleVersion(f16).version, "v2"); // агент не скачает её снова
     assert.equal(await rollbackBundle({ f16Dir: f16, serverDir }), null); // второй откат не нужен
+  });
+  await test("enforce: в ножевом раунде деньги и закупку не возвращает, в игре — возвращает", async () => {
+    const stateDir = path.join(dir, "enforce");
+    mkdirSync(stateDir, { recursive: true });
+    const inst = { name: "CS2-01" };
+    // сервер в ноже: knife.cfg поставил потолок денег 0 и фризтайм 10, голос сбит
+    const server = { mp_maxmoney: 0, mp_freezetime: 10, sv_alltalk: 0 };
+    const sent = [];
+    const rc = async (_i, cmd) => {
+      if (/ \d/.test(cmd)) { sent.push(cmd); return ""; }
+      return cmd.split(";").map((n) => `${n} = ${server[n]}`).join("\n");
+    };
+    const enforce = createEnforce({ stateDir, instances: [inst], rc, log: () => {} });
+    enforce.set(inst, { matchid: 7, cvars: { mp_maxmoney: 16000, mp_freezetime: 20, sv_alltalk: 1 } }, "t");
+    await enforce.apply(inst, { matchid: 7, gamestate: "knife", map_number: 0 });
+    assert.deepEqual(sent, ["sv_alltalk 1"]);
+    sent.length = 0;
+    await enforce.apply(inst, { matchid: 7, gamestate: "waiting_for_knife_decision", map_number: 0 });
+    assert.deepEqual(sent, ["sv_alltalk 1"]);
+    sent.length = 0;
+    await enforce.apply(inst, { matchid: 7, gamestate: "live", map_number: 0 });
+    assert.deepEqual(sent, ["mp_maxmoney 16000;mp_freezetime 20;sv_alltalk 1"]);
   });
 } finally {
   rmSync(dir, { recursive: true, force: true });

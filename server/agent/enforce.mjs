@@ -6,6 +6,10 @@ import path from "node:path";
 export const AUTO_HALFTIME_VOICE = "sv_auto_full_alltalk_during_warmup_half_end";
 export const DEFAULT_VOICE = `${AUTO_HALFTIME_VOICE} 0;sv_voiceenable 1;sv_alltalk 0;sv_deadtalk 1;sv_full_alltalk 0;sv_talk_enemy_living 0;sv_talk_enemy_dead 0`;
 const ACTIVE = ["warmup", "knife", "waiting_for_knife_decision", "going_live", "live"];
+const KNIFE = ["knife", "waiting_for_knife_decision"];
+/** Что задаёт knife.cfg MatchZy: в ножевом раунде не возвращаем — иначе за убийство ножом начисляются
+ *  деньги (потолок 16000 вместо 0) и в начале раунда можно купить оружие. На going_live/live вернётся live.cfg. */
+const KNIFE_OWNED = /^(mp_maxmoney|mp_startmoney|mp_afterroundmoney|mp_freezetime|mp_buytime|mp_round_restart_delay|mp_roundtime\w*|mp_free_armor|mp_give_player_c4|mp_(ct|t)_default_\w+|mp_restartgame)$/;
 /** Во время игры настройки сверяем реже: каждый RCON-запрос выполняется в основном потоке сервера */
 const LIVE_CHECK_MS = 60_000;
 /** Сколько ждать после готовности всех людей, прежде чем стартовать игру с ботами самим */
@@ -86,7 +90,9 @@ export function createEnforce({ stateDir, instances, rc, log }) {
     const prev = lastCheck.get(inst.name);
     if (get5.gamestate === "live" && prev?.state === state && Date.now() - prev.at < LIVE_CHECK_MS) return;
     lastCheck.set(inst.name, { at: Date.now(), state });
-    const names = Object.keys(rule.cvars);
+    const knife = KNIFE.includes(get5.gamestate);
+    const names = Object.keys(rule.cvars).filter((n) => !(knife && KNIFE_OWNED.test(n)));
+    if (!names.length) return;
     const out = await rc(inst, names.join(";")).catch(() => null);
     if (out == null) return; // RCON не ответил — не гадаем, исправим на следующем тике
     const expected = (name) => name === AUTO_HALFTIME_VOICE && rule.halftimeVoiceMaps?.length
