@@ -1,5 +1,6 @@
 import "server-only";
 import { modeOf } from "./modes";
+import { getMaxParallelMatches } from "./settings";
 import { db } from "./supabase";
 
 /**
@@ -60,8 +61,9 @@ export async function tournamentEta(tournamentId: string): Promise<TournamentEta
   // серия обычно короче best_of: BO3 в среднем ~2,5 карты, BO5 ~4
   const expectedMaps = (bo: number) => (bo <= 1 ? 1 : bo === 3 ? 2.5 : bo === 5 ? 4 : bo);
   const now = Date.now();
-  // в турнирное время турниру отданы все серверы (server-balance.ts)
-  const servers = Math.max(1, (inst ?? []).length);
+  // в турнирное время турниру отданы все серверы (server-balance.ts), но не больше, чем мест в зале
+  const limit = await getMaxParallelMatches();
+  const servers = Math.max(1, Math.min((inst ?? []).length, limit ?? Infinity));
   const serverFree: number[] = [];
   const teamFree = new Map<string, number>();
   const matchStart = new Map<string, number>();

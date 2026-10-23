@@ -163,7 +163,7 @@ export async function syncBracket(tournamentId: string) {
 async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
   if (matchIds.length === 0) return;
   const [{ data: t }, { data: list }] = await Promise.all([
-    db().from("tournaments").select("map_pool").eq("id", tournamentId).single(),
+    db().from("tournaments").select("map_pool, autopilot").eq("id", tournamentId).single(),
     db().from("matches").select("id, number, team1_id, team2_id").in("id", matchIds),
   ]);
   const pool = (t?.map_pool ?? []) as string[];
@@ -186,7 +186,9 @@ async function afterMatchesUpcoming(tournamentId: string, matchIds: string[]) {
       `Матч #${m.number}: ${t1.name} vs ${t2.name}`,
       pool.length === 1
         ? "Соперник определён. Карта одна — вето не нужно, ждите сервер."
-        : "Соперник определён. Вето карт начнётся по сигналу администратора.",
+        : t?.autopilot
+          ? "Соперник определён. Вето начнётся автоматически — придёт уведомление, на шаг 60 секунд."
+          : "Соперник определён. Вето карт начнётся по сигналу администратора.",
       `/matches/${m.id}`,
     );
   }

@@ -1,6 +1,7 @@
 import "server-only";
 import { notify } from "../audit";
 import { assignLobbyServers } from "../lobby";
+import { getMaxParallelMatches } from "../settings";
 import { db } from "../supabase";
 import type { Match } from "../types";
 import { enqueueCommand, getServerState, hostBusy } from "./state";
@@ -34,6 +35,16 @@ export async function assignServer(match: Match, instanceName: string, actorId?:
   return data === true;
 }
 
+/** Турнирные матчи, которые сейчас занимают сервер (и места в зале): идут или назначены и грузятся */
+export async function matchesOnServers() {
+  const { data } = await db()
+    .from("matches")
+    .select("status, server_state")
+    .not("server_instance", "is", null)
+    .in("status", ["ready", "live"]);
+  return (data ?? []).filter((m) => m.status === "live" || m.server_state !== "error").length;
+}
+
 // ───────────────────────── автопилот
 
 const AUTOPILOT_LEAD_MS = 10 * 60_000; // матч с расписанием уходит на сервер за 10 минут до начала
@@ -52,6 +63,9 @@ export async function autopilotTick() {
 
   const now = Date.now();
   const due = (m: { scheduled_at: string | null }) => !m.scheduled_at || new Date(m.scheduled_at).getTime() - now <= AUTOPILOT_LEAD_MS;
+  // места в зале: не больше MAX_PARALLEL_MATCHES матчей на серверах сразу (по всем турнирам — зал один)
+  const limit = await getMaxParallelMatches();
+  let seats = limit == null ? Infinity : limit - (await matchesOnServers());
 
   for (const t of ts) {
     const { data: list } = await db()
@@ -109,6 +123,7 @@ export async function autopilotTick() {
     // 2. готовые матчи — на свободные серверы
     for (const m of matches.filter((x) => x.status === "ready" && (!x.server_instance || x.server_state === "error") && due(x))) {
       if (!free(m)) continue; // кто-то из участников ещё доигрывает другой матч
+      if (seats <= 0) return; // зал занят — матч уйдёт, когда закончится один из идущих
       if (await workshopLoadBusy(m.id)) continue; // другой сервер сейчас качает/грузит карту — по одному
       const inst = await pickFreeInstance();
       if (!inst) return; // свободных серверов нет — ждём следующей синхронизации
@@ -117,6 +132,7 @@ export async function autopilotTick() {
       const { data: full } = await db().from("matches").select("*").eq("id", m.id).single();
       if (!full) continue;
       if (!(await assignServer(full as Match, inst.name))) continue;
+      seats--;
       await db()
         .from("audit_logs")
         .insert({ action: "autopilot.assign", entity_type: "match", entity_id: m.id, payload: { instance: inst.name } });

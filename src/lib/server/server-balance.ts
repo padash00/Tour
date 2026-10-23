@@ -1,4 +1,5 @@
 import "server-only";
+import { getMaxParallelMatches } from "../settings";
 import { db } from "../supabase";
 import { getServerState, hostBusy } from "./state";
 
@@ -56,7 +57,10 @@ export async function balanceServersTick() {
     .is("server_instance", null)
     .in("tournament.status", ["checkin", "live"]);
   const freeRunning = instances.filter((i) => i.running && (i.gamestate ?? "none") === "none" && !byMatch.has(i.name) && !byLobby.has(i.name)).length;
-  const deficit = (waiting ?? 0) - freeRunning;
+  // мест в зале меньше, чем серверов, — лишние серверы не поднимаем: автопилот всё равно не отдаст им матч
+  const limit = await getMaxParallelMatches();
+  const canStart = limit == null ? Infinity : Math.max(0, limit - byMatch.size);
+  const deficit = Math.min(waiting ?? 0, canStart) - freeRunning;
   if (deficit <= 0) return;
   const stopped = instances.filter((i) => !i.running && !byMatch.has(i.name) && !byLobby.has(i.name)).slice(0, deficit);
   const since = new Date(Date.now() - START_COOLDOWN_MS).toISOString();

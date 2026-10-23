@@ -26,6 +26,11 @@ export const SETTINGS = {
     secret: false,
     hint: "Через запятую. Эти аккаунты пускаются на сервер матча зрителями (ПК 801–803).",
   },
+  MAX_PARALLEL_MATCHES: {
+    label: "Турнирных матчей одновременно",
+    secret: false,
+    hint: "По местам в зале: 5×5 — мест / 10 (55 мест → 5). Автопилот не отправит на серверы больше матчей сразу, остальные ждут. Пусто — по числу серверов.",
+  },
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -56,6 +61,12 @@ export async function getSettingsStatus() {
       preview: !value ? "" : SETTINGS[key].secret ? `••••${value.slice(-4)}` : value,
     };
   });
+}
+
+/** Сколько турнирных матчей может идти на серверах одновременно (места в зале). null — без ограничения */
+export async function getMaxParallelMatches(): Promise<number | null> {
+  const n = Number.parseInt((await getSetting("MAX_PARALLEL_MATCHES")) ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /** Библиотека карт Workshop: строки «name@id» (хранится в app_settings.WORKSHOP_MAPS как JSON) */
