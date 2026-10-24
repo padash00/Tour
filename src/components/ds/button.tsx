@@ -23,20 +23,20 @@ const BASE =
   "disabled:pointer-events-none disabled:opacity-45 aria-disabled:pointer-events-none aria-disabled:opacity-45";
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-ink shadow-[0_4px_18px_-12px_var(--color-accent)] hover:bg-accent-strong hover:shadow-[0_6px_22px_-12px_var(--color-accent)] active:bg-accent-pressed",
-  secondary: "border border-line bg-ink/[0.03] text-fg hover:border-line-strong hover:bg-ink/[0.06]",
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed",
+  secondary: "border border-line-strong bg-surface text-fg hover:border-line-hover hover:bg-surface-2",
   ghost: "text-fg-2 hover:bg-ink/[0.06] hover:text-fg",
   danger: "border border-danger/35 bg-danger-dim text-danger hover:border-danger/60 hover:bg-danger/[0.16]",
   quiet: "text-accent hover:text-accent-strong underline-offset-4 hover:underline",
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: "h-9 gap-1.5 rounded-control px-3 text-meta sm:h-8",
-  md: "h-11 gap-2 rounded-control px-4 text-[14px] sm:h-10",
-  lg: "h-12 gap-2.5 rounded-control px-6 text-[15px]",
+  sm: "h-10 gap-1.5 rounded-control px-3.5 text-[14px] sm:h-9",
+  md: "h-12 gap-2 rounded-control px-5 text-[15.5px] sm:h-11",
+  lg: "h-14 gap-2.5 rounded-control px-7 text-[17px]",
 };
 // у quiet нет «коробки»: высота по тексту
-const QUIET_SIZE: Record<ButtonSize, string> = { sm: "gap-1 text-meta", md: "gap-1.5 text-[14px]", lg: "gap-2 text-[15px]" };
+const QUIET_SIZE: Record<ButtonSize, string> = { sm: "gap-1 text-[14px]", md: "gap-1.5 text-[15.5px]", lg: "gap-2 text-[17px]" };
 
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", extra?: string) {
   return cn(BASE, VARIANT[variant], variant === "quiet" ? QUIET_SIZE[size] : SIZE[size], extra);

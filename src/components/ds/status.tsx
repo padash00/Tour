@@ -12,7 +12,7 @@ export type StatusTone = "neutral" | "accent" | "ok" | "warn" | "danger" | "live
 export type StatusInfo = { label: string; tone: StatusTone; pulse?: boolean };
 
 const TONE: Record<StatusTone, string> = {
-  neutral: "text-fg-2 bg-ink/[0.05] border-line",
+  neutral: "text-fg-2 bg-surface-4 border-transparent",
   accent: "text-accent bg-accent-dim border-accent/30",
   ok: "text-ok bg-ok-dim border-ok/30",
   warn: "text-warn bg-warn-dim border-warn/30",
@@ -24,8 +24,8 @@ export function Status({ info, size = "md", className }: { info: StatusInfo; siz
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-chip border font-medium",
-        size === "sm" ? "h-6 px-2 text-micro" : "h-7 px-2.5 text-meta",
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border font-bold",
+        size === "sm" ? "h-7 px-2.5 text-[12.5px]" : "h-8 px-3 text-[14px]",
         TONE[info.tone],
         className,
       )}
@@ -41,7 +41,7 @@ export const tournamentStatus: Record<TournamentStatus, StatusInfo> = {
   registration: { label: "Регистрация открыта", tone: "accent" },
   registration_closed: { label: "Регистрация закрыта", tone: "warn" },
   checkin: { label: "Check-in", tone: "warn", pulse: true },
-  live: { label: "LIVE", tone: "live", pulse: true },
+  live: { label: "Турнир идёт", tone: "live", pulse: true },
   finished: { label: "Завершён", tone: "neutral" },
   cancelled: { label: "Отменён", tone: "danger" },
 };
@@ -59,9 +59,9 @@ export function matchStatus(status: MatchStatus, serverReady?: boolean, underRev
     case "ready":
       return serverReady ? { label: "Сервер готов", tone: "ok", pulse: true } : { label: "Готовим сервер", tone: "warn" };
     case "live":
-      return { label: "LIVE", tone: "live", pulse: true };
+      return { label: "Идёт игра", tone: "live", pulse: true };
     case "finished":
-      return { label: "Завершён", tone: "neutral" };
+      return { label: "Матч окончен", tone: "neutral" };
     case "cancelled":
       return { label: "Отменён", tone: "danger" };
   }
@@ -82,7 +82,7 @@ export const lobbyStatus: Record<LobbyPhase, StatusInfo> = {
   draft: { label: "Драфт", tone: "accent", pulse: true },
   veto: { label: "Вето", tone: "accent", pulse: true },
   server: { label: "Сервер", tone: "warn" },
-  live: { label: "LIVE", tone: "live", pulse: true },
+  live: { label: "Идёт игра", tone: "live", pulse: true },
   finished: { label: "Матч окончен", tone: "neutral" },
   closed: { label: "Закрыто", tone: "neutral" },
 };

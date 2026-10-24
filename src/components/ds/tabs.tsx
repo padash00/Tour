@@ -29,7 +29,7 @@ export function ContextNav({ items, match = "path", sticky, className }: { items
               href={it.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "inline-flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-[14px] font-medium transition-colors duration-[var(--dur-hover)]",
+                "inline-flex h-12 shrink-0 items-center gap-2 border-b-[3px] px-3.5 text-[15.5px] font-semibold transition-colors duration-[var(--dur-hover)]",
                 active ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
               )}
             >
