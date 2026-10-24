@@ -123,7 +123,7 @@ export function PlayerStatsTable({
     </SortTh>
   );
   return (
-    <div className={sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto"}>
+    <div className={cn("rounded-surface border border-line-subtle bg-surface", sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto")}>
       <table className={cn(DATA_TABLE, compact ? "min-w-[640px] text-[13px] [&_td]:h-12" : "min-w-[960px]")}>
         <thead>
           <tr>
@@ -235,7 +235,7 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
     </SortTh>
   );
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-surface border border-line-subtle bg-surface">
       <table className={cn(DATA_TABLE, "min-w-[900px]")}>
         <thead>
           <tr>

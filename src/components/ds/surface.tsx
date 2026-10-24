@@ -28,6 +28,9 @@ export function Region({ children, tone = "section", className }: { children: Re
   );
 }
 
+/** Оформление раздела-карточки (Section card) — то же у боковых блоков страницы */
+export const CARD_SECTION = "ds-card rounded-surface border border-line-subtle bg-surface p-5 sm:p-6 [&>div:first-child]:mb-4";
+
 export function Section({
   title,
   description,
@@ -35,6 +38,7 @@ export function Section({
   children,
   className,
   id,
+  card = true,
 }: {
   title?: ReactNode;
   description?: ReactNode;
@@ -42,9 +46,11 @@ export function Section({
   children: ReactNode;
   className?: string;
   id?: string;
+  /** раздел — белая карточка (по умолчанию): разделы не сливаются с серым фоном. card={false} — без карточки */
+  card?: boolean;
 }) {
   return (
-    <section id={id} className={cn("scroll-mt-24", className)}>
+    <section id={id} className={cn("scroll-mt-24", card && CARD_SECTION, className)}>
       {title && (
         <SectionTitle description={description} action={action}>
           {title}
@@ -55,9 +61,9 @@ export function Section({
   );
 }
 
-/** Вертикальный ритм между разделами страницы: 48 на телефоне, 64 на десктопе */
+/** Вертикальный ритм между разделами-карточками: 20 на телефоне, 24 на десктопе */
 export function Stack({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("flex flex-col gap-12 lg:gap-16", className)}>{children}</div>;
+  return <div className={cn("flex flex-col gap-5 lg:gap-6", className)}>{children}</div>;
 }
 
 export function Panel({ children, className, padded = true }: { children: ReactNode; className?: string; padded?: boolean }) {

@@ -140,7 +140,7 @@ export default function RulesPage() {
 
         <article className="min-w-0">
           {RULES.map((rule, i) => (
-            <section key={rule.title} id={`r${i + 1}`} className="scroll-mt-[calc(var(--shell-h)+24px)] border-b border-line-subtle pb-12 pt-2 first:pt-0 lg:pb-14">
+            <section key={rule.title} id={`r${i + 1}`} className="mb-5 scroll-mt-[calc(var(--shell-h)+24px)] rounded-surface border border-line-subtle bg-surface p-5 sm:p-7">
               <div className="flex items-baseline gap-4">
                 <span className="num text-meta text-accent">{String(i + 1).padStart(2, "0")}</span>
                 <h2 className="text-heading text-fg">{rule.title}</h2>
@@ -156,7 +156,7 @@ export default function RulesPage() {
             </section>
           ))}
 
-          <section id="faq" className="scroll-mt-[calc(var(--shell-h)+24px)] pt-12">
+          <section id="faq" className="scroll-mt-[calc(var(--shell-h)+24px)] rounded-surface border border-line-subtle bg-surface p-5 sm:p-7">
             <div className="flex items-baseline gap-4">
               <span className="num text-meta text-accent">?</span>
               <h2 className="text-heading text-fg">Частые вопросы</h2>

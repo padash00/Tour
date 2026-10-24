@@ -6,7 +6,7 @@
 export { cn } from "./cn";
 export { Button, IconButton, Spinner, buttonClass, type ButtonSize, type ButtonVariant } from "./button";
 export { PageTitle, SectionTitle, SubsectionTitle, Label, Meta, Eyebrow } from "./heading";
-export { Container, Region, Section, Stack, Panel, InteractivePanel, RowList, DataRow, FeatureSurface, CriticalSurface, Facts, Divider, type Tone } from "./surface";
+export { CARD_SECTION, Container, Region, Section, Stack, Panel, InteractivePanel, RowList, DataRow, FeatureSurface, CriticalSurface, Facts, Divider, type Tone } from "./surface";
 export { Status, tournamentStatus, matchStatus, registrationStatus, lobbyStatus, type StatusInfo, type StatusTone, type LobbyPhase } from "./status";
 export { Field, Input, Textarea, Select, SearchInput, Checkbox, Radio, Toggle, Segmented, Slider } from "./field";
 export { Dialog, Sheet, ConfirmDialog, Menu, MenuItem, MenuSeparator, Tooltip, ModalLayer, useModal } from "./overlay";

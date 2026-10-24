@@ -41,6 +41,7 @@ import {
   Status,
   SubsectionTitle,
   TeamLogo,
+  CARD_SECTION,
 } from "@/components/ds";
 import { Check } from "lucide-react";
 
@@ -207,14 +208,14 @@ export async function TournamentView({ t }: { t: Tournament }) {
           )}
 
           <TabPanel tab="overview" defaultKey={defaultTab}>
-            <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-14">
-              <div className="min-w-0">
+            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+              <div className="flex min-w-0 flex-col gap-5">
                 {["live", "finished"].includes(t.status) && <MvpBlock tournamentId={t.id} finished={finished} />}
                 <Overview t={t} lite={lite} mapImages={mapImages} />
               </div>
               <aside className="space-y-5 lg:sticky lg:top-[calc(var(--shell-h)+72px)]">
                 <ParticipationPanel t={lite} approvedCount={approved.length} />
-                <div>
+                <div className="rounded-surface border border-line-subtle bg-surface p-5">
                   <SubsectionTitle>Даты</SubsectionTitle>
                   <dl className="divide-y divide-line-subtle text-[14px]">
                     {[
@@ -274,7 +275,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                   </div>
                 )}
                 {(t.entry_fee || t.discord_url || t.contact) && (
-                  <div>
+                  <div className="rounded-surface border border-line-subtle bg-surface p-5">
                     <SubsectionTitle>Организатор</SubsectionTitle>
                     <dl className="divide-y divide-line-subtle text-[14px]">
                       {t.entry_fee && (
@@ -357,9 +358,9 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
   const mode = modeOf(t.format);
   const bo = t.default_best_of === t.final_best_of ? `BO${t.default_best_of}` : `BO${t.default_best_of} → BO${t.final_best_of} в финале`;
   return (
-    <Stack>
+    <Stack className="gap-5 lg:gap-5">
       {t.stream_url && (
-        <Section
+        <Section card
           title="Трансляция"
           action={
             <a href={t.stream_url} target="_blank" rel="noreferrer" className="text-meta font-medium text-accent hover:text-accent-strong">
@@ -372,12 +373,12 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
       )}
 
       {t.description && (
-        <Section title="О турнире">
+        <Section card title="О турнире">
           <div className="prose-f16 max-w-read">{t.description}</div>
         </Section>
       )}
 
-      <Section title="Формат турнира" description="Как будет проходить соревнование">
+      <Section card title="Формат турнира" description="Как будет проходить соревнование">
         {/* главное — сразу, крупно */}
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-heading text-fg">
           <span>{mode.size === 1 ? "1 на 1" : `${mode.size} на ${mode.size}`}</span>
@@ -402,7 +403,7 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
         />
       </Section>
 
-      <Section title="Маппул" description={`${t.map_pool.length} ${t.map_pool.length === 1 ? "карта" : t.map_pool.length < 5 ? "карты" : "карт"}`}>
+      <Section card title="Маппул" description={`${t.map_pool.length} ${t.map_pool.length === 1 ? "карта" : t.map_pool.length < 5 ? "карты" : "карт"}`}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {t.map_pool.map((m) => (
             <MapTile key={m} map={m} image={mapImages[m]} className="!h-24 sm:!h-28" />
@@ -411,7 +412,7 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
         <span className="sr-only">{t.map_pool.map(mapName).join(", ")}</span>
       </Section>
 
-      <Section title="Требования">
+      <Section card title="Требования">
         {t.requirements ? (
           <div className="prose-f16 max-w-read">{t.requirements}</div>
         ) : (
@@ -433,7 +434,7 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
       </Section>
 
       {t.sponsors?.length > 0 && (
-        <Section title="Партнёры">
+        <Section card title="Партнёры">
           <div className="flex flex-wrap gap-x-10 gap-y-3 text-title text-fg-2">
             {t.sponsors.map((sp) =>
               sp.url ? (
@@ -584,7 +585,7 @@ async function MvpBlock({ tournamentId, finished }: { tournamentId: string; fini
   if (!mvp) return null;
   const nick = mvp.player?.nickname ?? mvp.name;
   return (
-    <section className="mb-12">
+    <section className={CARD_SECTION}>
       <SectionTitle>{finished ? "MVP турнира" : mvp.by === "swing" ? "Лидер по Swing" : "Лидер по рейтингу"}</SectionTitle>
       <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
         <div className="flex min-w-0 items-center gap-4">

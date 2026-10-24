@@ -679,6 +679,15 @@ html[data-navigating] main > * {
   background: var(--color-bg);
 }
 
+/* внутри раздела-карточки (Section, .ds-card) вложенные белые карточки — светло-серые: не «белое на белом».
+   Вне слоёв — сильнее утилит Tailwind. */
+.ds-card :where(.bg-surface) {
+  background-color: var(--color-surface-2);
+}
+.ds-card a:where(.bg-surface):hover {
+  background-color: var(--color-surface-4);
+}
+
 /* иконки F16 DS (lucide-react и свои через createLucideIcon): одна толщина линии на весь сайт,
    размер задаётся классом size-3.5 / size-4 / size-5 / size-6 (14 / 16 / 20 / 24) */
 svg.lucide {
