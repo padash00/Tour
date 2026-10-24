@@ -97,15 +97,19 @@ async function applyInstance(inst: ReportedInstance, now: string, lanIp: string 
     return;
   }
   const { data: row } = await db().from("server_instances").select("port").eq("name", inst.name).single();
+  // онлайн-турнир: игроки дома — адрес пересылки через VPS (INTERNET_IP); турнир в клубе — адрес клуба
+  const { data: tour } = await db().from("tournaments").select("is_lan").eq("id", m.tournament_id).maybeSingle();
+  const internetIp = tour && !tour.is_lan ? ((await getSetting("INTERNET_IP")) ?? "").trim() : "";
+  const host = internetIp || lanIp;
   await db()
     .from("matches")
-    .update({ server_state: "ready", server_address: `${lanIp}:${row?.port}`, server_ready_at: new Date().toISOString() })
+    .update({ server_state: "ready", server_address: `${host}:${row?.port}`, server_ready_at: new Date().toISOString() })
     .eq("id", m.id);
   const full = await getMatch(m.id);
   const captains = [full?.team1?.captain_id, full?.team2?.captain_id].filter(Boolean) as string[];
   await notify(
     captains,
-    `Сервер для матча #${m.number} готов: ${lanIp}:${row?.port}`,
+    `Сервер для матча #${m.number} готов: ${host}:${row?.port}`,
     "Откройте страницу матча и нажмите «Подключиться». На подключение — 15 минут.",
     `/matches/${m.id}`,
   );

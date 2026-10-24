@@ -80,8 +80,9 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     ["group", "swiss", "grand_final", "third_place"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
     getMatchRosters(m),
     getStatRows({ matchId: m.id }),
-    // демо карт лежат на серверном ПК; у будущих матчей их нет
-    ["live", "finished"].includes(m.status) ? getMatchDemos(m.matchzy_id) : Promise.resolve({ demos: [], online: false }),
+    // демо карт лежат на серверном ПК; у будущих матчей их нет. Скачивание идёт напрямую с ПК клуба (через VPS
+    // не пересылается) — в онлайн-турнире игрокам дома ссылки не работали бы, поэтому их не показываем
+    ["live", "finished"].includes(m.status) && m.tournament.is_lan !== false ? getMatchDemos(m.matchzy_id) : Promise.resolve({ demos: [], online: false }),
   ]);
 
   const roundMaps = ["live", "finished"].includes(m.status)

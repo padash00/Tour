@@ -51,12 +51,14 @@ export async function balanceServersTick() {
   if (!tournamentTime) return; // выключенные серверы лобби запускает сама (assignLobbyServers)
 
   // 2. готовым матчам не хватает запущенных серверов → запускаем выключенные (по одному на матч)
-  const { count: waiting } = await db()
+  const { data: waitingRows } = await db()
     .from("matches")
-    .select("id, tournament:tournaments!inner(status)", { count: "exact", head: true })
+    .select("id, tournament:tournaments!inner(status, is_lan)")
     .eq("status", "ready")
     .is("server_instance", null)
     .in("tournament.status", ["checkin", "live"]);
+  const waitingLan = (waitingRows ?? []).filter((r) => r.tournament?.is_lan).length;
+  const waitingOnline = (waitingRows ?? []).length - waitingLan;
   // сервер, где матч только что закончился, через ~20 с освободится сам (MatchZy показывает итоги серии) —
   // под очередь его считаем свободным, иначе запустился бы лишний сервер
   const { data: justFinished } = await db()
@@ -69,10 +71,17 @@ export async function balanceServersTick() {
   const freeRunning = instances.filter(
     (i) => i.running && ((i.gamestate ?? "none") === "none" || finishing.has(i.name)) && !byMatch.has(i.name) && !byLobby.has(i.name),
   ).length;
-  // мест в зале меньше, чем серверов, — лишние серверы не поднимаем: автопилот всё равно не отдаст им матч
+  // мест в зале меньше, чем серверов, — лишние серверы под LAN-матчи не поднимаем: автопилот всё равно не отдаст им матч
   const limit = await getMaxParallelMatches();
-  const canStart = limit == null ? Infinity : Math.max(0, limit - byMatch.size);
-  const deficit = Math.min(waiting ?? 0, canStart) - freeRunning;
+  // места занимают только матчи LAN-турниров; онлайн-матчи (игроки дома) ограничены лишь числом серверов
+  const { data: lanRows } = await db()
+    .from("matches")
+    .select("id, tournament:tournaments!inner(is_lan)")
+    .eq("tournament.is_lan", true)
+    .not("server_instance", "is", null)
+    .in("status", ["ready", "live"]);
+  const canStart = limit == null ? Infinity : Math.max(0, limit - (lanRows ?? []).length);
+  const deficit = Math.min(waitingLan, canStart) + waitingOnline - freeRunning;
   if (deficit <= 0) return;
   const stopped = instances.filter((i) => !i.running && !byMatch.has(i.name) && !byLobby.has(i.name)).slice(0, deficit);
   const since = new Date(Date.now() - START_COOLDOWN_MS).toISOString();

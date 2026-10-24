@@ -35,11 +35,12 @@ export async function assignServer(match: Match, instanceName: string, actorId?:
   return data === true;
 }
 
-/** Турнирные матчи, которые сейчас занимают сервер (и места в зале): идут или назначены и грузятся */
+/** Турнирные матчи в клубе (LAN), которые сейчас занимают сервер и места в зале: идут или назначены и грузятся. Онлайн-матчи мест не занимают */
 export async function matchesOnServers() {
   const { data } = await db()
     .from("matches")
-    .select("status, server_state")
+    .select("status, server_state, tournament:tournaments!inner(is_lan)")
+    .eq("tournament.is_lan", true)
     .not("server_instance", "is", null)
     .in("status", ["ready", "live"]);
   return (data ?? []).filter((m) => m.status === "live" || m.server_state !== "error").length;
@@ -56,14 +57,15 @@ const AUTOPILOT_LEAD_MS = 10 * 60_000; // матч с расписанием у�
 export async function autopilotTick() {
   const { data: ts } = await db()
     .from("tournaments")
-    .select("id, map_pool")
+    .select("id, map_pool, is_lan")
     .eq("autopilot", true)
     .in("status", ["checkin", "live"]);
   if (!ts?.length) return;
 
   const now = Date.now();
   const due = (m: { scheduled_at: string | null }) => !m.scheduled_at || new Date(m.scheduled_at).getTime() - now <= AUTOPILOT_LEAD_MS;
-  // места в зале: не больше MAX_PARALLEL_MATCHES матчей на серверах сразу (по всем турнирам — зал один)
+  // места в зале: не больше MAX_PARALLEL_MATCHES матчей на серверах сразу (по всем LAN-турнирам — зал один).
+  // Онлайн-турниры игроки играют из дома — их матчи мест не занимают, их ограничивает только число серверов
   const limit = await getMaxParallelMatches();
   let seats = limit == null ? Infinity : limit - (await matchesOnServers());
 
@@ -123,7 +125,7 @@ export async function autopilotTick() {
     // 2. готовые матчи — на свободные серверы
     for (const m of matches.filter((x) => x.status === "ready" && (!x.server_instance || x.server_state === "error") && due(x))) {
       if (!free(m)) continue; // кто-то из участников ещё доигрывает другой матч
-      if (seats <= 0) return; // зал занят — матч уйдёт, когда закончится один из идущих
+      if (t.is_lan && seats <= 0) continue; // зал занят — матч уйдёт, когда закончится один из идущих (онлайн это не касается)
       if (await workshopLoadBusy(m.id)) continue; // другой сервер сейчас качает/грузит карту — по одному
       const inst = await pickFreeInstance();
       if (!inst) return; // свободных серверов нет — ждём следующей синхронизации
@@ -132,7 +134,7 @@ export async function autopilotTick() {
       const { data: full } = await db().from("matches").select("*").eq("id", m.id).single();
       if (!full) continue;
       if (!(await assignServer(full as Match, inst.name))) continue;
-      seats--;
+      if (t.is_lan) seats--;
       await db()
         .from("audit_logs")
         .insert({ action: "autopilot.assign", entity_type: "match", entity_id: m.id, payload: { instance: inst.name } });

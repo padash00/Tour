@@ -33,7 +33,7 @@ export type TournamentEta = { matchStart: Map<string, number>; finishAt: number 
 
 export async function tournamentEta(tournamentId: string): Promise<TournamentEta | null> {
   const [{ data: t }, { data: ms }, { data: inst }] = await Promise.all([
-    db().from("tournaments").select("format, status, starts_at").eq("id", tournamentId).maybeSingle(),
+    db().from("tournaments").select("format, status, starts_at, is_lan").eq("id", tournamentId).maybeSingle(),
     db()
       .from("matches")
       .select("id, number, round, status, best_of, team1_id, team2_id, team1_score, team2_score, started_at, finished_at, maps:match_maps(status)")
@@ -61,8 +61,9 @@ export async function tournamentEta(tournamentId: string): Promise<TournamentEta
   // серия обычно короче best_of: BO3 в среднем ~2,5 карты, BO5 ~4
   const expectedMaps = (bo: number) => (bo <= 1 ? 1 : bo === 3 ? 2.5 : bo === 5 ? 4 : bo);
   const now = Date.now();
-  // в турнирное время турниру отданы все серверы (server-balance.ts), но не больше, чем мест в зале
-  const limit = await getMaxParallelMatches();
+  // в турнирное время турниру отданы все серверы (server-balance.ts), но для LAN не больше, чем мест в зале
+  // у онлайн-турнира мест в зале нет — только серверы
+  const limit = t.is_lan ? await getMaxParallelMatches() : null;
   const servers = Math.max(1, Math.min((inst ?? []).length, limit ?? Infinity));
   const serverFree: number[] = [];
   const teamFree = new Map<string, number>();

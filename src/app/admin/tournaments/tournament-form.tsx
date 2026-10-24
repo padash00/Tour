@@ -549,7 +549,7 @@ export function TournamentForm({
               <Field label="Регистрация закрывается" hint="Обычно за сутки до старта">
                 <input type="datetime-local" value={regClose} onChange={(e) => setRegClose(e.target.value)} className="field" />
               </Field>
-              <Field label="Подтверждение участия (check-in): начало" hint="Капитаны нажимают «Мы придём». Обычно за час до старта">
+              <Field label="Подтверждение участия (check-in): начало" hint="Капитаны подтверждают участие команды. Обычно за час до старта">
                 <input type="datetime-local" value={checkinOpen} onChange={(e) => setCheckinOpen(e.target.value)} className="field" />
               </Field>
               <Field label="Подтверждение участия (check-in): конец" hint="Обычно за 15 минут до старта">

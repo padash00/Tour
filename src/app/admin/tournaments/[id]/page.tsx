@@ -212,7 +212,7 @@ function lifeSteps(t: T): LifeStep[] {
     {
       key: "checkin",
       label: "Check-in",
-      hint: t.checkin_opens_at || t.checkin_closes_at ? range(t.checkin_opens_at, t.checkin_closes_at) : "участники подтверждают, что пришли",
+      hint: t.checkin_opens_at || t.checkin_closes_at ? range(t.checkin_opens_at, t.checkin_closes_at) : t.is_lan ? "участники подтверждают, что придут" : "участники подтверждают участие",
     },
     { key: "bracket", label: "Сетка", hint: "из прошедших check-in" },
     { key: "live", label: "Идёт", hint: t.starts_at ? `старт ${d(t.starts_at)}` : "матчи на серверах" },

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 const FACTS = [
   { label: "Игра", value: "Counter-Strike 2" },
-  { label: "Формат", value: "LAN-турниры в клубе F16" },
+  { label: "Формат", value: "LAN в клубе F16 и онлайн" },
   { label: "Режимы", value: "5×5, 2×2, 1×1" },
   { label: "Вход", value: "Через Steam, без паролей" },
 ];
