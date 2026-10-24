@@ -242,9 +242,24 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
   };
   return (
     <Container className="flex flex-col gap-5 pb-12 pt-6 sm:pt-8">
-      <header>
-        <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-fg sm:text-[34px]">Турниры по CS2 в F16 Arena</h1>
-        <p className="mt-1 max-w-[62ch] text-[16px] text-fg-2">Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.</p>
+      {/* главный блок страницы: заголовок в своей карточке, а не надписью на фоне */}
+      <header className="relative overflow-hidden rounded-feature border border-line-subtle bg-surface p-6 sm:p-8">
+        <span className="absolute inset-x-0 top-0 h-1.5 bg-accent" aria-hidden />
+        {/* eslint-disable-next-line @next/next/no-img-element -- знак бренда, SVG как есть */}
+        <img src="/brand/f16-symbol-light.svg" alt="" aria-hidden className="pointer-events-none absolute right-6 top-1/2 hidden h-auto w-[34%] -translate-y-1/2 opacity-[0.12] lg:block" />
+        <div className="relative max-w-[640px]">
+          <span className="text-[14px] font-bold text-accent">F16 Arena · Усть-Каменогорск</span>
+          <h1 className="mt-1 text-[32px] font-extrabold leading-[1.1] tracking-[-0.02em] text-fg sm:text-[40px]">Турниры по CS2 в F16 Arena</h1>
+          <p className="mt-2 text-[16.5px] text-fg-2">Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.</p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button href="/tournaments" iconRight={<ArrowRight />}>
+              Все турниры
+            </Button>
+            <Button href="/stats" variant="secondary">
+              Рейтинг игроков
+            </Button>
+          </div>
+        </div>
       </header>
 
       <HomeMyMatch />
