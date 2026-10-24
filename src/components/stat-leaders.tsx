@@ -6,7 +6,7 @@ import { fmt, ratingColor } from "./stats-format";
 type Row = PlayerAgg & { player?: { nickname: string; avatar_url: string | null; steam_id: string } | null };
 
 /**
- * Лидеры над таблицей игроков: убийства, ADR, HS%, Swing, Rating.
+ * Лидеры над таблицей игроков: убийства, ADR, HS%, Swing, Rating, первые убийства, клатчи, KAST, эйсы/4K.
  * Для ADR и HS — порог по объёму, чтобы одна удачная карта не обгоняла весь турнир.
  */
 export function StatLeaders({ rows }: { rows: Row[] }) {
@@ -20,18 +20,31 @@ export function StatLeaders({ rows }: { rows: Row[] }) {
   const hs = top(rows.filter((r) => r.kills >= 10), (r) => r.hsPct);
   const swing = top(enoughRounds.filter((r) => r.swing != null), (r) => r.swing!);
   const rating = top(enoughRounds, (r) => r.rating);
+  const entry = top(rows.filter((r) => r.firstKills > 0), (r) => r.firstKills);
+  const clutch = top(rows.filter((r) => r.clutches > 0), (r) => r.clutches);
+  const kast = top(enoughRounds, (r) => r.kast);
+  const multi = top(rows, (r) => r.k5 * 100 + r.k4);
   const cards: { label: string; row: Row | null; value: string; tone?: string }[] = [
     { label: "Больше всего убийств", row: kills, value: String(kills?.kills ?? "") },
     { label: "Больше всего урона за раунд", row: adr, value: adr ? fmt.d1(adr.adr) : "" },
     { label: "Чаще всех в голову", row: hs, value: hs ? fmt.pct(hs.hsPct) : "" },
     { label: "Сильнее всех влияет на раунд", row: swing, value: swing ? fmt.swing(swing.swing) : "", tone: "text-ok" },
     { label: "Лучший рейтинг", row: rating, value: rating ? fmt.r(rating.rating) : "", tone: rating ? ratingColor(rating.rating) : undefined },
+    { label: "Чаще всех открывает раунд", row: entry, value: entry ? `${entry.firstKills} первых` : "" },
+    { label: "Больше всего клатчей", row: clutch, value: clutch ? String(clutch.clutches) : "" },
+    { label: "Самый стабильный (KAST)", row: kast, value: kast ? fmt.pct(kast.kast) : "" },
+    {
+      label: "Эйсы и 4K",
+      row: multi,
+      value: multi ? [multi.k5 && `${multi.k5} эйс`, multi.k4 && `${multi.k4}×4K`].filter(Boolean).join(" · ") : "",
+    },
   ];
-  const shown = cards.filter((c) => c.row);
+  // карточка без значения (никто не сделал ни одного клатча) не показывается
+  const shown = cards.filter((c) => c.row && c.value && c.value !== "0");
   if (!shown.length) return null;
 
   return (
-    <div className={cn("grid grid-cols-2 gap-3", shown.length >= 5 ? "lg:grid-cols-5" : shown.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+    <div className={cn("grid grid-cols-2 gap-3", shown.length >= 7 ? "lg:grid-cols-3 xl:grid-cols-5" : shown.length >= 5 ? "lg:grid-cols-5" : shown.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
       {shown.map((c) => {
         const r = c.row!;
         const nick = r.player?.nickname ?? r.name;
