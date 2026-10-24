@@ -22,6 +22,7 @@ import { db } from "@/lib/supabase";
  *   /matches/<id>/image?f=story         — «Результат», сторис 1080×1920
  *   /matches/<id>/image?f=wide          — «Результат», 1200×630 (превью ссылки в WhatsApp/Telegram)
  *   /matches/<id>/image?f=stats&map=N   — «Статистика карты» N: составы K A D ADR и история раундов (только админ)
+ *   /matches/<id>/image?f=stats&map=all — «Статистика матча»: сумма по всем сыгранным картам и счёт каждой карты
  *   &download=1 — отдать файлом. Только сыгранный матч, иначе 404.
  */
 
@@ -200,18 +201,25 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
 
   // ─────────────────────────────── «Статистика карты»
   if (statsMode) {
+    const whole = req.nextUrl.searchParams.get("map") === "all";
     const want = Number(req.nextUrl.searchParams.get("map"));
     const map = maps.find((x) => x.map_number === want) ?? maps[0];
     if (!map) return new Response("Карта не сыграна", { status: 404 });
-    const mapRounds = await getMatchRounds(
-      m.id,
-      { team1: rosters.team1.map((r) => r.player.steam_id), team2: rosters.team2.map((r) => r.player.steam_id) },
-      modeOf(m.tournament.format).size,
-      [map.map_number],
-    );
+    // весь матч: история раундов не нужна — вместо неё полоса со счётом каждой карты
+    const mapRounds = whole
+      ? []
+      : await getMatchRounds(
+          m.id,
+          { team1: rosters.team1.map((r) => r.player.steam_id), team2: rosters.team2.map((r) => r.player.steam_id) },
+          modeOf(m.tournament.format).size,
+          [map.map_number],
+        );
     // лишние записи после конца карты (сервер дописал раунд после матча) не показываем
     const chips: RoundChip[] = (mapRounds[0]?.rounds ?? []).slice(0, map.team1_score + map.team2_score);
-    const players = aggregatePlayers(rows.filter((r) => r.map_number === map.map_number));
+    const played = new Set(maps.map((x) => x.map_number));
+    const players = aggregatePlayers(rows.filter((r) => (whole ? played.has(r.map_number) : r.map_number === map.map_number)));
+    const won1 = maps.filter((x) => x.team1_score > x.team2_score).length;
+    const won2 = maps.filter((x) => x.team2_score > x.team1_score).length;
     const teamPlayers = (teamId: string | null) => players.filter((p) => p.team_id === teamId).sort((a, b) => b.rating - a.rating || b.kills - a.kills);
     const list1 = teamPlayers(m.team1_id);
     const list2 = teamPlayers(m.team2_id);
@@ -222,10 +230,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
     const PAD = 32;
     const ROW = 48;
     const BAR = 58;
-    const histH = chips.length ? 104 : 18;
+    const histH = whole ? 112 : chips.length ? 104 : 18;
     const block = (n: number) => BAR + Math.max(n, 1) * (ROW + 4);
     const H = PAD + 70 + 16 + block(list1.length) + histH + block(list2.length) + 60 + PAD;
-    const bg = await ogImage(cover(map.map_name), W * scale, 80, H * scale);
+    const bg = await ogImage(cover((whole ? maps.at(-1) : map)?.map_name), W * scale, 80, H * scale);
     const cols = [
       { k: "K", w: 76 },
       { k: "A", w: 76 },
@@ -295,8 +303,29 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         hows.flatMap((how) => ([1, 2] as const).map(async (n) => [`${how}${n}`, await svgPng(roundIconSvg(how, TEAM_COLOR[n]), iconSize * scale)] as const)),
       ),
     );
-    const history =
-      chips.length > 0 ? (
+    const mapStrip = (
+      <div style={{ display: "flex", alignItems: "center", height: histH, gap: 12 }}>
+        {maps.map((x) => {
+          const w = x.team1_score > x.team2_score ? 1 : x.team2_score > x.team1_score ? 2 : 0;
+          return (
+            <div
+              key={x.map_number}
+              style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "space-between", height: 70, padding: "0 22px", borderRadius: 10, background: "rgba(255,255,255,0.07)", border: `2px solid ${w ? rgba(TEAM_COLOR[w as 1 | 2], 0.6) : "rgba(255,255,255,0.12)"}` }}
+            >
+              <span style={{ fontSize: 24, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{mapName(x.map_name)}</span>
+              <span style={{ display: "flex", fontSize: 32, fontWeight: 700 }}>
+                <span style={{ color: TEAM_COLOR[1], opacity: w === 2 ? 0.55 : 1 }}>{x.team1_score}</span>
+                <span style={{ color: WHITE, margin: "0 8px" }}>:</span>
+                <span style={{ color: TEAM_COLOR[2], opacity: w === 1 ? 0.55 : 1 }}>{x.team2_score}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+    const history = whole ? (
+      mapStrip
+    ) : chips.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: histH, padding: "0 4px" }}>
           {([1, 2] as const).map((n) => (
             <div key={n} style={{ display: "flex", alignItems: "center", height: 40 }}>
@@ -325,16 +354,26 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         <div style={{ display: "flex", flexDirection: "column", position: "relative", width: W, height: H, padding: PAD }}>
           <div style={{ display: "flex", alignItems: "center", height: 70 }}>
             <div style={{ display: "flex", flex: 1, alignItems: "center", fontSize: 26 }}>
-              <span style={{ color: GREY }}>{`R: ${map.team1_score + map.team2_score}`}</span>
-              <span style={{ color: DIM, margin: "0 12px" }}>·</span>
-              <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{mapName(map.map_name)}</span>
-              <span style={{ color: DIM, margin: "0 12px" }}>·</span>
-              <span style={{ fontWeight: 700, color: by ? byColor : GREY }}>{by ? `пик ${by}` : "decider"}</span>
+              {whole ? (
+                <>
+                  <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{seriesLive ? "Счёт серии" : "Итог матча"}</span>
+                  <span style={{ color: DIM, margin: "0 12px" }}>·</span>
+                  <span style={{ color: GREY }}>{`BO${m.best_of} · раундов ${maps.reduce((s, x) => s + x.team1_score + x.team2_score, 0)}`}</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: GREY }}>{`R: ${map.team1_score + map.team2_score}`}</span>
+                  <span style={{ color: DIM, margin: "0 12px" }}>·</span>
+                  <span style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{mapName(map.map_name)}</span>
+                  <span style={{ color: DIM, margin: "0 12px" }}>·</span>
+                  <span style={{ fontWeight: 700, color: by ? byColor : GREY }}>{by ? `пик ${by}` : "decider"}</span>
+                </>
+              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", fontSize: 60, fontWeight: 700, letterSpacing: -1, lineHeight: 1 }}>
-              <span style={{ color: TEAM_COLOR[1] }}>{map.team1_score}</span>
+              <span style={{ color: TEAM_COLOR[1] }}>{whole ? won1 : map.team1_score}</span>
               <span style={{ color: WHITE, margin: "0 12px" }}>:</span>
-              <span style={{ color: TEAM_COLOR[2] }}>{map.team2_score}</span>
+              <span style={{ color: TEAM_COLOR[2] }}>{whole ? won2 : map.team2_score}</span>
             </div>
             <div style={{ display: "flex", flex: 1, justifyContent: "flex-end" }}>
               <img src={logo} alt="" width={Math.round(34 * LOGO_RATIO)} height={34} />
@@ -346,13 +385,13 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
             {teamBlock(t2, list2, 2)}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flex: 1, fontSize: 19, color: GREY }}>
-            <span>{cut(`${m.tournament.name} · ${stage} · карта ${map.map_number} из ${m.best_of}`, 70)}</span>
+            <span>{cut(`${m.tournament.name} · ${stage}${whole ? "" : ` · карта ${map.map_number} из ${m.best_of}`}`, 70)}</span>
             <span>tournament.f16-arena.kz</span>
           </div>
         </div>
       </>
     );
-    return finish(body, W, H, `f16-match-${m.number}-map${map.map_number}-stats.png`);
+    return finish(body, W, H, whole ? `f16-match-${m.number}-stats.png` : `f16-match-${m.number}-map${map.map_number}-stats.png`);
   }
 
   // ─────────────────────────────── «Результат»

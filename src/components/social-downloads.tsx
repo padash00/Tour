@@ -5,7 +5,8 @@ import { useViewer } from "./viewer";
 
 /**
  * Кнопки скачивания картинки для соцсетей: пост Instagram, сторис, широкая — только администратору.
- * maps — сыгранные карты матча: для каждой ещё «Статистика карты» (составы и история раундов).
+ * maps — сыгранные карты матча: для каждой ещё «Статистика карты» (составы и история раундов),
+ * при нескольких картах — «Весь матч» (сумма по картам и счёт каждой).
  * Страницы отдаются из кэша одинаковыми для всех, поэтому прав проверяем на клиенте; сами картинки
  * без прав админа сервер тоже не отдаёт.
  */
@@ -39,7 +40,12 @@ export function SocialDownloads({ base, title, text, maps = [] }: { base: string
       </div>
       {maps.length > 0 && (
         <div className="flex w-full flex-wrap items-center gap-2 border-t border-line-subtle pt-4">
-          <span className="mr-2 text-[13px] text-fg-3">Статистика карты</span>
+          <span className="mr-2 text-[13px] text-fg-3">Статистика</span>
+          {maps.length > 1 && (
+            <a href={`${base}?f=stats&map=all&download=1`} className={btnClass("secondary", "md")} download title="Сумма по всем сыгранным картам, 2400 px по ширине">
+              Весь матч
+            </a>
+          )}
           {maps.map((m) => (
             <a key={m.n} href={`${base}?f=stats&map=${m.n}&download=1`} className={btnClass("secondary", "md")} download title="Скачать 2400 px по ширине">
               {m.label}
