@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { Gamepad2 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { SocialDownloads } from "@/components/social-downloads";
@@ -23,14 +22,14 @@ import { LiveRefresh } from "@/components/live-refresh";
 import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
-import { ServerPreparing, ServerReady } from "@/components/competition/server-block";
+import { MatchExplain } from "@/components/competition/match-explain";
+import { MatchServerPanel, VetoSummary } from "@/components/competition/match-side";
 import { CopyConnect } from "@/components/copy-connect";
 import { VetoBoard } from "@/components/competition/veto-board";
 import { MatchProgress } from "@/components/competition/match-progress";
 import { MobileStickyCta } from "@/components/public/callout";
 import {
   Button,
-  Callout,
   Container,
   EmptyState,
   Facts,
@@ -102,7 +101,12 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const myTurn = m.status === "veto" && isCaptain && turnTeam?.id === myTeam?.id;
   const stage = matchStage(m, stageRounds);
   const serverPhase = ["ready", "live"].includes(m.status);
-  const currentMap = m.maps.find((x) => x.status === "live") ?? m.maps.find((x) => x.status === "pending");
+  // адрес сервера и подсказки «подключитесь» — только игрокам состава и администраторам
+  const participant = inRoster || admin;
+  // куда проходит победитель: стадия следующего матча сетки
+  const nextMatch = m.winner_to_match ? await getMatch(m.winner_to_match) : null;
+  const nextStage = nextMatch ? matchStage(nextMatch, stageRounds) : null;
+  const winsToMap = modeOf(m.tournament.format).size === 2 ? 9 : 13;
 
   const seriesMaps = m.maps.length > 0 && (
     <Section title={m.status === "finished" ? "Итоги серии" : "Карты серии"}>
@@ -196,7 +200,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                   return (
                     <div key={i}>
                       <div className="mb-3 text-title text-fg">{team?.name}</div>
-                      <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} />
+                      <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} plain highlightSteamId={player?.steam_id} />
                     </div>
                   );
                 })}
@@ -207,23 +211,16 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     </Section>
   );
 
+  // главный блок под плашкой: до вето — когда и как, во время вето — доска вето; дальше всё говорят плашка и колонка «Сервер»
   const currentState =
     m.status === "pending" || m.status === "upcoming" ? (
       <FeatureSurface>
-        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">Следующий шаг</div>
-        <h2 className="mt-2 text-heading text-fg">{m.status === "pending" ? "Ожидаем соперников" : "Матч назначен"}</h2>
-        <p className="mt-2 max-w-read text-[14px] text-fg-2">
-          {m.status === "pending"
-            ? "Команды определятся по итогам предыдущих матчей. Match Room обновится автоматически."
-            : m.tournament.map_pool.length <= 1
-              ? "Вето не требуется. Когда сервер будет готов, здесь появится подключение."
-              : "Капитанам придёт уведомление о начале вето карт."}
-        </p>
+        <h2 className="text-heading text-fg">Когда и как играется</h2>
         <Facts
-          className="mt-6"
+          className="mt-5"
           items={[
             { label: "Начало", value: m.scheduled_at ? formatDateTime(m.scheduled_at) : "Будет объявлено" },
-            { label: "Формат", value: `BO${m.best_of}` },
+            { label: "Формат", value: m.best_of === 1 ? "до 1 победы" : `до ${Math.ceil(m.best_of / 2)} побед` },
             { label: "Стадия", value: stage },
           ]}
         />
@@ -239,59 +236,11 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           </div>
         )}
       </>
-    ) : serverPhase && (inRoster || admin) ? (
-      m.server_address ? (
-        <ServerReady
-          address={m.server_address}
-          password={m.server_password}
-          readyAt={m.server_ready_at}
-          waiting={m.status === "ready"}
-          map={currentMap?.map_name}
-          serverNow={serverNow}
-        />
-      ) : (
-        <ServerPreparing loading={m.server_state === "loading"} />
-      )
-    ) : m.status === "ready" ? (
-      <FeatureSurface>
-        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">Сервер готовится</div>
-        <h2 className="mt-2 text-heading text-fg">Игроки подключаются</h2>
-        <p className="mt-2 text-[14px] text-fg-2">Адрес сервера видят только участники состава матча и администраторы.</p>
-      </FeatureSurface>
-    ) : m.status === "live" ? (
-      <FeatureSurface>
-        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-live">LIVE</div>
-        <h2 className="mt-2 text-heading text-fg">Матч идёт</h2>
-        <p className="mt-2 text-[14px] text-fg-2">
-          {currentMap ? `Сейчас: ${mapName(currentMap.map_name)} · ${currentMap.team1_score}:${currentMap.team2_score}.` : "Счёт и статистика обновляются автоматически."}
-        </p>
-      </FeatureSurface>
-    ) : m.status === "finished" ? (
-      <FeatureSurface>
-        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-ok">Итог</div>
-        <h2 className="mt-2 text-heading text-fg">
-          {m.winner_id === m.team1_id ? m.team1?.name : m.winner_id === m.team2_id ? m.team2?.name : "Матч завершён"}
-          {m.winner_id ? " — победитель" : ""}
-        </h2>
-        <p className="mt-2 text-[14px] text-fg-2">
-          Серия завершена со счётом <span className="num font-medium text-fg">{m.team1_score}:{m.team2_score}</span>.
-          {m.under_review ? " Результат находится на проверке администратора." : " Результат учтён в сетке турнира."}
-        </p>
-      </FeatureSurface>
-    ) : (
-      <Callout tone="danger" title="Матч отменён">Этот матч больше не будет сыгран.</Callout>
-    );
-
-  const vetoHistory =
-    m.status !== "veto" && m.veto.length > 0 ? (
-      <Section title="Вето карт">
-        <VetoBoard m={m} state={state} myTurn={false} compact images={mapImages} serverNow={serverNow} />
-      </Section>
     ) : null;
 
   const rostersBlock = (
     <Section title="Составы" description="Основной состав и запасные, заявленные на этот турнир.">
-      <div className="grid gap-10 md:grid-cols-2 md:gap-12">
+      <div className="grid gap-8 md:grid-cols-2">
         {[
           { team: m.team1, roster: rosters.team1 },
           { team: m.team2, roster: rosters.team2 },
@@ -377,25 +326,9 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
       </Section>
     ) : null;
 
-  const detailBlocks =
-    m.status === "live"
-      ? [
-          { key: "rounds", node: roundsBlock },
-          { key: "stats", node: scoreboard },
-          { key: "series", node: seriesMaps },
-        ]
-      : [
-          { key: "series", node: seriesMaps },
-          { key: "rounds", node: roundsBlock },
-          { key: "stats", node: scoreboard },
-        ];
-
-  const matchBands = [
-    ...detailBlocks,
-    { key: "veto", node: vetoHistory },
-    { key: "rosters", node: rostersBlock },
-    { key: "dispute", node: disputeBlock },
-  ].filter((band) => Boolean(band.node));
+  // во время игры сначала раунды и статистика, после — итоги серии
+  const detailBlocks = m.status === "live" ? [roundsBlock, scoreboard, seriesMaps] : [seriesMaps, roundsBlock, scoreboard];
+  const mainBlocks = [...detailBlocks, rostersBlock, disputeBlock].filter(Boolean);
 
   return (
     <>
@@ -403,50 +336,53 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         <LiveRefresh watch={`match:${m.id}`} intervalMs={m.status === "veto" ? 1000 : 2500} />
       )}
 
-      <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} />
+      <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} mapImages={mapImages} />
 
-      <Container width="wide" className="py-6 sm:py-8">
-        <div className="mx-auto max-w-[1100px]">
+      <Container width="wide" className="pb-6 pt-4 sm:pb-10">
+        <div className="flex flex-col gap-4">
+          <MatchExplain
+            m={m}
+            turnTeam={turnTeam?.name ?? null}
+            myTurn={myTurn}
+            participant={participant}
+            next={nextStage}
+            winsToMap={winsToMap}
+            serverNow={serverNow}
+          />
           <MatchProgress status={m.status} singleMap={m.tournament.map_pool.length <= 1} />
-          <section aria-label="Текущее состояние матча" className="mt-8">
-            {currentState}
-          </section>
+        </div>
+
+        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="flex min-w-0 flex-col gap-12">
+            {currentState && <section aria-label="Текущее состояние матча">{currentState}</section>}
+            {mainBlocks.map((node, i) => (
+              <div key={i} className="min-w-0">
+                {node}
+              </div>
+            ))}
+          </div>
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--shell-h)+16px)]" aria-label="Сервер и карта">
+            <MatchServerPanel m={m} participant={participant} serverNow={serverNow} />
+            {m.status !== "veto" && <VetoSummary m={m} />}
+            <section className="rounded-surface border border-line-subtle bg-surface p-5" aria-label="О матче">
+              <h2 className="text-heading text-fg">О матче</h2>
+              <dl className="mt-3 grid gap-2.5 text-[15px]">
+                <div className="flex justify-between gap-3"><dt className="text-fg-3">Турнир</dt><dd className="text-right font-semibold">{m.tournament.name}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-fg-3">Стадия</dt><dd className="text-right font-semibold">{stage}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-fg-3">Формат</dt><dd className="text-right font-semibold">{m.best_of === 1 ? "до 1 победы" : `до ${Math.ceil(m.best_of / 2)} побед`}</dd></div>
+                {m.scheduled_at && <div className="flex justify-between gap-3"><dt className="text-fg-3">Начало</dt><dd className="text-right font-semibold">{formatDateTime(m.scheduled_at)}</dd></div>}
+              </dl>
+            </section>
+          </aside>
         </div>
       </Container>
 
-      {matchBands.map((band, index) => (
-        <MatchBand key={band.key} tone={index % 2 === 0 ? "section" : "base"}>
-          {band.node}
-        </MatchBand>
-      ))}
-
-      {serverPhase && (inRoster || admin) && m.server_address && m.status === "ready" && (
+      {serverPhase && participant && m.server_address && m.status === "ready" && (
         <MobileStickyCta note="Сервер готов">
           <CopyConnect address={m.server_address} password={m.server_password} block />
         </MobileStickyCta>
       )}
     </>
-  );
-}
-
-function MatchBand({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: "base" | "section";
-}) {
-  return (
-    <div
-      className={cn(
-        "border-t border-line-subtle",
-        tone === "section" ? "bg-section" : "bg-bg",
-      )}
-    >
-      <Container width="wide" className="py-10 sm:py-12 lg:py-14">
-        {children}
-      </Container>
-    </div>
   );
 }
 

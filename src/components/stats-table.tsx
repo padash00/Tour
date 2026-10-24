@@ -94,6 +94,8 @@ export function PlayerStatsTable({
   rank = true,
   sticky,
   solo,
+  plain,
+  highlightSteamId,
 }: {
   rows: Row[];
   showTeam?: boolean;
@@ -102,6 +104,10 @@ export function PlayerStatsTable({
   sticky?: boolean;
   /** дуэль 1×1: каждый выигранный раунд MatchZy считает клатчем 1v1 — колонка бессмысленна */
   solo?: boolean;
+  /** заголовки колонок словами («Убийства», «Урон за раунд») вместо K/D/ADR — для страницы матча */
+  plain?: boolean;
+  /** строка этого игрока подсвечивается и помечается «это вы» */
+  highlightSteamId?: string | null;
 }) {
   // MatchZy присылает KAST и первые убийства не всегда — пустые колонки не показываем
   const showKast = rows.some((p) => p.kastRounds > 0);
@@ -110,6 +116,7 @@ export function PlayerStatsTable({
   // в дуэлях «команда» — это сам игрок: колонку с повтором ника не показываем
   const teamCol = showTeam && rows.some((p) => p.team && p.team.name !== (p.player?.nickname ?? p.name));
   const { sorted, sort, toggle } = useSort(rows, PLAYER_COLS, "rating");
+  const me = (steamId: string) => !!highlightSteamId && steamId === highlightSteamId;
   const th = (k: string, label: ReactNode, title?: string) => (
     <SortTh k={k} sort={sort} onSort={toggle} title={title}>
       {label}
@@ -124,17 +131,17 @@ export function PlayerStatsTable({
             <th>Игрок</th>
             {teamCol && <th>Команда</th>}
             {!compact && th("maps", "Карты")}
-            {th("kills", "K", "Убийства")}
-            {th("deaths", "D", "Смерти")}
-            {th("assists", "A", "Ассисты")}
+            {th("kills", plain ? "Убийства" : "K", "Убийства")}
+            {th("deaths", plain ? "Смерти" : "D", "Смерти")}
+            {th("assists", plain ? "Помощь" : "A", "Ассисты")}
             {th("diff", "±", "Убийства минус смерти")}
-            {th("adr", "ADR", "Средний урон за раунд")}
-            {showKast && th("kast", "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
+            {th("adr", plain ? "Урон за раунд" : "ADR", "Средний урон за раунд")}
+            {showKast && th("kast", plain ? "Полезен в раундах" : "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
             {!compact && th("hs", "HS", "Доля убийств в голову")}
             {showEntry && th("entry", "Entry", "Первые убийства / первые смерти раунда")}
             {showClutch && th("clutch", "Клатчи", "Выигранные клатчи")}
-            {th("swing", "Swing", "Средний вклад в шанс победы раунда")}
-            {th("rating", "Rating", "F16 Rating")}
+            {th("swing", plain ? "Влияние" : "Swing", "Средний вклад в шанс победы раунда (Swing)")}
+            {th("rating", plain ? "Рейтинг" : "Rating", "F16 Rating")}
           </tr>
         </thead>
         <tbody>
@@ -145,10 +152,11 @@ export function PlayerStatsTable({
               <span className="flex items-center gap-3">
                 <Avatar src={p.player?.avatar_url} name={nick} size={compact ? "xs" : "sm"} />
                 <span className="max-w-[180px] truncate font-semibold text-fg">{nick}</span>
+                {me(p.steam_id) && <span className="shrink-0 rounded-full bg-accent-dim px-2 py-0.5 text-[12px] font-bold text-accent">это вы</span>}
               </span>
             );
             return (
-              <tr key={p.steam_id}>
+              <tr key={p.steam_id} className={cn(me(p.steam_id) && "bg-accent-dim/60")}>
                 {rank && (
                   <td>
                     <RankBadge n={i + 1} />
