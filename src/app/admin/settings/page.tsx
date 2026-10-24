@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting, saveSkinParts, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
+import { editWorkshopMaps, saveSetting, saveSkinParts, saveSkinsMenu, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
 import { formatShortDateTime } from "@/lib/format";
-import { SKIN_PARTS, getDisabledMaps, getMapImages, getSettingsStatus, getSkinParts, getWorkshopMaps, isServerOpenJoin, isServerSkins, type SettingKey } from "@/lib/settings";
+import { SKIN_PARTS, getDisabledMaps, getMapImages, getSettingsStatus, getSkinParts, getSkinsMenu, getWorkshopMaps, isServerOpenJoin, isServerSkins, type SettingKey } from "@/lib/settings";
 import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -92,7 +92,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin, skins, skinParts] = await Promise.all([
+  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin, skins, skinParts, skinsMenu] = await Promise.all([
     getSettingsStatus(),
     getWorkshopMaps(),
     workshopInfo(),
@@ -102,6 +102,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
     isServerOpenJoin(),
     isServerSkins(),
     getSkinParts(),
+    getSkinsMenu(),
   ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
@@ -197,6 +198,32 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
                   </label>
                 ))}
               </div>
+              <div className="mt-4">
+                <SubmitButton>Сохранить</SubmitButton>
+              </div>
+            </ActionForm>
+            <ActionForm action={saveSkinsMenu} className="w-full border-t border-line-subtle pt-5">
+              <div className="text-[15px] font-bold text-fg">Меню скинов в игре</div>
+              <p className="mt-0.5 text-[13.5px] text-fg-3">Что видит игрок, когда пишет !skins.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {[
+                  { v: "text", t: "Обычное", d: "Список в чате и по центру экрана, выбор клавишами. Работает всегда." },
+                  { v: "panorama", t: "Окна F16 с мышью", d: "Окно в стиле F16 с курсором и картинками. Нужен аддон F16 UI в Workshop." },
+                ].map((o) => (
+                  <label key={o.v} className="flex cursor-pointer items-start gap-3 rounded-control p-3 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] transition-colors hover:bg-surface-2 has-[:checked]:bg-accent-dim has-[:checked]:shadow-none">
+                    <input type="radio" name="mode" value={o.v} defaultChecked={skinsMenu.mode === o.v} className="mt-0.5 size-5 accent-[var(--color-accent)]" />
+                    <span>
+                      <span className="block text-[15px] font-semibold text-fg">{o.t}</span>
+                      <span className="block text-[13px] text-fg-3">{o.d}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <label className="mt-3 block">
+                <span className="text-[14px] font-semibold text-fg">Номер аддона F16 UI в Workshop</span>
+                <input name="addon" defaultValue={skinsMenu.addon} placeholder="например 3812345678 или ссылка на страницу аддона" className="field mt-1.5" />
+                <span className="mt-1 block text-[13px] text-fg-3">Число из адреса страницы аддона в Steam (…?id=ЧИСЛО). Можно вставить ссылку целиком.</span>
+              </label>
               <div className="mt-4">
                 <SubmitButton>Сохранить</SubmitButton>
               </div>

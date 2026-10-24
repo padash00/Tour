@@ -190,7 +190,9 @@ const snapshots = {}; // { [instance]: { at, report } }
 let openJoin = true;
 // скины F16 (тумблер «Скины на серверах»): null — сайт ещё не ответил
 let skinsWanted = null;
-let skinParts = null; // какие виды скинов разрешены (скины, ножи, перчатки, агенты, музыка, значки)
+let skinParts = null;
+let skinsMenu = "text"; // меню скинов: «text» или «panorama» (окна F16)
+let uiAddon = ""; // номер аддона окон F16 в Workshop // какие виды скинов разрешены (скины, ножи, перчатки, агенты, музыка, значки)
 const openJoinApplied = new Map(); // инстанс → { value, at, uptime }
 async function applyOpenJoin(inst) {
   const prev = openJoinApplied.get(inst.name);
@@ -598,6 +600,8 @@ async function syncOnce() {
   if (typeof res.open_join === "boolean") openJoin = res.open_join;
   if (typeof res.skins === "boolean") skinsWanted = res.skins;
   if (res.skin_parts && typeof res.skin_parts === "object") skinParts = res.skin_parts;
+  if (res.skins_menu === "text" || res.skins_menu === "panorama") skinsMenu = res.skins_menu;
+  if (typeof res.ui_addon === "string") uiAddon = res.ui_addon;
   try {
     housekeeping.cleanupBackups(Number(res.backup_days ?? 1), Number(res.demo_days ?? res.backup_days ?? 1));
   } catch (e) {
@@ -633,7 +637,7 @@ async function housekeepingLoop() {
       log(`язык сервера: ${e.message}`);
     }
     await hud.ensurePlugin(Object.keys(recovery.assignments).length > 0).catch((e) => log(`F16Hud: ${e.message}`));
-    await skins.ensure(skinsWanted, skinParts).catch((e) => log(`скины: ${e.message}`));
+    await skins.ensure(skinsWanted, skinParts, skinsMenu, uiAddon).catch((e) => log(`скины: ${e.message}`));
     await refreshUpnp().catch(() => {});
     await housekeeping.ensureFirewall(demos ? DEMO_PORT : null).catch((e) => log(`брандмауэр: ${e.message}`));
     await housekeeping.ensureHiddenTasks().catch((e) => log(`планировщик: ${e.message}`));

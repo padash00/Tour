@@ -123,6 +123,16 @@ export async function getSkinParts(): Promise<SkinParts> {
   return all;
 }
 
+/**
+ * Меню скинов: «text» — обычное (чат и центр экрана), «panorama» — окна F16 с мышью.
+ * Окнам нужен клиентский аддон в Workshop (SERVER_UI_ADDON — его номер); без номера агент оставляет обычное меню.
+ */
+export async function getSkinsMenu(): Promise<{ mode: "text" | "panorama"; addon: string }> {
+  const { data } = await db().from("app_settings").select("key, value").in("key", ["SERVER_SKINS_MENU", "SERVER_UI_ADDON"]);
+  const v = new Map((data ?? []).map((r) => [r.key, r.value]));
+  return { mode: v.get("SERVER_SKINS_MENU") === "panorama" ? "panorama" : "text", addon: /^\d+$/.test(v.get("SERVER_UI_ADDON") ?? "") ? v.get("SERVER_UI_ADDON")! : "" };
+}
+
 /** Скины F16 на игровых серверах (WeaponPaints): app_settings.SERVER_SKINS «1» — включены. Применяет агент */
 export async function isServerSkins(): Promise<boolean> {
   const { data } = await db().from("app_settings").select("value").eq("key", "SERVER_SKINS").maybeSingle();

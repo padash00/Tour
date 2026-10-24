@@ -8,7 +8,7 @@ import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs
 import path from "node:path";
 
 /** Что ставится из эталона и убирается при выключении (общие библиотеки в shared/ безвредны и остаются) */
-const PLUGIN_DIRS = ["plugins/WeaponPaints", "plugins/MenuManagerCore", "plugins/PlayerSettings"];
+const PLUGIN_DIRS = ["plugins/WeaponPaints", "plugins/MenuManagerCore", "plugins/PlayerSettings", "plugins/PMM_WeaponPaints"];
 /** Вид скина с сайта → флаг в WeaponPaints.json (Additional) */
 const PART_FLAGS = { skin: "SkinEnabled", knife: "KnifeEnabled", glove: "GloveEnabled", agent: "AgentEnabled", music: "MusicEnabled", pins: "PinsEnabled" };
 const CONFIG_REL = path.join("counterstrikesharp", "configs", "plugins", "WeaponPaints", "WeaponPaints.json");
@@ -66,8 +66,44 @@ export function createSkins({ f16Dir, serverDir, instances, isRunning, restart, 
     return !!cfg?.Additional && Object.entries(PART_FLAGS).some(([part, flag]) => typeof parts[part] === "boolean" && cfg.Additional[flag] !== parts[part]);
   };
 
-  /** enabled — желаемое состояние с сайта; null — сайт ещё не ответил, ничего не трогаем. parts — разрешённые виды */
-  async function ensure(enabled, parts = null) {
+  // ── режим меню: «text» — обычное меню MenuManager (чат/центр экрана), «panorama» — окна F16 с мышью
+  // (MenuManager 1.3 с панорамой + PMM_WeaponPaints + MultiAddonManager раздаёт игрокам аддон с вёрсткой окон)
+  const csgo = path.join(serverDir, "game", "csgo");
+  const panoStage = path.join(f16Dir, "skins-panorama");
+  const mamVdf = path.join(csgo, "addons", "metamod", "multiaddonmanager.vdf");
+  const mamCfg = path.join(csgo, "cfg", "multiaddonmanager", "multiaddonmanager.cfg");
+  const currentMode = () => (existsSync(path.join(css, "plugins", "PMM_WeaponPaints", "PMM_WeaponPaints.dll")) && existsSync(mamVdf) ? "panorama" : "text");
+  const currentAddon = () => {
+    try {
+      return readFileSync(mamCfg, "utf8").match(/^\s*mm_client_extra_addons\s+"([^"]*)"/m)?.[1] ?? "";
+    } catch {
+      return "";
+    }
+  };
+  function setAddon(id) {
+    const text = readFileSync(mamCfg, "utf8");
+    writeFileSync(mamCfg, text.replace(/^(\s*mm_client_extra_addons\s+)"[^"]*"/m, `$1"${id}"`));
+  }
+  function toPanorama(addonId) {
+    // обычный MenuManager убираем целиком: смесь файлов двух версий в одной папке ломает загрузку
+    for (const d of ["plugins/MenuManagerCore", "shared/MenuManagerApi", "plugins/PlayerSettings", "shared/PlayerSettingsApi"]) rmSync(path.join(css, d), { recursive: true, force: true });
+    cpSync(panoStage, csgo, { recursive: true, force: true });
+    // одна копия API меню — общая в shared/: своя копия в WeaponPaints ломает окна
+    rmSync(path.join(css, "plugins", "WeaponPaints", "MenuManagerApi.dll"), { force: true });
+    setAddon(addonId);
+  }
+  function toText() {
+    for (const d of ["plugins/PMM_WeaponPaints", "plugins/MenuManagerCore", "shared/MenuManagerApi", "plugins/PlayerSettings", "shared/PlayerSettingsApi"]) rmSync(path.join(css, d), { recursive: true, force: true });
+    rmSync(mamVdf, { force: true });
+    // обычный MenuManager и его API — из эталона скинов
+    cpSync(stage, path.join(csgo, "addons"), { recursive: true, force: true });
+  }
+
+  /**
+   * enabled — желаемое состояние с сайта; null — сайт ещё не ответил, ничего не трогаем. parts — разрешённые виды.
+   * menu — «text» | «panorama»; addonId — номер аддона окон в Workshop (без него окна не включаются).
+   */
+  async function ensure(enabled, parts = null, menu = "text", addonId = "") {
     if (enabled == null) return;
     const now = installed() && guidelinesOff();
     // скины выключены — меняем только эталон, перезапуск не нужен
@@ -76,8 +112,10 @@ export function createSkins({ f16Dir, serverDir, instances, isRunning, restart, 
       waitingLogged = false;
       return;
     }
+    const wantMode = enabled && menu === "panorama" && /^\d+$/.test(addonId ?? "") && existsSync(panoStage) ? "panorama" : "text";
     const needParts = enabled && now && partsDiffer(parts);
-    if (enabled === now && !needParts) {
+    const needMode = enabled && now && (wantMode !== currentMode() || (wantMode === "panorama" && currentAddon() !== addonId));
+    if (enabled === now && !needParts && !needMode) {
       waitingLogged = false;
       return;
     }
@@ -96,15 +134,19 @@ export function createSkins({ f16Dir, serverDir, instances, isRunning, restart, 
     if (enabled) {
       syncParts(parts);
       cpSync(stage, path.join(serverDir, "game", "csgo", "addons"), { recursive: true, force: true });
+      if (wantMode === "panorama") toPanorama(addonId);
+      else if (currentMode() === "panorama") toText();
       setGuidelines(false);
     } else {
+      if (currentMode() === "panorama") toText();
       for (const d of PLUGIN_DIRS) rmSync(path.join(css, d), { recursive: true, force: true });
       setGuidelines(true);
     }
     for (const i of running) await restart(i, "start");
     waitingLogged = false;
     const on = parts ? Object.entries(PART_FLAGS).filter(([p]) => parts[p] !== false).map(([p]) => p).join(", ") : "всё";
-    log(`скины: ${enabled ? `включены (${on})` : "выключены"} (перезапущено серверов: ${running.length})`);
+    const mode = wantMode === "panorama" ? `окна F16, аддон ${addonId}` : "обычное меню";
+    log(`скины: ${enabled ? `включены (${on}; ${mode})` : "выключены"} (перезапущено серверов: ${running.length})`);
   }
 
   return { ensure, installed: () => installed() && guidelinesOff() };

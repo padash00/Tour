@@ -103,6 +103,26 @@ export async function saveSkinParts(_prev: ActionResult, formData: FormData): Pr
   return { success: "Сохранено. Применится в течение минуты, свободные серверы перезапустятся; если идёт матч — после него" };
 }
 
+/** Меню скинов: обычное или окна F16 с мышью + номер аддона окон в Workshop. Агент применит, когда нет матчей */
+export async function saveSkinsMenu(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const mode = formData.get("mode") === "panorama" ? "panorama" : "text";
+  const addon = String(formData.get("addon") ?? "").trim().replace(/.*[?&]id=(\d+).*/, "$1");
+  if (addon && !/^\d{5,15}$/.test(addon)) return { error: "Номер аддона — число из адреса страницы Workshop (…?id=ЧИСЛО)" };
+  if (mode === "panorama" && !addon) return { error: "Для окон нужен номер аддона: сначала опубликуйте аддон F16 UI в Workshop" };
+  const now = new Date().toISOString();
+  const { error } = await db()
+    .from("app_settings")
+    .upsert([
+      { key: "SERVER_SKINS_MENU", value: mode, updated_by: admin.id, updated_at: now },
+      { key: "SERVER_UI_ADDON", value: addon, updated_by: admin.id, updated_at: now },
+    ]);
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.server_skins_menu", undefined, { mode, addon });
+  revalidatePath("/admin/settings");
+  return { success: `${mode === "panorama" ? "Окна F16" : "Обычное меню"} — применится в течение минуты, свободные серверы перезапустятся` };
+}
+
 /** Добавить / убрать карту из библиотеки Workshop */
 export async function editWorkshopMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();
