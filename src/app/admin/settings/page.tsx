@@ -259,6 +259,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
       )}
 
       {settingTab && byKey.get(settingTab) && <SettingForm s={byKey.get(settingTab)!} />}
+      {tab === "servers" && byKey.get("INTERNET_IP") && <SettingForm s={byKey.get("INTERNET_IP")!} />}
       {tab === "servers" && byKey.get("BACKUP_RETENTION_DAYS") && <SettingForm s={byKey.get("BACKUP_RETENTION_DAYS")!} />}
       {tab === "servers" && byKey.get("DEMO_RETENTION_DAYS") && <SettingForm s={byKey.get("DEMO_RETENTION_DAYS")!} />}
 

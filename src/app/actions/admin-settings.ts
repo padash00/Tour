@@ -24,7 +24,7 @@ export async function saveSetting(_prev: ActionResult, formData: FormData): Prom
     if (key === "OBSERVER_STEAM_IDS" && !value.split(",").every((s) => /^\d{17}$/.test(s.trim()))) {
       return { error: "SteamID64 — 17 цифр, через запятую" };
     }
-    if (key === "PLAYER_IP" && isIP(value) !== 4 && !/^(?=.{1,253}$)(?=.*[a-z])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i.test(value)) {
+    if ((key === "PLAYER_IP" || key === "INTERNET_IP") && isIP(value) !== 4 && !/^(?=.{1,253}$)(?=.*[a-z])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i.test(value)) {
       return { error: "Укажите IPv4-адрес или имя сервера без http:// и номера порта" };
     }
     if ((key === "BACKUP_RETENTION_DAYS" || key === "DEMO_RETENTION_DAYS") && !/^\d{1,3}$/.test(value)) {

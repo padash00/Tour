@@ -628,8 +628,16 @@ async function setNote(g: LobbyGame, note: string) {
   if (g.note !== note) await db().from("lobby_games").update({ note }).eq("id", g.id);
 }
 
-/** Явно заданный адрес игрокам важнее сети лобби; иначе LAN использует адрес агента, интернет — UPnP. */
+/**
+ * Адрес игры лобби. Сеть «Интернет» — адрес пересылки через VPS (INTERNET_IP), если задан:
+ * игроки из дома заходят на VPS, тот передаёт их в клуб по туннелю. Иначе явно заданный адрес
+ * игрокам (PLAYER_IP) важнее сети лобби; без него LAN — адрес агента, интернет — UPnP.
+ */
 export async function lobbyAddress(g: LobbyGame, lanIp: string | null, upnpIp: string | null) {
+  if (g.settings.network === "internet") {
+    const internet = ((await getSetting("INTERNET_IP")) ?? "").trim();
+    if (internet) return internet;
+  }
   const configured = ((await getSetting("PLAYER_IP")) ?? "").trim();
   if (configured) return configured;
   return g.settings.network === "lan" ? lanIp || upnpIp : upnpIp || lanIp;
