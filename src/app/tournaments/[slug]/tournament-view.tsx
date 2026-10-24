@@ -42,6 +42,7 @@ import {
   SubsectionTitle,
   TeamLogo,
   CARD_SECTION,
+  cn,
 } from "@/components/ds";
 import { Check } from "lucide-react";
 
@@ -629,15 +630,18 @@ async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<Retur
   const swiss = t.bracket_type === "swiss" || t.bracket_type === "swiss_playoff";
   const groups = hasStage ? await getStandings(t) : [];
   return (
-    <div className="space-y-16">
-      {hasStage &&
-        (swiss ? (
-          <SwissView table={groups[0]?.table ?? []} matches={groups[0]?.matches ?? []} teams={teams} wins={t.swiss_wins} solo={t.format === "1v1"} />
-        ) : (
-          <GroupStageView groups={groups} teams={teams} advance={t.bracket_type === "groups_playoff" ? t.advance_per_group : undefined} solo={t.format === "1v1"} />
-        ))}
+    <div className="space-y-5">
+      {hasStage && (
+        <div className={CARD_SECTION}>
+          {swiss ? (
+            <SwissView table={groups[0]?.table ?? []} matches={groups[0]?.matches ?? []} teams={teams} wins={t.swiss_wins} solo={t.format === "1v1"} />
+          ) : (
+            <GroupStageView groups={groups} teams={teams} advance={t.bracket_type === "groups_playoff" ? t.advance_per_group : undefined} solo={t.format === "1v1"} />
+          )}
+        </div>
+      )}
       {playoff.length > 0 ? (
-        <div>
+        <div className={cn(CARD_SECTION, "overflow-x-auto")}>
           {hasStage && <SectionTitle>Плей-офф</SectionTitle>}
           <BracketView matches={playoff} />
         </div>

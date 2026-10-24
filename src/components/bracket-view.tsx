@@ -231,7 +231,7 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
 
   return (
     <BracketHover>
-      <div className="space-y-10 lg:space-y-14">
+      <div className="space-y-6">
         <div className="space-y-3">
           <div className="flex gap-3 rounded-surface bg-accent-dim px-4 py-3.5 text-[15px] text-fg-2 sm:px-5">
             <Info className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
