@@ -4,7 +4,7 @@ import { isIP } from "node:net";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { SETTINGS, type SettingKey } from "@/lib/settings";
+import { SKIN_PARTS, SETTINGS, type SettingKey } from "@/lib/settings";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
@@ -88,6 +88,19 @@ export async function setServerSkins(_prev: ActionResult, formData: FormData): P
         ? "Скины включатся в течение минуты: свободные серверы перезапустятся. Если идёт матч — после него"
         : "Скины выключатся в течение минуты: свободные серверы перезапустятся. Если идёт матч — после него",
   };
+}
+
+/** Какие виды скинов разрешены (app_settings.SERVER_SKIN_PARTS). Агент применит, когда на серверах нет матчей */
+export async function saveSkinParts(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const parts = Object.fromEntries(SKIN_PARTS.map((p) => [p.key, formData.get(p.key) === "on"]));
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: "SERVER_SKIN_PARTS", value: JSON.stringify(parts), updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.server_skin_parts", undefined, parts);
+  revalidatePath("/admin/settings");
+  return { success: "Сохранено. Применится в течение минуты, свободные серверы перезапустятся; если идёт матч — после него" };
 }
 
 /** Добавить / убрать карту из библиотеки Workshop */

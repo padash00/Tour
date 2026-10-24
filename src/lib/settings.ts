@@ -100,6 +100,29 @@ export async function getDisabledMaps(): Promise<string[]> {
   }
 }
 
+/** Виды скинов F16 — ключи совпадают с флагами WeaponPaints (Additional.<Key>Enabled) в агенте */
+export const SKIN_PARTS = [
+  { key: "skin", label: "Скины оружия", hint: "!skins — раскраски всего оружия" },
+  { key: "knife", label: "Ножи", hint: "!knife — модель ножа" },
+  { key: "glove", label: "Перчатки", hint: "!gloves" },
+  { key: "agent", label: "Агенты", hint: "!agents — модели игроков; влияют на заметность" },
+  { key: "music", label: "Музыка MVP", hint: "!music" },
+  { key: "pins", label: "Значки", hint: "!pins — значок в таблице счёта" },
+] as const;
+export type SkinPart = (typeof SKIN_PARTS)[number]["key"];
+export type SkinParts = Record<SkinPart, boolean>;
+
+/** Разрешённые виды скинов (app_settings.SERVER_SKIN_PARTS, JSON). Нет записи — разрешено всё */
+export async function getSkinParts(): Promise<SkinParts> {
+  const all = Object.fromEntries(SKIN_PARTS.map((p) => [p.key, true])) as SkinParts;
+  const { data } = await db().from("app_settings").select("value").eq("key", "SERVER_SKIN_PARTS").maybeSingle();
+  try {
+    const saved = data?.value ? (JSON.parse(data.value) as Partial<SkinParts>) : {};
+    for (const p of SKIN_PARTS) if (typeof saved[p.key] === "boolean") all[p.key] = saved[p.key]!;
+  } catch {}
+  return all;
+}
+
 /** Скины F16 на игровых серверах (WeaponPaints): app_settings.SERVER_SKINS «1» — включены. Применяет агент */
 export async function isServerSkins(): Promise<boolean> {
   const { data } = await db().from("app_settings").select("value").eq("key", "SERVER_SKINS").maybeSingle();

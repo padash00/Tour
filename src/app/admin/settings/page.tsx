@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
+import { editWorkshopMaps, saveSetting, saveSkinParts, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
 import { formatShortDateTime } from "@/lib/format";
-import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, isServerOpenJoin, isServerSkins, type SettingKey } from "@/lib/settings";
+import { SKIN_PARTS, getDisabledMaps, getMapImages, getSettingsStatus, getSkinParts, getWorkshopMaps, isServerOpenJoin, isServerSkins, type SettingKey } from "@/lib/settings";
 import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -92,7 +92,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin, skins] = await Promise.all([
+  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin, skins, skinParts] = await Promise.all([
     getSettingsStatus(),
     getWorkshopMaps(),
     workshopInfo(),
@@ -101,6 +101,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
     isProfileRequired(),
     isServerOpenJoin(),
     isServerSkins(),
+    getSkinParts(),
   ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
@@ -182,6 +183,24 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
               </p>
             </div>
             <ActionToggle action={setServerSkins} fields={{}} on={skins} label="Скины F16 на серверах" onLabel="Включены" offLabel="Выключены" />
+            <ActionForm action={saveSkinParts} className="w-full border-t border-line-subtle pt-5">
+              <div className="text-[15px] font-bold text-fg">Что разрешено игрокам</div>
+              <p className="mt-0.5 text-[13.5px] text-fg-3">Снимите галочку — этого вида не будет ни в меню игры, ни на игроках.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {SKIN_PARTS.map((p) => (
+                  <label key={p.key} className="flex cursor-pointer items-start gap-3 rounded-control p-3 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] transition-colors hover:bg-surface-2 has-[:checked]:bg-accent-dim has-[:checked]:shadow-none">
+                    <input type="checkbox" name={p.key} defaultChecked={skinParts[p.key]} className="mt-0.5 size-5 accent-[var(--color-accent)]" />
+                    <span>
+                      <span className="block text-[15px] font-semibold text-fg">{p.label}</span>
+                      <span className="block text-[13px] text-fg-3">{p.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-4">
+                <SubmitButton>Сохранить</SubmitButton>
+              </div>
+            </ActionForm>
           </div>
         </Panel>
       )}
