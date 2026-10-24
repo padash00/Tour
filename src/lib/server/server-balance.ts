@@ -12,6 +12,7 @@ import { getServerState, hostBusy } from "./state";
 
 const TOURNAMENT_LEAD_MS = 2 * 60 * 60_000; // игры лобби, начатые раньше, успевают доиграть
 const START_COOLDOWN_MS = 3 * 60_000;
+const FINISHING_MS = 3 * 60_000; // столько после конца матча его сервер считается «освобождается»
 
 /** Турнирное время: идёт или в check-in турнир, либо до начала турнира с открытой регистрацией меньше 2 часов */
 export async function isTournamentTime(now = Date.now()) {
@@ -56,7 +57,18 @@ export async function balanceServersTick() {
     .eq("status", "ready")
     .is("server_instance", null)
     .in("tournament.status", ["checkin", "live"]);
-  const freeRunning = instances.filter((i) => i.running && (i.gamestate ?? "none") === "none" && !byMatch.has(i.name) && !byLobby.has(i.name)).length;
+  // сервер, где матч только что закончился, через ~20 с освободится сам (MatchZy показывает итоги серии) —
+  // под очередь его считаем свободным, иначе запустился бы лишний сервер
+  const { data: justFinished } = await db()
+    .from("matches")
+    .select("server_instance")
+    .eq("status", "finished")
+    .not("server_instance", "is", null)
+    .gte("finished_at", new Date(Date.now() - FINISHING_MS).toISOString());
+  const finishing = new Set((justFinished ?? []).map((r) => r.server_instance));
+  const freeRunning = instances.filter(
+    (i) => i.running && ((i.gamestate ?? "none") === "none" || finishing.has(i.name)) && !byMatch.has(i.name) && !byLobby.has(i.name),
+  ).length;
   // мест в зале меньше, чем серверов, — лишние серверы не поднимаем: автопилот всё равно не отдаст им матч
   const limit = await getMaxParallelMatches();
   const canStart = limit == null ? Infinity : Math.max(0, limit - byMatch.size);

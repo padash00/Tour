@@ -37,6 +37,7 @@ import {
   invalidDemoTeams,
   type DemoTeam,
 } from "./demo-data";
+import { attributeBotStats } from "./demo-bot-stats";
 import { instancePort, rcon } from "./rcon";
 import { pick, rngFrom, ROLES, simulateMap, type Rng, type SimTeam, type TeamKey } from "./demo-sim";
 
@@ -538,9 +539,27 @@ async function playWithBots(ctx: Ctx, m: MatchFull) {
   const started = Date.now();
   let last = "";
   let since = Date.now();
+  let statsAt = 0;
+  const attributed = new Set<number>();
+  // статистика игроков: сыгранные карты — один раз, идущая — раз в минуту
+  const stats = async (cur: MatchFull, all = false) => {
+    for (const x of cur.maps) {
+      const done = x.status === "finished";
+      if (attributed.has(x.map_number) || (!done && !(all || x.status === "live"))) continue;
+      const n = await attributeBotStats(m.id, x.map_number).catch((e) => (ctx.log(`  #${m.number} статистика: ${(e as Error).message}`), 0));
+      if (done) {
+        attributed.add(x.map_number);
+        ctx.log(`  #${m.number} статистика ${mapLabel(x.map_name)}: ${n} игроков`);
+      }
+    }
+  };
   for (;;) {
     const cur = (await getMatch(m.id))!;
     if (["finished", "cancelled"].includes(cur.status)) break;
+    if (Date.now() - statsAt > 60_000 || cur.maps.some((x) => x.status === "finished" && !attributed.has(x.map_number))) {
+      statsAt = Date.now();
+      await stats(cur);
+    }
     if (Date.now() - started > MATCH_LIMIT_MS) throw new Error(`Матч #${m.number}: за 3 часа не закончился`);
     const status = await rcon(port, "get5_status").catch(() => "");
     const state = /"gamestate"\s*:\s*"(\w+)"/.exec(status)?.[1] ?? "нет ответа";
@@ -563,6 +582,7 @@ async function playWithBots(ctx: Ctx, m: MatchFull) {
     await sleep(5000);
   }
   await rcon(port, "bot_quota 0;bot_kick").catch(() => "");
+  await stats((await getMatch(m.id))!);
   const done = (await getMatch(m.id))!;
   for (const x of [...done.maps].sort((a, b) => a.map_number - b.map_number)) {
     if (x.status === "finished") ctx.log(`  #${m.number} ${mapLabel(x.map_name)}: ${done.team1?.name} ${x.team1_score}:${x.team2_score} ${done.team2?.name}`);
