@@ -72,7 +72,12 @@ export async function GET(request: NextRequest) {
       .select("id, status, team1_score, team2_score, server_state")
       .in("status", ["veto", "ready", "live"])
       .order("number");
-    parts = [data];
+    // счёт по раундам идущих карт — его показывают строки матчей
+    const liveIds = (data ?? []).filter((m) => m.status === "live").map((m) => m.id);
+    const maps = liveIds.length
+      ? await db().from("match_maps").select("match_id, map_number, status, team1_score, team2_score").in("match_id", liveIds).order("match_id").order("map_number")
+      : { data: [] };
+    parts = [data, maps.data];
   } else if (k === "servers") {
     const player = await getCurrentPlayer();
     if (!isAdmin(player)) {
