@@ -2,8 +2,9 @@ import { ImageResponse } from "next/og";
 import { getTournamentBySlug } from "@/lib/data";
 import { OG_FONT, ogFonts } from "@/lib/og-font";
 import { getTournamentRecap } from "@/lib/recap";
+import { buildRecapPoster } from "@/lib/recap-poster";
 
-/** Превью итогов для соцсетей: турнир, чемпион, 2–3 место, MVP */
+/** Превью итогов для соцсетей: тот же плакат, что и «Итоги» картинкой (широкий формат) */
 export const alt = "Итоги турнира F16 Arena";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -11,12 +12,14 @@ export const contentType = "image/png";
 export default async function RecapOgImage(props: { params: Promise<{ slug: string }> }) {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
-  // Onest с кириллицей (Google Fonts теперь отдаёт woff — старый поиск TTF находил пустоту)
+  // Inter Tight с кириллицей (см. og-font)
   const fonts = await ogFonts();
   const recap = t && t.status === "finished" ? await getTournamentRecap(t) : null;
-  const champ = recap?.placements.find((p) => p.place === "1");
-  const others = recap?.placements.filter((p) => p.place !== "1" && p.place !== "4").slice(0, 3) ?? [];
-  const mvp = recap?.mvp;
+
+  if (t && recap?.placements.some((p) => p.place === "1")) {
+    const poster = await buildRecapPoster(t, recap, "wide", 1, fonts);
+    return new ImageResponse(poster.node, { ...size, ...(fonts.length ? { fonts } : {}) });
+  }
 
   return new ImageResponse(
     (
@@ -26,42 +29,16 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
           height: "100%",
           display: "flex",
           flexDirection: "column",
+          justifyContent: "center",
           padding: "64px 80px",
-          background: "#f3f4f6", borderTop: "14px solid #5f9a00",
-          color: "#121417",
+          background: "#0b0d10",
+          color: "#ffffff",
           ...(fonts.length ? { fontFamily: OG_FONT } : {}),
         }}
       >
-        <div style={{ display: "flex", fontSize: 22, letterSpacing: 8, color: "#5f9a00" }}>F16 ARENA · {fonts.length ? "ИТОГИ" : "RESULTS"}</div>
+        <div style={{ display: "flex", fontSize: 22, letterSpacing: 8, color: "#c6f432" }}>F16 ARENA</div>
         <div style={{ display: "flex", marginTop: 18, fontSize: 64, fontWeight: 700, lineHeight: 1.05 }}>{t?.name ?? "F16 Arena"}</div>
-        {champ ? (
-          <div style={{ display: "flex", flexDirection: "column", marginTop: 48 }}>
-            <div style={{ display: "flex", fontSize: 24, color: "#b8860b" }}>{fonts.length ? "Чемпион" : "Champion"}</div>
-            <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
-              {champ.team.logo_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={champ.team.logo_url} alt="" width={96} height={96} style={{ borderRadius: 16, marginRight: 28, objectFit: "contain" }} />
-              )}
-              <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>{champ.team.name}</div>
-            </div>
-            <div style={{ display: "flex", marginTop: 40, gap: 48, fontSize: 26, color: "#454b55" }}>
-              {others.map((p) => (
-                <div key={p.team.id} style={{ display: "flex" }}>
-                  <span style={{ color: "#b0612a", marginRight: 12 }}>{p.place}</span>
-                  {p.team.name}
-                </div>
-              ))}
-              {mvp && (
-                <div style={{ display: "flex" }}>
-                  <span style={{ color: "#5f9a00", marginRight: 12 }}>MVP</span>
-                  {mvp.player?.nickname ?? mvp.name}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", marginTop: 48, fontSize: 32, color: "#454b55" }}>{fonts.length ? "Итоги появятся после финала" : "Results after the final"}</div>
-        )}
+        <div style={{ display: "flex", marginTop: 40, fontSize: 32, color: "#8a8f98" }}>Итоги появятся после финала</div>
       </div>
     ),
     { ...size, ...(fonts.length ? { fonts } : {}) },

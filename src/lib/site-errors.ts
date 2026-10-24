@@ -14,7 +14,13 @@ export type SiteError = {
 /** Одна и та же ошибка на одном адресе пишется не чаще раза в минуту — журнал не засоряется */
 const recent = new Map<string, number>();
 
+/** Не ошибки сайта: зритель закрыл или обновил страницу, пока она ещё отдавалась */
+const CLIENT_GONE = /destination stream closed early|ECONNRESET/i;
+
 export async function logSiteError(e: SiteError) {
+  // локальный сервер разработчика смотрит в ту же базу — его ошибки в боевой журнал не пишем
+  if (process.env.NODE_ENV === "development") return;
+  if (e.source === "server" && CLIENT_GONE.test(e.message)) return;
   const key = `${e.source}:${e.path}:${e.digest ?? e.message.slice(0, 80)}`;
   const now = Date.now();
   if ((recent.get(key) ?? 0) > now - 60_000) return;
