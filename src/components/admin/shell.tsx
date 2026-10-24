@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, Gauge, LayoutGrid, MonitorPlay, ScrollText, Search, Server, Settings, Shield, Swords, Trophy, User, type LucideIcon } from "lucide-react";
+import { Activity, ArrowLeft, Radio, Gauge, LayoutGrid, MonitorPlay, ScrollText, Search, Server, Settings, Shield, Swords, Trophy, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
 
 
@@ -14,6 +14,7 @@ import { cn } from "@/components/ui";
 
 const ICONS: Record<string, LucideIcon> = {
   overview: LayoutGrid,
+  online: Radio,
   tournaments: Trophy,
   matches: Swords,
   board: MonitorPlay,
@@ -28,6 +29,7 @@ export const ADMIN_SECTIONS = [
   { href: "/admin", label: "Главная пульта", short: "Главная", icon: "overview", hint: "что происходит сейчас", group: "Сейчас идёт", exact: true },
   { href: "/admin/matches", label: "Матчи", short: "Матчи", icon: "matches", hint: "счёт, вето, серверы", group: "Сейчас идёт" },
   { href: "/admin/servers", label: "Серверы", short: "Серверы", icon: "servers", hint: "включить, перезапустить", group: "Сейчас идёт" },
+  { href: "/admin/online", label: "Кто на сайте", short: "Онлайн", icon: "online", hint: "игроки онлайн и где они", group: "Сейчас идёт" },
   { href: "/admin/board", label: "Табло турнира", short: "Табло", icon: "board", hint: "для экрана в клубе", group: "Сейчас идёт" },
   { href: "/admin/tournaments", label: "Турниры", short: "Турниры", icon: "tournaments", hint: "создать, заявки, сетка", group: "Подготовка" },
   { href: "/admin/teams", label: "Команды", short: "Команды", icon: "teams", hint: "составы и капитаны", group: "Подготовка" },
@@ -145,6 +147,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   tournaments: "Турниры",
   matches: "Матчи",
   board: "Табло",
+  online: "Кто на сайте",
   servers: "Серверы",
   teams: "Команды",
   players: "Игроки",

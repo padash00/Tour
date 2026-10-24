@@ -32,9 +32,23 @@ function emit(next: State) {
 
 type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number }; profileIncomplete?: boolean };
 
+/** Случайный id вкладки — чтобы пульт считал гостей «на сайте»; никаких личных данных */
+function visitorId() {
+  try {
+    let id = sessionStorage.getItem("f16-visitor");
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem("f16-visitor", id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
 export function refreshViewer() {
   if (inflight) return inflight;
-  inflight = fetch("/api/me", { cache: "no-store", credentials: "same-origin" })
+  inflight = fetch(`/api/me?p=${encodeURIComponent(location.pathname)}`, { cache: "no-store", credentials: "same-origin", headers: { "x-visitor": visitorId() } })
     .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : { player: null, unread: 0 }))
     .then((d: MeResponse) =>
       emit({
@@ -72,18 +86,19 @@ export function ViewerSync() {
   useEffect(() => {
     refreshViewer();
   }, [pathname]);
-  // вошедшему игроку: есть срочное действие — раз в 5 с (ход в вето, проверка готовности), иначе раз в 15 с
+  // вошедшему игроку: есть срочное действие — раз в 5 с (ход в вето, проверка готовности), иначе раз в 15 с;
+  // гостю — раз в минуту, только чтобы пульт видел, что на сайте кто-то есть
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     const loop = () => {
-      const ms = state.activity && state.activity.priority <= 3 ? 5_000 : 15_000;
+      const ms = !state.player ? 60_000 : state.activity && state.activity.priority <= 3 ? 5_000 : 15_000;
       timer = setTimeout(async () => {
-        if (state.player && document.visibilityState === "visible") await refreshViewer();
+        if (document.visibilityState === "visible") await refreshViewer();
         loop();
       }, ms);
     };
     loop();
-    const onVisible = () => document.visibilityState === "visible" && state.player && refreshViewer();
+    const onVisible = () => document.visibilityState === "visible" && refreshViewer();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearTimeout(timer);

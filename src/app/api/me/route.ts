@@ -4,13 +4,16 @@ import { getUnreadCount } from "@/lib/data";
 import { getPlayerActivity } from "@/lib/activity";
 import { isProfileComplete } from "@/lib/profile";
 import { getProfile } from "@/lib/profiles";
+import { touchPresence } from "@/lib/presence";
 
 /**
  * Кто смотрит страницу. Публичные страницы отдаются из кэша CDN одинаковыми для всех,
  * а персональные детали (шапка, глобальная активность, кнопки участия) клиент подтягивает отсюда.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const player = await getCurrentPlayer();
+  // «кто на сайте» для пульта: игрок или гость (случайный id вкладки) и страница, где он сейчас
+  touchPresence({ playerId: player?.id ?? null, visitor: req.headers.get("x-visitor"), path: new URL(req.url).searchParams.get("p") });
   const body = player
     ? {
         player: {
