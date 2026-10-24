@@ -5,10 +5,11 @@ import { useViewer } from "./viewer";
 
 /**
  * Кнопки скачивания картинки для соцсетей: пост Instagram, сторис, широкая — только администратору.
+ * maps — сыгранные карты матча: для каждой ещё «Статистика карты» (составы и история раундов).
  * Страницы отдаются из кэша одинаковыми для всех, поэтому прав проверяем на клиенте; сами картинки
  * без прав админа сервер тоже не отдаёт.
  */
-export function SocialDownloads({ base, title, text }: { base: string; title: string; text: string }) {
+export function SocialDownloads({ base, title, text, maps = [] }: { base: string; title: string; text: string; maps?: { n: number; label: string }[] }) {
   const { player } = useViewer();
   if (!player?.isAdmin) return null;
   const items = [
@@ -36,6 +37,16 @@ export function SocialDownloads({ base, title, text }: { base: string; title: st
           </a>
         ))}
       </div>
+      {maps.length > 0 && (
+        <div className="flex w-full flex-wrap items-center gap-2 border-t border-line-subtle pt-4">
+          <span className="mr-2 text-[13px] text-fg-3">Статистика карты</span>
+          {maps.map((m) => (
+            <a key={m.n} href={`${base}?f=stats&map=${m.n}&download=1`} className={btnClass("secondary", "md")} download title="Скачать 2400 px по ширине">
+              {m.label}
+            </a>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }

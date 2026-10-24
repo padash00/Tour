@@ -7,8 +7,12 @@ import "server-only";
  * Если сеть недоступна — пустой список: вызывающий код рисует без своего шрифта.
  */
 const BASE = "https://cdn.jsdelivr.net/fontsource/fonts/inter-tight@latest";
-/** имя семейства для fontFamily в картинках */
-export const OG_FONT = "Inter Tight";
+const NAME = "Inter Tight";
+/**
+ * fontFamily для картинок. Кириллица — отдельным семейством: с одним именем на два файла одного веса
+ * satori брал недостающие глифы из кириллицы 400, и жирный русский текст выходил обычным.
+ */
+export const OG_FONT = `"${NAME}", "${NAME} Cyrillic"`;
 
 export type OgFont = { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" };
 
@@ -16,7 +20,7 @@ async function file(subset: "latin" | "cyrillic", weight: 400 | 700): Promise<Og
   try {
     const res = await fetch(`${BASE}/${subset}-${weight}-normal.woff`, { next: { revalidate: 86400 } });
     if (!res.ok) return null;
-    return { name: OG_FONT, data: await res.arrayBuffer(), weight, style: "normal" };
+    return { name: subset === "latin" ? NAME : `${NAME} Cyrillic`, data: await res.arrayBuffer(), weight, style: "normal" };
   } catch {
     return null;
   }

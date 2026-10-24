@@ -162,7 +162,15 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
       )}
       {m.status === "finished" && m.team1 && m.team2 && (
         <div className="mt-5">
-          <SocialDownloads base={`/matches/${m.id}/image`} title="Картинка матча" text="Счёт, карты и MVP — для поста, сторис или превью ссылки." />
+          <SocialDownloads
+            base={`/matches/${m.id}/image`}
+            title="Картинка матча"
+            text="Счёт, карты и MVP — для поста, сторис или превью ссылки."
+            maps={m.maps
+              .filter((x) => x.status === "finished")
+              .sort((a, b) => a.map_number - b.map_number)
+              .map((x) => ({ n: x.map_number, label: mapName(x.map_name) }))}
+          />
         </div>
       )}
     </Section>
