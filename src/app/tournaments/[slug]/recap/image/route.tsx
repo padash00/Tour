@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { getTournamentBySlug } from "@/lib/data";
 import { formatDate, plural } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
-import { ogFonts } from "@/lib/og-font";
+import { OG_FONT, ogFonts } from "@/lib/og-font";
 import { OG_FORMATS, ogAccess, ogFormat } from "@/lib/og-image";
 import { getTournamentRecap, type Placement, type StatLeader } from "@/lib/recap";
 
@@ -16,10 +16,10 @@ import { getTournamentRecap, type Placement, type StatLeader } from "@/lib/recap
  * Только для завершённого турнира, иначе 404.
  */
 
-const GOLD = "#e8c27a";
-const SILVER = "#c9d3e0";
-const BRONZE = "#d39a6a";
-const ACCENT = "#8ab8ff";
+const GOLD = "#5f9a00"; // победа и MVP — зелёный F16
+const SILVER = "#454b55";
+const BRONZE = "#b0612a";
+const ACCENT = "#5f9a00";
 const MEDAL: Record<string, string> = { "1": GOLD, "2": SILVER, "3": BRONZE, "3–4": BRONZE };
 
 /** картинка участника: аватар игрока (1×1) или логотип команды; без картинки — инициалы */
@@ -40,8 +40,8 @@ function Pic({ p, size }: { p: Placement; size: number }) {
             borderRadius: size,
             alignItems: "center",
             justifyContent: "center",
-            background: "#16223a",
-            color: "#c9d3e0",
+            background: "#eef0f3",
+            color: "#454b55",
             fontSize: size * 0.34,
             fontWeight: 700,
           }}
@@ -79,7 +79,7 @@ function Podium({ p, size, name, big }: { p: Placement; size: number; name: numb
       >
         {p.team.name}
       </div>
-      <div style={{ display: "flex", marginTop: 10, fontSize: 20, color: "#8a97ab" }}>
+      <div style={{ display: "flex", marginTop: 10, fontSize: 20, color: "#6b727d" }}>
         {`серии ${p.record.wins}–${p.record.losses} · карты ${p.record.mapWins}–${p.record.mapLosses}`}
       </div>
     </div>
@@ -95,15 +95,15 @@ function StatTile({ l }: { l: StatLeader }) {
         flex: 1,
         padding: "24px 26px",
         borderRadius: 20,
-        background: "rgba(14,24,40,0.85)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "#ffffff",
+        border: "1px solid #e6e8ec",
       }}
     >
-      <div style={{ display: "flex", fontSize: 19, color: "#8a97ab" }}>{l.label}</div>
+      <div style={{ display: "flex", fontSize: 19, color: "#6b727d" }}>{l.label}</div>
       <div style={{ display: "flex", marginTop: 8, fontSize: 46, fontWeight: 700 }}>{l.value}</div>
       <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
         {l.player?.avatar_url && <img src={l.player.avatar_url} alt="" width={30} height={30} style={{ borderRadius: 30, marginRight: 10 }} />}
-        <div style={{ display: "flex", fontSize: 21, color: "#d6deea" }}>{l.name}</div>
+        <div style={{ display: "flex", fontSize: 21, color: "#121417" }}>{l.name}</div>
       </div>
     </div>
   );
@@ -128,18 +128,18 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
   const wide = fmt === "wide";
   const story = fmt === "story";
   const size = OG_FORMATS[fmt];
-  const logo = new URL("/brand/f16-arena-horizontal.svg", req.nextUrl.origin).toString();
+  const logo = new URL("/brand/f16-arena-light.svg", req.nextUrl.origin).toString();
   const meta = [t.starts_at ? formatDate(t.starts_at) : null, modeOf(t.format).title, t.location].filter(Boolean).join(" · ");
 
   const header = (
     <div style={{ display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         {/* логотип 2228×842 — satori нужна и ширина, и высота */}
-        <img src={logo} alt="" width={Math.round((wide ? 44 : 56) * 2.646)} height={wide ? 44 : 56} />
-        <div style={{ display: "flex", fontSize: wide ? 18 : 22, letterSpacing: 6, color: "#7f93b0" }}>ИТОГИ ТУРНИРА</div>
+        <img src={logo} alt="" width={Math.round((wide ? 44 : 56) * 4.337)} height={wide ? 44 : 56} />
+        <div style={{ display: "flex", fontSize: wide ? 18 : 22, letterSpacing: 6, color: "#5f9a00" }}>ИТОГИ ТУРНИРА</div>
       </div>
       <div style={{ display: "flex", marginTop: wide ? 18 : 40, fontSize: wide ? 48 : 68, fontWeight: 700, lineHeight: 1.05 }}>{t.name}</div>
-      {meta && <div style={{ display: "flex", marginTop: 10, fontSize: wide ? 20 : 26, color: "#8a97ab" }}>{meta}</div>}
+      {meta && <div style={{ display: "flex", marginTop: 10, fontSize: wide ? 20 : 26, color: "#6b727d" }}>{meta}</div>}
     </div>
   );
 
@@ -165,8 +165,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
             marginTop: story ? 110 : 64,
             padding: "28px 34px",
             borderRadius: 24,
-            background: "linear-gradient(90deg, rgba(138,184,255,0.14), rgba(138,184,255,0.03))",
-            border: "1px solid rgba(138,184,255,0.3)",
+            background: "linear-gradient(90deg, #edf7d8, #ffffff)",
+            border: "1px solid #5f9a00",
           }}
         >
           {mvp.player?.avatar_url && <img src={mvp.player.avatar_url} alt="" width={96} height={96} style={{ borderRadius: 96, marginRight: 28 }} />}
@@ -182,7 +182,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
             ].map((x) => (
               <div key={x.l} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", fontSize: 38, fontWeight: 700 }}>{x.v}</div>
-                <div style={{ display: "flex", fontSize: 18, color: "#8a97ab" }}>{x.l}</div>
+                <div style={{ display: "flex", fontSize: 18, color: "#6b727d" }}>{x.l}</div>
               </div>
             ))}
           </div>
@@ -213,17 +213,17 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/tournaments/[slu
           flexDirection: "column",
           justifyContent: "space-between",
           padding: wide ? "48px 64px" : story ? "130px 72px 100px" : "72px 72px 56px",
-          background: `radial-gradient(1000px 700px at 50% ${wide ? "100%" : "34%"}, #2a2a2c 0%, #121a28 38%, #070b12 75%)`,
-          color: "#f4f7fb",
+          background: "#f3f4f6", borderTop: "14px solid #5f9a00",
+          color: "#121417",
           // undefined в стиле satori не принимает — ключ только когда шрифт загрузился
-          ...(fonts.length ? { fontFamily: "Onest" } : {}),
+          ...(fonts.length ? { fontFamily: OG_FONT } : {}),
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", ...(story ? { flex: 1 } : {}) }}>
           {header}
           {body}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: wide ? 16 : 20, color: "#5d6b80" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: wide ? 16 : 20, color: "#9aa0a9" }}>
           <span>
             {[
               `${recap.totals.matches} ${plural(recap.totals.matches, "матч", "матча", "матчей")}`,

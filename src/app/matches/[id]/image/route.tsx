@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { roundTitle } from "@/lib/bracket";
 import { formatDate, mapName } from "@/lib/format";
 import { getMatch, getMatchRosters } from "@/lib/matches";
-import { ogFonts } from "@/lib/og-font";
+import { OG_FONT, ogFonts } from "@/lib/og-font";
 import { OG_FORMATS, ogAccess, ogFormat, ogImage } from "@/lib/og-image";
 import { getMapImages } from "@/lib/settings";
 import { aggregatePlayers, getStatRows, type PlayerAgg } from "@/lib/stats";
@@ -18,15 +18,15 @@ import { db } from "@/lib/supabase";
  *   &download=1 — отдать файлом. Только сыгранный матч, иначе 404.
  */
 
-const GOLD = "#e8c27a";
-const ACCENT = "#8ab8ff";
-const MUTED = "#8a97ab";
+const GOLD = "#5f9a00"; // победа и MVP — зелёный F16
+const ACCENT = "#5f9a00";
+const MUTED = "#6b727d";
 
 type Side = { id: string | null; name: string; pic: string | null; tag: string };
 
 function Pic({ s, size, win }: { s: Side; size: number; win: boolean }) {
   return (
-    <div style={{ display: "flex", padding: 5, borderRadius: size, background: win ? `${GOLD}88` : "rgba(255,255,255,0.12)" }}>
+    <div style={{ display: "flex", padding: 5, borderRadius: size, background: win ? "#5f9a00" : "#e3e5e9" }}>
       {s.pic ? (
         <img src={s.pic} alt="" width={size} height={size} style={{ borderRadius: size, objectFit: "cover" }} />
       ) : (
@@ -38,8 +38,8 @@ function Pic({ s, size, win }: { s: Side; size: number; win: boolean }) {
             borderRadius: size,
             alignItems: "center",
             justifyContent: "center",
-            background: "#16223a",
-            color: "#c9d3e0",
+            background: "#eef0f3",
+            color: "#454b55",
             fontSize: size * 0.32,
             fontWeight: 700,
           }}
@@ -112,15 +112,15 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         ? `Швейцарка · раунд ${m.round}`
         : roundTitle(m.bracket, m.round, totalUpper, totalLower);
   const meta = [stage, `BO${m.best_of}`, m.finished_at ? formatDate(m.finished_at) : null].filter(Boolean).join(" · ");
-  const logo = new URL("/brand/f16-arena-horizontal.svg", req.nextUrl.origin).toString();
+  const logo = new URL("/brand/f16-arena-light.svg", req.nextUrl.origin).toString();
   const pick = (teamId: string | null) => (teamId === m.team1_id ? m.team1!.tag : teamId === m.team2_id ? m.team2!.tag : null);
 
   // ── блоки
   const header = (
     <div style={{ display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <img src={logo} alt="" width={Math.round((wide ? 40 : 56) * 2.646)} height={wide ? 40 : 56} />
-        <div style={{ display: "flex", fontSize: wide ? 16 : 22, letterSpacing: 6, color: "#7f93b0" }}>ИТОГ МАТЧА</div>
+        <img src={logo} alt="" width={Math.round((wide ? 40 : 56) * 4.337)} height={wide ? 40 : 56} />
+        <div style={{ display: "flex", fontSize: wide ? 16 : 22, letterSpacing: 6, color: "#5f9a00" }}>ИТОГ МАТЧА</div>
       </div>
       <div style={{ display: "flex", marginTop: wide ? 10 : story ? 56 : 30, fontSize: wide ? 26 : story ? 52 : 40, fontWeight: 700, lineHeight: 1.1 }}>
         {m.tournament.name}
@@ -145,12 +145,12 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
           textAlign: "center",
           width: wide ? 230 : 330,
           wordBreak: "break-all",
-          color: win ? "#ffffff" : "#aab5c6",
+          color: win ? "#121417" : "#6b727d",
         }}
       >
         {s.name}
       </div>
-      <div style={{ display: "flex", marginTop: 8, fontSize: wide ? 16 : 22, letterSpacing: 4, color: win ? GOLD : "#5d6b80", fontWeight: 700 }}>
+      <div style={{ display: "flex", marginTop: 8, fontSize: wide ? 16 : 22, letterSpacing: 4, color: win ? GOLD : "#9aa0a9", fontWeight: 700 }}>
         {win ? "ПОБЕДА" : " "}
       </div>
     </div>
@@ -159,9 +159,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: wide ? 8 : story ? (dense ? 70 : 110) : dense ? 30 : 56 }}>
       {sideBlock(t1, w1)}
       <div style={{ display: "flex", alignItems: "center", fontSize: scoreSize, fontWeight: 700, lineHeight: 1, letterSpacing: -4 }}>
-        <span style={{ color: w1 ? "#ffffff" : "#6b788c" }}>{m.team1_score}</span>
-        <span style={{ color: "#3c4a5e", margin: "0 18px", fontSize: scoreSize * 0.7 }}>:</span>
-        <span style={{ color: w1 ? "#6b788c" : "#ffffff" }}>{m.team2_score}</span>
+        <span style={{ color: w1 ? "#121417" : "#a3a8b0" }}>{m.team1_score}</span>
+        <span style={{ color: "#c6cad1", margin: "0 18px", fontSize: scoreSize * 0.7 }}>:</span>
+        <span style={{ color: w1 ? "#a3a8b0" : "#121417" }}>{m.team2_score}</span>
       </div>
       {sideBlock(t2, !w1)}
     </div>
@@ -181,25 +181,25 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
               height: mapH,
               borderRadius: 20,
               overflow: "hidden",
-              border: "1px solid rgba(255,255,255,0.10)",
-              backgroundColor: "#141c2a",
+              border: "1px solid #e3e5e9",
+              backgroundColor: "#ffffff",
               backgroundImage: covers[i]
-                ? `linear-gradient(90deg, rgba(7,11,18,0.92) 0%, rgba(7,11,18,0.62) 55%, rgba(7,11,18,0.85) 100%), url(${covers[i]})`
-                : "linear-gradient(90deg, #1a2333, #0e1520)",
+                ? `linear-gradient(90deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.86) 45%, rgba(255,255,255,0.35) 100%), url(${covers[i]})`
+                : "#121417",
               backgroundSize: "100% 100%",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: wide ? "0 22px" : "0 34px" }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", fontSize: wide ? 13 : story ? 22 : 18, color: "#9fb0c8", letterSpacing: 2 }}>
+                <div style={{ display: "flex", fontSize: wide ? 13 : story ? 22 : 18, color: "#6b727d", letterSpacing: 2 }}>
                   {`КАРТА ${x.map_number}${by ? ` · ПИК ${by}` : " · DECIDER"}`}
                 </div>
                 <div style={{ display: "flex", marginTop: 4, fontSize: wide ? 26 : story ? 50 : 40, fontWeight: 700 }}>{mapName(x.map_name)}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", fontSize: wide ? 34 : story ? 64 : 52, fontWeight: 700 }}>
-                <span style={{ color: win1 ? "#ffffff" : "#6b788c" }}>{x.team1_score}</span>
-                <span style={{ color: "#4a576b", margin: "0 10px" }}>:</span>
-                <span style={{ color: win1 ? "#6b788c" : "#ffffff" }}>{x.team2_score}</span>
+                <span style={{ color: win1 ? "#121417" : "#a3a8b0" }}>{x.team1_score}</span>
+                <span style={{ color: "#c6cad1", margin: "0 10px" }}>:</span>
+                <span style={{ color: win1 ? "#a3a8b0" : "#121417" }}>{x.team2_score}</span>
               </div>
             </div>
           </div>
@@ -223,8 +223,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         padding: story ? "36px 40px" : "24px 30px",
         flexWrap: story ? "wrap" : "nowrap",
         borderRadius: 24,
-        background: "linear-gradient(90deg, rgba(138,184,255,0.16), rgba(138,184,255,0.03))",
-        border: "1px solid rgba(138,184,255,0.3)",
+        background: "#edf7d8",
+        border: "1px solid #5f9a00",
       }}
     >
       {mvpPic && <img src={mvpPic} alt="" width={story ? 104 : 84} height={story ? 104 : 84} style={{ borderRadius: 104, marginRight: 24 }} />}
@@ -236,7 +236,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         style={{
           display: "flex",
           gap: story ? 0 : 28,
-          ...(story ? { width: "100%", justifyContent: "space-between", marginTop: 28, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)" } : {}),
+          ...(story ? { width: "100%", justifyContent: "space-between", marginTop: 28, paddingTop: 24, borderTop: "1px solid #e6e8ec" } : {}),
         }}
       >
         {stat("Rating", mvp.rating.toFixed(2))}
@@ -262,19 +262,19 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
     const pm = p.kills - p.deaths;
     switch (key) {
       case "kd":
-        return { v: `${p.kills}–${p.deaths}`, c: "#e8eef7" };
+        return { v: `${p.kills}–${p.deaths}`, c: "#121417" };
       case "pm":
-        return { v: pm > 0 ? `+${pm}` : String(pm), c: pm > 0 ? "#7ee2a8" : pm < 0 ? "#ff8b8b" : MUTED };
+        return { v: pm > 0 ? `+${pm}` : String(pm), c: pm > 0 ? "#4f8a00" : pm < 0 ? "#d92038" : MUTED };
       case "adr":
-        return { v: p.adr.toFixed(0), c: "#e8eef7" };
+        return { v: p.adr.toFixed(0), c: "#121417" };
       case "kast":
-        return { v: `${Math.round(p.kast)}%`, c: "#e8eef7" };
+        return { v: `${Math.round(p.kast)}%`, c: "#121417" };
       case "swing":
         return p.swing == null
           ? { v: "—", c: MUTED }
-          : { v: `${p.swing > 0 ? "+" : ""}${p.swing.toFixed(1)}%`, c: p.swing >= 1 ? "#7ee2a8" : p.swing <= -1 ? "#ff8b8b" : "#c9d3e0" };
+          : { v: `${p.swing > 0 ? "+" : ""}${p.swing.toFixed(1)}%`, c: p.swing >= 1 ? "#4f8a00" : p.swing <= -1 ? "#d92038" : "#454b55" };
       default:
-        return { v: p.rating.toFixed(2), c: p.rating >= 1.1 ? "#7ee2a8" : p.rating < 0.9 ? "#ff8b8b" : "#ffffff" };
+        return { v: p.rating.toFixed(2), c: p.rating >= 1.1 ? "#4f8a00" : p.rating < 0.9 ? "#d92038" : "#121417" };
     }
   };
   const teamTable = (teamId: string | null, name: string, win: boolean) => {
@@ -290,10 +290,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
             fontSize: fs * 0.82,
             color: MUTED,
             letterSpacing: 1,
-            borderBottom: "1px solid rgba(255,255,255,0.10)",
+            borderBottom: "1px solid #e3e5e9",
           }}
         >
-          <div style={{ display: "flex", flex: 1, minWidth: 0, color: win ? GOLD : "#aab5c6", fontWeight: 700, letterSpacing: 0 }}>{solo ? "Игрок" : name}</div>
+          <div style={{ display: "flex", flex: 1, minWidth: 0, color: win ? GOLD : "#6b727d", fontWeight: 700, letterSpacing: 0 }}>{solo ? "Игрок" : name}</div>
           {cols.map((c) => (
             <div key={c.key} style={{ display: "flex", width: c.w, justifyContent: "flex-end" }}>
               {c.label}
@@ -303,7 +303,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         {list.map((p) => (
           <div
             key={p.steam_id}
-            style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs, borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+            style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs, borderBottom: "1px solid #eef0f3" }}
           >
             <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0, fontWeight: 700, overflow: "hidden", whiteSpace: "nowrap" }}>
               {mvp?.steam_id === p.steam_id && (
@@ -311,7 +311,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
                   style={{
                     display: "flex",
                     fontSize: fs * 0.6,
-                    color: "#1a1206",
+                    color: "#ffffff",
                     background: GOLD,
                     borderRadius: 6,
                     padding: "2px 6px",
@@ -347,8 +347,8 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         marginTop: wide ? 14 : story ? 60 : dense ? 22 : 52,
         padding: wide ? "10px 18px" : story ? "22px 30px" : "18px 26px",
         borderRadius: 20,
-        background: "rgba(14,24,40,0.80)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "#ffffff",
+        border: "1px solid #e6e8ec",
       }}
     >
       {solo
@@ -362,7 +362,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
   function teamTableFor(list: PlayerAgg[]) {
     return (
       <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-        <div style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs * 0.82, color: MUTED, letterSpacing: 1, borderBottom: "1px solid rgba(255,255,255,0.10)" }}>
+        <div style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs * 0.82, color: MUTED, letterSpacing: 1, borderBottom: "1px solid #e3e5e9" }}>
           <div style={{ display: "flex", flex: 1 }}>Игрок</div>
           {cols.map((c) => (
             <div key={c.key} style={{ display: "flex", width: c.w, justifyContent: "flex-end" }}>
@@ -373,10 +373,10 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
         {list.map((p) => {
           const winner = p.team_id === m!.winner_id;
           return (
-            <div key={p.steam_id} style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-              <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0, fontWeight: 700, color: winner ? "#ffffff" : "#aab5c6" }}>
+            <div key={p.steam_id} style={{ display: "flex", alignItems: "center", height: rowH, fontSize: fs, borderBottom: "1px solid #eef0f3" }}>
+              <div style={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0, fontWeight: 700, color: winner ? "#121417" : "#6b727d" }}>
                 {mvp?.steam_id === p.steam_id && (
-                  <div style={{ display: "flex", fontSize: fs * 0.6, color: "#1a1206", background: GOLD, borderRadius: 6, padding: "2px 6px", marginRight: 8 }}>MVP</div>
+                  <div style={{ display: "flex", fontSize: fs * 0.6, color: "#ffffff", background: GOLD, borderRadius: 6, padding: "2px 6px", marginRight: 8 }}>MVP</div>
                 )}
                 {p.name.length > (wide ? 22 : 24) ? `${p.name.slice(0, wide ? 21 : 23)}…` : p.name}
               </div>
@@ -396,7 +396,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
   }
 
   const footer = (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: wide ? 15 : 22, color: "#5d6b80" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: wide ? 15 : 22, color: "#9aa0a9" }}>
       <span>{`Матч #${m.number}`}</span>
       <span>tournament.f16-arena.kz</span>
     </div>
@@ -432,13 +432,13 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
             flexDirection: "column",
             justifyContent: "space-between",
             padding: wide ? "40px 56px" : story ? "120px 72px 90px" : "72px 72px 56px",
-            background: `radial-gradient(1000px 800px at 50% ${wide ? "40%" : "26%"}, #2a2a2c 0%, #121a28 38%, #070b12 75%)`,
-            color: "#f4f7fb",
+            background: "#f3f4f6", borderTop: "14px solid #5f9a00",
+            color: "#121417",
             // satori масштабирует от центра: сдвигаем блок, чтобы после увеличения он ровно лёг на холст
             ...(scale !== 1
               ? { position: "absolute", left: (size.width * (scale - 1)) / 2, top: (size.height * (scale - 1)) / 2, transform: `scale(${scale})` }
               : {}),
-            ...(fonts.length ? { fontFamily: "Onest" } : {}),
+            ...(fonts.length ? { fontFamily: OG_FONT } : {}),
           }}
         >
           {body}

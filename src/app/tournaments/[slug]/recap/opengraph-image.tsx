@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getTournamentBySlug } from "@/lib/data";
-import { ogFonts } from "@/lib/og-font";
+import { OG_FONT, ogFonts } from "@/lib/og-font";
 import { getTournamentRecap } from "@/lib/recap";
 
 /** Превью итогов для соцсетей: турнир, чемпион, 2–3 место, MVP */
@@ -27,16 +27,16 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
           display: "flex",
           flexDirection: "column",
           padding: "64px 80px",
-          background: "radial-gradient(900px 520px at 85% 0%, #1b2c4a 0%, #070b12 70%)",
-          color: "#f4f7fb",
-          ...(fonts.length ? { fontFamily: "Onest" } : {}),
+          background: "#f3f4f6", borderTop: "14px solid #5f9a00",
+          color: "#121417",
+          ...(fonts.length ? { fontFamily: OG_FONT } : {}),
         }}
       >
-        <div style={{ display: "flex", fontSize: 22, letterSpacing: 8, color: "#7f93b0" }}>F16 ARENA · {fonts.length ? "ИТОГИ" : "RESULTS"}</div>
+        <div style={{ display: "flex", fontSize: 22, letterSpacing: 8, color: "#5f9a00" }}>F16 ARENA · {fonts.length ? "ИТОГИ" : "RESULTS"}</div>
         <div style={{ display: "flex", marginTop: 18, fontSize: 64, fontWeight: 700, lineHeight: 1.05 }}>{t?.name ?? "F16 Arena"}</div>
         {champ ? (
           <div style={{ display: "flex", flexDirection: "column", marginTop: 48 }}>
-            <div style={{ display: "flex", fontSize: 24, color: "#e8c27a" }}>{fonts.length ? "Чемпион" : "Champion"}</div>
+            <div style={{ display: "flex", fontSize: 24, color: "#b8860b" }}>{fonts.length ? "Чемпион" : "Champion"}</div>
             <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
               {champ.team.logo_url && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -44,23 +44,23 @@ export default async function RecapOgImage(props: { params: Promise<{ slug: stri
               )}
               <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>{champ.team.name}</div>
             </div>
-            <div style={{ display: "flex", marginTop: 40, gap: 48, fontSize: 26, color: "#a8b2c2" }}>
+            <div style={{ display: "flex", marginTop: 40, gap: 48, fontSize: 26, color: "#454b55" }}>
               {others.map((p) => (
                 <div key={p.team.id} style={{ display: "flex" }}>
-                  <span style={{ color: "#d39a6a", marginRight: 12 }}>{p.place}</span>
+                  <span style={{ color: "#b0612a", marginRight: 12 }}>{p.place}</span>
                   {p.team.name}
                 </div>
               ))}
               {mvp && (
                 <div style={{ display: "flex" }}>
-                  <span style={{ color: "#8ab8ff", marginRight: 12 }}>MVP</span>
+                  <span style={{ color: "#5f9a00", marginRight: 12 }}>MVP</span>
                   {mvp.player?.nickname ?? mvp.name}
                 </div>
               )}
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", marginTop: 48, fontSize: 32, color: "#a8b2c2" }}>{fonts.length ? "Итоги появятся после финала" : "Results after the final"}</div>
+          <div style={{ display: "flex", marginTop: 48, fontSize: 32, color: "#454b55" }}>{fonts.length ? "Итоги появятся после финала" : "Results after the final"}</div>
         )}
       </div>
     ),
