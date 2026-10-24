@@ -456,7 +456,13 @@ async function execute(cmd) {
       await rc(inst, "logaddress_delall_http").catch(() => {});
       const result = (await rc(inst, "get5_endmatch")).trim() || "ended";
       await enforce.clear(inst);
-      return { ok: true, result };
+      // матч снят — игроков на сервере не оставляем: сообщение в чат и через 5 с выход (боты и SourceTV остаются)
+      await rc(inst, 'say "F16 Arena: матч окончен, сервер освобождается. Спасибо за игру!"').catch(() => {});
+      await sleep(5000);
+      const status = await rc(inst, "status").catch(() => "");
+      const humans = [...status.matchAll(/^\s*(\d+)\s+\d+:\d+\s+\d+\s+\d+\s+\w+\s+\d+\s+\d+\.\d+\.\d+\.\d+:\d+/gm)].map((m) => m[1]);
+      for (const id of humans) await rc(inst, `kickid ${id} "Матч окончен — спасибо за игру! F16 Arena"`).catch(() => {});
+      return { ok: true, result: humans.length ? `${result} · выпущено игроков: ${humans.length}` : result };
     }
     case "rcon":
       return { ok: true, result: (await rc(inst, String(cmd.payload.command))).trim() };
