@@ -47,7 +47,7 @@ export function MatchHero({
           <div className="flex items-center gap-2">
             <Status info={info} size="sm" />
             {adminHref && (
-              <Link href={adminHref} className="inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-meta text-fg-3 hover:bg-white/[0.05] hover:text-fg">
+              <Link href={adminHref} className="inline-flex h-8 items-center gap-1.5 rounded-control px-2.5 text-meta text-fg-3 hover:bg-ink/[0.05] hover:text-fg">
                 <Settings className="size-3.5" aria-hidden />
                 Control
               </Link>

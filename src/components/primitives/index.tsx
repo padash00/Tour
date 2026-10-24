@@ -20,7 +20,7 @@ export function Wrap({ children, className }: { children: ReactNode; className?:
 
 /** Тонкий разделитель */
 export function Divider({ className }: { className?: string }) {
-  return <div className={cn("h-px w-full bg-white/[0.06]", className)} />;
+  return <div className={cn("h-px w-full bg-ink/[0.06]", className)} />;
 }
 
 // ───────────────────────── типографика
@@ -28,7 +28,7 @@ export function Divider({ className }: { className?: string }) {
 /** Надпись разрядкой — «БЛИЖАЙШИЙ ТУРНИР» */
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("text-[11px] sm:text-[12px] lg:text-[14px] font-medium uppercase tracking-[0.34em] text-[#7f93b0]", className)}>
+    <div className={cn("text-[11px] sm:text-[12px] lg:text-[14px] font-medium uppercase tracking-[0.34em] text-eyebrow", className)}>
       {children}
     </div>
   );
@@ -84,9 +84,9 @@ const BTN_BASE =
 
 const BTN_VARIANT: Record<BtnVariant, string> = {
   primary: "bg-accent text-accent-ink hover:bg-accent-strong active:bg-accent-pressed shadow-[0_1px_0_0_#ffffff40_inset]",
-  secondary: "border border-white/[0.14] bg-white/[0.03] text-fg hover:border-white/[0.26] hover:bg-white/[0.06]",
-  outline: "border border-white/25 text-fg hover:border-white/45 hover:bg-white/[0.03]",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
+  secondary: "border border-ink/[0.14] bg-ink/[0.03] text-fg hover:border-ink/[0.26] hover:bg-ink/[0.06]",
+  outline: "border border-ink/25 text-fg hover:border-ink/45 hover:bg-ink/[0.03]",
+  ghost: "text-fg-2 hover:text-fg hover:bg-ink/[0.05]",
   danger: "border border-danger/40 bg-danger/[0.08] text-danger hover:border-danger/60 hover:bg-danger/[0.14]",
 };
 
@@ -185,11 +185,11 @@ export function GhostBtn({ href, children, className }: { href: string; children
 // ───────────────────────── карточки
 
 /** Карточка как на главной («Как это работает», «Ближайший турнир») */
-export const CARD = "rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80";
+export const CARD = "rounded-[12px] border border-line-subtle bg-surface/80";
 
 /** Карточка-ссылка: мягкая реакция на наведение */
 export const CARD_LINK =
-  "lift hover:border-white/[0.16] hover:bg-[#0d1726] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
+  "lift hover:border-line-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
 
 export function cardClass(extra?: string, interactive?: boolean) {
   return cn(CARD, interactive && CARD_LINK, extra);
@@ -213,7 +213,7 @@ export function EmptyCard({
     <div
       className={cn(
         "rounded-[12px] border px-7 py-8 lg:px-10 lg:py-10",
-        dashed ? "border-dashed border-white/[0.12] bg-white/[0.012]" : "border-white/[0.08] bg-[#0b1420]/80",
+        dashed ? "border-dashed border-line bg-ink/[0.012]" : "border-line-subtle bg-surface/80",
         className,
       )}
     >
@@ -260,9 +260,7 @@ export function PageHero({
   return (
     <section className={cn("relative overflow-hidden", className)}>
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(900px_420px_at_85%_0%,#1a2c48b3,transparent_70%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(700px_380px_at_0%_100%,#0f1b2c80,transparent_70%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-white/[0.06]" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-ink/[0.06]" />
       </div>
       <div className={cn(WRAP, "relative", compact ? "pt-12 pb-12 lg:pt-16 lg:pb-14" : "pt-14 pb-14 lg:pt-20 lg:pb-16")}>
         <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
@@ -324,7 +322,7 @@ export function SearchField({ name = "q", defaultValue, placeholder }: { name?: 
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-12 w-full rounded-[8px] border border-white/[0.1] bg-[#09111b] px-4 text-[15px] text-fg outline-none transition-colors duration-150 placeholder:text-fg-3 hover:border-white/[0.18] focus:border-accent"
+        className="h-12 w-full rounded-[8px] border border-line bg-shell px-4 text-[15px] text-fg outline-none transition-colors duration-150 placeholder:text-fg-3 hover:border-line-strong focus:border-accent"
       />
     </form>
   );
@@ -340,7 +338,7 @@ const TONE: Record<Tone, string> = {
   live: "text-danger border-danger/40 bg-danger/[0.08]",
   danger: "text-danger border-danger/40 bg-danger/[0.08]",
   accent: "text-accent border-accent/40 bg-accent/[0.08]",
-  muted: "text-fg-2 border-white/15 bg-white/[0.03]",
+  muted: "text-fg-2 border-ink/15 bg-ink/[0.03]",
 };
 
 /** Статус как на карточке главной: рамка, точка, подпись */
@@ -466,7 +464,7 @@ export function Tooltip({ text, children, side = "top" }: { text: ReactNode; chi
       <span
         role="tooltip"
         className={cn(
-          "pointer-events-none absolute left-1/2 z-50 w-max max-w-[260px] -translate-x-1/2 rounded-[7px] border border-white/[0.1] bg-surface-4 px-2.5 py-1.5",
+          "pointer-events-none absolute left-1/2 z-50 w-max max-w-[260px] -translate-x-1/2 rounded-[7px] border border-line bg-surface-4 px-2.5 py-1.5",
           "text-[12px] leading-snug text-fg opacity-0 shadow-[var(--shadow-pop)] transition-opacity duration-150",
           "group-hover/tip:opacity-100 group-focus-within/tip:opacity-100",
           side === "top" ? "bottom-full mb-2" : "top-full mt-2",
@@ -491,7 +489,6 @@ export const AVATAR_SIZE = { xs: 24, sm: 32, md: 40, lg: 56, xl: 96, hero: 128 }
 export function Flow({ children }: { children: ReactNode }) {
   return (
     <div className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_70%_-10%,#16253d80,transparent_70%)]" />
       <div className="relative mx-auto w-full max-w-[860px] px-5 pb-6 sm:px-8">{children}</div>
     </div>
   );

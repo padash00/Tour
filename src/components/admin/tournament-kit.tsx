@@ -11,7 +11,7 @@ import { cn } from "@/components/ui";
 /** Поверхность-карточка как на сайте */
 export const CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
 /** Карточка-список со строками */
-export const CARD_LIST = `${CARD} divide-y divide-white/[0.06]`;
+export const CARD_LIST = `${CARD} divide-y divide-ink/[0.06]`;
 
 /** Подпись-надзаголовок раздела: обычный регистр, без разрядки */
 export function Label({ children, className }: { children: ReactNode; className?: string }) {
@@ -31,7 +31,7 @@ export function StatusChip({ status }: { status: TournamentStatus }) {
     <span
       className={cn(
         "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 text-[11px] font-medium whitespace-nowrap",
-        TONE[status] ?? "text-fg-2 border-white/15 bg-white/[0.03]",
+        TONE[status] ?? "text-fg-2 border-ink/15 bg-ink/[0.03]",
       )}
     >
       <span className={cn("size-1.5 rounded-full bg-current", status === "live" && "animate-pulse")} />

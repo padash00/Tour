@@ -25,7 +25,7 @@ export function HeaderUser() {
       <SearchTrigger />
       {status === "loading" ? (
         // место под профиль того же размера — без прыжка вёрстки
-        <span aria-hidden className="hidden h-10 w-[150px] rounded-control bg-white/[0.04] lg:block" />
+        <span aria-hidden className="hidden h-10 w-[150px] rounded-control bg-ink/[0.04] lg:block" />
       ) : user ? (
         <>
           <NotificationsBell unread={unread} />
@@ -34,7 +34,7 @@ export function HeaderUser() {
       ) : (
         <Link
           href={`/login?next=${encodeURIComponent(pathname)}`}
-          className="hidden h-10 items-center gap-2 rounded-control border border-line bg-white/[0.03] px-3.5 text-[14px] font-semibold text-fg transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-white/[0.06] sm:inline-flex"
+          className="hidden h-10 items-center gap-2 rounded-control border border-line bg-ink/[0.03] px-3.5 text-[14px] font-semibold text-fg transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-ink/[0.06] sm:inline-flex lg:hidden"
         >
           <SteamMark className="size-4" />
           Войти через Steam

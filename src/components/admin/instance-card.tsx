@@ -112,7 +112,7 @@ export function InstanceCard({
           <span className={cn(players ? "text-fg-2" : undefined)}>{players != null ? `${players}/10` : "—"}</span>
         </div>
         {hero && players != null && (
-          <div className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-1 overflow-hidden rounded-full bg-ink/[0.06]">
             <div className={cn("h-full rounded-full", live ? "bg-danger/80" : "bg-accent/70")} style={{ width: `${Math.min(100, players * 10)}%` }} />
           </div>
         )}
@@ -136,7 +136,7 @@ export function InstanceCard({
       </div>
 
       {online && liveMap && match && (
-        <div className="flex flex-wrap gap-1 border-t border-white/[0.06] px-2 py-2">
+        <div className="flex flex-wrap gap-1 border-t border-ink/[0.06] px-2 py-2">
           {[
             { cmd: "css_forcepause", label: "Пауза" },
             { cmd: "css_forceunpause", label: "Снять паузу" },
@@ -159,7 +159,7 @@ export function InstanceCard({
         </div>
       )}
       {online && (
-        <div className="border-t border-white/[0.06] bg-black/20 px-2 py-2">
+        <div className="border-t border-ink/[0.06] bg-black/20 px-2 py-2">
           <ServerActions instance={i.name} running={!!i.running} align="start" />
         </div>
       )}

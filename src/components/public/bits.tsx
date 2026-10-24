@@ -44,7 +44,7 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
   return (
     <Link
       href={`/tournaments/${t.slug}`}
-      className="group grid gap-4 rounded-surface border-b border-line-subtle px-2 py-6 transition-colors last:border-0 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 sm:grid-cols-[168px_1fr_auto] sm:items-center lg:gap-8 lg:py-7"
+      className="group grid gap-4 rounded-surface border-b border-line-subtle px-2 py-6 transition-colors last:border-0 hover:bg-ink/[0.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 sm:grid-cols-[168px_1fr_auto] sm:items-center lg:gap-8 lg:py-7"
     >
       <CoverImage url={t.cover_url} className="h-[120px] w-full rounded-control sm:h-[96px] sm:w-[168px]" />
       <div className="min-w-0">
@@ -73,7 +73,7 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
               {approved}<span className="text-fg-3">/{t.max_teams}</span>
             </span>
           </div>
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]">
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-ink/[0.07]">
             <div className="h-full rounded-full bg-accent/70" style={{ width: `${fill}%` }} />
           </div>
           {prize && <div className="mt-2 text-meta font-semibold text-fg">{prize}</div>}
@@ -105,7 +105,7 @@ export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTour
     <Link
       href={`/matches/${m.id}`}
       className={cn(
-        "group block rounded-control border-b border-line-subtle px-3 py-4 transition-colors last:border-0 hover:bg-white/[0.025] lg:py-5",
+        "group block rounded-control border-b border-line-subtle px-3 py-4 transition-colors last:border-0 hover:bg-ink/[0.025] lg:py-5",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
         live && "bg-live/[0.04]",
       )}

@@ -16,12 +16,12 @@ const title = (a: Award) =>
   a.kind === "place" ? (a.place === 1 ? "Чемпион" : `${a.place} место`) : a.kind === "mvp" ? "MVP турнира" : a.kind === "clutch" ? "Лучший клатч" : "Лучший ADR";
 
 function Medal({ a }: { a: Award }) {
-  const tone = a.kind === "place" ? PLACE_TONE[a.place!] : a.kind === "mvp" ? "border-accent/45 bg-accent/[0.08] text-accent" : "border-white/[0.14] bg-white/[0.03] text-fg-2";
+  const tone = a.kind === "place" ? PLACE_TONE[a.place!] : a.kind === "mvp" ? "border-accent/45 bg-accent/[0.08] text-accent" : "border-ink/[0.14] bg-ink/[0.03] text-fg-2";
   const icon = a.kind === "place" ? (a.place === 1 ? "🏆" : a.place === 2 ? "🥈" : "🥉") : a.kind === "mvp" ? "★" : a.kind === "clutch" ? "◆" : "◎";
   return (
     <Link
       href={`/tournaments/${a.tournament.slug}`}
-      className={cn("group flex min-w-0 items-center gap-3 rounded-[10px] border px-4 py-3 transition-colors hover:border-white/30", tone)}
+      className={cn("group flex min-w-0 items-center gap-3 rounded-[10px] border px-4 py-3 transition-colors hover:border-ink/30", tone)}
     >
       <span className="text-[22px] leading-none" aria-hidden>
         {icon}

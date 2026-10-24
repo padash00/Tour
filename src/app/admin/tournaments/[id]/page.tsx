@@ -177,7 +177,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             )}
           </Panel>
           <Panel title="Параметры матча" className="lg:col-span-2">
-            <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-white/[0.06]`}>
+            <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-ink/[0.06]`}>
               <BarCell label="Серии" value={`BO${t.default_best_of}`} hint={`финал BO${t.final_best_of}`} />
               <BarCell label="Стороны" value={t.knife_round ? "Нож" : "Фикс."} />
               <BarCell label="Овертайм" value={t.overtime ? "MR3" : "Нет"} />
@@ -333,12 +333,12 @@ function LifecyclePanel({
   return (
     <div className={`${CARD} p-5 lg:p-6`}>
       <Lifecycle steps={lifeSteps(t)} current={stepIndex(t.status, hasBracket)} cancelled={t.status === "cancelled"} />
-      <div className="mt-6 grid gap-5 border-t border-white/[0.06] pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] lg:items-center">
+      <div className="mt-6 grid gap-5 border-t border-ink/[0.06] pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] lg:items-center">
         <div>
           <Label className="text-[10px]">Сейчас</Label>
           <p className="mt-1.5 text-[14px] text-fg leading-relaxed">{now}</p>
         </div>
-        <div className="lg:border-l lg:border-white/[0.06] lg:pl-5">
+        <div className="lg:border-l lg:border-ink/[0.06] lg:pl-5">
           <Label className="text-[10px] text-accent/90">Следующий шаг</Label>
           <div className="mt-1.5 text-[16px] font-semibold text-fg">{next}</div>
           {hint && <p className="mt-1 text-[13px] text-fg-2 leading-relaxed">{hint}</p>}
@@ -359,9 +359,9 @@ function LifecyclePanel({
 function OverviewTab({ t, approved, checkedIn, pending }: { t: T; approved: number; checkedIn: number; pending: number }) {
   return (
     <div className="space-y-8">
-      <div className={`${CARD} grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]`}>
+      <div className={`${CARD} grid grid-cols-2 md:grid-cols-4 divide-x divide-ink/[0.06]`}>
         <BarCell label="Участники" value={`${approved} из ${t.max_teams}`} hint={approved >= t.max_teams ? "все места заняты" : `свободно мест: ${t.max_teams - approved}`} />
-        <Link href={`/admin/tournaments/${t.id}?tab=registration`} className="block hover:bg-white/[0.02] transition">
+        <Link href={`/admin/tournaments/${t.id}?tab=registration`} className="block hover:bg-ink/[0.02] transition">
           <BarCell label="Заявки ждут решения" value={pending} tone={pending ? "warn" : undefined} hint={pending ? "открыть и одобрить →" : "новых заявок нет"} />
         </Link>
         <BarCell label="Прошли check-in" value={`${checkedIn} из ${approved}`} hint="только они попадут в сетку" />
@@ -511,7 +511,7 @@ function BracketTab({
       </div>
     ) : null;
   const drawInfo = draw ? (
-    <div className="rounded-[10px] border border-line-subtle bg-white/[0.02] px-4 py-3 text-[13px] text-fg-2 leading-relaxed">
+    <div className="rounded-[10px] border border-line-subtle bg-ink/[0.02] px-4 py-3 text-[13px] text-fg-2 leading-relaxed">
       <span className="text-fg">Жеребьёвка проведена {formatDateTime(draw.at)}</span>
       {draw.redo && <span className="text-fg-3"> (повторная)</span>}, порядок: {drawOrderText(draw)}
     </div>
@@ -541,7 +541,7 @@ function BracketTab({
               Матчи турнира
             </Link>
           </div>
-          <div className="pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-3">
+          <div className="pt-4 border-t border-ink/[0.06] flex flex-wrap items-center gap-3">
             <ActionForm action={generateBracketAction} className="flex flex-wrap items-center gap-3">
               <input type="hidden" name="tournamentId" value={t.id} />
               <input type="hidden" name="seeding" value="draw" />
@@ -661,7 +661,7 @@ async function AwardsTab({ t, regs }: { t: T; regs: RegistrationWithTeam[] }) {
         }
       >
         {podium.length ? (
-          <div className={`${CARD} divide-y divide-white/[0.06]`}>
+          <div className={`${CARD} divide-y divide-ink/[0.06]`}>
             {podium.map((p) => (
               <div key={`${p.place}-${p.team.id}`} className="flex items-center gap-3 px-4 h-11 text-[13px]">
                 <span className="num w-10 text-fg-3">{p.place}</span>
@@ -774,7 +774,7 @@ async function ServersTab({ t }: { t: { id: string; map_pool: string[]; autopilo
   return (
     <div className="space-y-8 max-w-3xl">
       <Panel title="Карты турнира">
-        <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
+        <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06]">
           {t.map_pool.map((m) => {
             const id = m.split("@")[1];
             const i = id ? info[id] : null;
@@ -850,7 +850,7 @@ async function RegistrationTab({
         .filter((g) => g.items.length > 0)
         .map((g) => (
           <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
-            <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
+            <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06]">
               <RegistrationHead />
               {g.items.map((r) => (
                 <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} approveWarning={approveWarning.get(r.id)} />
@@ -866,7 +866,7 @@ const REG_GRID = "grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,2fr
 
 function RegistrationHead() {
   return (
-    <div className={cn(REG_GRID, "hidden md:grid px-4 h-9 text-[12px] font-medium text-[#7f93b0]")}>
+    <div className={cn(REG_GRID, "hidden md:grid px-4 h-9 text-[12px] font-medium text-eyebrow")}>
       <span>Команда</span>
       <span className="text-right">Состав</span>
       <span className="text-right">Avg ELO</span>
@@ -979,7 +979,7 @@ function RegistrationRow({
           Состав ({r.roster.length}) и действия <span className="group-open:hidden">▾</span>
           <span className="hidden group-open:inline">▴</span>
         </summary>
-        <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+        <div className="mt-2 divide-y divide-ink/[0.06] border-t border-ink/[0.06]">
           {r.roster
             .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
             .map((p) => (
@@ -1021,7 +1021,7 @@ function RegistrationRow({
 
         {/* отклонение с причиной — отдельно, ниже */}
         {r.status !== "rejected" && r.status !== "withdrawn" && (
-          <ActionForm action={decideRegistration} className="mt-3 pt-3 border-t border-white/[0.05] flex flex-wrap items-end gap-2">
+          <ActionForm action={decideRegistration} className="mt-3 pt-3 border-t border-ink/[0.05] flex flex-wrap items-end gap-2">
             <input type="hidden" name="registrationId" value={r.id} />
             <input type="hidden" name="decision" value="reject" />
             <ChipInput

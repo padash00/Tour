@@ -72,7 +72,7 @@ function WeaponList({ weapons }: { weapons: WeaponStat[] }) {
               {w.kills} <span className="text-fg-3">· {fmt.pct((100 * w.kills) / total)}</span>
             </span>
           </div>
-          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-ink/[0.06]">
             <div className="h-full rounded-full bg-accent/70" style={{ width: `${(100 * w.kills) / list[0].kills}%` }} />
           </div>
         </div>

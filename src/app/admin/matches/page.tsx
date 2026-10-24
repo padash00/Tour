@@ -45,7 +45,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
     <div className="space-y-6">
       <LiveRefresh watch="matches" intervalMs={4000} />
       <AdminHeader title="Матчи" />
-      <div className="flex gap-5 border-b border-white/[0.06]">
+      <div className="flex gap-5 border-b border-ink/[0.06]">
         {FILTERS.map((f) => (
           <Link
             key={f.key}

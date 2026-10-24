@@ -11,7 +11,7 @@ export function HeadToHeadList({ items, empty = "Появятся после п�
         const rd = h.roundsFor - h.roundsAgainst;
         const lost = h.matches - h.wins;
         return (
-          <div key={h.opponent.id} className="flex items-center gap-3 border-b border-white/[0.06] py-3 last:border-0">
+          <div key={h.opponent.id} className="flex items-center gap-3 border-b border-ink/[0.06] py-3 last:border-0">
             <Link href={h.href} className="flex min-w-0 flex-1 items-center gap-3 hover:[&_span]:text-accent">
               <TeamLogo src={h.opponent.logo_url} tag={h.opponent.tag} size={28} />
               <span className="truncate font-semibold text-fg transition-colors">{h.opponent.name}</span>

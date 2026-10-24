@@ -60,7 +60,7 @@ export function LivePanel({
         const ms = maps.filter((x) => x.match_id === m.id).sort((a, b) => a.map_number - b.map_number);
         const cur = ms.find((x) => x.status === "live") ?? ms.find((x) => x.status !== "finished") ?? ms.at(-1);
         return (
-          <div key={m.id} className="relative overflow-hidden rounded-[1vw] border border-white/[0.08] bg-[#0b1420]/85 px-[3vw] flex flex-col justify-center">
+          <div key={m.id} className="relative overflow-hidden rounded-[1vw] border border-line-subtle bg-surface/85 px-[3vw] flex flex-col justify-center">
             <div className="absolute left-0 inset-y-0 w-[0.35vw] bg-danger" />
             <div className="flex items-center justify-between text-[1.2vw] text-fg-3">
               <span className="inline-flex items-center gap-[0.6vw] font-semibold uppercase tracking-[0.2em] text-danger">
@@ -180,8 +180,8 @@ function BracketNode({ m }: { m: MatchWithTeams }) {
   return (
     <div
       className={cn(
-        "rounded-[0.5vw] border bg-[#0b1420]/90 divide-y divide-white/[0.06] overflow-hidden",
-        live ? "border-danger/60" : "border-white/[0.08]",
+        "rounded-[0.5vw] border bg-surface/90 divide-y divide-white/[0.06] overflow-hidden",
+        live ? "border-danger/60" : "border-line-subtle",
       )}
     >
       {row(m.team1, m.team1_score, fin && m.winner_id === m.team1_id)}
@@ -204,7 +204,7 @@ export function StandingsPanel({
   return (
     <div className={cn("h-full grid gap-[2vw]", groups.length > 1 && "grid-cols-2")}>
       {groups.slice(0, 4).map((g) => (
-        <div key={g.label ?? "A"} className="min-h-0 overflow-hidden rounded-[1vw] border border-white/[0.08] bg-[#0b1420]/85 p-[1.6vw]">
+        <div key={g.label ?? "A"} className="min-h-0 overflow-hidden rounded-[1vw] border border-line-subtle bg-surface/85 p-[1.6vw]">
           {groups.length > 1 && <div className="mb-[1.2vh] text-[1.1vw] uppercase tracking-[0.3em] text-fg-3">Группа {g.label}</div>}
           <table className="w-full">
             <thead>
@@ -265,7 +265,7 @@ export function UpcomingPanel({ matches, all }: { matches: MatchWithTeams[]; all
       {matches.slice(0, 6).map((m) => {
         const st = STATUS[m.status];
         return (
-          <div key={m.id} className="rounded-[1vw] border border-white/[0.08] bg-[#0b1420]/85 px-[2vw] flex flex-col justify-center">
+          <div key={m.id} className="rounded-[1vw] border border-line-subtle bg-surface/85 px-[2vw] flex flex-col justify-center">
             <div className="flex items-center justify-between gap-[1vw] text-[1vw]">
               <span className="truncate uppercase tracking-[0.2em] text-fg-3">
                 #{m.number} · {matchStage(m, all)} · BO{m.best_of}
@@ -297,7 +297,7 @@ export type TvLeader = { name: string; avatar: string | null; team: string | nul
 export function LeadersPanel({ leaders, mvp }: { leaders: TvLeader[]; mvp: (TvLeader & { by: "swing" | "rating"; swing: number | null }) | null }) {
   return (
     <div className="h-full grid grid-cols-[1fr_1.35fr] gap-[2vw]">
-      <div className="relative overflow-hidden rounded-[1vw] border border-accent/30 bg-[#0b1420]/85 p-[2.4vw] flex flex-col justify-center">
+      <div className="relative overflow-hidden rounded-[1vw] border border-accent/30 bg-surface/85 p-[2.4vw] flex flex-col justify-center">
         {mvp ? (
           <>
             <div className="text-[1.1vw] uppercase tracking-[0.3em] text-accent">MVP турнира</div>
@@ -322,7 +322,7 @@ export function LeadersPanel({ leaders, mvp }: { leaders: TvLeader[]; mvp: (TvLe
           <div className="text-[1.6vw] text-fg-2">MVP появится, когда игроки сыграют достаточно карт.</div>
         )}
       </div>
-      <div className="rounded-[1vw] border border-white/[0.08] bg-[#0b1420]/85 p-[2vw]">
+      <div className="rounded-[1vw] border border-line-subtle bg-surface/85 p-[2vw]">
         <div className="mb-[1.6vh] grid grid-cols-[3vw_1fr_7vw_6vw_6vw] text-[0.95vw] uppercase tracking-[0.18em] text-fg-3">
           <span>#</span>
           <span>Игрок</span>
@@ -367,7 +367,7 @@ export function ChampionPanel({ places, mvpName }: { places: TvPlace[]; mvpName:
   if (!champ) return <TvEmpty title="Турнир завершён" text="Итоги появятся после подсчёта результатов." />;
   return (
     <div className="h-full grid grid-rows-[1.6fr_1fr] gap-[2.4vh]">
-      <div className="relative overflow-hidden rounded-[1.2vw] border border-accent/30 bg-[#0b1420]/85 px-[4vw] flex items-center gap-[3vw]">
+      <div className="relative overflow-hidden rounded-[1.2vw] border border-accent/30 bg-surface/85 px-[4vw] flex items-center gap-[3vw]">
         <div className="absolute -right-[4vw] -top-[6vh] text-[22vw] font-bold leading-none text-white/[0.03] select-none">1</div>
         <Logo team={champ.team} size="22vh" />
         <div className="min-w-0">
@@ -383,7 +383,7 @@ export function ChampionPanel({ places, mvpName }: { places: TvPlace[]; mvpName:
       </div>
       <div className="grid gap-[2vw]" style={{ gridTemplateColumns: `repeat(${Math.max(1, rest.length)}, minmax(0,1fr))` }}>
         {rest.map((p) => (
-          <div key={p.place + p.team.id} className="rounded-[1vw] border border-white/[0.08] bg-[#0b1420]/85 px-[2.4vw] flex items-center gap-[1.6vw]">
+          <div key={p.place + p.team.id} className="rounded-[1vw] border border-line-subtle bg-surface/85 px-[2.4vw] flex items-center gap-[1.6vw]">
             <span className="num text-[4vw] font-semibold text-fg-3">{p.place}</span>
             <Logo team={p.team} size="9vh" />
             <div className="min-w-0">

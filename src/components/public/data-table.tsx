@@ -44,7 +44,7 @@ export function RankBadge({ n }: { n: number }) {
     <span
       className={cn(
         "num inline-grid size-7 place-items-center rounded-[6px] text-[13px] font-semibold",
-        n === 1 ? "bg-accent text-accent-ink" : "bg-white/[0.08] text-fg",
+        n === 1 ? "bg-accent text-accent-ink" : "bg-ink/[0.08] text-fg",
       )}
     >
       {n}
@@ -56,7 +56,7 @@ export function RankBadge({ n }: { n: number }) {
 export function RatingBar({ value, className }: { value: number; className?: string }) {
   const pct = Math.max(4, Math.min(100, (value / 1.6) * 100));
   return (
-    <span className="ml-auto block h-[3px] w-14 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden>
+    <span className="ml-auto block h-[3px] w-14 overflow-hidden rounded-full bg-ink/[0.06]" aria-hidden>
       <span className={cn("block h-full rounded-full bg-current opacity-70", className)} style={{ width: `${pct}%` }} />
     </span>
   );

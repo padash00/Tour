@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronDown, LayoutDashboard, LogOut, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
@@ -16,25 +16,12 @@ export function PublicOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Шапка: прозрачная поверх hero на главной, плотная после прокрутки и на остальных страницах */
+/** Верхняя строка: белая, прилипает к верху при прокрутке */
 export function HeaderShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 24);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
   if (noChrome(pathname)) return null;
-  const overHero = pathname === "/" && !scrolled;
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-40 transition-[background-color,border-color] duration-[var(--dur-state)]",
-        overHero ? "border-b border-transparent bg-transparent" : "border-b border-line-subtle bg-shell/90 backdrop-blur-xl backdrop-saturate-150",
-      )}
-    >
+    <header className="sticky top-0 z-30 border-b border-line-subtle bg-shell/92 backdrop-blur-xl backdrop-saturate-150">
       {children}
     </header>
   );
@@ -97,7 +84,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
         trigger={
           <button
             type="button"
-            className="flex h-10 items-center gap-2 rounded-control border border-line bg-white/[0.02] pl-1 pr-2 transition-colors duration-[var(--dur-hover)] hover:border-line-strong aria-expanded:border-line-strong aria-expanded:bg-white/[0.05]"
+            className="flex h-10 items-center gap-2 rounded-control border border-line bg-ink/[0.02] pl-1 pr-2 transition-colors duration-[var(--dur-hover)] hover:border-line-strong aria-expanded:border-line-strong aria-expanded:bg-ink/[0.05]"
           >
             <Avatar src={user.avatar} name={user.nickname} size="xs" className="!size-7" />
             <span className="max-w-[120px] truncate text-[14px] font-medium">{user.nickname}</span>
@@ -139,7 +126,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative grid size-10 place-items-center rounded-control text-fg-2 hover:bg-white/[0.06] hover:text-fg"
+        className="relative grid size-10 place-items-center rounded-control text-fg-2 hover:bg-ink/[0.06] hover:text-fg"
         aria-label={open ? "Закрыть меню" : "Меню"}
         aria-expanded={open}
         aria-controls="mobile-menu"
@@ -159,7 +146,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
             {PRIMARY_NAV.map((item) => {
               const active = isActive(pathname, item);
               return (
-                <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? "page" : undefined} className={cn(row, "font-medium", active ? "bg-white/[0.06] text-fg" : "text-fg-2 hover:text-fg")}>
+                <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? "page" : undefined} className={cn(row, "font-medium", active ? "bg-ink/[0.06] text-fg" : "text-fg-2 hover:text-fg")}>
                   {item.label}
                 </Link>
               );
@@ -213,7 +200,7 @@ export function NotificationsBell({ unread }: { unread: number }) {
   return (
     <Link
       href="/notifications"
-      className="relative grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-white/[0.06] hover:text-fg"
+      className="relative grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg"
       aria-label={unread > 0 ? `Уведомления: ${unread} новых` : "Уведомления"}
     >
       <Bell className="size-[18px]" />

@@ -42,7 +42,7 @@ export function StatLeaders({ rows }: { rows: Row[] }) {
           </span>
         );
         return (
-          <div key={c.label} className="min-w-0 rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-4">
+          <div key={c.label} className="min-w-0 rounded-[12px] border border-line-subtle bg-surface/80 p-4">
             <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-fg-3">{c.label}</div>
             <div className={cn("num mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em]", c.tone ?? "text-fg")}>{c.value}</div>
             <div className="mt-3">

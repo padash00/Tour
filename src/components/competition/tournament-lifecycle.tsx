@@ -66,7 +66,7 @@ export function TournamentLifecycle({ t }: { t: Tournament }) {
         const live = now && t.status === "live";
         return (
           <li key={s.label} aria-current={now ? "step" : undefined} className="min-w-0">
-            <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <div className="h-1 overflow-hidden rounded-full bg-ink/[0.08]">
               <div className={cn("h-full rounded-full", done ? "w-full bg-accent/60" : now ? (live ? "w-1/2 animate-pulse bg-live" : "w-1/2 animate-pulse bg-accent") : "w-0")} />
             </div>
             <div className={cn("mt-2.5 flex items-center gap-2 text-meta font-medium", now ? (live ? "text-live" : "text-fg") : done ? "text-fg-2" : "text-fg-3")}>

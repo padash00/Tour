@@ -12,7 +12,7 @@ export type StatusTone = "neutral" | "accent" | "ok" | "warn" | "danger" | "live
 export type StatusInfo = { label: string; tone: StatusTone; pulse?: boolean };
 
 const TONE: Record<StatusTone, string> = {
-  neutral: "text-fg-2 bg-white/[0.05] border-line",
+  neutral: "text-fg-2 bg-ink/[0.05] border-line",
   accent: "text-accent bg-accent-dim border-accent/30",
   ok: "text-ok bg-ok-dim border-ok/30",
   warn: "text-warn bg-warn-dim border-warn/30",

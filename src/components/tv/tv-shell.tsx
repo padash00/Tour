@@ -50,13 +50,13 @@ export function TvShell({ panels, tournament, footerNote }: { panels: TvPanel[];
       <main className="relative flex-1 min-h-0 px-[4vw] pt-[3.2vh] pb-[2vh]">
         {panel ? (
           <div key={`${panel.key}-${index}`} className="h-full flex flex-col animate-[tv-in_600ms_ease-out]">
-            <div className="text-[1.25vw] font-medium uppercase tracking-[0.34em] text-[#7f93b0]">{panel.title}</div>
+            <div className="text-[1.25vw] font-medium uppercase tracking-[0.34em] text-eyebrow">{panel.title}</div>
             <div className="mt-[2.4vh] flex-1 min-h-0">{panel.node}</div>
           </div>
         ) : null}
       </main>
 
-      <footer className="relative shrink-0 border-t border-white/[0.08] bg-[#060a10]/80 px-[4vw] h-[8.5vh] flex items-center gap-[2vw]">
+      <footer className="relative shrink-0 border-t border-line-subtle bg-[#060a10]/80 px-[4vw] h-[8.5vh] flex items-center gap-[2vw]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/f16-arena-horizontal.svg" alt="F16 Arena" className="h-[5.4vh] w-auto" />
         <div className="h-[3.4vh] w-px bg-white/15" />

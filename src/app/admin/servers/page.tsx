@@ -116,7 +116,7 @@ export default async function ServersPage() {
       </Section>
 
       {/* ── хост ── */}
-      <Strip className="grid-cols-2 md:grid-cols-4 lg:[&>*:nth-child(n+5)]:border-t lg:[&>*:nth-child(n+5)]:border-white/[0.06]">
+      <Strip className="grid-cols-2 md:grid-cols-4 lg:[&>*:nth-child(n+5)]:border-t lg:[&>*:nth-child(n+5)]:border-ink/[0.06]">
         {/* связь с агентом — в блоке выше; здесь только железо и версии: ровно 8 ячеек, 2 ряда по 4 */}
         <StripCell label="CPU" value={cpu != null ? `${cpu}%` : "—"} tone={cpu == null ? undefined : cpu > 85 ? "danger" : cpu > 65 ? "warn" : undefined} />
         <StripCell label="RAM" value={info.ram_used_gb ?? "—"} hint={info.ram_total_gb ? `из ${info.ram_total_gb} GB` : undefined} />

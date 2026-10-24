@@ -94,7 +94,7 @@ export function MapCard({
             <button
               type="submit"
               disabled={removing}
-              className="h-8 rounded-md px-2 text-fg-3 transition-colors hover:bg-white/[0.04] hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="h-8 rounded-md px-2 text-fg-3 transition-colors hover:bg-ink/[0.04] hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               убрать картинку
             </button>

@@ -114,12 +114,12 @@ export function AdminRail({ logo, profile }: { logo: ReactNode; profile: ReactNo
       {/* десктоп: рельс */}
       <aside
         className={cn(
-          "group/rail hidden lg:flex fixed inset-y-0 left-0 z-40 flex-col border-r border-[#16222f] bg-[#060a11] transition-[width] duration-200",
+          "group/rail hidden lg:flex fixed inset-y-0 left-0 z-40 flex-col border-r border-surface-2 bg-bg transition-[width] duration-200",
           pinned ? "w-[232px]" : "w-[76px] hover:w-[232px] hover:shadow-[24px_0_48px_-24px_#000]",
         )}
         data-pinned={pinned}
       >
-        <div className="flex h-14 shrink-0 items-center gap-3 overflow-hidden border-b border-[#16222f] px-[22px]">{logo}</div>
+        <div className="flex h-14 shrink-0 items-center gap-3 overflow-hidden border-b border-surface-2 px-[22px]">{logo}</div>
         <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-3 py-4" aria-label="Разделы F16 Control">
           {ADMIN_SECTIONS.map((s) => {
             const active = isActive(pathname, s.href, "exact" in s && s.exact);
@@ -131,7 +131,7 @@ export function AdminRail({ logo, profile }: { logo: ReactNode; profile: ReactNo
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex h-11 items-center gap-3.5 overflow-hidden rounded-[8px] px-[15px] text-[13px] transition-colors",
-                  active ? "bg-accent/[0.1] text-fg" : "text-fg-3 hover:bg-white/[0.04] hover:text-fg",
+                  active ? "bg-accent/[0.1] text-fg" : "text-fg-3 hover:bg-ink/[0.04] hover:text-fg",
                 )}
               >
                 {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-accent" />}
@@ -148,12 +148,12 @@ export function AdminRail({ logo, profile }: { logo: ReactNode; profile: ReactNo
             );
           })}
         </nav>
-        <div className="space-y-2 border-t border-[#16222f] p-3">
+        <div className="space-y-2 border-t border-surface-2 p-3">
           {profile}
           <button
             type="button"
             onClick={toggle}
-            className="flex h-9 w-full items-center gap-3.5 overflow-hidden rounded-[8px] px-[15px] text-[12px] text-fg-3 transition-colors hover:bg-white/[0.04] hover:text-fg"
+            className="flex h-9 w-full items-center gap-3.5 overflow-hidden rounded-[8px] px-[15px] text-[12px] text-fg-3 transition-colors hover:bg-ink/[0.04] hover:text-fg"
             aria-pressed={pinned}
           >
             <svg viewBox="0 0 24 24" className={cn("size-[19px] shrink-0 transition-transform", pinned && "rotate-180")} {...stroke}>
@@ -175,7 +175,7 @@ export function AdminRail({ logo, profile }: { logo: ReactNode; profile: ReactNo
 export function AdminMobileNav() {
   const pathname = usePathname();
   return (
-    <nav className="lg:hidden flex gap-1 overflow-x-auto border-b border-[#16222f] bg-[#060a11] px-3 py-2 [scrollbar-width:none]" aria-label="Разделы F16 Control">
+    <nav className="lg:hidden flex gap-1 overflow-x-auto border-b border-surface-2 bg-bg px-3 py-2 [scrollbar-width:none]" aria-label="Разделы F16 Control">
       {ADMIN_SECTIONS.map((s) => {
         const active = isActive(pathname, s.href, "exact" in s && s.exact);
         return (
@@ -303,7 +303,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="md:hidden grid size-9 place-items-center rounded-[8px] border border-[#1a2838] text-fg-3"
+        className="md:hidden grid size-9 place-items-center rounded-[8px] border border-surface-3 text-fg-3"
         aria-label="Поиск"
       >
         <svg viewBox="0 0 24 24" className="size-4" {...stroke}>
@@ -320,7 +320,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             className="w-full max-w-[600px] overflow-hidden rounded-surface border border-line bg-surface shadow-[0_30px_80px_-20px_#000]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-[#1a2838] px-4">
+            <div className="flex items-center gap-3 border-b border-surface-3 px-4">
               <svg viewBox="0 0 24 24" className="size-[18px] text-fg-3" {...stroke}>
                 <circle cx="11" cy="11" r="6.5" />
                 <path d="m16 16 4 4" />

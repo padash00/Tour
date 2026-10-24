@@ -18,8 +18,8 @@ type Size = "sm" | "md" | "lg";
 const variants: Record<Variant, string> = {
   primary: "bg-accent text-accent-ink shadow-[0_4px_18px_-12px_var(--color-accent)] hover:bg-accent-strong hover:shadow-[0_6px_22px_-12px_var(--color-accent)] active:bg-accent-pressed",
   secondary: "bg-surface text-fg border border-line hover:bg-surface-2 hover:border-line-strong",
-  outline: "bg-transparent text-fg border border-line-strong hover:border-line-hover hover:bg-white/[0.03]",
-  ghost: "text-fg-2 hover:text-fg hover:bg-white/[0.05]",
+  outline: "bg-transparent text-fg border border-line-strong hover:border-line-hover hover:bg-ink/[0.03]",
+  ghost: "text-fg-2 hover:text-fg hover:bg-ink/[0.05]",
   danger: "bg-danger/[0.1] text-danger border border-danger/35 hover:bg-danger/[0.16] hover:border-danger/55",
   // знак бренда — использовать крайне редко
   warm: "bg-warm text-[#1a0d03] hover:brightness-110",
@@ -130,7 +130,7 @@ export function Container({
 
 export function KV({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-white/[0.05] last:border-0">
+    <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-ink/[0.05] last:border-0">
       <span className="text-sm text-fg-3">{label}</span>
       <span className="text-sm text-fg text-right">{children}</span>
     </div>
@@ -284,7 +284,7 @@ export function Notice({ tone = "neutral", children }: { tone?: "neutral" | "ok"
     warn: "border-warn text-fg-2",
     danger: "border-danger text-fg-2",
   }[tone];
-  return <div className={cn("border-l-2 bg-white/[0.02] rounded-r-lg px-4 py-3 text-sm leading-relaxed", t)}>{children}</div>;
+  return <div className={cn("border-l-2 bg-ink/[0.02] rounded-r-lg px-4 py-3 text-sm leading-relaxed", t)}>{children}</div>;
 }
 
 // ───────────────────────── icons

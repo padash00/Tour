@@ -392,7 +392,7 @@ export function RegistrationDemo() {
               type="button"
               aria-pressed={pick === c.key}
               onClick={() => setPick(c.key)}
-              className={`h-8 rounded-control border px-2.5 text-meta ${pick === c.key ? "border-line-strong bg-white/[0.07] text-fg" : "border-transparent text-fg-3 hover:text-fg"}`}
+              className={`h-8 rounded-control border px-2.5 text-meta ${pick === c.key ? "border-line-strong bg-ink/[0.07] text-fg" : "border-transparent text-fg-3 hover:text-fg"}`}
             >
               {c.label}
             </button>

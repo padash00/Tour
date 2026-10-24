@@ -122,14 +122,14 @@ export default function RulesPage() {
             <ol className="space-y-1 text-[14px]">
               {RULES.map((rule, i) => (
                 <li key={rule.title}>
-                  <a href={`#r${i + 1}`} className="flex gap-3 rounded-control px-2 py-2 text-fg-2 transition-colors hover:bg-white/[0.04] hover:text-fg">
+                  <a href={`#r${i + 1}`} className="flex gap-3 rounded-control px-2 py-2 text-fg-2 transition-colors hover:bg-ink/[0.04] hover:text-fg">
                     <span className="num w-6 text-micro text-fg-3">{String(i + 1).padStart(2, "0")}</span>
                     {rule.title}
                   </a>
                 </li>
               ))}
               <li className="mt-2 border-t border-line-subtle pt-2">
-                <a href="#faq" className="flex gap-3 rounded-control px-2 py-2 text-accent hover:bg-white/[0.04]">
+                <a href="#faq" className="flex gap-3 rounded-control px-2 py-2 text-accent hover:bg-ink/[0.04]">
                   <span className="w-6 text-micro">?</span>
                   Частые вопросы
                 </a>

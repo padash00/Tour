@@ -39,7 +39,7 @@ const TONE_ICON = {
   ok: "bg-ok-dim text-ok border-ok/30",
   accent: "bg-accent-dim text-accent border-accent/30",
   warn: "bg-warn-dim text-warn border-warn/30",
-  neutral: "bg-white/[0.05] text-fg-2 border-line",
+  neutral: "bg-ink/[0.05] text-fg-2 border-line",
 };
 
 const KIND: Record<Kind, { icon: ReactNode; tone: keyof typeof TONE_ICON; urgent?: boolean }> = {
@@ -59,7 +59,7 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
       <span
         className={cn(
           "mt-0.5 grid size-9 shrink-0 place-items-center rounded-control border [&>svg]:size-[18px]",
-          unread ? cn(TONE_ICON[k.tone], k.urgent && "ring-2 ring-current/20") : "border-line-subtle bg-white/[0.02] text-fg-3",
+          unread ? cn(TONE_ICON[k.tone], k.urgent && "ring-2 ring-current/20") : "border-line-subtle bg-ink/[0.02] text-fg-3",
         )}
         aria-hidden
       >

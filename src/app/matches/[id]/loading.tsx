@@ -3,7 +3,7 @@ import { Container, Skeleton } from "@/components/ds";
 export default function Loading() {
   return (
     <>
-      <div className="border-b border-white/[0.06]">
+      <div className="border-b border-ink/[0.06]">
         <Container width="wide" className="pb-12 pt-8 sm:pb-16 sm:pt-10">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="mx-auto mt-14 h-3 w-64" />

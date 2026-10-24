@@ -62,12 +62,12 @@ export function MatchRow({ m, stage, href }: { m: MatchWithTeams; stage?: string
     <Link
       href={href ?? `/matches/${m.id}`}
       className={cn(
-        "group grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3.5 rounded-xl transition-colors hover:bg-white/[0.03]",
+        "group grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 py-3.5 rounded-xl transition-colors hover:bg-ink/[0.03]",
         m.status === "live" && "bg-danger-dim/50",
       )}
     >
       <div className="flex items-center gap-3 min-w-0">
-        {m.team1 ? <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={28} /> : <span className="size-7 rounded-md bg-white/[0.03]" />}
+        {m.team1 ? <TeamLogo src={m.team1.logo_url} tag={m.team1.tag} size={28} /> : <span className="size-7 rounded-md bg-ink/[0.03]" />}
         <span className={cn("truncate font-medium", finished && m.winner_id !== m.team1_id && "text-fg-3")}>
           {m.team1?.name ?? "TBD"}
         </span>
@@ -94,7 +94,7 @@ export function MatchRow({ m, stage, href }: { m: MatchWithTeams; stage?: string
         <span className={cn("truncate font-medium text-right", finished && m.winner_id !== m.team2_id && "text-fg-3")}>
           {m.team2?.name ?? "TBD"}
         </span>
-        {m.team2 ? <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={28} /> : <span className="size-7 rounded-md bg-white/[0.03]" />}
+        {m.team2 ? <TeamLogo src={m.team2.logo_url} tag={m.team2.tag} size={28} /> : <span className="size-7 rounded-md bg-ink/[0.03]" />}
       </div>
     </Link>
   );

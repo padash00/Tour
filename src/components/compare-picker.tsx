@@ -64,7 +64,7 @@ export function ComparePicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="inline-flex h-11 items-center gap-2 rounded-[8px] border border-white/[0.14] bg-white/[0.02] px-4 text-[14px] font-medium text-fg-2 transition-colors hover:border-white/[0.28] hover:text-fg"
+        className="inline-flex h-11 items-center gap-2 rounded-[8px] border border-ink/[0.14] bg-ink/[0.02] px-4 text-[14px] font-medium text-fg-2 transition-colors hover:border-ink/[0.28] hover:text-fg"
       >
         <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
           <path d="M5 2v12M11 2v12M2 5h6M8 11h6" strokeLinecap="round" />
@@ -73,7 +73,7 @@ export function ComparePicker({
       </button>
       {open && (
         // на телефоне — по центру экрана: кнопка может стоять у левого края, и выпадашка ушла бы за экран
-        <div className="z-40 rounded-[12px] max-sm:fixed max-sm:inset-x-5 max-sm:top-24 sm:absolute sm:right-0 sm:mt-2 sm:w-[320px] border border-white/[0.1] bg-[#0b1420] p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
+        <div className="z-40 rounded-[12px] max-sm:fixed max-sm:inset-x-5 max-sm:top-24 sm:absolute sm:right-0 sm:mt-2 sm:w-[320px] border border-line bg-surface p-2 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]">
           <input
             autoFocus
             value={q}
@@ -88,7 +88,7 @@ export function ComparePicker({
                 <button
                   type="button"
                   onClick={() => go(p.steam_id)}
-                  className="flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[14px] text-fg-2 hover:bg-white/[0.05] hover:text-fg"
+                  className="flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[14px] text-fg-2 hover:bg-ink/[0.05] hover:text-fg"
                 >
                   <Avatar src={p.avatar_url} name={p.nickname} size={26} />
                   <span className="truncate">{p.nickname}</span>

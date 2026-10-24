@@ -156,7 +156,7 @@ export default async function AdminOverview() {
                 </div>
               )}
               {servers.instances.some((i) => !i.running && !byInstance.has(i.name)) && (
-                <div className={cn(ADMIN_CARD, "divide-y divide-white/[0.06]")}>
+                <div className={cn(ADMIN_CARD, "divide-y divide-ink/[0.06]")}>
                   {servers.instances
                     .filter((i) => !i.running && !byInstance.has(i.name))
                     .map((i) => (
@@ -223,7 +223,7 @@ export default async function AdminOverview() {
           {queue.length === 0 ? (
             <Quiet>Очередь пуста: новые матчи появятся, когда определятся соперники.</Quiet>
           ) : (
-            <div className={`${ADMIN_CARD} divide-y divide-white/[0.06]`}>
+            <div className={`${ADMIN_CARD} divide-y divide-ink/[0.06]`}>
               {queue.map((m) => (
                 <div key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-[13px]">
                   <span className="num text-fg-3 w-9">#{m.number}</span>
@@ -262,7 +262,7 @@ export default async function AdminOverview() {
           {/* ── текущий турнир ── */}
           <Section title="Текущий турнир" action={<SectionLink href="/admin/tournaments">Все турниры</SectionLink>}>
             {current ? (
-              <Link href={`/admin/tournaments/${current.id}`} className={`${ADMIN_CARD} block p-5 transition-colors hover:border-white/[0.16]`}>
+              <Link href={`/admin/tournaments/${current.id}`} className={`${ADMIN_CARD} block p-5 transition-colors hover:border-line-strong`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-[18px] font-semibold tracking-[-0.01em]">{current.name}</div>
@@ -288,7 +288,7 @@ export default async function AdminOverview() {
             {logs.length === 0 ? (
               <Quiet>Журнал пуст.</Quiet>
             ) : (
-              <div className="rounded-[12px] border border-white/[0.08] bg-[#05080d] px-4 py-3 font-mono text-[12px] leading-6 overflow-x-auto">
+              <div className="rounded-[12px] border border-line-subtle bg-[#05080d] px-4 py-3 font-mono text-[12px] leading-6 overflow-x-auto">
                 {logs.map((l) => (
                   <div key={l.id} className="flex gap-3 min-w-0 whitespace-nowrap">
                     <span className="text-fg-3 shrink-0">{formatTime(l.created_at)}</span>

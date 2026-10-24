@@ -34,7 +34,7 @@ export async function OfficialTab({ t, admin }: { t: Tournament; admin: Player }
 
   return (
     <div className="space-y-8">
-      <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-white/[0.06]`}>
+      <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-ink/[0.06]`}>
         <BarCell label="Команды" value={`${teams.length} из ${t.max_teams}`} hint={`одобрено ${approved}`} />
         <BarCell label="Организации" value={orgs.size} />
         <BarCell label="Участники" value={participants.length} hint={t.require_coach ? "игроки и тренеры" : "игроки"} />

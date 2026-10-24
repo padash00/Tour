@@ -113,7 +113,7 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
               aria-label="Поиск лобби"
               className="h-11 w-full rounded-control border border-line bg-shell pl-9 pr-24 text-[14px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
             />
-            <button type="submit" className="absolute right-1.5 top-1.5 h-8 rounded-control px-3 text-meta font-medium text-fg-2 hover:bg-white/[0.06] hover:text-fg">
+            <button type="submit" className="absolute right-1.5 top-1.5 h-8 rounded-control px-3 text-meta font-medium text-fg-2 hover:bg-ink/[0.06] hover:text-fg">
               Найти
             </button>
           </form>

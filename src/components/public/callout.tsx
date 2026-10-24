@@ -7,7 +7,7 @@ import { cn } from "../ui";
  */
 
 const TONE = {
-  neutral: { box: "border-white/[0.1] bg-white/[0.025] text-fg-2", icon: "text-fg-3" },
+  neutral: { box: "border-line bg-ink/[0.025] text-fg-2", icon: "text-fg-3" },
   ok: { box: "border-ok/30 bg-ok/[0.06] text-fg-2", icon: "text-ok" },
   warn: { box: "border-warn/30 bg-warn/[0.06] text-fg-2", icon: "text-warn" },
   danger: { box: "border-danger/30 bg-danger/[0.06] text-fg-2", icon: "text-danger" },

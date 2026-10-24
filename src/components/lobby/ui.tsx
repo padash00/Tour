@@ -38,10 +38,10 @@ export function Sheet({
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-[#03060bd9] backdrop-blur-[6px] animate-[fade_.15s_ease-out]" onClick={onClose} />
+      <div className="absolute inset-0 bg-bg/85 backdrop-blur-[6px] animate-[fade_.15s_ease-out]" onClick={onClose} />
       <div
         ref={panel}
-        className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[16px] border border-white/[0.1] bg-surface-2 shadow-[var(--shadow-pop)] animate-[pop_.2s_cubic-bezier(.2,.8,.2,1)] sm:rounded-[16px]"
+        className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[16px] border border-line bg-surface-2 shadow-[var(--shadow-pop)] animate-[pop_.2s_cubic-bezier(.2,.8,.2,1)] sm:rounded-[16px]"
         style={{ maxWidth: width }}
       >
         <div className="flex items-start gap-4 px-6 pt-6 pb-4 sm:px-8">
@@ -49,14 +49,14 @@ export function Sheet({
             <h2 className="text-[22px] font-semibold tracking-[-0.015em] text-fg">{title}</h2>
             {subtitle && <p className="mt-1.5 text-[14px] text-fg-2">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-[8px] text-fg-3 hover:bg-white/[0.06] hover:text-fg" aria-label="Закрыть">
+          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-[8px] text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label="Закрыть">
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
             </svg>
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 sm:px-8">{children}</div>
-        {footer && <div className="border-t border-white/[0.06] bg-black/[0.15] px-6 py-4 sm:px-8">{footer}</div>}
+        {footer && <div className="border-t border-ink/[0.06] bg-black/[0.15] px-6 py-4 sm:px-8">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -168,7 +168,7 @@ export function Choice<T extends string | number>({
         const o = options.find((x) => String(x.value) === e.target.value);
         if (o) onChange?.(o.value);
       }}
-      className="h-9 max-w-[200px] rounded-[8px] border border-white/[0.1] bg-surface-3 px-3 text-[13px] text-fg disabled:opacity-70"
+      className="h-9 max-w-[200px] rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg disabled:opacity-70"
     >
       {options.map((o) => (
         <option key={String(o.value)} value={String(o.value)}>
@@ -215,7 +215,7 @@ export function Slider({
         onKeyUp={(e) => onChange?.(Number((e.target as HTMLInputElement).value))}
         className="hidden w-32 accent-[var(--color-accent)] sm:block"
       />
-      <div className="flex h-9 w-[92px] items-center rounded-[8px] border border-white/[0.1] bg-surface-3 px-2">
+      <div className="flex h-9 w-[92px] items-center rounded-[8px] border border-line bg-surface-3 px-2">
         {prefix && <span className="text-[13px] text-fg-3">{prefix}</span>}
         <input
           type="number"
@@ -237,7 +237,7 @@ export function Slider({
 
 export function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-[12px] border border-white/[0.06] bg-black/[0.12] p-3 sm:p-4">
+    <section className="rounded-[12px] border border-ink/[0.06] bg-black/[0.12] p-3 sm:p-4">
       <h3 className="mb-3 px-1 text-[13px] font-medium text-fg-2">{title}</h3>
       <div className="space-y-1.5">{children}</div>
     </section>

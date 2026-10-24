@@ -3,7 +3,6 @@ import { Button, Container, Eyebrow } from "@/components/ds";
 export default function NotFound() {
   return (
     <section className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_420px_at_80%_-10%,#16253d80,transparent_70%)]" />
       <Container className="relative py-28 sm:py-36 lg:py-44">
         <Eyebrow>Ошибка 404</Eyebrow>
         <h1 className="mt-5 text-[40px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[56px]">Страница не найдена</h1>

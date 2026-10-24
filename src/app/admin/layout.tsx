@@ -99,7 +99,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           <Link
             href="/"
             title="На сайт"
-            className="flex h-11 items-center gap-3 overflow-hidden rounded-[8px] px-[9px] text-[13px] text-fg-2 transition-colors hover:bg-white/[0.04] hover:text-fg"
+            className="flex h-11 items-center gap-3 overflow-hidden rounded-[8px] px-[9px] text-[13px] text-fg-2 transition-colors hover:bg-ink/[0.04] hover:text-fg"
           >
             <span className="shrink-0">
               <Avatar src={admin.avatar_url} name={admin.nickname} size={30} />
@@ -114,7 +114,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* командная строка */}
-        <header className="sticky top-0 z-30 border-b border-[#16222f] bg-[#060a11]/90 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-surface-2 bg-bg/90 backdrop-blur-xl">
           <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
             <Link href="/admin" className="lg:hidden shrink-0" aria-label="F16 Control">
               <ControlLogo />
@@ -139,14 +139,14 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
                     )}
                   </span>
                 </span>
-                <span className="hidden sm:flex items-center gap-1.5 border-l border-[#1a2838] pl-3">
+                <span className="hidden sm:flex items-center gap-1.5 border-l border-surface-3 pl-3">
                   <span className="text-fg-3">SRV</span>
                   <span className="text-fg">
                     {busy}/{servers.instances.length}
                   </span>
                   <span className="text-fg-3">· {running} вкл</span>
                 </span>
-                <span className="flex items-center gap-1.5 border-l border-[#1a2838] pl-3">
+                <span className="flex items-center gap-1.5 border-l border-surface-3 pl-3">
                   <span className={cn("size-1.5 rounded-full", live ? "bg-danger animate-pulse" : "bg-fg-3/50")} />
                   <span className={live ? "text-danger" : "text-fg-3"}>LIVE {live}</span>
                 </span>

@@ -14,7 +14,7 @@ const CARD = "rounded-surface border border-line-subtle bg-surface";
 
 const MEDAL: Record<string, string> = {
   "1": "text-[#e8c27a] border-[#e8c27a]/40 bg-[#e8c27a]/[0.08]",
-  "2": "text-[#c9d3e0] border-[#c9d3e0]/35 bg-[#c9d3e0]/[0.06]",
+  "2": "text-fg-2 border-fg-2/35 bg-fg-2/[0.06]",
   "3": "text-[#d39a6a] border-[#d39a6a]/35 bg-[#d39a6a]/[0.06]",
   "3–4": "text-[#d39a6a] border-[#d39a6a]/35 bg-[#d39a6a]/[0.06]",
 };
@@ -46,7 +46,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
         {p.place === "1" ? "🏆" : p.place === "2" ? "🥈" : "🥉"} {PLACE_LABEL[p.place] ?? `${p.place} место`}
       </span>
       <Link href={href} className="group relative mt-5 flex flex-col items-center gap-3 min-w-0 max-w-full">
-        <span className={cn("rounded-full p-[3px]", big ? "bg-[#e8c27a]/40" : p.place === "2" ? "bg-[#c9d3e0]/25" : "bg-[#d39a6a]/30")}>
+        <span className={cn("rounded-full p-[3px]", big ? "bg-[#e8c27a]/40" : p.place === "2" ? "bg-fg-2/25" : "bg-[#d39a6a]/30")}>
           {player ? (
             <Avatar src={player.avatar_url} name={player.nickname} size={size} />
           ) : (
@@ -72,7 +72,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
       {!solo && p.roster.length > 0 && (
         <div className="relative mt-4 flex flex-wrap justify-center gap-1.5 border-t border-line-subtle pt-4">
           {p.roster.map((m) => (
-            <Link key={m.id} href={`/players/${m.steam_id}`} title={m.nickname} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] py-0.5 pl-0.5 pr-2.5 text-[12px] text-fg-2 hover:text-fg">
+            <Link key={m.id} href={`/players/${m.steam_id}`} title={m.nickname} className="flex items-center gap-1.5 rounded-full bg-ink/[0.04] py-0.5 pl-0.5 pr-2.5 text-[12px] text-fg-2 hover:text-fg">
               <Avatar src={m.avatar_url} name={m.nickname} size="xs" />
               <span className="max-w-[110px] truncate">{m.nickname}</span>
             </Link>
@@ -249,7 +249,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
           {championPath.length > 0 && (
             <section>
               <Eyebrow className="mb-6">Путь чемпиона</Eyebrow>
-              <ol className={cn(CARD, "divide-y divide-white/[0.06]")}>
+              <ol className={cn(CARD, "divide-y divide-ink/[0.06]")}>
                 {championPath.map((s) => (
                   <li key={s.matchId}>
                     <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[140px_1fr_auto] items-center gap-x-5 gap-y-1 px-5 py-4 hover:bg-surface-2">
@@ -284,7 +284,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       {/* цифры */}
       <section>
         <Eyebrow className="mb-6">Турнир в цифрах</Eyebrow>
-        <div className={cn(CARD, "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-white/[0.06]")}>
+        <div className={cn(CARD, "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-ink/[0.06]")}>
           {[
             { l: solo ? "Участников" : "Команд", v: totals.teams },
             { l: "Игроков", v: totals.players || "—" },

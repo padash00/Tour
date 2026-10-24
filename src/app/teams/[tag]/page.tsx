@@ -219,13 +219,13 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                 { label: "F16 Rating", value: teamRating ? teamRating.toFixed(2) : "—", cls: teamRating ? ratingColor(teamRating) : "text-fg-3" },
                 { label: "Турниров", value: participations.length, cls: "text-fg" },
               ].map((f) => (
-                <div key={f.label} className="rounded-control border border-line-subtle bg-white/[0.02] px-4 py-3">
+                <div key={f.label} className="rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
                   <dt className="text-micro text-fg-3">{f.label}</dt>
                   <dd className={cn("num mt-1 text-[20px] font-semibold leading-none", f.cls)}>{f.value}</dd>
                 </div>
               ))}
             </dl>
-            <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-white/[0.02] px-4 py-3">
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
               <span className="text-micro text-fg-3">Форма</span>
               {form.length ? (
                 <span className="flex items-center gap-3">

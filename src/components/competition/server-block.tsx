@@ -82,7 +82,7 @@ export function ServerPreparing({ loading }: { loading: boolean }) {
           const current = loading ? i === 1 : i === 0;
           return (
             <div key={label}>
-              <div className="h-1 overflow-hidden rounded-full bg-white/[0.07]">
+              <div className="h-1 overflow-hidden rounded-full bg-ink/[0.07]">
                 <div className={done ? "h-full w-full bg-accent/70" : current ? "h-full w-1/2 animate-pulse bg-accent" : "h-0"} />
               </div>
               <div className={`mt-2 text-micro ${current ? "text-fg" : done ? "text-fg-2" : "text-fg-4"}`}>{label}</div>

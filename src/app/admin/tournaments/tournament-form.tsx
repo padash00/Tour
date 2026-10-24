@@ -81,14 +81,14 @@ function OptionCard({
 }
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="mb-2 text-[12px] font-medium text-[#7f93b0]">{children}</div>;
+  return <div className="mb-2 text-[12px] font-medium text-eyebrow">{children}</div>;
 }
 
 function Section({ show, title, hint, children }: { show: boolean; title: string; hint?: string; children: ReactNode }) {
   // скрытые шаги остаются в DOM: их поля уходят вместе с формой
   return (
     <section className={cn(!show && "hidden")}>
-      <div className="mb-7 pb-5 border-b border-white/[0.06]">
+      <div className="mb-7 pb-5 border-b border-ink/[0.06]">
         <h2 className="text-[24px] font-semibold tracking-[-0.015em]">{title}</h2>
         {hint && <p className="mt-1.5 text-[13px] text-fg-3">{hint}</p>}
       </div>
@@ -99,7 +99,7 @@ function Section({ show, title, hint, children }: { show: boolean; title: string
 
 function SummaryRow({ label, value, warn }: { label: string; value: ReactNode; warn?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-2 border-b border-white/[0.05] last:border-0 text-[13px]">
+    <div className="flex items-baseline justify-between gap-3 py-2 border-b border-ink/[0.05] last:border-0 text-[13px]">
       <span className="text-fg-3 shrink-0">{label}</span>
       <span className={cn("text-right min-w-0 truncate", warn ? "text-warn" : "text-fg")}>{value}</span>
     </div>
@@ -421,7 +421,7 @@ export function TournamentForm({
               </div>
             </div>
             {(bracket === "groups_playoff" || bracket === "swiss" || bracket === "swiss_playoff" || bracket === "round_robin") && (
-              <div className="grid sm:grid-cols-3 gap-5 rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4">
+              <div className="grid sm:grid-cols-3 gap-5 rounded-[8px] bg-shell border border-ink/[0.06] p-4">
                 {bracket === "groups_playoff" && (
                   <>
                     <div>
@@ -684,11 +684,11 @@ export function TournamentForm({
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={img} alt="" className="absolute inset-0 size-full object-cover saturate-[0.55] brightness-[0.55]" />
-                        <span className="absolute inset-0 bg-gradient-to-t from-[#070b12cc] to-transparent" />
+                        <span className="absolute inset-0 bg-gradient-to-t from-bg/80 to-transparent" />
                       </>
                     )}
                     <span className="relative text-[14px] font-semibold">{m.name}</span>
-                    <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-[#06101f]" : "border border-line-strong")}>
+                    <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-bg" : "border border-line-strong")}>
                       {on ? "✓" : ""}
                     </span>
                     {(MODES[format as ModeKey]?.maps as readonly string[] | undefined)?.includes(m.id) && (
@@ -716,7 +716,7 @@ export function TournamentForm({
                       >
                         <span className="text-[14px] font-semibold">{w.split("@")[0]}</span>
                         <span className="absolute bottom-2 left-3 text-[10px] text-fg-3">workshop</span>
-                        <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-[#06101f]" : "border border-line-strong")}>
+                        <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-bg" : "border border-line-strong")}>
                           {on ? "✓" : ""}
                         </span>
                       </button>
@@ -745,7 +745,7 @@ export function TournamentForm({
                   ))}
               </div>
             )}
-            <div className="rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4">
+            <div className="rounded-[8px] bg-shell border border-ink/[0.06] p-4">
               <div className="text-[13px] font-medium text-fg-2">Своя карта из Steam Workshop</div>
               <p className="mt-1 text-xs text-fg-3">
                 Только для этого турнира. Чтобы карта была всегда под рукой и прошла проверку на сервере — добавьте её в Настройки → Workshop-карты.
@@ -786,7 +786,7 @@ export function TournamentForm({
           </Section>
 
           <Section show={step === 5} title="Регистрация" hint="Взнос, призы и контакты для участников">
-            <div className="rounded-[8px] bg-[#09111b] border border-white/[0.06] p-4 space-y-4">
+            <div className="rounded-[8px] bg-shell border border-ink/[0.06] p-4 space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="max-w-lg">
                   <div className="text-[14px] font-semibold text-fg">Официальный турнир</div>
@@ -957,7 +957,7 @@ export function TournamentForm({
             )}
           </Section>
 
-          <div className="mt-10 pt-5 border-t border-white/[0.06] flex items-center justify-between gap-3">
+          <div className="mt-10 pt-5 border-t border-ink/[0.06] flex items-center justify-between gap-3">
             <button type="button" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className={ghostBtn}>
               ← Назад
             </button>
@@ -971,7 +971,7 @@ export function TournamentForm({
 
         {/* сводка */}
         <aside className="xl:sticky xl:top-8 rounded-[12px] border border-line bg-surface p-5">
-          <div className="text-[12px] font-medium text-[#7f93b0]">Сводка</div>
+          <div className="text-[12px] font-medium text-eyebrow">Сводка</div>
           <div className="mt-2 text-[18px] font-semibold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
           <div className="mt-4">
             <SummaryRow label="Режим" value={MODES[format as ModeKey]?.title ?? format} />

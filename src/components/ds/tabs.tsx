@@ -34,7 +34,7 @@ export function ContextNav({ items, match = "path", sticky, className }: { items
               )}
             >
               {it.label}
-              {it.count != null && <span className={cn("num rounded-chip px-1.5 py-px text-micro", it.alert ? "bg-accent font-semibold text-accent-ink" : "bg-white/[0.06] text-fg-2")}>{it.count}</span>}
+              {it.count != null && <span className={cn("num rounded-chip px-1.5 py-px text-micro", it.alert ? "bg-accent font-semibold text-accent-ink" : "bg-ink/[0.06] text-fg-2")}>{it.count}</span>}
             </Link>
           );
         })}

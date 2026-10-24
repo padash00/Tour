@@ -51,7 +51,7 @@ export function MapThumb({ map, image, className, children }: { map: string; ima
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.7] brightness-[0.75]" />
       )}
-      <span className="absolute inset-0 bg-gradient-to-t from-[#070b12d9] via-transparent to-transparent" />
+      <span className="absolute inset-0 bg-gradient-to-t from-bg/85 via-transparent to-transparent" />
       {children}
     </div>
   );
@@ -77,7 +77,7 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
           <Choice value={s.maps[0] ?? ""} disabled={ro} onChange={(v) => patch({ maps: [v] })} options={pool.map((m) => ({ value: m, label: mapLabel(m) }))} />
         </Row>
       ) : (
-        <button type="button" onClick={onAdvanced} className="flex min-h-[52px] w-full items-center gap-3 rounded-[10px] bg-white/[0.03] px-4 py-2 text-left hover:bg-white/[0.05]">
+        <button type="button" onClick={onAdvanced} className="flex min-h-[52px] w-full items-center gap-3 rounded-[10px] bg-ink/[0.03] px-4 py-2 text-left hover:bg-ink/[0.05]">
           <span className="text-fg-3">{Icon.map()}</span>
           <span className="flex-1 text-[14px]">{s.map_choice === "host" ? "Карты серии" : "Пул карт"}</span>
           <span className="flex -space-x-2">
@@ -336,7 +336,7 @@ function MapGrid({ s, ro, patch, maps, images }: { s: LobbySettings; ro: boolean
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && looksLikeWorkshop && addWorkshop()}
             placeholder="Название карты или ссылка на мастерскую"
-            className="h-11 min-w-0 flex-1 rounded-[8px] border border-white/[0.1] bg-surface-3 px-3 text-[14px] text-fg outline-none focus:border-accent/50"
+            className="h-11 min-w-0 flex-1 rounded-[8px] border border-line bg-surface-3 px-3 text-[14px] text-fg outline-none focus:border-accent/50"
           />
           {looksLikeWorkshop ? (
             <button type="button" disabled={pending} onClick={addWorkshop} className={btnClass("secondary", "md")}>
@@ -360,7 +360,7 @@ function MapGrid({ s, ro, patch, maps, images }: { s: LobbySettings; ro: boolean
               <MapThumb
                 map={m.id}
                 image={m.image ?? images[m.id]}
-                className={cn("h-[78px] rounded-[8px] border transition-all", on ? "border-accent ring-1 ring-accent" : "border-white/[0.06] group-hover:border-white/25")}
+                className={cn("h-[78px] rounded-[8px] border transition-all", on ? "border-accent ring-1 ring-accent" : "border-ink/[0.06] group-hover:border-ink/25")}
               >
                 <span className="absolute bottom-1.5 left-1.5 rounded-[4px] bg-black/60 px-1.5 py-0.5 text-[12px] font-medium text-fg">{mapLabel(m.id)}</span>
                 {on && s.map_choice === "host" && s.best_of > 1 && (
@@ -411,7 +411,7 @@ function Templates({ s, patch, templates, onChange }: { s: LobbySettings; patch:
           onChange={(e) => setName(e.target.value)}
           placeholder="Сохранить текущие как…"
           maxLength={40}
-          className="h-9 min-w-0 flex-1 rounded-[7px] border border-white/[0.1] bg-surface-3 px-3 text-[13px] text-fg outline-none"
+          className="h-9 min-w-0 flex-1 rounded-[7px] border border-line bg-surface-3 px-3 text-[13px] text-fg outline-none"
         />
         <button
           type="button"

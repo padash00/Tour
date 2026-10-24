@@ -184,7 +184,7 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
               <div key={label} className="min-w-[120px]">
                 <div className="text-[12px] text-fg-3">{label}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-ink/[0.06]">
                     <div className={cn("h-full rounded-full", s.done === s.total ? "bg-ok" : "bg-accent")} style={{ width: `${(s.done / s.total) * 100}%` }} />
                   </div>
                   <span className="num text-[13px]">

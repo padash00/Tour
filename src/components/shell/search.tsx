@@ -52,7 +52,7 @@ function toItems(r: SearchResult): Item[] {
       group: "tournaments" as const,
       node: (
         <>
-          <span className="grid size-8 shrink-0 place-items-center rounded-control bg-white/[0.05] text-fg-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-control bg-ink/[0.05] text-fg-3">
             <Trophy className="size-4" />
           </span>
           <span className="min-w-0 flex-1 truncate font-medium">{t.name}</span>
@@ -66,7 +66,7 @@ function toItems(r: SearchResult): Item[] {
       group: "matches" as const,
       node: (
         <>
-          <span className="grid size-8 shrink-0 place-items-center rounded-control bg-white/[0.05] text-fg-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-control bg-ink/[0.05] text-fg-3">
             <Swords className="size-4" />
           </span>
           <span className="min-w-0 flex-1">
@@ -178,7 +178,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           {loading ? (
             <Spinner className="size-4 text-fg-3" />
           ) : q ? (
-            <button type="button" onClick={() => { setQ(""); setActive(0); }} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-white/[0.06] hover:text-fg">
+            <button type="button" onClick={() => { setQ(""); setActive(0); }} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-ink/[0.06] hover:text-fg">
               <X className="size-4" />
             </button>
           ) : null}
@@ -216,7 +216,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                       aria-selected={on}
                       onMouseMove={() => setActive(i)}
                       onClick={() => go(it.href)}
-                      className={cn("flex min-h-12 cursor-pointer items-center gap-3 rounded-control px-3 py-2 text-[14px] text-fg", on && "bg-white/[0.07]")}
+                      className={cn("flex min-h-12 cursor-pointer items-center gap-3 rounded-control px-3 py-2 text-[14px] text-fg", on && "bg-ink/[0.07]")}
                     >
                       {it.node}
                       {on && <CornerDownLeft className="size-4 shrink-0 text-fg-3" aria-hidden />}
@@ -268,7 +268,7 @@ export function SearchTrigger() {
         onClick={() => setOpen(true)}
         aria-label="Поиск"
         aria-keyshortcuts="Control+K"
-        className="hidden h-10 w-56 items-center gap-2.5 rounded-control border border-line bg-white/[0.02] px-3 text-[14px] text-fg-3 transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:text-fg-2 xl:flex"
+        className="hidden h-10 w-56 items-center gap-2.5 rounded-control border border-line bg-ink/[0.02] px-3 text-[14px] text-fg-3 transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:text-fg-2 xl:flex"
       >
         <Search className="size-4" />
         <span className="flex-1 text-left">Поиск</span>
@@ -278,7 +278,7 @@ export function SearchTrigger() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Поиск"
-        className="grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-white/[0.06] hover:text-fg xl:hidden"
+        className="grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg xl:hidden"
       >
         <Search className="size-[18px]" />
       </button>

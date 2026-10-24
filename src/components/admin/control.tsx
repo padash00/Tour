@@ -35,7 +35,7 @@ export function AdminHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-7 border-b border-white/[0.06]">
+    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-7 border-b border-ink/[0.06]">
       <div className="min-w-0">
         {back && (
           <Link href={back.href} className="rounded-sm text-[12px] text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
@@ -194,7 +194,7 @@ export { SubTabs } from "./sub-tabs";
 export function TableSkeleton({ rows = 8, cols = 6 }: { rows?: number; cols?: number }) {
   return (
     <div className="space-y-6">
-      <div className="pb-7 border-b border-white/[0.06]">
+      <div className="pb-7 border-b border-ink/[0.06]">
         <div className="skeleton h-3 w-24" />
         <div className="skeleton mt-3 h-8 w-56" />
       </div>

@@ -194,17 +194,17 @@ export function LobbyRoom({
               <div className="relative flex min-h-[148px] flex-col justify-between gap-6 p-3 sm:p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">
-                    <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-control bg-[#070b12b3] px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-[#070b12e6]">
+                    <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-control bg-bg/70 px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
                       {Icon.back("size-4")}
                       <span className="hidden sm:inline">К списку лобби</span>
                     </Link>
                     {copyInvite && (
-                      <button type="button" onClick={copyInvite} title="Скопировать ссылку-приглашение" aria-label="Скопировать ссылку-приглашение" className="grid size-10 place-items-center rounded-control bg-[#070b12b3] text-fg backdrop-blur-sm transition-colors hover:bg-[#070b12e6]">
+                      <button type="button" onClick={copyInvite} title="Скопировать ссылку-приглашение" aria-label="Скопировать ссылку-приглашение" className="grid size-10 place-items-center rounded-control bg-bg/70 text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
                         {Icon.link("size-[18px]")}
                       </button>
                     )}
                   </div>
-                  <span className="num absolute left-1/2 top-0 hidden -translate-x-1/2 rounded-b-control bg-[#070b12cc] px-4 py-2 text-[13px] font-medium text-fg-2 backdrop-blur-sm sm:block">
+                  <span className="num absolute left-1/2 top-0 hidden -translate-x-1/2 rounded-b-control bg-bg/80 px-4 py-2 text-[13px] font-medium text-fg-2 backdrop-blur-sm sm:block">
                     Игроков <span className="text-fg">{playersNow}/{s.team_size * 2}</span>
                   </span>
                   {isMember ? (
@@ -240,7 +240,7 @@ export function LobbyRoom({
                       {mapLabel(headMap)} · {lobby.visibility === "public" ? "открытое" : lobby.visibility === "closed" ? "по паролю" : "приватное"}
                     </p>
                   </div>
-                  <span className="num rounded-control bg-[#070b12b3] px-3 py-1.5 text-meta text-fg-2 backdrop-blur-sm sm:hidden">
+                  <span className="num rounded-control bg-bg/70 px-3 py-1.5 text-meta text-fg-2 backdrop-blur-sm sm:hidden">
                     {playersNow}/{s.team_size * 2}
                   </span>
                 </div>
@@ -358,7 +358,7 @@ export function LobbyRoom({
                   {view.history.map((h) => (
                     <Link key={h.id} href={`/lobbies/games/${h.id}`} className="flex min-h-14 items-center gap-3 py-2.5 text-[14px] hover:text-accent">
                       <span className={cn("min-w-0 flex-1 truncate text-right", h.winner === 1 && "font-semibold")}>{h.team1}</span>
-                      <span className="num shrink-0 rounded-control bg-white/[0.05] px-2 py-0.5 font-semibold">
+                      <span className="num shrink-0 rounded-control bg-ink/[0.05] px-2 py-0.5 font-semibold">
                         {h.team1_score}:{h.team2_score}
                       </span>
                       <span className={cn("min-w-0 flex-1 truncate", h.winner === 2 && "font-semibold")}>{h.team2}</span>
@@ -448,18 +448,18 @@ function VisibilityRow({ view, run, code }: { view: LobbyView; run: Run; code: s
   const [pw, setPw] = useState("");
   const changed = vis !== view.lobby.visibility || pw.length > 0;
   return (
-    <div className="space-y-2 rounded-control bg-white/[0.03] px-4 py-3">
+    <div className="space-y-2 rounded-control bg-ink/[0.03] px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-fg-3">{Icon.lock()}</span>
         <span className="flex-1 text-[14px]">Тип лобби</span>
-        <select value={vis} onChange={(e) => setVis(e.target.value as typeof vis)} className="h-9 rounded-[8px] border border-white/[0.1] bg-surface-3 px-3 text-[13px] text-fg">
+        <select value={vis} onChange={(e) => setVis(e.target.value as typeof vis)} className="h-9 rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg">
           <option value="public">Открытое</option>
           <option value="closed">Закрытое</option>
           <option value="private">Приватное</option>
         </select>
       </div>
       {vis !== "public" && (
-        <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={view.lobby.has_password ? "Новый пароль (не обязательно)" : "Пароль"} maxLength={32} className="h-9 w-full rounded-[8px] border border-white/[0.1] bg-surface-3 px-3 text-[13px] text-fg outline-none" />
+        <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={view.lobby.has_password ? "Новый пароль (не обязательно)" : "Пароль"} maxLength={32} className="h-9 w-full rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg outline-none" />
       )}
       {changed && (
         <button type="button" onClick={() => (setPw(""), run(() => A.setVisibility(code, vis, pw), "Тип лобби изменён"))} className={btnClass("primary", "sm", "w-full")}>

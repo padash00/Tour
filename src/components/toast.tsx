@@ -105,7 +105,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       aria-live={toast.tone === "error" ? "assertive" : "polite"}
       aria-atomic="true"
       className={cn(
-        "pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-[10px] border border-white/[0.1]",
+        "pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-[10px] border border-line",
         "bg-surface-2/95 py-3.5 pl-4 pr-10 shadow-[var(--shadow-pop)] backdrop-blur-xl animate-[toast-in_.22s_cubic-bezier(.2,.8,.2,1)]",
       )}
     >
@@ -116,7 +116,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         type="button"
         onClick={onClose}
         aria-label="Закрыть"
-        className="absolute right-2 top-2 grid size-7 place-items-center rounded-md text-fg-3 transition-colors hover:bg-white/[0.06] hover:text-fg"
+        className="absolute right-2 top-2 grid size-7 place-items-center rounded-md text-fg-3 transition-colors hover:bg-ink/[0.06] hover:text-fg"
       >
         <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
           <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />

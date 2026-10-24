@@ -139,7 +139,7 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
           : null;
 
   return (
-    <div className="group grid overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 lg:grid-cols-[44%_1fr]">
+    <div className="group grid overflow-hidden rounded-[12px] border border-line-subtle bg-surface/80 lg:grid-cols-[44%_1fr]">
       <div className="relative min-h-[240px] overflow-hidden lg:min-h-[350px]">
         <Image
           src={t.cover_url ?? "/home/tournament.jpg"}
@@ -149,19 +149,19 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
           className="media-zoom object-cover"
           unoptimized={!!t.cover_url}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070b12] via-[#070b12]/55 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-7 sm:p-9 lg:p-11">
           <div className="text-[34px] sm:text-[44px] lg:text-[54px] font-semibold leading-none tracking-[-0.02em] text-fg">{t.name}</div>
           <Eyebrow className="mt-4 text-fg-3">{isFirst ? "Первый турнир платформы" : formatDate(t.starts_at)}</Eyebrow>
         </div>
       </div>
 
-      <div className="flex flex-col justify-center gap-9 lg:gap-11 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-white/[0.08] lg:my-9 lg:py-2">
+      <div className="flex flex-col justify-center gap-9 lg:gap-11 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-line-subtle lg:my-9 lg:py-2">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center text-[15px] lg:text-[18px] text-fg">
             {[t.game, mode.size === 5 ? "5v5" : mode.size === 2 ? "2v2" : "1v1", bracketLabel[t.bracket_type] ?? t.bracket_type].map((x, i) => (
               <span key={i} className="flex items-center">
-                {i > 0 && <span className="mx-5 h-4 w-px bg-white/20" />}
+                {i > 0 && <span className="mx-5 h-4 w-px bg-ink/20" />}
                 {x}
               </span>
             ))}
@@ -180,7 +180,7 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
               </div>
             </div>
           </div>
-          <div className="flex items-start gap-4 sm:border-l sm:border-white/[0.08] sm:pl-8">
+          <div className="flex items-start gap-4 sm:border-l sm:border-line-subtle sm:pl-8">
             <span className="mt-0.5 text-fg-2">{Icon.globe("size-6 lg:size-8")}</span>
             <div>
               <div className="text-[15px] lg:text-[18px] text-fg">{t.is_lan ? "LAN" : "Онлайн"}</div>
@@ -203,16 +203,16 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
 /** Турниров ещё нет — честно, в той же композиции */
 function NoTournamentCard() {
   return (
-    <div className="grid overflow-hidden rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 lg:grid-cols-[44%_1fr]">
+    <div className="grid overflow-hidden rounded-[12px] border border-line-subtle bg-surface/80 lg:grid-cols-[44%_1fr]">
       <div className="relative min-h-[240px] lg:min-h-[350px]">
         <Image src="/home/tournament.jpg" alt="" fill sizes="(min-width: 1024px) 600px, 100vw" className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070b12] via-[#070b12]/55 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-7 sm:p-9 lg:p-11">
           <div className="text-[34px] sm:text-[44px] lg:text-[54px] font-semibold leading-none tracking-[-0.02em] text-fg">Скоро</div>
           <Eyebrow className="mt-4 text-fg-3">Первый турнир платформы</Eyebrow>
         </div>
       </div>
-      <div className="flex flex-col justify-center gap-8 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-white/[0.08] lg:my-9 lg:py-2">
+      <div className="flex flex-col justify-center gap-8 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-line-subtle lg:my-9 lg:py-2">
         <p className="max-w-md lg:max-w-lg text-[16px] lg:text-[19px] leading-relaxed text-fg-2">
           Первый турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
         </p>
@@ -227,12 +227,12 @@ function NoTournamentCard() {
 function NextTournaments({ list }: { list: Tournament[] }) {
   if (list.length > 0) {
     return (
-      <div className="mt-5 overflow-hidden rounded-[12px] border border-dashed border-white/[0.12]">
+      <div className="mt-5 overflow-hidden rounded-[12px] border border-dashed border-line">
         {list.map((t, i) => (
           <Link
             key={t.id}
             href={`/tournaments/${t.slug}`}
-            className={cn("group flex items-center gap-6 px-8 py-6 transition-colors hover:bg-white/[0.02]", i > 0 && "border-t border-white/[0.06]")}
+            className={cn("group flex items-center gap-6 px-8 py-6 transition-colors hover:bg-ink/[0.02]", i > 0 && "border-t border-ink/[0.06]")}
           >
             <span className="text-fg-2">{Icon.calendar("size-7")}</span>
             <div className="min-w-0 flex-1">
@@ -248,7 +248,7 @@ function NextTournaments({ list }: { list: Tournament[] }) {
     );
   }
   return (
-    <div className="mt-5 flex items-center gap-6 lg:gap-8 rounded-[12px] border border-dashed border-white/[0.12] bg-white/[0.012] px-8 py-7 lg:px-11 lg:py-8">
+    <div className="mt-5 flex items-center gap-6 lg:gap-8 rounded-[12px] border border-dashed border-line bg-ink/[0.012] px-8 py-7 lg:px-11 lg:py-8">
       <span className="text-fg-2">{Icon.calendar("size-8 lg:size-10")}</span>
       <div>
         <div className="text-[15px] lg:text-[18px] font-semibold text-fg">Следующие турниры</div>
@@ -288,7 +288,7 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
         <Eyebrow className="mb-5 lg:mb-6">Как это работает</Eyebrow>
         <ol className="grid gap-4 md:grid-cols-3">
           {STEPS.map((s) => (
-            <li key={s.n} className="relative rounded-[12px] border border-white/[0.08] bg-[#0b1420]/80 p-8 pb-10 lg:p-10 lg:pb-14">
+            <li key={s.n} className="relative rounded-[12px] border border-line-subtle bg-surface/80 p-8 pb-10 lg:p-10 lg:pb-14">
               <span className="absolute right-8 top-8 lg:right-10 lg:top-10 text-fg-2">{s.icon("size-7 lg:size-9")}</span>
               <span className="text-[13px] lg:text-[15px] text-fg-3">{s.n}</span>
               <div className="mt-3 text-[22px] lg:text-[26px] font-semibold tracking-[-0.01em] text-fg">{s.title}</div>
@@ -302,7 +302,7 @@ export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
         <Eyebrow className="mb-8 lg:mb-10">Почему F16 Arena</Eyebrow>
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
           {WHY.map((w, i) => (
-            <div key={w.title} className={cn("lg:px-10", i === 0 && "lg:pl-0", i > 0 && "lg:border-l lg:border-white/[0.08]")}>
+            <div key={w.title} className={cn("lg:px-10", i === 0 && "lg:pl-0", i > 0 && "lg:border-l lg:border-line-subtle")}>
               <span className="text-fg-2">{w.icon("size-7 lg:size-9")}</span>
               <div className="mt-5 lg:mt-6 text-[18px] lg:text-[21px] font-semibold text-fg">{w.title}</div>
               <p className="mt-3 text-[14px] lg:text-[16px] leading-[1.6] text-fg-3">{w.text}</p>

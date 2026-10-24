@@ -23,7 +23,7 @@ function Chips({ items }: { items: string[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((x) => (
-        <span key={x} className="inline-flex h-7 items-center rounded-chip border border-line-subtle bg-white/[0.03] px-2.5 text-meta text-fg-2">
+        <span key={x} className="inline-flex h-7 items-center rounded-chip border border-line-subtle bg-ink/[0.03] px-2.5 text-meta text-fg-2">
           {x}
         </span>
       ))}

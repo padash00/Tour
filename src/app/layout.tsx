@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, Onest } from "next/font/google";
+import { Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
+import { MobileTabBar, ShellFrame, SiteSidebar } from "@/components/shell/sidebar";
 import { ToastProvider } from "@/components/toast";
 import { RouteTransition } from "@/components/route-transition";
 import { NavProgress } from "@/components/nav-progress";
@@ -10,14 +11,14 @@ import { SITE_URL } from "@/lib/site";
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/seo";
 import "./globals.css";
 
-// Onest — гротеск с полноценной кириллицей: интерфейс и заголовки
-const onest = Onest({
-  variable: "--font-onest",
+// Inter Tight — чёткий гротеск с кириллицей: весь интерфейс
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
-// цифры: счёт, ELO, порты, время — табличные
+// адреса серверов и коды
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin", "cyrillic"],
@@ -44,13 +45,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070b12",
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ru" className={`${onest.variable} ${jetbrains.variable} h-full`}>
+    <html lang="ru" className={`${interTight.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         <ToastProvider>
           <Suspense fallback={null}>
@@ -62,13 +63,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           >
             Перейти к содержимому
           </a>
-          <SiteHeader />
-          <ProfileNudge />
-          {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
-          <main id="main-content" tabIndex={-1} className="flex-1 anim-in">
-            <RouteTransition>{children}</RouteTransition>
-          </main>
-          <SiteFooter />
+          <SiteSidebar />
+          <ShellFrame>
+            <SiteHeader />
+            <ProfileNudge />
+            {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
+            <main id="main-content" tabIndex={-1} className="flex-1 anim-in">
+              <RouteTransition>{children}</RouteTransition>
+            </main>
+            <SiteFooter />
+          </ShellFrame>
+          <MobileTabBar />
         </ToastProvider>
       </body>
     </html>

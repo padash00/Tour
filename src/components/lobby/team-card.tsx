@@ -74,7 +74,7 @@ export function TeamCard({
           )}
           <div className="num text-[12px] text-fg-3">AVG ELO: {avg ?? "—"}</div>
         </div>
-        <span className="num rounded-[6px] bg-white/[0.05] px-2 py-1 text-[13px] text-fg-2">
+        <span className="num rounded-[6px] bg-ink/[0.05] px-2 py-1 text-[13px] text-fg-2">
           {members.length + bots.length}/{size}
         </span>
       </div>
@@ -90,7 +90,7 @@ export function TeamCard({
               <div className="text-[12px] text-fg-3">{BOT_DIFFICULTY[view.lobby.settings.bot_difficulty]}</div>
             </div>
             {canAddBot && (
-              <button type="button" disabled={busy} onClick={() => run(() => A.removeBot(code, team, b))} className="grid size-8 place-items-center rounded-[7px] text-fg-3 hover:bg-white/[0.06] hover:text-danger" aria-label="Убрать бота">
+              <button type="button" disabled={busy} onClick={() => run(() => A.removeBot(code, team, b))} className="grid size-8 place-items-center rounded-[7px] text-fg-3 hover:bg-ink/[0.06] hover:text-danger" aria-label="Убрать бота">
                 {Icon.x("size-4")}
               </button>
             )}
@@ -98,11 +98,11 @@ export function TeamCard({
         ))}
         {Array.from({ length: empty }, (_, i) => (
           <div key={i} className="flex h-[64px] items-stretch">
-            <button type="button" onClick={onEmpty} className="grid flex-1 place-items-center text-fg-4 transition-colors hover:bg-white/[0.03] hover:text-fg-2" aria-label="Занять место">
+            <button type="button" onClick={onEmpty} className="grid flex-1 place-items-center text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-fg-2" aria-label="Занять место">
               {Icon.plus("size-5")}
             </button>
             {canAddBot && (
-              <button type="button" disabled={busy} onClick={() => run(() => A.addBot(code, team))} title="Добавить бота" className="grid w-16 place-items-center border-l border-white/[0.04] text-fg-4 transition-colors hover:bg-white/[0.03] hover:text-accent">
+              <button type="button" disabled={busy} onClick={() => run(() => A.addBot(code, team))} title="Добавить бота" className="grid w-16 place-items-center border-l border-ink/[0.04] text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-accent">
                 {Icon.bot("size-5")}
               </button>
             )}
@@ -150,7 +150,7 @@ export function PlayerLine({
     <div
       className={cn(
         "relative flex items-center gap-3 transition-[background-color,box-shadow] duration-300",
-        big ? "h-[64px] px-4" : "rounded-control bg-white/[0.03] px-3 py-2",
+        big ? "h-[64px] px-4" : "rounded-control bg-ink/[0.03] px-3 py-2",
         self && big && !(showReady && m.ready) && "bg-accent/[0.05]",
         showReady && m.ready && "bg-gradient-to-r from-ok/[0.28] via-ok/[0.16] to-ok/[0.08] shadow-[inset_3px_0_0_0_var(--color-ok)]",
       )}
@@ -185,7 +185,7 @@ export function PlayerLine({
         <Menu
           label={`Действия с игроком ${m.nickname}`}
           trigger={
-            <button type="button" className="grid size-9 place-items-center rounded-control text-fg-3 hover:bg-white/[0.06] hover:text-fg" aria-label={`Действия с игроком ${m.nickname}`}>
+            <button type="button" className="grid size-9 place-items-center rounded-control text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label={`Действия с игроком ${m.nickname}`}>
               {Icon.more("size-5")}
             </button>
           }
@@ -213,7 +213,7 @@ export function PlayerLine({
 }
 
 export const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-white/[0.03] hover:text-fg-2" aria-label="Занять место">
+  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-ink/[0.03] hover:text-fg-2" aria-label="Занять место">
     {Icon.plus("size-5")}
   </button>
 );
@@ -223,7 +223,7 @@ export function Panel({ title, count, right, children }: { title: string; count?
     <section className="rounded-surface border border-line-subtle bg-surface p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-3">
         <h2 className="text-title text-fg">{title}</h2>
-        {count != null && <span className="num rounded-chip bg-white/[0.06] px-2 py-0.5 text-micro text-fg-2">{count}</span>}
+        {count != null && <span className="num rounded-chip bg-ink/[0.06] px-2 py-0.5 text-micro text-fg-2">{count}</span>}
         <span className="ml-auto">{right}</span>
       </div>
       {children}

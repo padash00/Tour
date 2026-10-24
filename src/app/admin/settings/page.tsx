@@ -125,7 +125,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
                 key={t.key}
                 href={href(t.key)}
                 aria-current={tab === t.key ? "page" : undefined}
-                className={`relative flex h-10 items-center justify-between gap-3 rounded-[8px] px-3 text-[13px] whitespace-nowrap transition ${tab === t.key ? "bg-accent/[0.08] text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]"}`}
+                className={`relative flex h-10 items-center justify-between gap-3 rounded-[8px] px-3 text-[13px] whitespace-nowrap transition ${tab === t.key ? "bg-accent/[0.08] text-fg" : "text-fg-3 hover:text-fg-2 hover:bg-ink/[0.03]"}`}
               >
                 {tab === t.key && <span className="hidden lg:block absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-accent" />}
                 {t.label}
@@ -175,19 +175,19 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
 
       {tab === "general" && (
         <Panel title="Состояние">
-          <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06] max-w-2xl">
+          <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06] max-w-2xl">
             {settings.map((s) => (
               <Link
                 key={s.key}
                 href={href(Object.entries(TAB_SETTING).find(([, v]) => v === s.key)?.[0] ?? "general")}
-                className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-white/[0.03]"
+                className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-ink/[0.03]"
               >
                 <Dot tone={s.source ? "ok" : "warn"} />
                 <span className="flex-1">{s.label}</span>
                 <span className={s.source ? "text-fg-3" : "text-warn"}>{s.source ? (s.source === "site" ? "задан" : "в Vercel") : "не задан"}</span>
               </Link>
             ))}
-            <Link href={href("workshop")} className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-white/[0.03]">
+            <Link href={href("workshop")} className="flex items-center gap-3 px-4 h-11 text-[13px] hover:bg-ink/[0.03]">
               <Dot tone={broken ? "danger" : unchecked ? "warn" : "ok"} />
               <span className="flex-1">Workshop-карты</span>
               <span className="text-fg-3">
@@ -236,7 +236,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
             проверяет, грузится ли она в CS2.
           </p>
           {workshop.length > 0 && (
-            <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
+            <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06]">
               {workshop.map((w) => {
                 const [name, id] = w.split("@");
                 const i = info[id];
@@ -295,7 +295,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
 
       {tab === "security" && (
         <div className="space-y-6 max-w-2xl">
-          <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
+          <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06]">
             <InfoRow label="Вход">Только через Steam OpenID</InfoRow>
             <InfoRow label="Администраторы из Vercel (ADMIN_STEAM_IDS)">
               <span className="num">{env.adminSteamIds.length}</span>
@@ -329,7 +329,7 @@ async function ServersInfo() {
   const bundle = getAgentBundle().version;
   return (
     <div className="space-y-4 max-w-2xl">
-      <div className="rounded-[12px] border border-line bg-surface divide-y divide-white/[0.06]">
+      <div className="rounded-[12px] border border-line bg-surface divide-y divide-ink/[0.06]">
         <InfoRow label="F16 Server Agent">
           <span className="flex items-center gap-2">
             <Dot tone={online ? "ok" : "danger"} />

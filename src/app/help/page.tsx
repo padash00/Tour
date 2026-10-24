@@ -32,7 +32,7 @@ export default function HelpPage() {
               <ul className="space-y-1 text-[14px]">
                 {g.topics.map((id) => (
                   <li key={id}>
-                    <a href={`#${id}`} className="block rounded-control px-2 py-2 text-fg-2 transition-colors hover:bg-white/[0.04] hover:text-fg">
+                    <a href={`#${id}`} className="block rounded-control px-2 py-2 text-fg-2 transition-colors hover:bg-ink/[0.04] hover:text-fg">
                       {HELP[id].title}
                     </a>
                   </li>

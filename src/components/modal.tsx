@@ -56,12 +56,12 @@ export function Modal({
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-[#03060bd9] backdrop-blur-[6px] animate-[fade_.15s_ease-out]" onClick={onClose} />
+      <div className="absolute inset-0 bg-bg/85 backdrop-blur-[6px] animate-[fade_.15s_ease-out]" onClick={onClose} />
       <div
         ref={panel}
         className={cn(
           "relative w-full max-w-[460px] overflow-hidden rounded-[14px] border bg-surface-2 shadow-[var(--shadow-pop)] animate-[pop_.2s_cubic-bezier(.2,.8,.2,1)]",
-          tone === "danger" ? "border-danger/30" : "border-white/[0.1]",
+          tone === "danger" ? "border-danger/30" : "border-line",
         )}
       >
         {tone === "danger" && <span className="absolute inset-x-0 top-0 h-[2px] bg-danger/70" />}
@@ -88,7 +88,7 @@ export function Modal({
           </div>
         </div>
         {footer && (
-          <div className="flex flex-col-reverse gap-2 border-t border-white/[0.06] bg-black/[0.15] px-6 py-4 sm:flex-row sm:justify-end sm:px-7">
+          <div className="flex flex-col-reverse gap-2 border-t border-ink/[0.06] bg-black/[0.15] px-6 py-4 sm:flex-row sm:justify-end sm:px-7">
             {footer}
           </div>
         )}

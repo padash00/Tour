@@ -44,7 +44,7 @@ export function ChatBox({ instances, fixed, className }: { instances?: string[];
                 input.current.focus();
               }
             }}
-            className="h-7 rounded-full border border-white/[0.10] px-2.5 text-[12px] text-fg-2 transition-colors hover:border-white/[0.22] hover:text-fg"
+            className="h-7 rounded-full border border-ink/[0.10] px-2.5 text-[12px] text-fg-2 transition-colors hover:border-ink/[0.22] hover:text-fg"
           >
             {p}
           </button>

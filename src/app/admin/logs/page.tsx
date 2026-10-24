@@ -90,7 +90,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
           {sev && <input type="hidden" name="s" value={sev} />}
           <input name="q" defaultValue={q} placeholder="Поиск по действию и данным" aria-label="Поиск" className="field !h-10 flex-1 min-w-[220px] text-[13px]" />
           <input name="a" defaultValue={actor} placeholder="Кто (ник или system)" aria-label="Кто" className="field !h-10 w-56 text-[13px]" />
-          <button type="submit" className="h-10 rounded-[8px] border border-white/[0.14] bg-white/[0.03] px-4 text-[13px] font-medium hover:border-white/[0.26]">
+          <button type="submit" className="h-10 rounded-[8px] border border-ink/[0.14] bg-ink/[0.03] px-4 text-[13px] font-medium hover:border-ink/[0.26]">
             Найти
           </button>
           {(q || actor) && (
@@ -107,7 +107,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
                 href={href({ f: f.key === "all" ? null : f.key })}
                 className={cn(
                   "h-8 px-3 inline-flex items-center rounded-[7px] text-[12px] transition",
-                  filter === f.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]",
+                  filter === f.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-ink/[0.03]",
                 )}
               >
                 {f.label}
@@ -121,7 +121,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
                 href={href({ s })}
                 className={cn(
                   "h-8 px-3 inline-flex items-center rounded-[7px] text-[12px] font-mono transition",
-                  sev === s ? "bg-white/[0.07]" : "hover:bg-white/[0.03]",
+                  sev === s ? "bg-ink/[0.07]" : "hover:bg-ink/[0.03]",
                   s ? sevCls[s] : "text-fg-2",
                 )}
               >
@@ -135,7 +135,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
       {logs.length === 0 ? (
         <EmptyState compact title="Записей нет" description={q || actor || sev || filter !== "all" ? "Попробуйте снять фильтры." : undefined} />
       ) : (
-        <div className="rounded-[12px] border border-white/[0.08] bg-[#04070c] overflow-x-auto">
+        <div className="rounded-[12px] border border-line-subtle bg-[#04070c] overflow-x-auto">
           <div className="min-w-[820px] font-mono text-[12px] leading-[22px]">
             {[...days.entries()].map(([day, rows]) => (
               <div key={day}>
@@ -146,7 +146,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
                   const s = severityOf(l.action);
                   const payload = l.payload && Object.keys(l.payload).length ? l.payload : null;
                   return (
-                    <details key={l.id} className="group px-4 hover:bg-white/[0.03] open:bg-white/[0.02]">
+                    <details key={l.id} className="group px-4 hover:bg-ink/[0.03] open:bg-ink/[0.02]">
                       <summary className={cn("flex gap-4 list-none", payload ? "cursor-pointer" : "cursor-default")}>
                         <span className="text-fg-3 shrink-0 w-[52px]">{formatTime(l.created_at)}</span>
                         <span className={cn("shrink-0 w-11 uppercase", sevCls[s])}>{s}</span>
@@ -155,7 +155,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
                         <span className="text-fg-3 truncate">{payload ? JSON.stringify(payload) : ""}</span>
                       </summary>
                       {payload && (
-                        <pre className="ml-[200px] mb-2 mt-1 max-h-72 overflow-auto rounded-[6px] bg-white/[0.03] px-3 py-2 whitespace-pre-wrap break-all text-fg-2">
+                        <pre className="ml-[200px] mb-2 mt-1 max-h-72 overflow-auto rounded-[6px] bg-ink/[0.03] px-3 py-2 whitespace-pre-wrap break-all text-fg-2">
                           {JSON.stringify(payload, null, 2)}
                           {l.entity_type ? `\n\n${l.entity_type}: ${l.entity_id ?? ""}` : ""}
                         </pre>

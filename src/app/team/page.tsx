@@ -237,7 +237,7 @@ export default async function MyTeamPage(props: PageProps<"/team">) {
                       </div>
                     </dl>
                   </div>
-                  <div className="rounded-surface border border-line-subtle bg-white/[0.02] p-4 sm:p-5">
+                  <div className="rounded-surface border border-line-subtle bg-ink/[0.02] p-4 sm:p-5">
                     <Eyebrow tone="accent">Следующий шаг</Eyebrow>
                     <div className="mt-2 text-title text-fg">{step.title}</div>
                     <p className="mt-1 text-[14px] leading-relaxed text-fg-2">{step.text}</p>

@@ -46,11 +46,11 @@ export function MapTile({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[10px] border border-white/[0.08] h-28 sm:h-36 xl:h-44 p-4 lg:p-5 flex flex-col justify-end text-left transition-all duration-200 w-full",
+        "relative overflow-hidden rounded-[10px] border border-line-subtle h-28 sm:h-36 xl:h-44 p-4 lg:p-5 flex flex-col justify-end text-left transition-all duration-200 w-full",
         state === "banned" && "opacity-35 grayscale",
         state === "picked" && "ring-2 ring-accent/80 border-transparent",
         state === "decider" && "ring-2 ring-ok/70 border-transparent",
-        interactive && "cursor-pointer hover:ring-1 hover:ring-white/40 hover:-translate-y-px",
+        interactive && "cursor-pointer hover:ring-1 hover:ring-ink/40 hover:-translate-y-px",
         className,
       )}
       style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}
@@ -59,7 +59,7 @@ export function MapTile({
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.55] brightness-[0.7]" />
-          <span className="absolute inset-0 bg-gradient-to-t from-[#070b12f0] via-[#070b1266] to-transparent" />
+          <span className="absolute inset-0 bg-gradient-to-t from-bg via-bg to-transparent" />
         </>
       ) : (
         <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff0d,transparent_60%)]" />

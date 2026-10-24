@@ -89,7 +89,7 @@ export function TournamentList({ items, featuredId }: { items: TournamentItem[];
               onClick={() => choose(f.key)}
               className={cn(
                 "inline-flex h-9 shrink-0 items-center gap-2 rounded-control border px-3 text-[14px] font-medium transition-colors duration-[var(--dur-hover)]",
-                filter === f.key ? "border-line-strong bg-white/[0.07] text-fg" : "border-transparent text-fg-3 hover:text-fg",
+                filter === f.key ? "border-line-strong bg-ink/[0.07] text-fg" : "border-transparent text-fg-3 hover:text-fg",
               )}
             >
               {f.label}

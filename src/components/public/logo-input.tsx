@@ -21,7 +21,7 @@ export function LogoInput({ name = "logo", current, tag }: { name?: string; curr
         className={cn(
           "grid size-20 shrink-0 place-items-center overflow-hidden rounded-[12px] border border-dashed transition-colors duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-          src ? "border-white/[0.12] bg-[#09111b]" : "border-white/[0.2] bg-[#09111b] hover:border-accent/60",
+          src ? "border-line bg-shell" : "border-ink/[0.2] bg-shell hover:border-accent/60",
         )}
         aria-label="Выбрать логотип"
       >

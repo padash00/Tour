@@ -246,7 +246,7 @@ export function ParticipationPanel({ t, approvedCount, preview }: { t: Tournamen
       {p.text && <p className="mt-3 text-[14px] leading-relaxed text-fg-2">{p.text}</p>}
       {t.status === "registration" && !(me.reg && ["pending", "approved"].includes(me.reg.status)) && (
         <div className="mt-4">
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
             <div className="h-full rounded-full bg-accent/70" style={{ width: `${fill}%` }} />
           </div>
           <div className="num mt-1.5 text-micro text-fg-3">
@@ -272,7 +272,7 @@ export function ParticipationPanel({ t, approvedCount, preview }: { t: Tournamen
 export function HeroCta({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
   const me = useTournamentMe(t.id);
   if (!me) {
-    return t.status === "registration" || t.status === "checkin" ? <span aria-hidden className="inline-block h-12 w-56 rounded-control bg-white/[0.04]" /> : null;
+    return t.status === "registration" || t.status === "checkin" ? <span aria-hidden className="inline-block h-12 w-56 rounded-control bg-ink/[0.04]" /> : null;
   }
   const p = participation(t, me, approvedCount);
   if (!p.cta || p.cta.variant === "secondary") return null;

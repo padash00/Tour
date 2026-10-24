@@ -1,15 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 171 2046 1700">
-  <defs>
-    <linearGradient id="f16Gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="42%" stop-color="#DCEBFF"/>
-      <stop offset="72%" stop-color="#9FC6FF"/>
-      <stop offset="100%" stop-color="#4F8FFF"/>
-    </linearGradient>
-  </defs>
-  <g fill="url(#f16Gradient)">
-    <path d="M 1801 377 L 1061 387 L 309 1082 L 1006 689 L 1582 669 L 1801 520 Z"/>
-<path d="M 1553 824 L 939 818 L 645 992 L 251 1665 L 698 1475 L 889 1133 Z"/>
-<path d="M 1625 909 L 1201 1079 L 986 1529 L 1365 1336 Z"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="f16g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E2FF00"/><stop offset="1" stop-color="#7CC400"/></linearGradient></defs><rect width="512" height="512" fill="#000"/><g transform="translate(64 171.8) scale(0.51682)"><path fill="url(#f16g)" fill-rule="evenodd" d="M312 0 225 86H93v40h132v79H93v120H0V86L87 0Z M339 0h80v325h-93V86h-74Z M526 0h216l-87 86H529v39h213v200H439V86Z M529 206h124v40H529Z"/></g></svg>

@@ -334,12 +334,12 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           </div>
         </div>
         {m.maps.length > 0 && (
-          <div className="flex flex-wrap border-t border-white/[0.06]">
+          <div className="flex flex-wrap border-t border-ink/[0.06]">
             {m.maps.map((map) => (
               <div
                 key={map.id}
                 className={cn(
-                  "flex-1 min-w-[140px] px-5 py-3 border-r border-white/[0.06] last:border-r-0 text-[13px]",
+                  "flex-1 min-w-[140px] px-5 py-3 border-r border-ink/[0.06] last:border-r-0 text-[13px]",
                   map.status === "live" && "bg-danger/[0.05]",
                 )}
               >
@@ -425,7 +425,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           {/* управление игрой: пауза, откат раунда */}
           {onServer && m.server_instance && (
             <Section title="Управление игрой">
-              <div className={`${ADMIN_CARD} divide-y divide-white/[0.06]`}>
+              <div className={`${ADMIN_CARD} divide-y divide-ink/[0.06]`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                   <div className="min-w-0">
                     <div className="text-[14px] font-medium">Техническая пауза</div>
@@ -498,7 +498,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               <summary className="cursor-pointer list-none text-[12px] text-fg-3 hover:text-fg-2">
                 Счёт не обновляется с сервера? Ввести вручную ▾
               </summary>
-              <div className={`${ADMIN_CARD} mt-3 divide-y divide-white/[0.06]`}>
+              <div className={`${ADMIN_CARD} mt-3 divide-y divide-ink/[0.06]`}>
                 {m.maps
                   .filter((map) => map.status === "live")
                   .map((map) => (
@@ -529,7 +529,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
           {/* составы */}
           {(m.team1_id || m.team2_id) && (
             <Section title="Составы">
-              <div className={`${ADMIN_CARD} grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.06]`}>
+              <div className={`${ADMIN_CARD} grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-ink/[0.06]`}>
                 {[
                   { name: t1, team: m.team1, list: rosters.team1 },
                   { name: t2, team: m.team2, list: rosters.team2 },
@@ -548,7 +548,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
                     <ul className="space-y-0.5">
                       {side.list.map((r) => (
                         <li key={r.player.id}>
-                          <Link href={`/players/${r.player.steam_id}`} className="flex items-center gap-2.5 h-8 rounded-[6px] px-1.5 -mx-1.5 text-[13px] hover:bg-white/[0.03]">
+                          <Link href={`/players/${r.player.steam_id}`} className="flex items-center gap-2.5 h-8 rounded-[6px] px-1.5 -mx-1.5 text-[13px] hover:bg-ink/[0.03]">
                             <Avatar src={r.player.avatar_url} name={r.player.nickname} size={22} />
                             <span className="flex-1 truncate">{r.player.nickname}</span>
                             {r.role === "sub" && <span className="text-[11px] text-fg-3">запас</span>}
@@ -577,7 +577,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
             {disputes.length === 0 ? (
               <Quiet>Споров нет. Капитаны могут открыть спор на странице матча.</Quiet>
             ) : (
-              <div className={`${ADMIN_CARD} divide-y divide-white/[0.06]`}>
+              <div className={`${ADMIN_CARD} divide-y divide-ink/[0.06]`}>
                 {disputes.map((d) => (
                   <div key={d.id} className="p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-fg-3">
@@ -621,7 +621,7 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
         </div>
 
         {/* ── колонка действий ── */}
-        <aside className={`${ADMIN_CARD} xl:sticky xl:top-6 overflow-hidden divide-y divide-white/[0.06]`}>
+        <aside className={`${ADMIN_CARD} xl:sticky xl:top-6 overflow-hidden divide-y divide-ink/[0.06]`}>
           <RailGroup title="Формат и время">
             {["pending", "upcoming"].includes(m.status) && (
               <div className="flex flex-wrap gap-1.5">

@@ -237,7 +237,7 @@ export function CenterColumn({
               aria-label={title}
               disabled={busy}
               onClick={() => run(() => A.teamTool(code, tool))}
-              className="grid h-11 place-items-center border-l border-line-subtle text-fg-3 transition-colors first:border-l-0 hover:bg-white/[0.04] hover:text-fg disabled:opacity-50"
+              className="grid h-11 place-items-center border-l border-line-subtle text-fg-3 transition-colors first:border-l-0 hover:bg-ink/[0.04] hover:text-fg disabled:opacity-50"
             >
               {icon}
             </button>

@@ -163,7 +163,7 @@ function MapStatCard({ r, rank, image, maxPlayed }: { r: MapAgg; rank: number; i
             <span className="text-ok/90">пики {votes ? `${Math.round(pickShare)}%` : "—"}</span>
             <span className="text-danger/80">баны {votes ? `${Math.round(100 - pickShare)}%` : "—"}</span>
           </div>
-          <div className="flex h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
             {votes > 0 && (
               <>
                 <span className="h-full bg-ok/70" style={{ width: `${pickShare}%` }} />
@@ -177,7 +177,7 @@ function MapStatCard({ r, rank, image, maxPlayed }: { r: MapAgg; rank: number; i
             <span>популярность</span>
             <span className="num">{Math.round((100 * r.played) / maxPlayed)}%</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
             <span className="block h-full rounded-full bg-accent/75" style={{ width: `${(100 * r.played) / maxPlayed}%` }} />
           </div>
         </div>

@@ -117,7 +117,7 @@ export function RosterPicker({
                       onClick={() => setSlots((cur) => ({ ...cur, [m.player_id]: o }))}
                       className={cn(
                         "h-9 flex-1 whitespace-nowrap rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-[var(--dur-hover)] disabled:cursor-not-allowed disabled:opacity-35 sm:flex-none",
-                        s === o ? (o === "main" ? "bg-accent text-accent-ink" : "bg-white/[0.1] text-fg") : "text-fg-3 hover:text-fg",
+                        s === o ? (o === "main" ? "bg-accent text-accent-ink" : "bg-ink/[0.1] text-fg") : "text-fg-3 hover:text-fg",
                       )}
                     >
                       {SLOT_LABEL[o]}
@@ -396,7 +396,7 @@ export function CheckinTask({
                   )}
                 </form>
               ) : (
-                <div className="flex items-start gap-3 rounded-control border border-line bg-white/[0.03] px-4 py-3">
+                <div className="flex items-start gap-3 rounded-control border border-line bg-ink/[0.03] px-4 py-3">
                   <Clock className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden />
                   <div className="text-[14px] leading-relaxed">
                     <div className="font-medium text-fg">Check-in проходит капитан команды</div>
@@ -458,7 +458,7 @@ function CheckRow({ state, label, detail }: { state: "ok" | "fail" | "wait"; lab
           "grid size-6 shrink-0 place-items-center rounded-full",
           state === "ok" && "bg-ok/15 text-ok",
           state === "fail" && "bg-danger/15 text-danger",
-          state === "wait" && "bg-white/[0.06] text-fg-3",
+          state === "wait" && "bg-ink/[0.06] text-fg-3",
         )}
       >
         {icon}

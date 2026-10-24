@@ -13,7 +13,7 @@ export function SubTabs({ items, active }: { items: { key: string; label: ReactN
   const [pending, setPending] = useState<{ key: string; from: string } | null>(null);
   const current = pending && pending.from === active ? pending.key : active;
   return (
-    <div className="flex gap-6 border-b border-white/[0.06] overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+    <div className="flex gap-6 border-b border-ink/[0.06] overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
       {items.map((t) => (
         <Link
           key={t.key}

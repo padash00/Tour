@@ -23,7 +23,7 @@ export const toneBar: Record<KitTone, string> = {
   warn: "bg-warn",
   danger: "bg-danger",
   accent: "bg-accent",
-  muted: "bg-white/15",
+  muted: "bg-ink/15",
 };
 
 // ───────────────────────── полоса статуса
@@ -32,7 +32,7 @@ export const toneBar: Record<KitTone, string> = {
 export function Strip({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={cn(ADMIN_CARD, "overflow-hidden")}>
-      <div className={cn("grid divide-white/[0.06] max-lg:divide-y lg:divide-x", className)}>{children}</div>
+      <div className={cn("grid divide-ink/[0.06] max-lg:divide-y lg:divide-x", className)}>{children}</div>
     </div>
   );
 }
@@ -65,7 +65,7 @@ export function StripCell({
     </>
   );
   return href ? (
-    <Link href={href} className="block px-5 py-4 min-w-0 transition-colors hover:bg-white/[0.025]">
+    <Link href={href} className="block px-5 py-4 min-w-0 transition-colors hover:bg-ink/[0.025]">
       {body}
     </Link>
   ) : (
@@ -142,7 +142,7 @@ export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; cu
                 aria-hidden
                 className={cn(
                   "absolute left-[30px] right-0 top-[13px] h-[2px] rounded-full",
-                  cancelled ? "bg-danger/25" : done ? "bg-accent/70" : "bg-white/[0.08]",
+                  cancelled ? "bg-danger/25" : done ? "bg-accent/70" : "bg-ink/[0.08]",
                 )}
               />
             )}
@@ -181,7 +181,7 @@ export function MiniLifecycle({ total, current, cancelled }: { total: number; cu
           key={i}
           className={cn(
             "h-1.5 w-5 rounded-full",
-            cancelled ? "bg-danger/40" : i < current ? "bg-accent" : i === current ? "bg-accent/55" : "bg-white/[0.1]",
+            cancelled ? "bg-danger/40" : i < current ? "bg-accent" : i === current ? "bg-accent/55" : "bg-ink/[0.1]",
           )}
         />
       ))}
@@ -196,7 +196,7 @@ export type TimelineItem = { label: string; at: string | null; state: "done" | "
 /** Горизонтальная хронология состояния (вето → сервер → готов → live → итог) */
 export function Timeline({ items, format }: { items: TimelineItem[]; format: (iso: string | null) => string }) {
   return (
-    <ol className="grid grid-cols-2 sm:grid-cols-5 gap-px overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.06]">
+    <ol className="grid grid-cols-2 sm:grid-cols-5 gap-px overflow-hidden rounded-[12px] border border-line-subtle bg-ink/[0.06]">
       {items.map((it) => (
         <li key={it.label} className="relative bg-surface px-4 py-3 min-w-0">
           <span
@@ -227,7 +227,7 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
 export function RailGroup({ title, children, tone }: { title: string; children: ReactNode; tone?: "danger" }) {
   return (
     <div className={cn("p-4 space-y-2.5", tone === "danger" && "bg-danger/[0.04]")}>
-      <div className={cn("text-[12px] font-medium", tone === "danger" ? "text-danger" : "text-[#7f93b0]")}>
+      <div className={cn("text-[12px] font-medium", tone === "danger" ? "text-danger" : "text-eyebrow")}>
         {title}
       </div>
       {children}
@@ -238,7 +238,7 @@ export function RailGroup({ title, children, tone }: { title: string; children: 
 /** Сетка «подпись — значение» в одну строку с разделителями */
 export function FactRow({ items, className }: { items: { label: ReactNode; value: ReactNode }[]; className?: string }) {
   return (
-    <div className={cn(ADMIN_CARD, "grid divide-white/[0.06] max-md:divide-y md:grid-flow-col md:auto-cols-fr md:divide-x", className)}>
+    <div className={cn(ADMIN_CARD, "grid divide-ink/[0.06] max-md:divide-y md:grid-flow-col md:auto-cols-fr md:divide-x", className)}>
       {items.map((it, i) => (
         <div key={i} className="px-4 py-3 min-w-0">
           <div className="text-[12px] font-medium text-fg-3">{it.label}</div>

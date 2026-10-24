@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand";
 import { HeaderUser } from "./header-user";
-import { HeaderShell, PrimaryNav, PublicOnly } from "./nav-links";
+import { HeaderShell, PublicOnly } from "./nav-links";
 import { PRIMARY_NAV, SECONDARY_NAV } from "./shell/nav";
 import { MobileActivityBar } from "./shell/activity";
 
@@ -15,16 +15,17 @@ export function Logo({ height = 30 }: { height?: number }) {
 }
 
 /**
- * Шапка продукта: 56 px на телефоне, 64 px на десктопе (--header-h).
- * Логотип · основное меню · [поиск · глобальная активность · уведомления · профиль].
+ * Верхняя строка (64 px, --header-h): поиск · уведомления · профиль. Разделы — в боковом меню (shell/sidebar),
+ * на телефоне — в нижней панели; там же в строке логотип.
  * Одинакова для всех (страницы кэшируются CDN) — персональная правая часть подгружается на клиенте.
  */
 export function SiteHeader() {
   return (
     <HeaderShell>
-      <div className="mx-auto flex h-[var(--header-h)] w-full max-w-product items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <Logo height={34} />
-        <PrimaryNav />
+      <div className="flex h-[var(--header-h)] w-full items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <span className="lg:hidden">
+          <Logo height={26} />
+        </span>
         <HeaderUser />
       </div>
       {/* на телефоне срочное действие — отдельной строкой под шапкой (на десктопе — внутри шапки) */}
@@ -37,7 +38,7 @@ export function SiteHeader() {
 export function SiteFooter() {
   return (
     <PublicOnly>
-      <footer className="mt-24 border-t border-line-subtle bg-shell">
+      <footer className="mt-20 border-t border-line-subtle bg-shell">
         <div className="mx-auto grid w-full max-w-product gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto_auto] md:gap-16 lg:px-8">
           <div className="flex flex-col gap-4">
             <Logo height={40} />

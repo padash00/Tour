@@ -125,7 +125,7 @@ export function SearchInput({
         {loading ? (
           <Spinner className="size-4" />
         ) : value ? (
-          <button type="button" aria-label="Очистить" onClick={() => onChange("")} className="grid size-7 place-items-center rounded-tiny hover:bg-white/[0.06] hover:text-fg">
+          <button type="button" aria-label="Очистить" onClick={() => onChange("")} className="grid size-7 place-items-center rounded-tiny hover:bg-ink/[0.06] hover:text-fg">
             <X className="size-4" />
           </button>
         ) : null}

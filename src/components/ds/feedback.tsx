@@ -70,7 +70,7 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
 
 type CalloutTone = "info" | "ok" | "warn" | "danger";
 const CALLOUT: Record<CalloutTone, { cls: string; icon: ReactNode }> = {
-  info: { cls: "border-line bg-white/[0.03] text-fg-2 [&_[data-ic]]:text-accent", icon: <Info /> },
+  info: { cls: "border-line bg-ink/[0.03] text-fg-2 [&_[data-ic]]:text-accent", icon: <Info /> },
   ok: { cls: "border-ok/30 bg-ok-dim text-fg-2 [&_[data-ic]]:text-ok", icon: <Check /> },
   warn: { cls: "border-warn/30 bg-warn-dim text-fg-2 [&_[data-ic]]:text-warn", icon: <TriangleAlert /> },
   danger: { cls: "border-danger/35 bg-danger-dim text-fg-2 [&_[data-ic]]:text-danger", icon: <CircleAlert /> },

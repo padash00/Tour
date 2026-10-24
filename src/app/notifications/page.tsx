@@ -89,7 +89,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
           {pages > 1 && (
             <nav aria-label="Страницы" className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
               {page > 1 && (
-                <Link href={pageHref(page - 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-white/[0.04] hover:text-fg">
+                <Link href={pageHref(page - 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-ink/[0.04] hover:text-fg">
                   ← Назад
                 </Link>
               )}
@@ -98,13 +98,13 @@ export default async function NotificationsPage(props: PageProps<"/notifications
                   key={p}
                   href={pageHref(p)}
                   aria-current={p === page ? "page" : undefined}
-                  className={cn("num grid size-10 place-items-center rounded-control text-[14px]", p === page ? "border border-line-strong bg-white/[0.06] text-fg" : "text-fg-3 hover:bg-white/[0.04] hover:text-fg")}
+                  className={cn("num grid size-10 place-items-center rounded-control text-[14px]", p === page ? "border border-line-strong bg-ink/[0.06] text-fg" : "text-fg-3 hover:bg-ink/[0.04] hover:text-fg")}
                 >
                   {p}
                 </Link>
               ))}
               {page < pages && (
-                <Link href={pageHref(page + 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-white/[0.04] hover:text-fg">
+                <Link href={pageHref(page + 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-ink/[0.04] hover:text-fg">
                   Дальше →
                 </Link>
               )}

@@ -174,7 +174,7 @@ function TeamsProgress({ checked, total, solo }: { checked: number; total: numbe
           {checked} из {total}
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.08]" aria-hidden>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink/[0.08]" aria-hidden>
         <div className="h-full rounded-full bg-ok/80" style={{ width: `${(checked / Math.max(1, total)) * 100}%` }} />
       </div>
     </div>

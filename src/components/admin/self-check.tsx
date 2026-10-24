@@ -37,7 +37,7 @@ export function SelfCheckPanel({ report, running, disabled }: { report: SelfChec
       </div>
       {disabled && <p className="mt-2 text-[12px] text-fg-3">{disabled}</p>}
       {items.length > 0 && (
-        <ul className="mt-3 divide-y divide-white/[0.05] border-t border-white/[0.06]">
+        <ul className="mt-3 divide-y divide-ink/[0.05] border-t border-ink/[0.06]">
           {items.map((i) => (
             <li key={i.label} className="flex items-start gap-3 py-2 text-[13px]">
               <span

@@ -75,7 +75,7 @@ function Row({ m }: { m: Metric }) {
       {cell(m.a, aWins)}
       <div className="w-[96px] sm:w-[140px] text-center">
         <div className="text-[12px] sm:text-[13px] text-fg-3">{m.label}</div>
-        <div className="mt-1.5 flex h-1 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className="mt-1.5 flex h-1 overflow-hidden rounded-full bg-ink/[0.06]">
           <div className="h-full bg-accent/70 transition-[width] duration-500" style={{ width: `${Math.round(share * 100)}%` }} />
           <div className="h-full flex-1 bg-warn/60" />
         </div>

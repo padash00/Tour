@@ -41,7 +41,7 @@ export function AgentHealth({ lastSeen, initialNow, pending, inflight, metrics, 
     <section aria-label="Состояние управления серверами" className="space-y-3">
       {/* одна полоса на все показатели — без «сирот» в последнем ряду */}
       <div
-        className="grid overflow-hidden rounded-surface border border-line bg-surface max-lg:divide-y max-lg:divide-white/[0.06] sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] lg:divide-x lg:divide-white/[0.06]"
+        className="grid overflow-hidden rounded-surface border border-line bg-surface max-lg:divide-y max-lg:divide-ink/[0.06] sm:grid-cols-2 lg:[grid-template-columns:repeat(var(--n),minmax(0,1fr))] lg:divide-x lg:divide-ink/[0.06]"
         style={{ "--n": cards.length } as React.CSSProperties}
       >
         {cards.map(({ icon: Icon, ...card }) => (

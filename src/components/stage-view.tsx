@@ -163,7 +163,7 @@ function CrossTable({
                   <TeamCell team={teams.get(r.teamId)} />
                 </td>
                 {ids.map((col) => {
-                  if (col === r.teamId) return <td key={col} className="p-1"><div className="h-10 rounded-[6px] bg-white/[0.03] [background-image:repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.03)_6px_7px)]" /></td>;
+                  if (col === r.teamId) return <td key={col} className="p-1"><div className="h-10 rounded-[6px] bg-ink/[0.03] [background-image:repeating-linear-gradient(135deg,transparent_0_6px,rgba(255,255,255,0.03)_6px_7px)]" /></td>;
                   const m = meet(r.teamId, col);
                   if (!m) return <td key={col} className="p-1" />;
                   const mine = m.team1_id === r.teamId;

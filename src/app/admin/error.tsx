@@ -35,7 +35,7 @@ export default function AdminError({ error, retry }: { error: Error & { digest?:
         >
           Повторить
         </button>
-        <Link href="/admin" className="inline-flex h-9 items-center rounded-[8px] border border-white/20 px-4 text-[13px] text-fg hover:border-white/40">
+        <Link href="/admin" className="inline-flex h-9 items-center rounded-[8px] border border-ink/20 px-4 text-[13px] text-fg hover:border-ink/40">
           К обзору
         </Link>
       </div>

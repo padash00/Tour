@@ -52,7 +52,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
           <Link
             key={r.key}
             href={roleHref(r.key)}
-            className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-[7px] text-[12px] transition ${role === r.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-white/[0.03]"}`}
+            className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-[7px] text-[12px] transition ${role === r.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-ink/[0.03]"}`}
           >
             {r.label} <span className="num opacity-70">{r.n}</span>
           </Link>
