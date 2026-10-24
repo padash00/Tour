@@ -1,90 +1,101 @@
 import Link from "next/link";
-import { MoveHorizontal } from "lucide-react";
+import { Info, MoveHorizontal } from "lucide-react";
 import { THIRD_PLACE_TITLE, roundTitle } from "@/lib/bracket";
 import { liveMapOf, mapLabel } from "@/lib/maps";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
-import { MatchStatusBadge } from "./match-bits";
 import { SectionTitle, TeamLogo, cn } from "./ds";
 import { BracketHover } from "./competition/bracket-hover";
 
-// размеры сетки: компактные узлы, линии между колонками
-const W = 256;
-const H = 78;
+// размеры сетки: карточки матчей покрупнее (читаемо любому), линии между колонками
+const W = 244;
+const H = 104;
 const GAP_Y = 18;
-const GAP_X = 72;
-const HEAD = 46;
+const GAP_X = 44;
+const HEAD = 52;
 
-function Slot({ team, score, winner, loser, showScore }: { team: Team | null; score: number; winner: boolean; loser: boolean; showScore: boolean }) {
+/** Подписи пустых мест: «победитель матча 3», «проигравший матча 13» — кто сюда придёт */
+type SlotHints = Map<string, string>;
+
+function slotHints(all: MatchWithTeams[]): SlotHints {
+  const hints: SlotHints = new Map();
+  for (const f of all) {
+    if (f.winner_to_match && f.winner_to_slot) hints.set(`${f.winner_to_match}:${f.winner_to_slot}`, `победитель матча ${f.number}`);
+    if (f.loser_to_match && f.loser_to_slot) hints.set(`${f.loser_to_match}:${f.loser_to_slot}`, `проигравший матча ${f.number}`);
+  }
+  return hints;
+}
+
+function Slot({ team, hint, score, winner, loser, showScore }: { team: Team | null; hint?: string; score: number; winner: boolean; loser: boolean; showScore: boolean }) {
   return (
     <div
       data-team={team?.id}
       className={cn(
-        "relative flex h-[31px] items-center gap-2.5 rounded-[6px] px-3 transition-[opacity,background-color] duration-[var(--dur-hover)]",
-        winner ? "text-fg" : loser ? "text-fg-3" : team ? "text-fg-2" : "text-fg-4",
+        "relative flex h-[38px] items-center gap-2.5 px-3 transition-[opacity,background-color] duration-[var(--dur-hover)]",
+        winner ? "text-accent" : loser ? "text-fg-3" : team ? "text-fg" : "text-fg-4",
       )}
     >
-      {winner && <span className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-accent" />}
-      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="xs" /> : <span className="size-5 rounded-[5px] border border-dashed border-line" />}
-      <span className={cn("flex-1 truncate text-[14px]", winner && "font-semibold")}>{team?.name ?? "TBD"}</span>
-      {showScore && (
-        <span
-          className={cn(
-            "num grid h-6 min-w-6 place-items-center rounded-[5px] px-1 text-[13px]",
-            winner ? "bg-accent-dim font-semibold text-accent" : "text-fg-3",
-          )}
-        >
-          {score}
-        </span>
-      )}
+      {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="xs" /> : <span className="size-6 shrink-0 rounded-[6px] border border-dashed border-line-strong" />}
+      <span className={cn("flex-1 truncate", team ? "text-[15px]" : "text-[13.5px]", winner ? "font-extrabold" : team ? "font-semibold" : "font-medium")}>{team?.name ?? hint ?? "ждёт соперника"}</span>
+      {showScore && <span className={cn("num min-w-6 text-right text-[16px]", winner ? "font-extrabold" : "font-semibold")}>{score}</span>}
     </div>
   );
 }
 
-function Node({ m }: { m: MatchWithTeams }) {
+const STATUS_TEXT: Record<string, string> = {
+  pending: "ждёт соперников",
+  upcoming: "скоро",
+  veto: "выбор карт",
+  ready: "готовим сервер",
+  live: "идёт",
+  finished: "окончен",
+};
+
+function Node({ m, hints }: { m: MatchWithTeams; hints: SlotHints }) {
   const finished = m.status === "finished";
   const bye = m.is_walkover && (!m.team1_id || !m.team2_id);
   if (m.status === "cancelled" || bye) {
     return (
-      <div className="flex h-full items-center rounded-surface border border-dashed border-line-subtle bg-surface/60 px-3 text-micro text-fg-3">
-        #{m.number} · {bye ? `${(m.team1 ?? m.team2)?.name ?? "—"} проходит дальше` : "пустой матч"}
+      <div className="flex h-full items-center rounded-surface border border-dashed border-line bg-surface/70 px-4 text-meta text-fg-3">
+        Матч {m.number} · {bye ? `${(m.team1 ?? m.team2)?.name ?? "—"} проходит дальше без игры` : "пустой матч"}
       </div>
     );
   }
 
-  const live = m.status === "live" || m.status === "veto" || m.status === "ready";
-  const showScore = finished || m.status === "live";
-  // идущая карта: в BO1 в слотах — раунды (счёт серии до конца карты 0:0), в BO3 — серия, раунды в шапке
+  const live = m.status === "live";
+  const active = live || m.status === "veto" || m.status === "ready";
+  const showScore = finished || live;
+  // идущая карта: в BO1 в строках — раунды (счёт серии до конца карты 0:0), в BO3 — серия, раунды в подписи
   const lm = liveMapOf(m);
   const rounds = lm && m.best_of === 1;
   const s1 = rounds ? lm.team1_score : m.team1_score;
   const s2 = rounds ? lm.team2_score : m.team2_score;
+  const map = lm ? mapLabel(lm.map_name) : null;
 
   return (
     <Link
       href={`/matches/${m.id}`}
       data-node=""
       className={cn(
-        "block h-full rounded-surface border bg-surface px-1 transition-[border-color,background-color] duration-[var(--dur-hover)] hover:bg-surface-2",
+        "flex h-full flex-col overflow-hidden rounded-surface border bg-surface transition-[border-color,background-color,box-shadow] duration-[var(--dur-hover)] hover:bg-surface-2",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-        live ? "border-live/40" : "border-line-subtle hover:border-line-strong",
+        live ? "border-live shadow-[inset_0_0_0_1px_var(--color-live)]" : active ? "border-warn/60" : "border-line-subtle hover:border-line-strong",
       )}
     >
-      <div className="flex h-[14px] items-center justify-between px-2 pt-1 text-[10px] text-fg-3">
-        <span className="num">
-          #{m.number} · BO{m.best_of}
-          {lm && (
-            <span className="text-live">
-              {" "}
-              · {mapLabel(lm.map_name)}
-              {!rounds && ` ${lm.team1_score}:${lm.team2_score}`}
-            </span>
-          )}
+      <div className={cn("flex h-[26px] items-center justify-between gap-2 px-3 pt-1 text-[12.5px] font-semibold", live ? "text-live" : active ? "text-warn" : "text-fg-3")}>
+        <span className="truncate">
+          {live && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" aria-hidden />}
+          {STATUS_TEXT[m.status] ?? ""}
+          {map && ` · ${map}`}
+          {lm && !rounds && ` ${lm.team1_score}:${lm.team2_score}`}
         </span>
-        <MatchStatusBadge status={m.status} compact />
+        <span className="num shrink-0 font-medium text-fg-3">
+          №{m.number} · {m.best_of === 1 ? "до 1 победы" : `до ${Math.ceil(m.best_of / 2)} побед`}
+        </span>
       </div>
-      <Slot team={m.team1} score={s1} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} />
-      <Slot team={m.team2} score={s2} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} />
+      <Slot team={m.team1} hint={hints.get(`${m.id}:1`)} score={s1} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} />
+      <div className="mx-3 h-px bg-line-subtle" />
+      <Slot team={m.team2} hint={hints.get(`${m.id}:2`)} score={s2} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} />
     </Link>
   );
 }
@@ -127,11 +138,13 @@ function BracketSection({
   matches,
   totalUpper,
   totalLower,
+  hints,
 }: {
   title: string;
   matches: MatchWithTeams[];
   totalUpper: number;
   totalLower: number;
+  hints: SlotHints;
 }) {
   const { placed, rounds } = layout(matches);
   const all = [...placed.values()];
@@ -143,9 +156,9 @@ function BracketSection({
     const to = p.m.winner_to_match ? placed.get(p.m.winner_to_match) : null;
     if (!to) return [];
     const x1 = p.x + W;
-    const y1 = p.y + H / 2 + 10;
+    const y1 = p.y + H / 2 + 13;
     const x2 = to.x;
-    const y2 = to.y + H / 2 + 10;
+    const y2 = to.y + H / 2 + 13;
     const mid = x1 + GAP_X / 2;
     const done = p.m.status === "finished";
     return [{ key: p.m.id, d: `M${x1} ${y1} H${mid} V${y2} H${x2}`, done }];
@@ -162,8 +175,8 @@ function BracketSection({
                 key={line.key}
                 d={line.d}
                 fill="none"
-                className={line.done ? "stroke-accent/45" : "stroke-line-strong"}
-                strokeWidth="1.25"
+                className={line.done ? "stroke-accent/60" : "stroke-line-strong"}
+                strokeWidth="1.5"
                 strokeLinejoin="round"
               />
             ))}
@@ -177,15 +190,15 @@ function BracketSection({
               <div
                 key={r}
                 className={cn(
-                  "absolute flex h-8 items-center justify-between gap-2 whitespace-nowrap rounded-control border bg-shell/95 px-3 text-micro font-semibold uppercase tracking-[0.12em]",
-                  active ? "border-live/35 text-fg" : done ? "border-line-subtle text-fg-3" : "border-line text-fg-2",
+                  "absolute flex h-9 items-center justify-between gap-2 whitespace-nowrap px-1 text-[15px] font-bold",
+                  active ? "text-fg" : done ? "text-fg-3" : "text-fg-2",
                 )}
                 style={{ left: col * (W + GAP_X), top: 0, width: W }}
               >
                 <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower)}</span>
-                <span className="num font-normal normal-case tracking-normal text-fg-3">
-                  {active && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" />}
-                  {inRound.length}
+                <span className="num text-meta font-medium text-fg-3">
+                  {active && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" aria-hidden />}
+                  {inRound.length} {inRound.length === 1 ? "матч" : inRound.length < 5 ? "матча" : "матчей"}
                 </span>
               </div>
             );
@@ -193,7 +206,7 @@ function BracketSection({
 
           {all.map((p) => (
             <div key={p.m.id} className="absolute" style={{ left: p.x, top: p.y, width: W, height: H }}>
-              <Node m={p.m} />
+              <Node m={p.m} hints={hints} />
             </div>
           ))}
         </div>
@@ -213,15 +226,36 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const totalLower = Math.max(0, ...lower.map((m) => m.round));
 
   if (playoff.length === 0) return null;
+  const hints = slotHints(playoff);
+  const bo = [...new Set(playoff.map((m) => m.best_of))].sort((a, b) => a - b);
 
   return (
     <BracketHover>
-      <div className="space-y-12 lg:space-y-16">
-        <div className="text-meta text-fg-3">
-          <span className="hidden md:inline">Наведите на команду, чтобы увидеть её путь по сетке.</span>
-          <span className="inline-flex items-center gap-2 md:hidden">
-            <MoveHorizontal className="size-4" aria-hidden /> Проведите по сетке в сторону, чтобы увидеть следующие раунды.
-          </span>
+      <div className="space-y-10 lg:space-y-14">
+        <div className="space-y-3">
+          <div className="flex gap-3 rounded-surface bg-accent-dim px-4 py-3.5 text-[15px] text-fg-2 sm:px-5">
+            <Info className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+            <p>
+              <b className="block text-fg">Как читать сетку</b>
+              {bo.length > 1 ? `Ранние матчи — до ${Math.ceil(bo[0] / 2)} победы, решающие — до ${Math.ceil(bo[bo.length - 1] / 2)} побед.` : bo[0] === 1 ? "Каждый матч — одна карта." : `Каждый матч — до ${Math.ceil(bo[0] / 2)} побед.`}{" "}
+              Победитель идёт в следующий столбец, проигравший выбывает.{" "}
+              <span className="hidden md:inline">Наведите на команду — подсветится её путь.</span>
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-meta text-fg-2">
+            <span className="inline-flex items-center gap-2">
+              <span className="size-3 rounded-[4px] bg-accent" aria-hidden /> победитель
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="size-3 rounded-[4px] border-2 border-live" aria-hidden /> идёт сейчас
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="size-3 rounded-[4px] border border-dashed border-line-strong" aria-hidden /> ещё не определён
+            </span>
+            <span className="inline-flex items-center gap-2 md:hidden">
+              <MoveHorizontal className="size-4" aria-hidden /> листайте сетку в сторону
+            </span>
+          </div>
         </div>
 
         {upper.length > 0 && (
@@ -230,20 +264,21 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
             matches={upper}
             totalUpper={totalUpper}
             totalLower={totalLower}
+            hints={hints}
           />
         )}
 
         {lower.length > 0 && (
-          <BracketSection title="Нижняя сетка" matches={lower} totalUpper={totalUpper} totalLower={totalLower} />
+          <BracketSection title="Нижняя сетка" matches={lower} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
         )}
 
         {grandFinal.length > 0 && (
-          <BracketSection title="Гранд-финал" matches={grandFinal} totalUpper={totalUpper} totalLower={totalLower} />
+          <BracketSection title="Гранд-финал" matches={grandFinal} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
         )}
 
         {/* проигравшие полуфиналов играют за 3-е место */}
         {thirdPlace.length > 0 && (
-          <BracketSection title={THIRD_PLACE_TITLE} matches={thirdPlace} totalUpper={totalUpper} totalLower={totalLower} />
+          <BracketSection title={THIRD_PLACE_TITLE} matches={thirdPlace} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
         )}
       </div>
     </BracketHover>

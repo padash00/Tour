@@ -41,15 +41,43 @@ import {
   Status,
   SubsectionTitle,
   TeamLogo,
-  tournamentStatus,
 } from "@/components/ds";
 import { Check } from "lucide-react";
 
 const real = (v: string | null | undefined) => !!v && !/^\s*0+\s*$/.test(v);
-const modeShort = (format: string) => {
-  const s = modeOf(format).size;
-  return s === 5 ? "5v5" : s === 2 ? "2v2" : "1v1";
+
+/** Статус турнира словами — для баннера на тёмной обложке */
+const STATUS_WORD: Record<Tournament["status"], { text: string; tone: "live" | "ok" | "warn" | "muted" }> = {
+  draft: { text: "Черновик", tone: "muted" },
+  registration: { text: "Регистрация открыта", tone: "ok" },
+  registration_closed: { text: "Регистрация закрыта", tone: "warn" },
+  checkin: { text: "Идёт check-in", tone: "warn" },
+  live: { text: "Турнир идёт", tone: "live" },
+  finished: { text: "Турнир завершён", tone: "muted" },
+  cancelled: { text: "Турнир отменён", tone: "muted" },
 };
+
+function StatusWord({ status }: { status: Tournament["status"] }) {
+  const s = STATUS_WORD[status];
+  const color = { live: "text-live", ok: "text-ok", warn: "text-warn", muted: "text-fg-2" }[s.tone];
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[13.5px] font-bold ${color}`}>
+      {s.tone !== "muted" && <span className={`size-2 rounded-full bg-current ${s.tone === "live" ? "animate-pulse" : ""}`} aria-hidden />}
+      {s.text}
+    </span>
+  );
+}
+
+const modeLabel = (format: string) => {
+  const n = modeOf(format).size;
+  return n === 1 ? "1 на 1" : `${n} на ${n}`;
+};
+
+/** Медаль места: 1 — золото, 2 — серебро, 3 — бронза */
+function Medal({ n }: { n: number }) {
+  const tone = n === 1 ? "bg-gold/20 text-gold" : n === 2 ? "bg-silver/20 text-silver" : n === 3 ? "bg-bronze/20 text-bronze" : "bg-ink/[0.06] text-fg-3";
+  return <span className={`grid size-10 shrink-0 place-items-center rounded-full text-[15px] font-extrabold ${tone}`}>{n}</span>;
+}
 
 /**
  * Страница турнира. Одинакова для всех зрителей — отдаётся из кэша CDN (ISR);
@@ -85,75 +113,68 @@ export async function TournamentView({ t }: { t: Tournament }) {
   const base = `/tournaments/${t.slug}`;
   const places = t.prize_distribution.filter((p) => real(p.prize));
   const hasPrize = real(t.prize_pool) || places.length > 0;
+  // ход турнира: настоящие матчи (без отменённых и пропусков хода)
+  const counted = matches.filter((m) => m.status !== "cancelled" && !(m.is_walkover && (!m.team1_id || !m.team2_id)));
+  const progress = { played: counted.filter((m) => m.status === "finished").length, total: counted.length, now: counted.filter((m) => ["veto", "ready", "live"].includes(m.status)).length };
 
   return (
     <>
       {["registration", "checkin", "live"].includes(t.status) && <LiveRefresh watch={`tournament:${t.id}`} intervalMs={5000} />}
 
-      {/* ── шапка турнира: обложка — фон, а не главный объект */}
-      <section className="relative overflow-hidden border-b border-line-subtle">
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <Image src={t.cover_url ?? "/home/tournament.jpg"} alt="" fill priority sizes="100vw" className="object-cover object-[60%_30%] opacity-35" unoptimized={!!t.cover_url} />
-          <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/90 to-bg/55" />
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-bg to-transparent" />
+      {/* ── шапка турнира: баннер с обложкой, ниже — этапы турнира карточками */}
+      <Container className="pt-4 sm:pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/tournaments" className="inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
+            <ArrowLeft className="size-4" /> Турниры
+          </Link>
+          <AdminControlLink t={lite} />
         </div>
-        <Container className="relative pb-8 pt-5 sm:pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href="/tournaments" className="inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
-              <ArrowLeft className="size-4" /> Турниры
-            </Link>
-            <AdminControlLink t={lite} />
-          </div>
-          {t.status === "draft" && (
-            <Callout tone="warn" title="Черновик" className="mt-4 max-w-2xl">
-              Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.
-            </Callout>
-          )}
-          <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        {t.status === "draft" && (
+          <Callout tone="warn" title="Черновик" className="mt-3 max-w-2xl">
+            Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.
+          </Callout>
+        )}
+        <section className="relative isolate mt-3 overflow-hidden rounded-feature bg-ink text-white">
+          <Image src={t.cover_url ?? "/home/tournament.jpg"} alt="" fill priority sizes="(min-width: 1024px) 1100px, 100vw" className="-z-20 object-cover object-[60%_30%]" unoptimized={!!t.cover_url} />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-ink/95 via-ink/75 to-ink/25" aria-hidden />
+          <div className="flex min-h-[260px] flex-col justify-end gap-5 p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <Status info={tournamentStatus[t.status]} />
-              <h1 className="mt-3 break-words text-[30px] font-semibold leading-tight tracking-[-0.018em] text-fg sm:text-[38px]">{t.name}</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-fg-2">
-                {[t.game, modeShort(t.format), bracketLabel[t.bracket_type] ?? t.bracket_type, t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн")]
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusWord status={t.status} />
+                {[t.game ? `${t.game} · ${modeLabel(t.format)}` : modeLabel(t.format), bracketLabel[t.bracket_type] ?? t.bracket_type, t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн")]
                   .filter(Boolean)
-                  .map((x, i) => (
-                    <span key={i} className="flex items-center gap-3">
-                      {i > 0 && <span className="text-fg-4" aria-hidden>·</span>}
+                  .map((x) => (
+                    <span key={x} className="rounded-full bg-white/15 px-3 py-1 text-[13.5px] font-semibold backdrop-blur-sm">
                       {x}
                     </span>
                   ))}
               </div>
-              <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
-                <div>
-                  <dt className="text-micro text-fg-3">Старт</dt>
-                  <dd className="text-[15px] font-medium text-fg">{t.starts_at ? formatDateTime(t.starts_at) : "Дата уточняется"}</dd>
-                </div>
-                <div>
-                  <dt className="text-micro text-fg-3">{solo ? "Участники" : "Команды"}</dt>
-                  <dd className="num text-[15px] font-medium text-fg">
-                    {approved.length} / {t.max_teams}
-                  </dd>
-                </div>
-                {real(t.prize_pool) && (
-                  <div>
-                    <dt className="text-micro text-fg-3">Призовой фонд</dt>
-                    <dd className="text-[15px] font-medium text-fg">{formatMoney(t.prize_pool)}</dd>
+              <h1 className="mt-3 break-words text-[30px] font-extrabold leading-[1.08] tracking-[-0.02em] sm:text-[44px]">{t.name}</h1>
+              <dl className="mt-4 flex flex-wrap gap-2.5">
+                {[
+                  { k: "Старт", v: t.starts_at ? formatDateTime(t.starts_at) : "дата уточняется" },
+                  { k: solo ? "Участники" : "Команды", v: `${approved.length} из ${t.max_teams}` },
+                  ...(real(t.prize_pool) ? [{ k: "Призовой фонд", v: formatMoney(t.prize_pool) }] : places[0] ? [{ k: "Главный приз", v: places[0].prize }] : []),
+                ].map((f) => (
+                  <div key={f.k} className="rounded-control bg-white/12 px-3.5 py-2 backdrop-blur-sm">
+                    <dt className="text-[12px] font-semibold text-white/70">{f.k}</dt>
+                    <dd className="text-[15.5px] font-bold">{f.v}</dd>
                   </div>
-                )}
+                ))}
               </dl>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
               <div className="hidden sm:block">
                 <HeroCta t={lite} approvedCount={approved.length} />
               </div>
-              <p className="max-w-sm text-meta text-fg-3 lg:text-right">{nextStepText(t)}</p>
+              <p className="max-w-sm text-[14.5px] text-white/80 lg:text-right">{nextStepText(t)}</p>
             </div>
           </div>
-          <div className="mt-7 max-w-4xl">
-            <TournamentLifecycle t={t} />
-          </div>
-        </Container>
-      </section>
+        </section>
+        <div className="mt-3 mb-2">
+          <TournamentLifecycle t={t} approvedCount={approved.length} played={progress.played} total={progress.total} />
+        </div>
+      </Container>
 
       {/* ── вкладки (липкие) + содержимое: общий контейнер, чтобы вкладки держались при прокрутке */}
       <Container>
@@ -191,7 +212,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 {["live", "finished"].includes(t.status) && <MvpBlock tournamentId={t.id} finished={finished} />}
                 <Overview t={t} lite={lite} mapImages={mapImages} />
               </div>
-              <aside className="space-y-8 lg:sticky lg:top-[calc(var(--shell-h)+72px)]">
+              <aside className="space-y-5 lg:sticky lg:top-[calc(var(--shell-h)+72px)]">
                 <ParticipationPanel t={lite} approvedCount={approved.length} />
                 <div>
                   <SubsectionTitle>Даты</SubsectionTitle>
@@ -208,19 +229,47 @@ export async function TournamentView({ t }: { t: Tournament }) {
                     ))}
                   </dl>
                 </div>
+                {progress.total > 0 && t.status !== "finished" && (
+                  <div className="rounded-surface border border-line-subtle bg-surface p-5">
+                    <SubsectionTitle>Ход турнира</SubsectionTitle>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-ink/[0.07]" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.played} aria-label="Сыграно матчей">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round((100 * progress.played) / progress.total)}%` }} />
+                    </div>
+                    <dl className="mt-3 divide-y divide-line-subtle text-[15px]">
+                      <div className="flex justify-between gap-4 py-2.5">
+                        <dt className="text-fg-3">Сыграно</dt>
+                        <dd className="font-bold text-fg">
+                          {progress.played} из {progress.total} матчей
+                        </dd>
+                      </div>
+                      {progress.now > 0 && (
+                        <div className="flex justify-between gap-4 py-2.5">
+                          <dt className="text-fg-3">Идут сейчас</dt>
+                          <dd className="font-bold text-live">{progress.now}</dd>
+                        </div>
+                      )}
+                    </dl>
+                    <Button href={`${base}?tab=bracket`} variant="secondary" block className="mt-2">
+                      Смотреть сетку
+                    </Button>
+                  </div>
+                )}
                 {hasPrize && (
-                  <div>
-                    <SubsectionTitle>Призовой фонд</SubsectionTitle>
-                    {real(t.prize_pool) && <div className="text-heading text-fg">{formatMoney(t.prize_pool)}</div>}
+                  <div className="rounded-surface border border-line-subtle bg-surface p-5">
+                    <SubsectionTitle>Призы</SubsectionTitle>
+                    {real(t.prize_pool) && <div className="mb-2 text-heading text-fg">{formatMoney(t.prize_pool)}</div>}
                     {places.length > 0 && (
-                      <dl className="mt-2 divide-y divide-line-subtle text-[14px]">
-                        {places.map((p) => (
-                          <div key={p.place} className="flex justify-between gap-4 py-2.5">
-                            <dt className="text-fg-3">{p.place}</dt>
-                            <dd className="text-fg">{p.prize}</dd>
-                          </div>
+                      <ul className="space-y-2.5">
+                        {places.map((p, i) => (
+                          <li key={p.place} className="flex items-center gap-3">
+                            <Medal n={i + 1} />
+                            <span className="min-w-0">
+                              <span className="block text-[15.5px] font-bold text-fg">{p.prize}</span>
+                              <span className="block text-meta text-fg-3">{p.place}</span>
+                            </span>
+                          </li>
                         ))}
-                      </dl>
+                      </ul>
                     )}
                   </div>
                 )}
@@ -507,8 +556,11 @@ async function StatsTab({ tournamentId, solo }: { tournamentId: string; solo: bo
           />
           <div data-tabs-scope="tstats">
             <TabPanel tab="players" defaultKey="players" className="space-y-6">
+              <p className="max-w-read text-[15px] text-fg-2">
+                <b className="text-fg">Рейтинг</b> показывает, насколько игрок помог команде: больше — лучше, средний игрок — около 1.00.
+              </p>
               <StatLeaders rows={rows} />
-              <PlayerStatsTable rows={rows} solo={solo} showTeam={!solo} />
+              <PlayerStatsTable rows={rows} solo={solo} showTeam={!solo} plain />
             </TabPanel>
             <TabPanel tab="teams" defaultKey="players">
               {teams.length ? (

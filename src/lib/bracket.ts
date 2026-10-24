@@ -257,6 +257,8 @@ export function roundTitle(bracket: Side, round: number, totalUpper: number, tot
   if (bracket === "upper") {
     if (round === totalUpper) return totalLower ? "Финал верхней сетки" : "Финал";
     if (round === totalUpper - 1) return totalLower ? "Полуфинал верхней сетки" : "Полуфинал";
+    // олимпийка без нижней сетки: «1/4 финала», «1/8 финала» — так понятнее, чем «раунд 2»
+    if (!totalLower) return `1/${2 ** (totalUpper - round)} финала`;
     return `Верхняя · раунд ${round}`;
   }
   if (round === totalLower) return "Финал нижней сетки";

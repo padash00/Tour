@@ -89,7 +89,7 @@ export function ClientTabs({
                 document.getElementById(`${scope}-tab-${key}`)?.focus();
               }}
               className={cn(
-                "inline-flex h-12 shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-[14px] font-medium transition-colors duration-[var(--dur-hover)]",
+                "inline-flex h-14 shrink-0 items-center whitespace-nowrap border-b-[3px] px-4 text-[16px] font-semibold transition-colors duration-[var(--dur-hover)]",
                 t.key === active ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
               )}
             >

@@ -22,10 +22,10 @@ export function StatLeaders({ rows }: { rows: Row[] }) {
   const rating = top(enoughRounds, (r) => r.rating);
   const cards: { label: string; row: Row | null; value: string; tone?: string }[] = [
     { label: "Больше всего убийств", row: kills, value: String(kills?.kills ?? "") },
-    { label: "Лучший ADR", row: adr, value: adr ? fmt.d1(adr.adr) : "" },
-    { label: "Самый точный · HS", row: hs, value: hs ? fmt.pct(hs.hsPct) : "" },
-    { label: "Лучший Swing", row: swing, value: swing ? fmt.swing(swing.swing) : "", tone: "text-ok" },
-    { label: "Лучший Rating", row: rating, value: rating ? fmt.r(rating.rating) : "", tone: rating ? ratingColor(rating.rating) : undefined },
+    { label: "Больше всего урона за раунд", row: adr, value: adr ? fmt.d1(adr.adr) : "" },
+    { label: "Чаще всех в голову", row: hs, value: hs ? fmt.pct(hs.hsPct) : "" },
+    { label: "Сильнее всех влияет на раунд", row: swing, value: swing ? fmt.swing(swing.swing) : "", tone: "text-ok" },
+    { label: "Лучший рейтинг", row: rating, value: rating ? fmt.r(rating.rating) : "", tone: rating ? ratingColor(rating.rating) : undefined },
   ];
   const shown = cards.filter((c) => c.row);
   if (!shown.length) return null;
@@ -42,8 +42,8 @@ export function StatLeaders({ rows }: { rows: Row[] }) {
           </span>
         );
         return (
-          <div key={c.label} className="min-w-0 rounded-[12px] border border-line-subtle bg-surface/80 p-4">
-            <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-fg-3">{c.label}</div>
+          <div key={c.label} className="min-w-0 rounded-surface border border-line-subtle bg-surface p-4">
+            <div className="text-[13px] font-semibold text-fg-3">{c.label}</div>
             <div className={cn("num mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em]", c.tone ?? "text-fg")}>{c.value}</div>
             <div className="mt-3">
               {r.player ? (
