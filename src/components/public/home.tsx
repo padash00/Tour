@@ -1,16 +1,23 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { bracketLabel, formatDate, formatMoney } from "@/lib/format";
+import { ArrowRight, CalendarDays, MapPin, Trophy, Users } from "lucide-react";
+import { bracketLabel, formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { liveMapOf, mapLabel } from "@/lib/maps";
+import type { MatchWithTeams } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
 import type { Tournament } from "@/lib/types";
-import { Button, Container, Eyebrow, Status, cn, tournamentStatus } from "@/components/ds";
+import { Button, Container, Status, cn, tournamentStatus } from "@/components/ds";
+import { HomeMyMatch } from "./home-my-match";
 import { TeamCta } from "./team-cta";
 
 /*
- * Главная F16 Arena — по утверждённому макету (F16_Homepage_Approved_Reference.png).
+ * Главная F16 Arena — светлый макет «с боковым меню» (экран «Главная»).
+ * Порядок: ваш матч (вошедшему, на клиенте) · ближайший турнир · как участвовать · матчи сейчас · последние результаты.
  * Только отображение: данные приходят из app/page.tsx.
  */
+
+type TMeta = Pick<Tournament, "id" | "name" | "slug" | "status">;
+export type HomeMatch = MatchWithTeams & { tournament: TMeta; maps?: { map_number: number; map_name: string; team1_score: number; team2_score: number }[] };
 
 export type HomeData = {
   featured: Tournament | null;
@@ -18,109 +25,38 @@ export type HomeData = {
   /** турниров до этого не было — «первый турнир платформы» */
   isFirst: boolean;
   upcoming: Tournament[];
+  /** матчи, которые идут сейчас */
+  live?: HomeMatch[];
+  /** последние сыгранные матчи */
+  results?: HomeMatch[];
+  /** картинки карт: { de_mirage: url } */
+  mapImages?: Record<string, string>;
+  /** число раундов верхней сетки по турнирам — для подписи стадии */
+  upperRounds?: Record<string, number>;
   /** больше не используется: кнопка команды уточняется на клиенте (TeamCta) */
   loggedIn?: boolean;
 };
 
-const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+/** Стадия словами: «1/8 финала», «Полуфинал», «Финал» (по числу раундов сетки), иначе «раунд N» */
+function stageName(m: MatchWithTeams, totalUpper?: number) {
+  if (m.bracket === "grand_final") return "Гранд-финал";
+  if (m.bracket === "third_place") return "Матч за 3-е место";
+  if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
+  if (m.bracket === "upper" && totalUpper) {
+    const left = totalUpper - m.round; // 0 — финал, 1 — полуфинал, 2 — 1/4 …
+    if (left === 0) return "Финал";
+    if (left === 1) return "Полуфинал";
+    return `1/${2 ** left} финала`;
+  }
+  return `раунд ${m.round}`;
+}
 
-const Icon = {
-  calendar: (c = "size-6") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <rect x="3.5" y="5" width="17" height="15" rx="2" />
-      <path d="M3.5 10h17M8 3v4M16 3v4" />
-    </svg>
-  ),
-  globe: (c = "size-6") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5c-2.5-2.6-3.6-5.4-3.6-8.5S9.5 6.1 12 3.5Z" />
-    </svg>
-  ),
-  users: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <circle cx="9" cy="8.5" r="3.2" />
-      <path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5" />
-      <circle cx="16.5" cy="9" r="2.6" />
-      <path d="M17 14c2.3.3 3.7 1.9 4 4.5" />
-    </svg>
-  ),
-  trophy: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0V4Z" />
-      <path d="M7.5 6H4.5v1.2A3 3 0 0 0 7.5 10M16.5 6h3v1.2a3 3 0 0 1-3 3M12 13.5v3.5M8.5 20h7M10 17h4v3h-4z" />
-    </svg>
-  ),
-  bars: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <path d="M5 20v-4M9.5 20v-7M14 20v-10M18.5 20V4" />
-    </svg>
-  ),
-  shield: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <path d="M12 3 5 6v5.5c0 4.4 3 8.1 7 9.5 4-1.4 7-5.1 7-9.5V6l-7-3Z" />
-    </svg>
-  ),
-  bolt: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <path d="M13 3 5 13.5h6L10.5 21 19 10.5h-6L13 3Z" />
-    </svg>
-  ),
-  star: (c = "size-7") => (
-    <svg viewBox="0 0 24 24" className={c} {...stroke} aria-hidden>
-      <path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8L12 3.5Z" />
-    </svg>
-  ),
-};
-
-// ───────────────────────── hero
-
-function Hero({ featured }: Pick<HomeData, "featured">) {
-  return (
-    <section className="relative -mt-[var(--header-h)] overflow-hidden">
-      {/* фото из утверждённого макета — справа, растворяется в фоне */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-[64%] lg:w-[58%]">
-        <Image src="/home/hero.jpg" alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover object-[30%_top]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/10 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-bg to-transparent" />
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-bg/70 to-transparent" />
-        <div className="absolute inset-0 bg-bg/55 md:bg-transparent" />
-      </div>
-
-      <Container className="relative pt-[132px] pb-20 md:pt-[168px] md:pb-28 lg:pt-[170px] lg:pb-[96px] lg:min-h-[660px]">
-        <div className="max-w-[640px] lg:max-w-[820px]">
-          <Eyebrow className="leading-[1.9]">
-            Киберспортивная платформа
-            <br />
-            для соревновательных команд
-          </Eyebrow>
-          <h1 className="mt-7 text-[40px] sm:text-[56px] lg:text-[70px] font-semibold leading-[1.06] tracking-[-0.012em] text-fg lg:whitespace-nowrap">
-            Настоящие турниры
-            <br />
-            для <span className="text-accent">реальных команд</span>
-          </h1>
-          <p className="mt-8 max-w-[560px] lg:max-w-[680px] text-[16px] sm:text-[18px] lg:text-[20px] leading-[1.6] text-fg-2">
-            F16 Arena — это турниры по CS2, честная соревновательная среда и удобные инструменты для команд. Играйте,
-            развивайтесь и становитесь частью сообщества.
-          </p>
-          <div className="mt-11 lg:mt-14 flex flex-wrap gap-4 lg:gap-5">
-            <Button href={featured ? `/tournaments/${featured.slug}` : "/tournaments"} size="lg" iconRight={<ArrowRight />}>
-              Посмотреть турнир
-            </Button>
-            <TeamCta size="lg" />
-          </div>
-        </div>
-
-        {/* подпись справа внизу, как в макете */}
-        <div className="hidden lg:flex absolute right-16 bottom-[96px] flex-col items-end gap-3 text-[12px] uppercase tracking-[0.3em] text-fg-3">
-          <span className="mb-2 h-px w-10 bg-fg-2/70" />
-          <span>CS2</span>
-          <span>Teams</span>
-          <span>Tournaments</span>
-          <span>Community</span>
-        </div>
-      </Container>
-    </section>
+function MapThumb({ src, className }: { src?: string; className?: string }) {
+  return src ? (
+    // eslint-disable-next-line @next/next/no-img-element -- картинки карт из хранилища сайта, размер мелкий
+    <img src={src} alt="" className={cn("object-cover", className)} loading="lazy" />
+  ) : (
+    <span aria-hidden className={cn("bg-surface-4", className)} />
   );
 }
 
@@ -129,71 +65,58 @@ function Hero({ featured }: Pick<HomeData, "featured">) {
 export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
   const mode = modeOf(t.format);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
-  const second =
+  const action =
     t.status === "registration"
-      ? { href: `/tournaments/${t.slug}/register`, label: mode.size === 1 ? "Зарегистрироваться" : "Зарегистрировать команду" }
+      ? { href: `/tournaments/${t.slug}/register`, label: "Подать заявку" }
       : t.status === "checkin"
         ? { href: `/tournaments/${t.slug}/checkin`, label: "Пройти check-in" }
         : t.status === "live"
           ? { href: `/tournaments/${t.slug}?tab=bracket`, label: "Смотреть сетку" }
           : null;
+  const who = mode.size === 1 ? "Участники" : "Команды";
+  const facts = [
+    { icon: <CalendarDays />, label: "Начало", value: t.starts_at ? formatDateTime(t.starts_at) : "дата будет объявлена" },
+    { icon: <Users />, label: who, value: `${approved} из ${t.max_teams}` },
+    { icon: <MapPin />, label: "Где", value: t.is_lan ? (t.location ?? "F16 Arena") : "онлайн" },
+    { icon: <Trophy />, label: "Призы", value: prize ?? "будут объявлены" },
+  ];
 
   return (
-    <div className="group grid overflow-hidden rounded-[12px] border border-line-subtle bg-surface/80 lg:grid-cols-[44%_1fr]">
-      <div className="relative min-h-[240px] overflow-hidden lg:min-h-[350px]">
-        <Image
-          src={t.cover_url ?? "/home/tournament.jpg"}
-          alt=""
-          fill
-          sizes="(min-width: 1024px) 600px, 100vw"
-          className="media-zoom object-cover"
-          unoptimized={!!t.cover_url}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-7 sm:p-9 lg:p-11">
-          <div className="text-[34px] sm:text-[44px] lg:text-[54px] font-semibold leading-none tracking-[-0.02em] text-fg">{t.name}</div>
-          <Eyebrow className="mt-4 text-fg-3">{isFirst ? "Первый турнир платформы" : formatDate(t.starts_at)}</Eyebrow>
-        </div>
+    <div className="grid overflow-hidden rounded-surface border border-line-subtle bg-surface lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="relative aspect-[16/9] lg:aspect-auto lg:min-h-[320px]">
+        <Image src={t.cover_url ?? "/home/tournament.jpg"} alt="" fill sizes="(min-width: 1024px) 640px, 100vw" className="object-cover" unoptimized={!!t.cover_url} />
       </div>
-
-      <div className="flex flex-col justify-center gap-9 lg:gap-11 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-line-subtle lg:my-9 lg:py-2">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center text-[15px] lg:text-[18px] text-fg">
-            {[t.game, mode.size === 5 ? "5v5" : mode.size === 2 ? "2v2" : "1v1", bracketLabel[t.bracket_type] ?? t.bracket_type].map((x, i) => (
-              <span key={i} className="flex items-center">
-                {i > 0 && <span className="mx-5 h-4 w-px bg-ink/20" />}
-                {x}
-              </span>
-            ))}
-          </div>
+      <div className="flex flex-col justify-center gap-5 p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2">
           <Status info={tournamentStatus[t.status]} />
+          {isFirst && <span className="rounded-full bg-surface-4 px-3 py-1 text-[13px] font-semibold text-fg-2">Первый турнир платформы</span>}
         </div>
-
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="flex items-start gap-4">
-            <span className="mt-0.5 text-fg-2">{Icon.calendar("size-6 lg:size-8")}</span>
-            <div>
-              <div className="text-[15px] lg:text-[18px] text-fg">{t.starts_at ? formatDate(t.starts_at) : "Дата будет объявлена"}</div>
-              <div className="mt-1 text-[13px] lg:text-[15px] text-fg-3">
-                {mode.size === 1 ? "Участники" : "Команды"}: {approved} из {t.max_teams}
-                {prize ? ` · ${prize}` : ""}
+        <div>
+          <h2 className="text-[30px] font-extrabold leading-tight tracking-[-0.02em] text-fg sm:text-[36px]">{t.name}</h2>
+          <p className="mt-1.5 text-[16px] text-fg-2">
+            {t.game} · {mode.size === 5 ? "5 на 5" : mode.size === 2 ? "2 на 2" : "1 на 1"} · {bracketLabel[t.bracket_type] ?? t.bracket_type}
+          </p>
+        </div>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          {facts.map((f) => (
+            <div key={f.label} className="flex items-start gap-3">
+              <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-control bg-accent-dim text-accent [&>svg]:size-[18px]">{f.icon}</span>
+              <div className="min-w-0">
+                <dt className="text-[13.5px] text-fg-3">{f.label}</dt>
+                <dd className="text-[16px] font-semibold text-fg">{f.value}</dd>
               </div>
             </div>
-          </div>
-          <div className="flex items-start gap-4 sm:border-l sm:border-line-subtle sm:pl-8">
-            <span className="mt-0.5 text-fg-2">{Icon.globe("size-6 lg:size-8")}</span>
-            <div>
-              <div className="text-[15px] lg:text-[18px] text-fg">{t.is_lan ? "LAN" : "Онлайн"}</div>
-              <div className="mt-1 text-[13px] lg:text-[15px] text-fg-3">{t.location ?? (t.is_lan ? "F16 Arena" : "—")}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-4">
-          <Button href={`/tournaments/${t.slug}`} size="lg" iconRight={<ArrowRight />}>
+          ))}
+        </dl>
+        <div className="flex flex-wrap gap-3">
+          {action && (
+            <Button href={action.href} size="lg" iconRight={<ArrowRight />}>
+              {action.label}
+            </Button>
+          )}
+          <Button href={`/tournaments/${t.slug}`} size="lg" variant="secondary">
             Подробнее о турнире
           </Button>
-          {second && <Button href={second.href} variant="secondary" size="lg">{second.label}</Button>}
         </div>
       </div>
     </div>
@@ -203,113 +126,172 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
 /** Турниров ещё нет — честно, в той же композиции */
 function NoTournamentCard() {
   return (
-    <div className="grid overflow-hidden rounded-[12px] border border-line-subtle bg-surface/80 lg:grid-cols-[44%_1fr]">
-      <div className="relative min-h-[240px] lg:min-h-[350px]">
-        <Image src="/home/tournament.jpg" alt="" fill sizes="(min-width: 1024px) 600px, 100vw" className="object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-7 sm:p-9 lg:p-11">
-          <div className="text-[34px] sm:text-[44px] lg:text-[54px] font-semibold leading-none tracking-[-0.02em] text-fg">Скоро</div>
-          <Eyebrow className="mt-4 text-fg-3">Первый турнир платформы</Eyebrow>
-        </div>
-      </div>
-      <div className="flex flex-col justify-center gap-8 p-7 sm:p-10 lg:px-12 lg:border-l lg:border-line-subtle lg:my-9 lg:py-2">
-        <p className="max-w-md lg:max-w-lg text-[16px] lg:text-[19px] leading-relaxed text-fg-2">
-          Первый турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
-        </p>
-        <div className="flex flex-wrap gap-4">
-          <TeamCta size="lg" />
-        </div>
+    <div className="flex flex-col gap-4 rounded-surface border border-line-subtle bg-surface p-6 sm:p-8">
+      <h2 className="text-[26px] font-extrabold text-fg">Скоро первый турнир</h2>
+      <p className="max-w-[60ch] text-[16px] text-fg-2">
+        Турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
+      </p>
+      <div>
+        <TeamCta size="lg" />
       </div>
     </div>
   );
 }
 
 function NextTournaments({ list }: { list: Tournament[] }) {
-  if (list.length > 0) {
-    return (
-      <div className="mt-5 overflow-hidden rounded-[12px] border border-dashed border-line">
-        {list.map((t, i) => (
-          <Link
-            key={t.id}
-            href={`/tournaments/${t.slug}`}
-            className={cn("group flex items-center gap-6 px-8 py-6 transition-colors hover:bg-ink/[0.02]", i > 0 && "border-t border-ink/[0.06]")}
-          >
-            <span className="text-fg-2">{Icon.calendar("size-7")}</span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[15px] font-semibold text-fg truncate">{t.name}</div>
-              <div className="mt-1 text-[13px] text-fg-3">
-                {formatDate(t.starts_at)} · {tournamentStatus[t.status].label}
-              </div>
-            </div>
-            <ArrowRight className="size-4 text-fg-3 transition-transform group-hover:translate-x-0.5 group-hover:text-fg" aria-hidden />
-          </Link>
-        ))}
-      </div>
-    );
-  }
+  if (!list.length) return null;
   return (
-    <div className="mt-5 flex items-center gap-6 lg:gap-8 rounded-[12px] border border-dashed border-line bg-ink/[0.012] px-8 py-7 lg:px-11 lg:py-8">
-      <span className="text-fg-2">{Icon.calendar("size-8 lg:size-10")}</span>
-      <div>
-        <div className="text-[15px] lg:text-[18px] font-semibold text-fg">Следующие турниры</div>
-        <div className="mt-1 lg:mt-2 text-[14px] lg:text-[16px] text-fg-3">Впереди ещё больше соревнований. Следите за обновлениями!</div>
-      </div>
+    <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface">
+      {list.map((t, i) => (
+        <Link key={t.id} href={`/tournaments/${t.slug}`} className={cn("group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-2", i > 0 && "border-t border-line-subtle")}>
+          <span className="grid size-10 shrink-0 place-items-center rounded-control bg-surface-4 text-fg-2">
+            <CalendarDays className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[16px] font-bold text-fg">{t.name}</div>
+            <div className="text-[14px] text-fg-3">
+              {formatDate(t.starts_at)} · {tournamentStatus[t.status].label}
+            </div>
+          </div>
+          <ArrowRight className="size-5 text-fg-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+      ))}
     </div>
   );
 }
 
-// ───────────────────────── как это работает / почему F16
+// ───────────────────────── как участвовать
 
-const STEPS = [
-  { n: "01", title: "Соберите команду", text: "Создайте команду, пригласите игроков и настройте профиль.", icon: Icon.users },
-  { n: "02", title: "Участвуйте в турнирах", text: "Играйте в организованных турнирах с честными правилами и стабильной инфраструктурой.", icon: Icon.trophy },
-  { n: "03", title: "Развивайтесь", text: "Получайте игровой опыт, двигайтесь выше и становитесь частью сообщества F16 Arena.", icon: Icon.bars },
+const HOW = [
+  { title: "Войдите через Steam", text: "Кнопка в меню. Пароль на сайте не нужен." },
+  { title: "Соберите команду", text: "Капитан создаёт команду и приглашает игроков по ссылке." },
+  { title: "Подайте заявку", text: "На странице турнира. Статус заявки будет виден там же." },
 ];
 
-const WHY = [
-  { title: "Честная игра", text: "Проверка составов, вето на сайте и прозрачные правила.", icon: Icon.shield },
-  { title: "Удобно для команд", text: "Инструменты для управления составом, расписание и статистика.", icon: Icon.users },
-  { title: "Фокус на CS2", text: "Только CS2. Турниры, созданные для соревновательной сцены.", icon: Icon.bolt },
-  { title: "Развивающееся сообщество", text: "Новые турниры, возможности и поддержка команд.", icon: Icon.star },
-];
+// ───────────────────────── матчи
 
-export function HomeView({ featured, approved, isFirst, upcoming }: HomeData) {
+function LiveCard({ m, img, totalUpper }: { m: HomeMatch; img?: string; totalUpper?: number }) {
+  const map = liveMapOf(m);
+  const s1 = map ? map.team1_score : m.team1_score;
+  const s2 = map ? map.team2_score : m.team2_score;
   return (
-    <>
-      <Hero featured={featured} />
+    <Link href={`/matches/${m.id}`} className="group overflow-hidden rounded-surface border border-line-subtle bg-surface transition-colors hover:border-line-strong">
+      <MapThumb src={img} className="block h-28 w-full" />
+      <div className="flex flex-col gap-2 p-4">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-danger-dim px-2.5 py-0.5 text-[13px] font-bold text-live">
+          <span className="size-2 animate-pulse rounded-full bg-live" aria-hidden />
+          Идёт{map ? ` · ${mapLabel(map.map_name)}` : ""}
+        </span>
+        {[
+          { name: m.team1?.name ?? "—", s: s1, lead: s1 > s2 },
+          { name: m.team2?.name ?? "—", s: s2, lead: s2 > s1 },
+        ].map((r, i) => (
+          <div key={i} className="flex items-center justify-between gap-3">
+            <span className="truncate text-[16px] font-semibold text-fg">{r.name}</span>
+            <span className={cn("num text-[20px] font-extrabold", r.lead ? "text-accent" : "text-fg")}>{r.s}</span>
+          </div>
+        ))}
+        <span className="truncate text-[13px] text-fg-3">
+          {m.tournament.name} · {stageName(m, totalUpper)}
+        </span>
+      </div>
+    </Link>
+  );
+}
 
-      <section><Container className="relative">
-        <Eyebrow className="mb-5">{featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"}</Eyebrow>
+function ResultRow({ m, img }: { m: HomeMatch; img?: string }) {
+  const w1 = m.winner_id != null && m.winner_id === m.team1_id;
+  const w2 = m.winner_id != null && m.winner_id === m.team2_id;
+  const single = m.best_of === 1 && m.maps?.[0];
+  // BO1 — счёт карты по раундам, серия — по картам
+  const a = single ? single.team1_score : m.team1_score;
+  const b = single ? single.team2_score : m.team2_score;
+  return (
+    <Link href={`/matches/${m.id}`} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2 sm:grid-cols-[64px_minmax(0,1fr)_auto_minmax(0,1fr)_minmax(0,140px)] sm:gap-4">
+      <MapThumb src={img} className="hidden h-11 w-16 rounded-chip sm:block" />
+      <span className={cn("truncate text-[16px]", w1 ? "font-bold text-accent" : "text-fg-3")}>{m.team1?.name ?? "—"}</span>
+      <span className="num min-w-16 text-center text-[20px] font-extrabold text-fg">
+        {a} : {b}
+      </span>
+      <span className={cn("truncate text-right text-[16px]", w2 ? "font-bold text-accent" : "text-fg-3")}>{m.team2?.name ?? "—"}</span>
+      <span className="hidden truncate text-right text-[13px] text-fg-3 sm:block">{single ? mapLabel(single.map_name) : `до ${Math.floor(m.best_of / 2) + 1} побед`}</span>
+    </Link>
+  );
+}
+
+function SectionHead({ title, hint, href, link }: { title: string; hint?: string; href?: string; link?: string }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+      <div>
+        <h2 className="text-[22px] font-extrabold tracking-[-0.015em] text-fg">{title}</h2>
+        {hint && <p className="mt-0.5 text-[15px] text-fg-3">{hint}</p>}
+      </div>
+      {href && (
+        <Link href={href} className="text-[15px] font-semibold text-accent hover:text-accent-strong">
+          {link}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export function HomeView({ featured, approved, isFirst, upcoming, live = [], results = [], mapImages = {}, upperRounds = {} }: HomeData) {
+  const firstMap = (m: HomeMatch) => {
+    const map = liveMapOf(m)?.map_name ?? m.maps?.[0]?.map_name;
+    return map ? mapImages[map] : undefined;
+  };
+  return (
+    <Container className="flex flex-col gap-10 pb-12 pt-6 sm:pt-8">
+      <header>
+        <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-fg sm:text-[34px]">Турниры по CS2 в F16 Arena</h1>
+        <p className="mt-1 max-w-[62ch] text-[16px] text-fg-2">Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.</p>
+      </header>
+
+      <HomeMyMatch />
+
+      <section className="flex flex-col gap-3">
+        <SectionHead title={featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"} href="/tournaments" link="Все турниры" />
         {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard />}
         <NextTournaments list={upcoming} />
-      </Container></section>
+      </section>
 
-      <section><Container className="pt-16 md:pt-20">
-        <Eyebrow className="mb-5 lg:mb-6">Как это работает</Eyebrow>
-        <ol className="grid gap-4 md:grid-cols-3">
-          {STEPS.map((s) => (
-            <li key={s.n} className="relative rounded-[12px] border border-line-subtle bg-surface/80 p-8 pb-10 lg:p-10 lg:pb-14">
-              <span className="absolute right-8 top-8 lg:right-10 lg:top-10 text-fg-2">{s.icon("size-7 lg:size-9")}</span>
-              <span className="text-[13px] lg:text-[15px] text-fg-3">{s.n}</span>
-              <div className="mt-3 text-[22px] lg:text-[26px] font-semibold tracking-[-0.01em] text-fg">{s.title}</div>
-              <p className="mt-4 max-w-[300px] lg:max-w-[340px] text-[15px] lg:text-[18px] leading-[1.6] text-fg-2">{s.text}</p>
+      <section>
+        <SectionHead title="Как участвовать" />
+        <ol className="grid gap-3 md:grid-cols-3">
+          {HOW.map((s, i) => (
+            <li key={s.title} className="flex flex-col gap-2 rounded-surface border border-line-subtle bg-surface p-5">
+              <span className="grid size-9 place-items-center rounded-full bg-accent text-[15px] font-extrabold text-accent-ink">{i + 1}</span>
+              <span className="text-[17px] font-bold text-fg">{s.title}</span>
+              <span className="text-[15px] text-fg-2">{s.text}</span>
             </li>
           ))}
         </ol>
-      </Container></section>
-
-      <section><Container className="pb-20 pt-16 md:pb-28 md:pt-20">
-        <Eyebrow className="mb-8 lg:mb-10">Почему F16 Arena</Eyebrow>
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
-          {WHY.map((w, i) => (
-            <div key={w.title} className={cn("lg:px-10", i === 0 && "lg:pl-0", i > 0 && "lg:border-l lg:border-line-subtle")}>
-              <span className="text-fg-2">{w.icon("size-7 lg:size-9")}</span>
-              <div className="mt-5 lg:mt-6 text-[18px] lg:text-[21px] font-semibold text-fg">{w.title}</div>
-              <p className="mt-3 text-[14px] lg:text-[16px] leading-[1.6] text-fg-3">{w.text}</p>
-            </div>
-          ))}
+        <div className="mt-3">
+          <TeamCta />
         </div>
-      </Container></section>
-    </>
+      </section>
+
+      {live.length > 0 && (
+        <section>
+          <SectionHead title="Матчи, которые идут сейчас" hint="Счёт текущей карты. Зелёным — кто ведёт." href="/matches" link="Все матчи" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {live.map((m) => (
+              <LiveCard key={m.id} m={m} totalUpper={upperRounds[m.tournament_id]} img={firstMap(m)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {results.length > 0 && (
+        <section>
+          <SectionHead title="Последние результаты" hint="Победитель выделен зелёным." href="/matches" link="Все матчи" />
+          <div className="divide-y divide-line-subtle overflow-hidden rounded-surface border border-line-subtle bg-surface">
+            {results.map((m) => (
+              <ResultRow key={m.id} m={m} img={firstMap(m)} />
+            ))}
+          </div>
+        </section>
+      )}
+    </Container>
   );
 }
