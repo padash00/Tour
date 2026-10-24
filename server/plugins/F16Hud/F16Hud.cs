@@ -19,7 +19,7 @@ namespace F16Hud;
 public class F16Hud : BasePlugin
 {
     public override string ModuleName => "F16 HUD";
-    public override string ModuleVersion => "1.5.0";
+    public override string ModuleVersion => "1.5.1";
     public override string ModuleAuthor => "F16 Arena";
 
     private DateTime _until;
@@ -73,6 +73,8 @@ public class F16Hud : BasePlugin
             foreach (var p in Utilities.GetPlayers())
             {
                 if (p is not { IsValid: true, IsBot: false, IsHLTV: false }) continue;
+                // только тем, кто уже в игре: вывод в центр экрана игроку, который ещё подключается, роняет сервер
+                if (p.PlayerPawn?.IsValid != true) continue;
                 if (_mode == "html") p.PrintToCenterHtml(html, 1);
                 else if (_mode == "hint") p.PrintToCenter(plain);
                 else p.PrintToCenterAlert(plain);
