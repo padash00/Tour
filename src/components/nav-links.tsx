@@ -57,13 +57,14 @@ export type UserInfo = { nickname: string; avatar: string | null; steamId: strin
 
 function userLinks(u: UserInfo) {
   return [
-    { href: "/me", label: "Моя игра", icon: <LayoutDashboard /> },
-    { href: `/players/${u.steamId}`, label: "Публичный профиль", icon: <User /> },
-    { href: "/team", label: "Моя команда", icon: <Users /> },
-    { href: "/notifications", label: u.unread ? `Уведомления · ${u.unread > 99 ? "99+" : u.unread}` : "Уведомления", icon: <Bell /> },
-    ...(u.admin ? [{ href: "/admin", label: "F16 Control", icon: <Shield /> }] : []),
+    { href: "/me", label: "Моя игра", hint: "матчи, заявки, что делать дальше", icon: <LayoutDashboard /> },
+    { href: "/team", label: "Моя команда", hint: "состав и приглашения", icon: <Users /> },
+    { href: "/notifications", label: "Уведомления", hint: u.unread ? "есть непрочитанные" : "всё прочитано", icon: <Bell />, count: u.unread },
+    { href: `/players/${u.steamId}`, label: "Мой профиль", hint: "как вас видят другие", icon: <User /> },
   ];
 }
+
+const countLabel = (n: number) => (n > 99 ? "99+" : String(n));
 
 /** Выход — POST-форма (logout принимает только POST со своего сайта) */
 function useLogout() {
@@ -84,28 +85,59 @@ export function UserMenu({ user }: { user: UserInfo }) {
         trigger={
           <button
             type="button"
-            className="flex h-10 items-center gap-2 rounded-control border border-line bg-ink/[0.02] pl-1 pr-2 transition-colors duration-[var(--dur-hover)] hover:border-line-strong aria-expanded:border-line-strong aria-expanded:bg-ink/[0.05]"
+            className="flex h-11 items-center gap-2 rounded-full bg-surface pl-1 pr-2.5 shadow-[inset_0_0_0_1px_var(--color-line)] transition-colors duration-[var(--dur-hover)] hover:bg-surface-2 aria-expanded:bg-surface-2 aria-expanded:shadow-[inset_0_0_0_1px_var(--color-line-strong)]"
           >
-            <Avatar src={user.avatar} name={user.nickname} size="xs" className="!size-7" />
-            <span className="max-w-[120px] truncate text-[14px] font-medium">{user.nickname}</span>
+            <Avatar src={user.avatar} name={user.nickname} size="xs" className="!size-9 !rounded-full" />
+            <span className="max-w-[130px] truncate text-[15px] font-semibold">{user.nickname}</span>
             <ChevronDown className="size-4 text-fg-3" />
           </button>
         }
       >
-        <div className="px-3.5 pb-2 pt-1.5">
-          <div className="truncate text-[14px] font-semibold text-fg">{user.nickname}</div>
-          <div className="text-micro text-fg-3">{user.admin ? "Администратор" : "Игрок F16 Arena"}</div>
-        </div>
-        <MenuSeparator />
-        {userLinks(user).map((l) => (
-          <MenuItem key={l.href} icon={l.icon} onSelect={() => router.push(l.href)}>
-            {l.label}
+        <div className="w-[300px]">
+          <div className="mb-1.5 flex items-center gap-3 rounded-surface bg-surface-2 p-3">
+            <Avatar src={user.avatar} name={user.nickname} size="md" className="!rounded-full" />
+            <div className="min-w-0">
+              <div className="truncate text-[16px] font-bold text-fg">{user.nickname}</div>
+              <span className={cn("mt-1 inline-flex rounded-full px-2 py-0.5 text-[12px] font-bold", user.admin ? "bg-accent-dim text-accent" : "bg-ink/[0.06] text-fg-2")}>
+                {user.admin ? "Администратор" : "Игрок F16 Arena"}
+              </span>
+            </div>
+          </div>
+          {userLinks(user).map((l) => (
+            <MenuItem
+              key={l.href}
+              icon={l.icon}
+              hint={l.hint}
+              badge={l.count ? <span className="rounded-full bg-live px-2 py-0.5 text-[12px] font-bold text-white">{countLabel(l.count)}</span> : undefined}
+              onSelect={() => router.push(l.href)}
+            >
+              {l.label}
+            </MenuItem>
+          ))}
+          {user.admin && (
+            <>
+              <MenuSeparator />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => router.push("/admin")}
+                className="flex w-full items-center gap-3 rounded-control bg-fg px-2.5 py-2.5 text-left text-white outline-none transition-opacity hover:opacity-90 focus-visible:opacity-90"
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-control bg-white/15 [&>svg]:size-[18px]">
+                  <Shield />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold leading-tight">Пульт организатора</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-snug text-white/70">F16 Control: турниры, матчи, серверы</span>
+                </span>
+              </button>
+            </>
+          )}
+          <MenuSeparator />
+          <MenuItem icon={<LogOut />} danger onSelect={logout}>
+            Выйти из аккаунта
           </MenuItem>
-        ))}
-        <MenuSeparator />
-        <MenuItem icon={<LogOut />} danger onSelect={logout}>
-          Выйти
-        </MenuItem>
+        </div>
       </Menu>
     </div>
   );
@@ -161,10 +193,11 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
                   <div className="text-meta text-fg-3">{user.admin ? "Администратор" : "Игрок F16 Arena"}</div>
                 </div>
               </div>
-              {userLinks(user).map((l) => (
+              {[...userLinks(user), ...(user.admin ? [{ href: "/admin", label: "Пульт организатора", hint: "F16 Control", icon: <Shield />, count: 0 }] : [])].map((l) => (
                 <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className={cn(row, "text-fg-2 hover:text-fg [&>svg]:size-5 [&>svg]:text-fg-3")}>
                   {l.icon}
                   {l.label}
+                  {l.count ? <span className="ml-auto rounded-full bg-live px-2 py-0.5 text-[12px] font-bold text-white">{countLabel(l.count)}</span> : null}
                 </Link>
               ))}
               <button type="button" onClick={logout} className={cn(row, "w-full text-left text-danger [&>svg]:size-5")}>

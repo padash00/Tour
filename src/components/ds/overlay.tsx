@@ -350,7 +350,7 @@ export function Menu({
           role="menu"
           aria-label={label}
           className={cn(
-            "absolute top-full z-50 mt-1.5 min-w-52 overflow-hidden rounded-popover border border-line bg-surface-4 py-1 shadow-[var(--shadow-pop)]",
+            "absolute top-full z-50 mt-2 min-w-56 overflow-hidden rounded-popover bg-elevated p-1.5 shadow-[var(--shadow-pop)]",
             "animate-[menu-in_var(--dur-pop)_ease-out]",
             align === "end" ? "right-0" : "left-0",
           )}
@@ -362,7 +362,8 @@ export function Menu({
   );
 }
 
-export function MenuItem({ children, onSelect, danger, icon, disabled }: { children: ReactNode; onSelect: () => void; danger?: boolean; icon?: ReactNode; disabled?: boolean }) {
+/** Пункт меню. hint — короткое пояснение второй строкой, badge — счётчик справа */
+export function MenuItem({ children, onSelect, danger, icon, disabled, hint, badge }: { children: ReactNode; onSelect: () => void; danger?: boolean; icon?: ReactNode; disabled?: boolean; hint?: ReactNode; badge?: ReactNode }) {
   const { close } = useContext(MenuContext);
   return (
     <button
@@ -374,21 +375,25 @@ export function MenuItem({ children, onSelect, danger, icon, disabled }: { child
         onSelect();
       }}
       className={cn(
-        "flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[14px] outline-none transition-colors disabled:opacity-45",
-        "hover:bg-white/[0.06] focus-visible:bg-white/[0.08]",
-        danger ? "text-danger" : "text-fg",
-        "[&>svg]:size-4 [&>svg]:text-current",
+        "flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors disabled:opacity-45",
+        danger ? "text-danger hover:bg-danger-dim focus-visible:bg-danger-dim" : "text-fg hover:bg-ink/[0.05] focus-visible:bg-ink/[0.07]",
       )}
     >
-      {icon}
-      {children}
+      {icon && (
+        <span className={cn("grid size-9 shrink-0 place-items-center rounded-control [&>svg]:size-[18px]", danger ? "bg-danger-dim text-danger" : "bg-ink/[0.05] text-fg-2")}>{icon}</span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold leading-tight">{children}</span>
+        {hint && <span className="mt-0.5 block truncate text-[12.5px] leading-snug text-fg-3">{hint}</span>}
+      </span>
+      {badge}
     </button>
   );
 }
 
 /** Разделитель: отделяет опасные пункты («Покинуть», «Удалить») от обычных */
 export function MenuSeparator() {
-  return <div role="separator" className="my-1 h-px bg-line-subtle" />;
+  return <div role="separator" className="mx-2 my-1.5 h-px bg-line-subtle" />;
 }
 
 // ───────────────────────── тултип
