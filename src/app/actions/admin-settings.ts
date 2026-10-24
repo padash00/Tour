@@ -71,6 +71,25 @@ export async function setServerOpenJoin(_prev: ActionResult, formData: FormData)
   return { success: value === "1" ? "На серверы может зайти любой — применится за несколько секунд" : "На серверы пускаем только игроков матча" };
 }
 
+/** Скины F16 на игровых серверах (app_settings.SERVER_SKINS: «1» / «0»). Агент ставит или убирает плагины, когда матчей нет */
+export async function setServerSkins(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const value = formData.get("on");
+  if (value !== "0" && value !== "1") return { error: "Не удалось определить новое состояние" };
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: "SERVER_SKINS", value, updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.server_skins", undefined, { on: value === "1" });
+  revalidatePath("/admin/settings");
+  return {
+    success:
+      value === "1"
+        ? "Скины включатся в течение минуты: свободные серверы перезапустятся. Если идёт матч — после него"
+        : "Скины выключатся в течение минуты: свободные серверы перезапустятся. Если идёт матч — после него",
+  };
+}
+
 /** Добавить / убрать карту из библиотеки Workshop */
 export async function editWorkshopMaps(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const admin = await requireAdmin();

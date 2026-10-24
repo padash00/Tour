@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting, setProfileRequired, setServerOpenJoin } from "@/app/actions/admin-settings";
+import { editWorkshopMaps, saveSetting, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
 import { getAgentBundle } from "@/lib/agent-bundle";
 import { env } from "@/lib/env";
 import { formatShortDateTime } from "@/lib/format";
-import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, isServerOpenJoin, type SettingKey } from "@/lib/settings";
+import { getDisabledMaps, getMapImages, getSettingsStatus, getWorkshopMaps, isServerOpenJoin, isServerSkins, type SettingKey } from "@/lib/settings";
 import { CS2_MAPS } from "@/lib/maps";
 import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -92,7 +92,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
   await requireAdmin("/admin/settings"); // права проверяются в каждой странице, не только в layout
   const sp = await props.searchParams;
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "general") as TabKey;
-  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin] = await Promise.all([
+  const [settings, workshop, info, mapImages, disabledMaps, profileRequired, openJoin, skins] = await Promise.all([
     getSettingsStatus(),
     getWorkshopMaps(),
     workshopInfo(),
@@ -100,6 +100,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
     getDisabledMaps(),
     isProfileRequired(),
     isServerOpenJoin(),
+    isServerSkins(),
   ]);
   const byKey = new Map(settings.map((s) => [s.key, s]));
   const href = (k: string) => (k === "general" ? "/admin/settings" : `/admin/settings?tab=${k}`);
@@ -167,6 +168,20 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
               </p>
             </div>
             <ActionToggle action={setServerOpenJoin} fields={{}} on={openJoin} label="Пускать на серверы всех" onLabel="Всех" offLabel="Только матч" />
+          </div>
+          <div className={`${ADMIN_CARD} mt-4 flex max-w-2xl flex-wrap items-start justify-between gap-4 p-6`}>
+            <div className="max-w-md">
+              <div className="text-[17px] font-bold text-fg">Скины F16 на серверах</div>
+              <p className="mt-1 text-[14px] leading-relaxed text-fg-3">
+                Игроки выбирают в игре скины оружия, ножи, перчатки, агентов, музыку и значки: команды <b>!skins</b>, <b>!knife</b>,{" "}
+                <b>!gloves</b>, <b>!agents</b>. Выбор сохраняется за игроком. Включение и выключение перезапускает свободные серверы;
+                серверы с матчем — после окончания матча.
+              </p>
+              <p className="mt-2 text-[13px] leading-relaxed text-warn">
+                Выдача предметов, которых нет в инвентаре, нарушает правила серверов Valve — есть риск блокировки токена сервера.
+              </p>
+            </div>
+            <ActionToggle action={setServerSkins} fields={{}} on={skins} label="Скины F16 на серверах" onLabel="Включены" offLabel="Выключены" />
           </div>
         </Panel>
       )}

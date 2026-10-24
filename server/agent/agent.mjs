@@ -40,6 +40,7 @@ import { cs2Build, prefetchMaps, readVersions, restartAll, updateCs2, updatePlug
 import { createMatchLoader } from "./match-load.mjs";
 import { createRecovery } from "./recovery.mjs";
 import { createRelay } from "./relay.mjs";
+import { createSkins } from "./skins.mjs";
 import { ensureUpnp } from "./upnp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -187,6 +188,8 @@ const snapshots = {}; // { [instance]: { at, report } }
 // Вход на серверы для всех (настройка сайта «Пускать на серверы всех»). Применяем при изменении,
 // после перезапуска сервера и раз в 5 минут (MatchZy может вернуть значения из своего конфига)
 let openJoin = true;
+// скины F16 (тумблер «Скины на серверах»): null — сайт ещё не ответил
+let skinsWanted = null;
 const openJoinApplied = new Map(); // инстанс → { value, at, uptime }
 async function applyOpenJoin(inst) {
   const prev = openJoinApplied.get(inst.name);
@@ -586,6 +589,7 @@ async function syncOnce() {
   recovery.ackEvents(Array.isArray(res.processed_events) ? res.processed_events : events.map((e) => e.id));
   await housekeeping.syncMatchzyAdmins(res.admins).catch((e) => log(`MatchZy admins: ${e.message}`));
   if (typeof res.open_join === "boolean") openJoin = res.open_join;
+  if (typeof res.skins === "boolean") skinsWanted = res.skins;
   try {
     housekeeping.cleanupBackups(Number(res.backup_days ?? 1), Number(res.demo_days ?? res.backup_days ?? 1));
   } catch (e) {
@@ -621,6 +625,7 @@ async function housekeepingLoop() {
       log(`язык сервера: ${e.message}`);
     }
     await hud.ensurePlugin(Object.keys(recovery.assignments).length > 0).catch((e) => log(`F16Hud: ${e.message}`));
+    await skins.ensure(skinsWanted).catch((e) => log(`скины: ${e.message}`));
     await refreshUpnp().catch(() => {});
     await housekeeping.ensureFirewall(demos ? DEMO_PORT : null).catch((e) => log(`брандмауэр: ${e.message}`));
     await housekeeping.ensureHiddenTasks().catch((e) => log(`планировщик: ${e.message}`));
@@ -629,6 +634,17 @@ async function housekeepingLoop() {
     await sleep(60_000);
   }
 }
+
+const skins = createSkins({
+  f16Dir: F16_DIR,
+  serverDir: SERVER_DIR,
+  instances: INSTANCES,
+  isRunning: (inst) => snapshots[inst.name]?.report?.running === true,
+  restart: (inst, how) => runStartScript(inst.name, how === "stop"),
+  // матч на сервере или идёт обслуживание (обновление, прогрев) — плагины не трогаем
+  hasMatches: () => Object.keys(recovery.assignments).length > 0 || laneActive.size > 0,
+  log,
+});
 
 await relay.start();
 demos?.start();
