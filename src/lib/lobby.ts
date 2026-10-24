@@ -48,6 +48,8 @@ export type LobbyGame = Narrow<
 
 export const ONLINE_MS = 45_000; // игрок «в лобби», если страница опрашивала сервер за это время
 const HOST_AWAY_MS = 3 * 60_000; // хост пропал — хост переходит к следующему
+/** Лобби в ожидании, где ни у кого не открыта страница столько времени, закрывается само */
+export const ABANDONED_MS = 2 * 60_000;
 export const READY_CHECK_SECONDS = 30;
 export const DRAFT_STEP_SECONDS = 30;
 export const LOBBY_VETO_SECONDS = 30;
@@ -446,6 +448,23 @@ export async function lobbyTick() {
     .or(`draft.not.is.null,ready_check_until.lt.${new Date(now).toISOString()}`);
   for (const row of due ?? []) await lobbyTimeouts(parseLobby(row)!);
   await lobbyGameWatchdog();
+  await closeAbandonedLobbies(now);
+}
+
+/**
+ * Брошенные лобби: игроки ушли со страницы или закрыли вкладку, не нажав «Выйти».
+ * Закрываются только ожидающие лобби (идущую игру не трогаем), когда ни один участник
+ * не открывал страницу дольше ABANDONED_MS, и само лобби не менялось столько же.
+ */
+async function closeAbandonedLobbies(now: number) {
+  const cutoff = new Date(now - ABANDONED_MS).toISOString();
+  const { data: stale } = await db().from("lobbies").select("*").eq("status", "waiting").lt("updated_at", cutoff).limit(50);
+  for (const row of stale ?? []) {
+    const lobby = parseLobby(row)!;
+    const { data: fresh } = await db().from("lobby_members").select("player_id").eq("lobby_id", lobby.id).gte("last_seen_at", cutoff).limit(1);
+    if (fresh?.length) continue;
+    await closeLobby(lobby, "Лобби закрыто — все ушли со страницы");
+  }
 }
 
 /**
