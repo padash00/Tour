@@ -10,6 +10,8 @@ import type { Tournament } from "@/lib/types";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { mainPlayersLabel, modeOf } from "@/lib/modes";
 import { getPlayerLeaderboard, getTeamStats, getTournamentMvp } from "@/lib/stats";
+import { getTournamentDays } from "@/lib/top-players";
+import { TopDownloads } from "@/components/top-downloads";
 import { PlayerStatsTable, RatingExplainer, TeamStatsTable } from "@/components/stats-table";
 import { fmt } from "@/components/stats-format";
 import { StatLeaders } from "@/components/stat-leaders";
@@ -330,7 +332,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
             <MatchesTab matches={matches} />
           </TabPanel>
           <TabPanel tab="stats" defaultKey={defaultTab}>
-            <StatsTab tournamentId={t.id} solo={solo} finished={finished} />
+            <StatsTab tournamentId={t.id} slug={t.slug} solo={solo} finished={finished} />
           </TabPanel>
           <TabPanel tab="rules" defaultKey={defaultTab}>
             <div className="max-w-read">
@@ -542,11 +544,12 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
   );
 }
 
-async function StatsTab({ tournamentId, solo, finished }: { tournamentId: string; solo: boolean; finished: boolean }) {
+async function StatsTab({ tournamentId, slug, solo, finished }: { tournamentId: string; slug: string; solo: boolean; finished: boolean }) {
   // getPlayerLeaderboard кэширован на запрос — getTeamStats и MvpBlock берут ту же таблицу, а не считают заново
-  const [rows, teams, nominations] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId), getTournamentNominations(tournamentId)]);
+  const [rows, teams, nominations, days] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId), getTournamentNominations(tournamentId), getTournamentDays(tournamentId)]);
   return (
     <div className="space-y-10">
+      {rows.length > 0 && <TopDownloads slug={slug} days={days} gate />}
       {rows.length > 0 && <TournamentAwards nominations={nominations} rows={rows} finished={finished} />}
       {rows.length ? (
         <div className="space-y-6">

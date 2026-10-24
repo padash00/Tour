@@ -23,19 +23,19 @@ const WHITE = "#ffffff";
 const GREY = "#8a8f98";
 const MEDAL: Record<string, string> = { "1": "#f5c542", "2": "#c9d0da", "3": "#d98a4e", "3–4": "#d98a4e" };
 /** пропорции логотипа f16-arena-horizontal.svg (1414×326) */
-const LOGO_RATIO = 1414 / 326;
+export const LOGO_RATIO = 1414 / 326;
 
-const fit = (name: string, base: number, max = 12) => (name.length > max ? Math.max(Math.round(base * 0.5), Math.round((base * max) / name.length)) : base);
-const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-const rgba = (hex: string, a: number) => {
+export const fit = (name: string, base: number, max = 12) => (name.length > max ? Math.max(Math.round(base * 0.5), Math.round((base * max) / name.length)) : base);
+export const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+export const rgba = (hex: string, a: number) => {
   const n = Number.parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
-type Pic = { src: string | null; tag: string };
+export type Pic = { src: string | null; tag: string };
 
 /** Герб: логотип команды (или аватар соло-игрока); без картинки — ПОЛНЫЙ тег в квадрате */
-function Crest({ pic, size, color }: { pic: Pic; size: number; color: string }) {
+export function Crest({ pic, size, color }: { pic: Pic; size: number; color: string }) {
   const r = size * 0.16;
   const ring = { border: `${Math.max(3, Math.round(size * 0.022))}px solid ${color}`, borderRadius: r + 4 } as const;
   return pic.src ? (
@@ -65,7 +65,7 @@ function Crest({ pic, size, color }: { pic: Pic; size: number; color: string }) 
   );
 }
 
-async function svgPng(svg: Buffer, width: number) {
+export async function svgPng(svg: Buffer, width: number) {
   const sharp = (await import("sharp")).default;
   const out = await sharp(svg, { density: 300 }).resize({ width }).png().toBuffer();
   return `data:image/png;base64,${out.toString("base64")}`;

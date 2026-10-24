@@ -38,6 +38,8 @@ import { tournamentEta } from "@/lib/schedule";
 import { getLastDraw } from "@/lib/draw-log";
 import { getTournamentNominations, type Nomination } from "@/lib/nominations";
 import { getTournamentRecap } from "@/lib/recap";
+import { getTournamentDays } from "@/lib/top-players";
+import { TopDownloads } from "@/components/top-downloads";
 import { clearNomination, setNomination } from "@/app/actions/admin-nominations";
 import { drawOrderText } from "@/lib/draw";
 import { approveWarningOf, loadOfficial } from "@/lib/official-data";
@@ -653,10 +655,14 @@ async function MatchesTab({ tournamentId }: { tournamentId: string }) {
 // ───────────────────────── Награды: места, номинации, дипломы
 
 async function AwardsTab({ t, regs }: { t: T; regs: RegistrationWithTeam[] }) {
-  const [recap, nominations] = await Promise.all([getTournamentRecap(t), getTournamentNominations(t.id)]);
+  const [recap, nominations, days] = await Promise.all([getTournamentRecap(t), getTournamentNominations(t.id), getTournamentDays(t.id)]);
   const podium = recap.placements;
   return (
     <div className="space-y-8 max-w-4xl">
+      <Panel title="Картинки для соцсетей">
+        <TopDownloads slug={t.slug} days={days} />
+      </Panel>
+
       <Panel
         title="Места"
         action={

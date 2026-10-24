@@ -276,8 +276,16 @@ async function attachSwing<R extends MapStatRow>(rows: R[]): Promise<R[]> {
 export type LeaderboardRow = Awaited<ReturnType<typeof getPlayerLeaderboard>>[number];
 
 /** Таблица игроков (по рейтингу). В пределах запроса считается один раз на турнир */
-export const getPlayerLeaderboard = cache(async (tournamentId?: string) => {
-  const rows = await getStatRows({ tournamentId });
+export const getPlayerLeaderboard = cache(async (tournamentId?: string) => buildLeaderboard(await getStatRows({ tournamentId })));
+
+/** Таблица игроков только по части матчей турнира (например, по матчам одного дня) */
+export async function getPlayerLeaderboardForMatches(tournamentId: string, matchIds: string[]) {
+  const ids = new Set(matchIds);
+  const rows = (await getStatRows({ tournamentId })).filter((r) => ids.has(r.match_id));
+  return buildLeaderboard(rows);
+}
+
+async function buildLeaderboard(rows: MapStatRow[]) {
   const agg = aggregatePlayers(rows);
   const ids = [...new Set(agg.map((a) => a.team_id).filter(Boolean))] as string[];
   const pids = agg.map((a) => a.player_id).filter(Boolean) as string[];
@@ -294,7 +302,7 @@ export const getPlayerLeaderboard = cache(async (tournamentId?: string) => {
       player: a.player_id ? (playerById.get(a.player_id) ?? null) : null,
     }))
     .sort((a, b) => b.rating - a.rating);
-});
+}
 
 /**
  * MVP турнира: лучший Swing (средний вклад в шанс победы раунда) среди игроков, сыгравших
