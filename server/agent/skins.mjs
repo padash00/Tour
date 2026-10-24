@@ -95,6 +95,9 @@ export function createSkins({ f16Dir, serverDir, instances, isRunning, restart, 
   function toText() {
     for (const d of ["plugins/PMM_WeaponPaints", "plugins/MenuManagerCore", "shared/MenuManagerApi", "plugins/PlayerSettings", "shared/PlayerSettingsApi"]) rmSync(path.join(css, d), { recursive: true, force: true });
     rmSync(mamVdf, { force: true });
+    // конфиг оконного меню («DefaultMenu: PanoramaMenu») роняет обычный MenuManager — он создаст свой заново
+    rmSync(path.join(css, "configs", "plugins", "MenuManagerCore"), { recursive: true, force: true });
+    rmSync(path.join(css, "shared", "CS2MenuManager"), { recursive: true, force: true });
     // обычный MenuManager и его API — из эталона скинов
     cpSync(stage, path.join(csgo, "addons"), { recursive: true, force: true });
   }
