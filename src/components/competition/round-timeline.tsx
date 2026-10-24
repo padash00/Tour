@@ -43,18 +43,18 @@ export function HowIcon({ how, className }: { how: RoundHow; className?: string 
   );
 }
 
-function Legend({ team1, team2 }: { team1: string; team2: string }) {
+function Legend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[12px] text-fg-3">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-fg-3">
       <span className="inline-flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-accent/85" /> {team1}
+        <span className="size-3 rounded-[4px] bg-ct/70" /> CT
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="size-2.5 rounded-[3px] bg-warn/85" /> {team2}
+        <span className="size-3 rounded-[4px] bg-t/70" /> T
       </span>
       {(Object.keys(HOW_LABEL) as RoundHow[]).map((h) => (
         <span key={h} className="inline-flex items-center gap-1.5">
-          <HowIcon how={h} /> {HOW_LABEL[h]}
+          <HowIcon how={h} className="size-3" /> {HOW_LABEL[h]}
         </span>
       ))}
     </div>
@@ -81,6 +81,80 @@ export function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds;
           </span>
         </Fragment>
       ))}
+    </div>
+  );
+}
+
+type Segment = { title: string; rounds: MapRounds["rounds"]; s1: number; s2: number };
+
+/** Деление на половины по номерам раундов: основное время и половины овертаймов */
+function segments(rounds: MapRounds["rounds"]): Segment[] {
+  // половина — 12 раундов (MR12), у 2×2 — 8 (видно по смене сторон на 9-м раунде); овертайм — по 3 раунда на сторону
+  const half = rounds.some((r) => r.switched && r.n === 9) ? 8 : 12;
+  const ot = half === 8 ? 4 : 3;
+  const out: Segment[] = [];
+  let cur: MapRounds["rounds"] = [];
+  const key = (n: number) => (n <= half ? 0 : n <= 2 * half ? 1 : 2 + Math.floor((n - 2 * half - 1) / ot));
+  rounds.forEach((r, idx) => {
+    const cut = idx > 0 && key(r.n) !== key(rounds[idx - 1].n);
+    if (cut) {
+      out.push({ title: "", rounds: cur, s1: 0, s2: 0 });
+      cur = [];
+    }
+    cur.push(r);
+  });
+  if (cur.length) out.push({ title: "", rounds: cur, s1: 0, s2: 0 });
+  return out.map((seg, i) => ({
+    ...seg,
+    title: i === 0 ? "1-я половина" : i === 1 ? "2-я половина" : `Овертайм ${Math.floor((i - 2) / 2) + 1} · ${(i - 2) % 2 === 0 ? "1-я" : "2-я"} пол.`,
+    s1: seg.rounds.filter((r) => r.winner === 1).length,
+    s2: seg.rounds.filter((r) => r.winner === 2).length,
+  }));
+}
+
+const SIDE_CELL = { CT: "bg-ct/15 text-ct", T: "bg-t/15 text-t" } as const;
+
+/** История раундов как на HLTV: строка на команду, значок исхода — в строке победителя, цвет — сторона (CT/T) */
+function RoundHistory({ map, team1, team2 }: { map: MapRounds; team1: string; team2: string }) {
+  const segs = segments(map.rounds);
+  const cell = (r: MapRounds["rounds"][number], team: 1 | 2) => {
+    const won = r.winner === team;
+    return (
+      <span
+        className={cn("grid h-8 w-[26px] place-items-center rounded-[6px]", won ? (r.side ? SIDE_CELL[r.side] : "bg-surface-4 text-fg-2") : "bg-ink/[0.035]")}
+        title={won ? `Раунд ${r.n} · ${team === 1 ? team1 : team2}${r.side ? ` (${r.side})` : ""} · ${HOW_LABEL[r.how]}` : undefined}
+      >
+        {won && <HowIcon how={r.how} className="size-[13px]" />}
+      </span>
+    );
+  };
+  return (
+    <div className="overflow-x-auto">
+      <div className="flex w-max gap-3">
+        <div className="flex shrink-0 flex-col gap-1 pt-6">
+          <span className="flex h-8 max-w-[150px] items-center truncate text-[14px] font-bold text-fg">{team1}</span>
+          <span className="flex h-8 max-w-[150px] items-center truncate text-[14px] font-bold text-fg">{team2}</span>
+        </div>
+        {segs.map((seg, i) => (
+          <div key={i} className={cn("flex flex-col gap-1", i > 0 && "border-l border-line pl-3")}>
+            <span className="flex h-5 items-center justify-between gap-3 text-[12px] text-fg-3">
+              <span className="whitespace-nowrap">{seg.title}</span>
+              <span className="num whitespace-nowrap font-bold text-fg-2">
+                {seg.s1}:{seg.s2}
+              </span>
+            </span>
+            <div className="flex gap-1">
+              {seg.rounds.map((r) => (
+                <div key={r.n} className="flex flex-col items-center gap-1">
+                  {cell(r, 1)}
+                  {cell(r, 2)}
+                  <span className="num text-[10.5px] leading-none text-fg-4">{r.n}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -135,7 +209,7 @@ export function RoundTimeline({
   if (!shown.length) return null;
   return (
     <div className="space-y-5">
-      <Legend team1={team1} team2={team2} />
+      <Legend />
       <div className="divide-y divide-line-subtle rounded-surface border border-line-subtle bg-surface">
         {[...shown].reverse().map((m) => {
           const won1 = m.rounds.filter((r) => r.winner === 1).length;
@@ -149,14 +223,13 @@ export function RoundTimeline({
                   {mapNames[m.mapNumber] ? ` · ${mapName(mapNames[m.mapNumber])}` : ""}
                   {isLive && <span className="ml-2 inline-block size-1.5 rounded-full bg-danger align-middle animate-pulse" />}
                 </div>
-                <div className="num text-[14px]">
-                  <span className="text-accent">{won1}</span>
-                  <span className="mx-1 text-fg-3">:</span>
-                  <span className="text-warn">{won2}</span>
-                  <span className="ml-2 text-[12px] text-fg-3">раундов в логе</span>
+                <div className="num text-[17px] font-extrabold text-fg">
+                  {won1}
+                  <span className="mx-1 text-fg-4">:</span>
+                  {won2}
                 </div>
               </div>
-              <RoundChips map={m} team1={team1} team2={team2} />
+              <RoundHistory map={m} team1={team1} team2={team2} />
               {isLive && <KillFeed kills={m.lastKills} round={m.lastRound} />}
             </div>
           );

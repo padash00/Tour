@@ -14,6 +14,8 @@ export type RoundChip = {
   how: RoundHow;
   /** перед этим раундом команды поменялись сторонами (перерыв, овертайм) */
   switched: boolean;
+  /** сторона победителя раунда (CT/T) — цвет значка в истории раундов */
+  side: Side | null;
 };
 export type KillLine = {
   killer: string;
@@ -86,7 +88,7 @@ export function buildMapRounds(rows: Row[], team1: Set<string>, team2: Set<strin
           : loserDeaths >= teamSize
             ? "kill"
             : "time";
-      rounds.push({ n: r.round_number, winner, how, switched });
+      rounds.push({ n: r.round_number, winner, how, switched, side: winnerSide });
     }
     const last = list.at(-1);
     const lastKills: KillLine[] = (last?.events ?? [])

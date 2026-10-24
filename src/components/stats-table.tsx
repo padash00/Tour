@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { Star } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import type { PlayerAgg, TeamStatRow } from "@/lib/stats";
 import { Avatar, TeamLogo, cn } from "@/components/ds";
-import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar } from "./public/data-table";
-import { fmt, ratingColor, swingColor } from "./stats-format";
+import { DATA_TABLE, NUM_CELL, RankBadge } from "./public/data-table";
+import { fmt, swingColor } from "./stats-format";
 
 type Row = PlayerAgg & {
   team?: { name: string; tag: string } | null;
@@ -35,6 +36,7 @@ function SortTh({
   children,
   title,
   left,
+  className,
 }: {
   k: string;
   sort: Sort;
@@ -42,16 +44,17 @@ function SortTh({
   children: ReactNode;
   title?: string;
   left?: boolean;
+  className?: string;
 }) {
   const active = sort.key === k;
   return (
-    <th className={left ? undefined : "!text-right"} aria-sort={active ? (sort.dir === -1 ? "descending" : "ascending") : undefined}>
+    <th className={cn(!left && "!text-right", className)} aria-sort={active ? (sort.dir === -1 ? "descending" : "ascending") : undefined}>
       <button
         type="button"
         onClick={() => onSort(k)}
         title={title ?? "Сортировать"}
         className={cn(
-          "inline-flex cursor-pointer items-center gap-1.5 uppercase tracking-[inherit] transition-colors hover:text-fg",
+          "inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-fg",
           active && "text-fg-2",
         )}
       >
@@ -83,8 +86,24 @@ const PLAYER_COLS: Record<string, (p: Row) => number> = {
   rating: (p) => p.rating,
 };
 
+/** Рейтинг плашкой: ≥ 1.10 — зелёная, < 0.90 — красная, иначе нейтральная */
+export function RatingPill({ value, className }: { value: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "num inline-block min-w-[3.25rem] rounded-chip px-2 py-1 text-center text-[15px] font-extrabold leading-none",
+        value >= 1.1 ? "bg-ok-dim text-ok" : value < 0.9 ? "bg-danger-dim text-danger" : "bg-surface-4 text-fg",
+        className,
+      )}
+    >
+      {fmt.r(value)}
+    </span>
+  );
+}
+
 /**
- * Таблица игроков: рейтинг, K-D-A, ADR, KAST, HS, entry, клатчи.
+ * Таблица игроков в стиле HLTV: компактные строки (~44 px), команда — мелко под ником, У–С одной колонкой,
+ * рейтинг плашкой. HS, entry и клатчи — только на широких экранах (от 1536 px).
  * sticky — своя вертикальная прокрутка с закреплённой шапкой (для длинных рейтингов).
  */
 export function PlayerStatsTable({
@@ -94,8 +113,8 @@ export function PlayerStatsTable({
   rank = true,
   sticky,
   solo,
-  plain,
   highlightSteamId,
+  mvpSteamId,
 }: {
   rows: Row[];
   showTeam?: boolean;
@@ -104,44 +123,51 @@ export function PlayerStatsTable({
   sticky?: boolean;
   /** дуэль 1×1: каждый выигранный раунд MatchZy считает клатчем 1v1 — колонка бессмысленна */
   solo?: boolean;
-  /** заголовки колонок словами («Убийства», «Урон за раунд») вместо K/D/ADR — для страницы матча */
+  /** устарело: заголовки теперь всегда словами */
   plain?: boolean;
   /** строка этого игрока подсвечивается и помечается «это вы» */
   highlightSteamId?: string | null;
+  /** лучший игрок (MVP) — звёздочка у ника */
+  mvpSteamId?: string | null;
 }) {
   // MatchZy присылает KAST и первые убийства не всегда — пустые колонки не показываем
   const showKast = rows.some((p) => p.kastRounds > 0);
+  const showSwing = rows.some((p) => p.swing != null);
   const showEntry = !compact && !solo && rows.some((p) => p.firstKills + p.firstDeaths > 0);
   const showClutch = !compact && !solo && rows.some((p) => p.clutches > 0);
-  // в дуэлях «команда» — это сам игрок: колонку с повтором ника не показываем
-  const teamCol = showTeam && rows.some((p) => p.team && p.team.name !== (p.player?.nickname ?? p.name));
+  // в дуэлях «команда» — это сам игрок: подпись с повтором ника не показываем
+  const teamLine = showTeam && rows.some((p) => p.team && p.team.name !== (p.player?.nickname ?? p.name));
   const { sorted, sort, toggle } = useSort(rows, PLAYER_COLS, "rating");
   const me = (steamId: string) => !!highlightSteamId && steamId === highlightSteamId;
-  const th = (k: string, label: ReactNode, title?: string) => (
-    <SortTh k={k} sort={sort} onSort={toggle} title={title}>
+  const th = (k: string, label: ReactNode, title?: string, cls?: string) => (
+    <SortTh k={k} sort={sort} onSort={toggle} title={title} className={cls}>
       {label}
     </SortTh>
   );
+  const wide = "hidden 2xl:table-cell";
   return (
     <div className={cn("rounded-surface border border-line-subtle bg-surface", sticky ? "max-h-[min(78vh,960px)] overflow-auto overscroll-contain" : "overflow-x-auto")}>
-      <table className={cn(DATA_TABLE, compact ? "min-w-[640px] text-[13px] [&_td]:h-12" : "min-w-[960px]")}>
+      <table
+        className={cn(
+          DATA_TABLE,
+          "min-w-[600px] text-[15px] lg:min-w-0 [&_td]:h-11 [&_td]:py-1 [&_th]:h-10 sm:[&_td:first-child]:!pl-4 sm:[&_th:first-child]:!pl-4 sm:[&_td:last-child]:!pr-4 sm:[&_th:last-child]:!pr-4",
+          compact ? "text-[14.5px] sm:[&_td]:px-2 sm:[&_th]:px-2" : "sm:[&_td]:px-3 sm:[&_th]:px-3",
+        )}
+      >
         <thead>
           <tr>
-            {rank && <th className="w-14">#</th>}
+            {rank && <th className="w-12">#</th>}
             <th>Игрок</th>
-            {teamCol && <th>Команда</th>}
             {!compact && th("maps", "Карты")}
-            {th("kills", plain ? "Убийства" : "K", "Убийства")}
-            {th("deaths", plain ? "Смерти" : "D", "Смерти")}
-            {th("assists", plain ? "Помощь" : "A", "Ассисты")}
+            {th("diff", "У–С", "Убийства – смерти (сортировка по разнице)")}
             {th("diff", "±", "Убийства минус смерти")}
-            {th("adr", plain ? "Урон за раунд" : "ADR", "Средний урон за раунд")}
-            {showKast && th("kast", plain ? "Полезен в раундах" : "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
-            {!compact && th("hs", "HS", "Доля убийств в голову")}
-            {showEntry && th("entry", "Entry", "Первые убийства / первые смерти раунда")}
-            {showClutch && th("clutch", "Клатчи", "Выигранные клатчи")}
-            {th("swing", plain ? "Влияние" : "Swing", "Средний вклад в шанс победы раунда (Swing)")}
-            {th("rating", plain ? "Рейтинг" : "Rating", "F16 Rating")}
+            {th("adr", "Урон/р", "Средний урон за раунд (ADR)")}
+            {showKast && th("kast", "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
+            {!compact && th("hs", "HS", "Доля убийств в голову", wide)}
+            {showEntry && th("entry", "Entry", "Первые убийства / первые смерти раунда", wide)}
+            {showClutch && th("clutch", "Клатчи", "Выигранные клатчи", wide)}
+            {showSwing && th("swing", "Swing", "Средний вклад в шанс победы раунда")}
+            {th("rating", "Рейтинг", "F16 Rating: больше — лучше, средний игрок ~1.00")}
           </tr>
         </thead>
         <tbody>
@@ -149,10 +175,16 @@ export function PlayerStatsTable({
             const nick = p.player?.nickname ?? p.name;
             const diff = p.kills - p.deaths;
             const name = (
-              <span className="flex items-center gap-3">
-                <Avatar src={p.player?.avatar_url} name={nick} size={compact ? "xs" : "sm"} />
-                <span className="max-w-[180px] truncate font-semibold text-fg">{nick}</span>
-                {me(p.steam_id) && <span className="shrink-0 rounded-full bg-accent-dim px-2 py-0.5 text-[12px] font-bold text-accent">это вы</span>}
+              <span className="flex min-w-0 items-center gap-2.5">
+                <Avatar src={p.player?.avatar_url} name={nick} size="xs" className="!size-7" />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn("truncate font-semibold text-fg", compact ? "max-w-[110px] xl:max-w-[150px]" : "max-w-[180px]")}>{nick}</span>
+                    {mvpSteamId === p.steam_id && <Star className="size-3.5 shrink-0 fill-gold text-gold" aria-label="Лучший игрок команды" />}
+                    {me(p.steam_id) && <span className="shrink-0 rounded-full bg-accent-dim px-1.5 text-[11px] font-bold text-accent">это вы</span>}
+                  </span>
+                  {teamLine && p.team && <span className="block max-w-[200px] truncate text-[12.5px] leading-tight text-fg-3">{p.team.name}</span>}
+                </span>
               </span>
             );
             return (
@@ -164,43 +196,33 @@ export function PlayerStatsTable({
                 )}
                 <td>
                   {p.player ? (
-                    <Link href={`/players/${p.player.steam_id}`} className="rounded-[6px] transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+                    <Link href={`/players/${p.player.steam_id}`} className="block rounded-[6px] transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
                       {name}
                     </Link>
                   ) : (
                     name
                   )}
                 </td>
-                {teamCol && (
-                  <td className="text-[13px]">
-                    {p.team ? (
-                      <Link href={`/teams/${p.team.tag}`} className="hover:text-fg">
-                        {p.team.name}
-                      </Link>
-                    ) : (
-                      <span className="text-fg-3">—</span>
-                    )}
-                  </td>
-                )}
                 {!compact && <td className={NUM_CELL}>{p.maps}</td>}
-                <td className={cn(NUM_CELL, "text-fg")}>{p.kills}</td>
-                <td className={NUM_CELL}>{p.deaths}</td>
-                <td className={NUM_CELL}>{p.assists}</td>
-                <td className={cn(NUM_CELL, diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "")}>{diff > 0 ? `+${diff}` : diff}</td>
+                <td className={cn(NUM_CELL, "whitespace-nowrap text-fg")} title={`${p.assists} ассист.`}>
+                  {p.kills}
+                  <span className="text-fg-4">–</span>
+                  {p.deaths}
+                </td>
+                <td className={cn(NUM_CELL, "font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "text-fg-3")}>{diff > 0 ? `+${diff}` : diff}</td>
                 <td className={NUM_CELL}>{fmt.d1(p.adr)}</td>
                 {showKast && <td className={NUM_CELL}>{fmt.pct(p.kast)}</td>}
-                {!compact && <td className={NUM_CELL}>{fmt.pct(p.hsPct)}</td>}
+                {!compact && <td className={cn(NUM_CELL, wide)}>{fmt.pct(p.hsPct)}</td>}
                 {showEntry && (
-                  <td className={NUM_CELL}>
+                  <td className={cn(NUM_CELL, wide)}>
                     {p.firstKills}
                     <span className="text-fg-3">/{p.firstDeaths}</span>
                   </td>
                 )}
-                {showClutch && <td className={NUM_CELL}>{p.clutches}</td>}
-                <td className={cn(NUM_CELL, swingColor(p.swing))}>{fmt.swing(p.swing)}</td>
-                <td className={cn(NUM_CELL, ratingColor(p.rating))}>
-                  <span className="block text-[15px] font-semibold leading-none">{fmt.r(p.rating)}</span>
-                  {!compact && <RatingBar value={p.rating} className="mt-1.5" />}
+                {showClutch && <td className={cn(NUM_CELL, wide)}>{p.clutches}</td>}
+                {showSwing && <td className={cn(NUM_CELL, swingColor(p.swing))}>{fmt.swing(p.swing)}</td>}
+                <td className="text-right">
+                  <RatingPill value={p.rating} className="mr-2" />
                 </td>
               </tr>
             );

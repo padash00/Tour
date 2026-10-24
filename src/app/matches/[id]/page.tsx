@@ -17,6 +17,8 @@ import { modeOf } from "@/lib/modes";
 import { getMatchRounds } from "@/lib/rounds-data";
 import { RoundTimeline } from "@/components/competition/round-timeline";
 import { PlayerStatsTable } from "@/components/stats-table";
+import { ClientTabs } from "@/components/public/client-tabs";
+import { MatchMvp } from "@/components/competition/match-mvp";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
 import { matchStage } from "@/components/match-bits";
@@ -40,6 +42,7 @@ import {
   Status,
   SubsectionTitle,
   Textarea,
+  TeamLogo,
   cn,
 } from "@/components/ds";
 
@@ -165,50 +168,113 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     </Section>
   );
 
-  const roundsBlock = roundMaps.some((x) => x.rounds.length > 0) && (
+  const shownRoundMaps = roundMaps.filter((x) => x.rounds.length > 0);
+  const roundsDefault = `r${liveMapNumber ?? shownRoundMaps.at(-1)?.mapNumber ?? 1}`;
+  const roundTimeline = (maps: typeof roundMaps) => (
+    <RoundTimeline
+      maps={maps}
+      mapNames={Object.fromEntries(m.maps.map((x) => [x.map_number, x.map_name]))}
+      team1={m.team1?.name ?? "Команда 1"}
+      team2={m.team2?.name ?? "Команда 2"}
+      liveMap={m.status === "live" ? liveMapNumber : null}
+    />
+  );
+  const mapTabLabel = (n: number) => {
+    const map = m.maps.find((x) => x.map_number === n);
+    return map ? `Карта ${n} · ${mapName(map.map_name)}${map.status !== "pending" ? ` ${map.team1_score}:${map.team2_score}` : ""}` : `Карта ${n}`;
+  };
+  const roundsBlock = shownRoundMaps.length > 0 && (
     <Section title="Раунды">
-      <RoundTimeline
-        maps={roundMaps}
-        mapNames={Object.fromEntries(m.maps.map((x) => [x.map_number, x.map_name]))}
-        team1={m.team1?.name ?? "Команда 1"}
-        team2={m.team2?.name ?? "Команда 2"}
-        liveMap={m.status === "live" ? liveMapNumber : null}
-      />
+      {shownRoundMaps.length > 1 ? (
+        <div className="space-y-4">
+          <ClientTabs scope="match-rounds" param="rounds" defaultKey={roundsDefault} items={shownRoundMaps.map((x) => ({ key: `r${x.mapNumber}`, label: mapTabLabel(x.mapNumber) }))} />
+          <div data-tabs-scope="match-rounds">
+            {shownRoundMaps.map((x) => (
+              <div key={x.mapNumber} data-tab={`r${x.mapNumber}`} hidden={`r${x.mapNumber}` !== roundsDefault}>
+                {roundTimeline([x])}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        roundTimeline(shownRoundMaps)
+      )}
     </Section>
   );
 
-  const scoreboard = statRows.length > 0 && (
-    <Section title="Статистика">
-      <div className="space-y-10">
-        {[...new Set(statRows.map((r) => r.map_number))]
-          .sort((a, b) => a - b)
-          .map((n) => {
-            const map = m.maps.find((x) => x.map_number === n);
-            const rows = statRows.filter((r) => r.map_number === n);
-            const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
-            return (
-              <div key={n} className="space-y-5">
-                <SubsectionTitle>
-                  Карта {n}
-                  {map ? ` · ${mapName(map.map_name)} · ${map.team1_score}:${map.team2_score}` : ""}
-                </SubsectionTitle>
-                {[m.team1, m.team2].map((team, i) => {
-                  const teamRows = aggregatePlayers(rows.filter((r) => r.team_id === team?.id))
-                    .map((a) => ({ ...a, player: rosterPlayers.find((p) => p.steam_id === a.steam_id) ?? null }))
-                    .sort((a, b) => b.rating - a.rating);
-                  if (!teamRows.length) return null;
-                  return (
-                    <div key={i}>
-                      <div className="mb-3 text-title text-fg">{team?.name}</div>
-                      <PlayerStatsTable rows={teamRows} showTeam={false} compact rank={false} plain highlightSteamId={player?.steam_id} />
-                    </div>
-                  );
-                })}
+  const rosterPlayers = [...rosters.team1, ...rosters.team2].map((r) => r.player);
+  const teamOfId = (id: string | null) => (id === m.team1_id ? m.team1 : id === m.team2_id ? m.team2 : null);
+  // MVP матча — лучший рейтинг по всем сыгранным картам
+  const matchPlayers = aggregatePlayers(statRows).sort((a, b) => b.rating - a.rating);
+  const mvp = matchPlayers[0] ?? null;
+  const statMaps = [...new Set(statRows.map((r) => r.map_number))].sort((a, b) => a - b);
+  const teamTables = (rows: typeof statRows, mapNumber: number | null) => {
+    const map = mapNumber != null ? m.maps.find((x) => x.map_number === mapNumber) : null;
+    return (
+      <div className="space-y-5">
+        {[m.team1, m.team2].map((team, i) => {
+          const teamRows = aggregatePlayers(rows.filter((r) => r.team_id === team?.id))
+            .map((a) => ({ ...a, player: rosterPlayers.find((p) => p.steam_id === a.steam_id) ?? null }))
+            .sort((a, b) => b.rating - a.rating);
+          if (!team || !teamRows.length) return null;
+          const score = map ? (i === 0 ? map.team1_score : map.team2_score) : i === 0 ? m.team1_score : m.team2_score;
+          const won = map ? (i === 0 ? map.team1_score > map.team2_score : map.team2_score > map.team1_score) && map.status === "finished" : m.winner_id === team.id;
+          return (
+            <div key={i}>
+              <div className="mb-2.5 flex items-center gap-3">
+                <TeamLogo src={team.logo_url} tag={team.tag} size="sm" />
+                <span className={cn("min-w-0 flex-1 truncate text-[17px] font-bold", won ? "text-accent" : "text-fg")}>{team.name}</span>
+                <span className={cn("num text-[20px] font-extrabold", won ? "text-accent" : "text-fg-3")}>{score}</span>
               </div>
-            );
-          })}
+              <PlayerStatsTable
+                rows={teamRows}
+                showTeam={false}
+                compact
+                rank={false}
+                highlightSteamId={player?.steam_id}
+                mvpSteamId={teamRows[0]?.steam_id}
+              />
+            </div>
+          );
+        })}
       </div>
+    );
+  };
+  const scoreboard = statRows.length > 0 && (
+    <Section title="Статистика" description="У–С — убийства и смерти, Урон/р — средний урон за раунд, рейтинг: больше — лучше, средний игрок ~1.00.">
+      {statMaps.length > 1 ? (
+        <div className="space-y-4">
+          <ClientTabs
+            scope="match-stats"
+            param="stats"
+            defaultKey="all"
+            items={[{ key: "all", label: "Все карты" }, ...statMaps.map((n) => ({ key: `m${n}`, label: mapTabLabel(n) }))]}
+          />
+          <div data-tabs-scope="match-stats">
+            <div data-tab="all">{teamTables(statRows, null)}</div>
+            {statMaps.map((n) => (
+              <div key={n} data-tab={`m${n}`} hidden>
+                {teamTables(
+                  statRows.filter((r) => r.map_number === n),
+                  n,
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        teamTables(statRows, statMaps[0] ?? null)
+      )}
     </Section>
+  );
+
+  const mvpBlock = mvp && ["live", "finished"].includes(m.status) && (
+    <MatchMvp
+      p={mvp}
+      player={rosterPlayers.find((x) => x.steam_id === mvp.steam_id) ?? null}
+      team={teamOfId(mvp.team_id)}
+      live={m.status === "live"}
+    />
   );
 
   // главный блок под плашкой: до вето — когда и как, во время вето — доска вето; дальше всё говорят плашка и колонка «Сервер»
@@ -327,7 +393,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     ) : null;
 
   // во время игры сначала раунды и статистика, после — итоги серии
-  const detailBlocks = m.status === "live" ? [roundsBlock, scoreboard, seriesMaps] : [seriesMaps, roundsBlock, scoreboard];
+  const detailBlocks = m.status === "live" ? [mvpBlock, roundsBlock, scoreboard, seriesMaps] : [mvpBlock, seriesMaps, roundsBlock, scoreboard];
   const mainBlocks = [...detailBlocks, rostersBlock, disputeBlock].filter(Boolean);
 
   return (
@@ -353,7 +419,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
         </div>
 
         <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="flex min-w-0 flex-col gap-12">
+          <div className="flex min-w-0 flex-col gap-5">
             {currentState && <section aria-label="Текущее состояние матча">{currentState}</section>}
             {mainBlocks.map((node, i) => (
               <div key={i} className="min-w-0">
