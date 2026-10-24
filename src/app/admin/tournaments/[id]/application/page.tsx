@@ -75,16 +75,16 @@ export default async function ApplicationPrintPage(props: PageProps<"/admin/tour
       <style>{PRINT_CSS}</style>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href={`/admin/tournaments/${t.id}?tab=official`} className="text-[12px] text-fg-3 hover:text-fg">
+          <Link href={`/admin/tournaments/${t.id}?tab=official`} className="text-[14px] font-semibold text-fg-3 hover:text-fg">
             ← {t.name}
           </Link>
-          <h1 className="mt-2 text-[22px] font-semibold">{reg ? "Заявка команды" : `Заявки команд · ${indexes.length}`}</h1>
-          <p className="mt-1 text-[13px] text-fg-3">Формат A4. В диалоге печати можно выбрать «Сохранить как PDF». Каждая заявка — с новой страницы.</p>
+          <h1 className="mt-2 text-[28px] font-bold tracking-[-0.02em]">{reg ? "Заявка команды" : `Заявки команд · ${indexes.length}`}</h1>
+          <p className="mt-2 max-w-read text-[15px] text-fg-2">Лист A4. Нажмите «Печать»: в окне печати можно выбрать принтер или «Сохранить как PDF». Каждая заявка печатается с новой страницы.</p>
         </div>
         <PrintButton />
       </div>
       {indexes.length === 0 ? (
-        <p className="text-[13px] text-fg-3">Активных заявок нет.</p>
+        <p className="text-[15px] text-fg-3">Активных заявок нет.</p>
       ) : (
         <div className="f16-print space-y-8">
           {indexes.map((i) => (
@@ -104,7 +104,7 @@ function Sheet({ t, data, index }: { t: Tournament; data: OfficialData; index: n
   const captainName = fullName(captainProfile) || (team.registration.roster.find((p) => p.player_id === team.registration.team.captain_id)?.player.nickname ?? "");
   const line = "inline-block min-w-[220px] border-b border-black px-1";
   return (
-    <section className="f16-sheet mx-auto max-w-[210mm] rounded-[4px] p-[14mm] shadow-[0_0_0_1px_#ffffff20]">
+    <section className="f16-sheet mx-auto max-w-[210mm] rounded-[4px] p-[14mm] shadow-[0_0_0_1px_var(--color-line),var(--shadow-soft)]">
       <p style={{ textAlign: "right", fontSize: "11pt" }}>
         Приложение №1
         <br />к Положению о проведении городского спортивного

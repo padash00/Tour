@@ -31,28 +31,31 @@ export function ChatBox({ instances, fixed, className }: { instances?: string[];
   }, [state, toast]);
 
   return (
-    <form action={action} className={cn("space-y-2", className)}>
+    <form action={action} className={cn("space-y-3", className)}>
       {fixed ? <input type="hidden" name="instance" value={fixed} /> : null}
-      <div className="flex flex-wrap gap-1.5">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => {
-              if (input.current) {
-                input.current.value = p;
-                input.current.focus();
-              }
-            }}
-            className="h-7 rounded-full border border-ink/[0.10] px-2.5 text-[12px] text-fg-2 transition-colors hover:border-ink/[0.22] hover:text-fg"
-          >
-            {p}
-          </button>
-        ))}
+      <div>
+        <div className="mb-2 text-[13.5px] font-semibold text-fg-3">Готовые фразы — нажмите, и текст подставится в поле</div>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => {
+                if (input.current) {
+                  input.current.value = p;
+                  input.current.focus();
+                }
+              }}
+              className="h-9 rounded-full border border-line-strong bg-surface px-3.5 text-[13.5px] font-medium text-fg-2 transition-colors hover:border-line-hover hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {!fixed && (
-          <select name="instance" defaultValue="all" aria-label="Сервер" className="field !h-9 !w-auto text-[13px]">
+          <select name="instance" defaultValue="all" aria-label="На какой сервер отправить" className="field !h-11 !w-auto text-[15px]">
             <option value="all">Все серверы</option>
             {(instances ?? []).map((i) => (
               <option key={i} value={i}>
@@ -61,9 +64,10 @@ export function ChatBox({ instances, fixed, className }: { instances?: string[];
             ))}
           </select>
         )}
-        <input ref={input} name="text" maxLength={180} placeholder="Сообщение игрокам в чат…" aria-label="Сообщение" className="field !h-9 min-w-[200px] flex-1 text-[13px]" />
-        <SubmitButton size="sm">Отправить</SubmitButton>
+        <input ref={input} name="text" maxLength={180} placeholder="Сообщение игрокам в чат…" aria-label="Сообщение" className="field !h-11 min-w-[200px] flex-1 text-[15px]" />
+        <SubmitButton size="md">Отправить игрокам</SubmitButton>
       </div>
+      <p className="text-[13px] text-fg-3">В игре сообщение появится в чате с пометкой «[F16 ADMIN]».</p>
     </form>
   );
 }

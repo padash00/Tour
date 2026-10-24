@@ -8,7 +8,8 @@ import type { PrizeRow, Tournament } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
 import { ConfirmModal } from "@/components/modal";
 import { requirementsTemplate, rulesTemplate } from "@/lib/rules-templates";
-import { Field, buttonClass, cn } from "@/components/ui";
+import { buttonClass, cn } from "@/components/ui";
+import { ADMIN_CARD } from "@/components/admin/control";
 
 const DEFAULT_RULES = `Вето проходит на странице матча до подключения к серверу.
 На сервер допускаются только заявленные игроки (по SteamID).
@@ -32,15 +33,15 @@ function Segmented<T extends string | number>({
   options: { value: T; label: string; hint?: string }[];
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-0.5 rounded-lg border border-line bg-bg-2 p-0.5">
+    <div className="inline-flex flex-wrap gap-1 rounded-control border border-line bg-surface-2 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "h-8 min-w-10 px-3 rounded-md text-[13px] font-medium transition",
-            value === o.value ? "bg-surface-3 text-fg" : "text-fg-3 hover:text-fg-2",
+            "h-10 min-w-11 px-4 rounded-[10px] text-[15px] font-semibold transition",
+            value === o.value ? "bg-accent text-accent-ink shadow-sm" : "text-fg-2 hover:bg-ink/[0.06] hover:text-fg",
           )}
           title={o.hint}
         >
@@ -67,21 +68,37 @@ function OptionCard({
       type="button"
       onClick={onClick}
       className={cn(
-        "text-left rounded-lg border p-3.5 transition",
-        active ? "border-accent/60 bg-accent-dim" : "border-line bg-bg-2 hover:border-line-strong",
+        "text-left rounded-control border-2 p-4 transition",
+        active ? "border-accent bg-accent-dim" : "border-line bg-surface hover:border-line-hover hover:bg-surface-2",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={cn("text-[14px] font-semibold", active ? "text-accent" : "text-fg")}>{title}</span>
-        <span className={cn("size-3.5 rounded-full border-2 shrink-0", active ? "border-accent bg-accent" : "border-line-strong")} />
+        <span className={cn("text-[16px] font-bold", active ? "text-accent" : "text-fg")}>{title}</span>
+        <span className={cn("size-4 rounded-full border-2 shrink-0", active ? "border-accent bg-accent" : "border-line-strong")} />
       </div>
-      <p className="mt-1 text-[12px] text-fg-3 leading-relaxed">{text}</p>
+      <p className="mt-1.5 text-[14px] text-fg-2 leading-relaxed">{text}</p>
     </button>
   );
 }
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="mb-2 text-[12px] font-medium text-eyebrow">{children}</div>;
+  return <div className="mb-2 text-[15px] font-semibold text-fg">{children}</div>;
+}
+
+/** Подсказка под полем: простыми словами, 14 px */
+function Hint({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cn("mt-2 text-[14px] leading-relaxed text-fg-3", className)}>{children}</p>;
+}
+
+/** Поле с подписью сверху (15 px, жирно) и подсказкой под ним */
+function Field({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-2 block text-[15px] font-semibold text-fg">{label}</span>
+      {children}
+      {hint && <span className="mt-2 block text-[14px] leading-relaxed text-fg-3">{hint}</span>}
+    </label>
+  );
 }
 
 function Section({ show, title, hint, children }: { show: boolean; title: string; hint?: string; children: ReactNode }) {
@@ -89,24 +106,24 @@ function Section({ show, title, hint, children }: { show: boolean; title: string
   return (
     <section className={cn(!show && "hidden")}>
       <div className="mb-7 pb-5 border-b border-ink/[0.06]">
-        <h2 className="text-[24px] font-semibold tracking-[-0.015em]">{title}</h2>
-        {hint && <p className="mt-1.5 text-[13px] text-fg-3">{hint}</p>}
+        <h2 className="text-[26px] font-bold tracking-[-0.02em]">{title}</h2>
+        {hint && <p className="mt-2 text-[15.5px] text-fg-2">{hint}</p>}
       </div>
-      <div className="space-y-6">{children}</div>
+      <div className="space-y-8">{children}</div>
     </section>
   );
 }
 
 function SummaryRow({ label, value, warn }: { label: string; value: ReactNode; warn?: boolean }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 py-2 border-b border-ink/[0.05] last:border-0 text-[13px]">
+    <div className="flex items-baseline justify-between gap-3 py-2.5 border-b border-ink/[0.06] last:border-0 text-[15px]">
       <span className="text-fg-3 shrink-0">{label}</span>
       <span className={cn("text-right min-w-0 truncate", warn ? "text-warn" : "text-fg")}>{value}</span>
     </div>
   );
 }
 
-const ghostBtn = "h-10 px-4 rounded-lg border border-line text-[13px] text-fg-2 hover:text-fg hover:border-line-strong disabled:opacity-40";
+const ghostBtn = "h-12 px-5 rounded-control border border-line-strong bg-surface text-[15px] font-semibold text-fg hover:bg-surface-2 disabled:opacity-40 disabled:pointer-events-none";
 
 // ───────────────────────── даты
 
@@ -298,20 +315,20 @@ export function TournamentForm({
       {requireCoach && <input type="hidden" name="require_coach" value="on" />}
       {allowSubs && <input type="hidden" name="allow_substitutes" value="on" />}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[180px_minmax(0,1fr)_300px] gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[210px_minmax(0,1fr)_320px] gap-8 items-start">
         {/* шаги */}
-        <nav className="flex xl:flex-col gap-0.5 overflow-x-auto xl:sticky xl:top-8">
+        <nav aria-label="Шаги формы" className="flex xl:flex-col gap-1 overflow-x-auto xl:sticky xl:top-8">
           {STEPS.map((s, i) => (
             <button
               key={s}
               type="button"
               onClick={() => setStep(i)}
               className={cn(
-                "relative flex items-center gap-3 h-10 px-3 rounded-[8px] text-[13px] whitespace-nowrap text-left transition",
-                step === i ? "bg-surface border border-line text-fg" : "border border-transparent text-fg-3 hover:text-fg-2",
+                "relative flex items-center gap-3 h-12 px-3.5 rounded-control text-[15.5px] font-semibold whitespace-nowrap text-left transition",
+                step === i ? "bg-surface border border-line-strong text-fg shadow-sm" : "border border-transparent text-fg-3 hover:bg-ink/[0.04] hover:text-fg-2",
               )}
             >
-              <span className={cn("num text-[11px] w-5", step === i ? "text-accent" : "text-fg-3")}>{String(i + 1).padStart(2, "0")}</span>
+              <span className={cn("num text-[13.5px] w-6", step === i ? "text-accent" : "text-fg-3")}>{String(i + 1).padStart(2, "0")}</span>
               <span className="flex-1">{s}</span>
               {missing[i] && <span className="size-1.5 rounded-full bg-warn" title={missing[i] ?? ""} />}
             </button>
@@ -319,21 +336,22 @@ export function TournamentForm({
         </nav>
 
         {/* активный шаг */}
-        <div className="min-w-0 rounded-[12px] border border-line bg-surface p-6 sm:p-8">
-          <Section show={step === 0} title="Основное" hint="Название, обложка и описание для страницы турнира">
+        <div className={cn(ADMIN_CARD, "min-w-0 p-6 sm:p-8")}>
+          <Section show={step === 0} title="Основное" hint="Как называется турнир и как он выглядит на сайте. Начните с названия.">
             <div>
-              <Label>Название</Label>
+              <Label>Название турнира</Label>
               <input
                 name="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="F16 Cup #1"
-                className="field h-12 text-lg font-semibold"
+                className="field h-14 text-[20px] font-semibold"
               />
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-fg-3">
-                <span>Адрес:</span>
+              <Hint>Так турнир увидят игроки. Например: «F16 Cup #1».</Hint>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[14.5px] text-fg-3">
+                <span>Адрес страницы на сайте:</span>
                 {slugEdited ? (
-                  <input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} aria-label="Адрес страницы турнира" className="field h-8 w-64 num text-[13px]" />
+                  <input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} aria-label="Адрес страницы турнира" className="field w-64 num" />
                 ) : (
                   <span className="num text-fg-2">/tournaments/{effectiveSlug || "…"}</span>
                 )}
@@ -344,7 +362,7 @@ export function TournamentForm({
                       setSlug(effectiveSlug);
                       setSlugEdited(true);
                     }}
-                    className="text-accent hover:underline"
+                    className="font-semibold text-accent hover:underline"
                   >
                     изменить
                   </button>
@@ -352,15 +370,15 @@ export function TournamentForm({
               </div>
             </div>
             <label className="block cursor-pointer">
-              <Label>Обложка</Label>
-              <div className="relative grid place-items-center overflow-hidden rounded-lg border border-dashed border-line-strong bg-bg-2 aspect-[3/1] transition hover:border-accent">
+              <Label>Обложка (картинка вверху страницы турнира)</Label>
+              <div className="relative grid place-items-center overflow-hidden rounded-surface border-2 border-dashed border-line-strong bg-surface-2 aspect-[3/1] transition hover:border-accent">
                 {cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
-                  <div className="text-center text-[13px] text-fg-3">
-                    <div className="text-fg-2 font-medium">Загрузить обложку</div>
-                    <div className="mt-1 text-xs">PNG, JPG или WEBP до 3 МБ · широкая и тёмная</div>
+                  <div className="text-center text-[14.5px] text-fg-3">
+                    <div className="text-[17px] font-bold text-fg">Нажмите, чтобы загрузить обложку</div>
+                    <div className="mt-1.5 text-[14px]">Широкая картинка: PNG, JPG или WEBP до 3 МБ</div>
                   </div>
                 )}
               </div>
@@ -377,19 +395,19 @@ export function TournamentForm({
               />
             </label>
             {t?.cover_url && (
-              <label className="flex items-center gap-2 text-[13px] text-fg-2">
-                <input type="checkbox" name="removeCover" className="size-4 accent-[var(--color-accent)]" onChange={(e) => setCover(e.target.checked ? null : t.cover_url)} />
+              <label className="flex items-center gap-2.5 text-[15px] text-fg-2">
+                <input type="checkbox" name="removeCover" className="size-5 accent-[var(--color-accent)]" onChange={(e) => setCover(e.target.checked ? null : t.cover_url)} />
                 Убрать обложку
               </label>
             )}
-            <Field label="Описание турнира">
+            <Field label="Описание турнира" hint="Пара предложений: о чём турнир и кому он подойдёт. Можно оставить пустым.">
               <textarea name="description" rows={3} defaultValue={t?.description ?? ""} placeholder="Пара предложений для страницы турнира" className="field resize-y" />
             </Field>
           </Section>
 
-          <Section show={step === 1} title="Формат" hint="Режим игры, система турнира и формат серий">
+          <Section show={step === 1} title="Формат" hint="Сколько игроков в команде, как команды играют между собой и сколько карт в матче.">
             <div>
-              <Label>Режим игры</Label>
+              <Label>Сколько игроков в команде</Label>
               <div className="grid sm:grid-cols-3 gap-2">
                 {(Object.keys(MODES) as ModeKey[]).map((k) => (
                   <OptionCard
@@ -413,7 +431,7 @@ export function TournamentForm({
               </div>
             </div>
             <div>
-              <Label>Система турнира</Label>
+              <Label>Как проходит турнир</Label>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {(Object.keys(FORMATS) as FormatKind[]).map((k) => (
                   <OptionCard key={k} active={bracket === k} onClick={() => setBracket(k)} title={FORMATS[k].title} text={FORMATS[k].text} />
@@ -421,28 +439,28 @@ export function TournamentForm({
               </div>
             </div>
             {(bracket === "groups_playoff" || bracket === "swiss" || bracket === "swiss_playoff" || bracket === "round_robin") && (
-              <div className="grid sm:grid-cols-3 gap-5 rounded-[8px] bg-shell border border-ink/[0.06] p-4">
+              <div className="grid sm:grid-cols-3 gap-6 rounded-control bg-surface-2 border border-line-subtle p-5">
                 {bracket === "groups_playoff" && (
                   <>
                     <div>
-                      <Label>Групп</Label>
+                      <Label>Сколько групп</Label>
                       <Segmented value={groupsCount} onChange={setGroupsCount} options={[2, 4, 8].map((n) => ({ value: n, label: String(n) }))} />
                     </div>
                     <div>
-                      <Label>Выходят из группы</Label>
+                      <Label>Сколько команд выходит из группы</Label>
                       <Segmented value={advance} onChange={setAdvance} options={[1, 2, 4].map((n) => ({ value: n, label: String(n) }))} />
                     </div>
                   </>
                 )}
                 {(bracket === "swiss" || bracket === "swiss_playoff") && (
                   <div>
-                    <Label>Побед для выхода / поражений для вылета</Label>
+                    <Label>Сколько побед до выхода и поражений до вылета</Label>
                     <Segmented value={swissWins} onChange={setSwissWins} options={[2, 3].map((n) => ({ value: n, label: `${n}–${n}` }))} />
                   </div>
                 )}
                 {(bracket === "groups_playoff" || bracket === "swiss_playoff") && (
                   <div>
-                    <Label>Плей-офф</Label>
+                    <Label>Сетка плей-офф (после групп)</Label>
                     <Segmented
                       value={playoffType}
                       onChange={setPlayoffType}
@@ -451,7 +469,7 @@ export function TournamentForm({
                   </div>
                 )}
                 {bracket === "round_robin" && (
-                  <p className="sm:col-span-3 text-[13px] text-fg-3">
+                  <p className="sm:col-span-3 text-[14.5px] text-fg-3">
                     {maxTeams} участников → {(maxTeams * (maxTeams - 1)) / 2} матчей, {maxTeams % 2 ? maxTeams : maxTeams - 1} туров. Места — по
                     победам, затем личная встреча, разница карт и раундов.
                   </p>
@@ -460,7 +478,7 @@ export function TournamentForm({
             )}
             <div className="grid sm:grid-cols-3 gap-5">
               <div>
-                <Label>{format === "1v1" ? "Участников" : "Команд"}</Label>
+                <Label>{format === "1v1" ? "Сколько участников" : "Сколько команд"}</Label>
                 <Segmented
                   value={maxTeams}
                   onChange={setMaxTeams}
@@ -468,16 +486,17 @@ export function TournamentForm({
                 />
               </div>
               <div>
-                <Label>Обычные матчи</Label>
+                <Label>Обычные матчи (сколько карт)</Label>
                 <Segmented value={bo} onChange={setBo} options={[1, 3].map((n) => ({ value: n, label: `BO${n}` }))} />
+                <Hint>BO1 — одна карта. BO3 — играют до двух побед на картах.</Hint>
               </div>
               <div>
-                <Label>Финальная стадия</Label>
+                <Label>Финальные матчи (сколько карт)</Label>
                 <Segmented value={finalBo} onChange={setFinalBo} options={[1, 3, 5].map((n) => ({ value: n, label: `BO${n}` }))} />
                 {bracket === "double_elimination" && (
-                  <p className="mt-2 text-[12px] text-fg-3">Гранд-финал Double Elimination всегда BO5: команда из верхней сетки начинает со счётом 1:0.</p>
+                  <p className="mt-2 text-[14px] text-fg-3">Гранд-финал Double Elimination всегда BO5: команда из верхней сетки начинает со счётом 1:0.</p>
                 )}
-                <p className="mt-1.5 text-xs text-fg-3">
+                <p className="mt-1.5 text-[13.5px] text-fg-3">
                   {bracket === "double_elimination" || playoffType === "double_elimination"
                     ? "Финал верхней, два последних раунда нижней и гранд-финал"
                     : bracket === "round_robin" || bracket === "swiss"
@@ -488,24 +507,24 @@ export function TournamentForm({
             </div>
             {singleElim && (
               <div>
-                <Label>Матч за 3-е место</Label>
+                <Label>Играть ли матч за 3-е место</Label>
                 <Segmented
                   value={thirdPlace ? "on" : "off"}
                   onChange={(v) => setThirdPlace(v === "on")}
                   options={[{ value: "off", label: "Без матча" }, { value: "on", label: "Матч за 3-е место" }]}
                 />
-                <p className="mt-1.5 text-xs text-fg-3">
+                <p className="mt-1.5 text-[13.5px] text-fg-3">
                   {thirdPlace ? "Проигравшие в полуфиналах сыграют за бронзу" : "Оба проигравших полуфиналиста делят 3–4 место"}
                 </p>
               </div>
             )}
           </Section>
 
-          <Section show={step === 2} title="Расписание" hint="Место проведения и даты. Время Алматы">
+          <Section show={step === 2} title="Расписание" hint="Где и когда пройдёт турнир. Все даты указываются по времени Алматы. Сначала поставьте дату старта.">
             <div>
-              <Label>Место</Label>
+              <Label>Где проходит</Label>
               <div className="flex flex-wrap items-center gap-3">
-                <Segmented value={isLan ? "lan" : "online"} onChange={(v) => setIsLan(v === "lan")} options={[{ value: "lan", label: "LAN" }, { value: "online", label: "Онлайн" }]} />
+                <Segmented value={isLan ? "lan" : "online"} onChange={(v) => setIsLan(v === "lan")} options={[{ value: "lan", label: "В клубе (LAN)" }, { value: "online", label: "Онлайн" }]} />
                 <input
                   name="location"
                   value={location}
@@ -516,37 +535,37 @@ export function TournamentForm({
               </div>
             </div>
             <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
-              <Field label="Старт турнира">
+              <Field label="Когда начинается турнир" hint="Остальные даты можно заполнить одной кнопкой справа.">
                 <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} className="field" />
               </Field>
               <button type="button" onClick={autoDates} disabled={!start} className={ghostBtn}>
-                Заполнить остальное по старту
+                Заполнить остальные даты
               </button>
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Регистрация открывается">
+            <div className="grid sm:grid-cols-2 gap-5">
+              <Field label="Регистрация открывается" hint="С этого момента команды могут подавать заявки">
                 <input type="datetime-local" value={regOpen} onChange={(e) => setRegOpen(e.target.value)} className="field" />
               </Field>
-              <Field label="Регистрация закрывается" hint="по умолчанию — за сутки до старта">
+              <Field label="Регистрация закрывается" hint="Обычно за сутки до старта">
                 <input type="datetime-local" value={regClose} onChange={(e) => setRegClose(e.target.value)} className="field" />
               </Field>
-              <Field label="Check-in с" hint="за час до старта">
+              <Field label="Подтверждение участия (check-in): начало" hint="Капитаны нажимают «Мы придём». Обычно за час до старта">
                 <input type="datetime-local" value={checkinOpen} onChange={(e) => setCheckinOpen(e.target.value)} className="field" />
               </Field>
-              <Field label="Check-in до" hint="за 15 минут до старта">
+              <Field label="Подтверждение участия (check-in): конец" hint="Обычно за 15 минут до старта">
                 <input type="datetime-local" value={checkinClose} onChange={(e) => setCheckinClose(e.target.value)} className="field" />
               </Field>
             </div>
-            {startMoved && <p className="text-[13px] text-warn">{startMoved}</p>}
+            {startMoved && <p className="text-[15px] font-medium text-warn">{startMoved}</p>}
             {dateIssues.length > 0 && (
-              <div className="rounded-lg border border-danger/30 bg-danger/[0.06] px-4 py-3 text-[13px] text-danger">
+              <div className="rounded-control border border-danger/30 bg-danger-dim px-5 py-4 text-[15px] text-danger">
                 <div className="font-semibold">Даты не по порядку — турнир не сохранится:</div>
                 <ul className="mt-1 list-disc pl-5 space-y-0.5">
                   {dateIssues.map((x) => (
                     <li key={x}>{x}</li>
                   ))}
                 </ul>
-                <div className="mt-1.5 text-fg-2">Проще всего: поставьте старт и нажмите «Заполнить остальное по старту».</div>
+                <div className="mt-1.5 text-fg-2">Проще всего: поставьте старт и нажмите «Заполнить остальные даты».</div>
               </div>
             )}
           </Section>
@@ -556,35 +575,35 @@ export function TournamentForm({
             title="Правила матча"
             hint={
               format === "1v1"
-                ? "Дуэль: без тактических пауз. Уходит в MatchZy при загрузке матча"
-                : "Уходят в MatchZy на сервер при загрузке каждого матча"
+                ? "Дуэль: без тактических пауз. Правила применяются на игровом сервере автоматически."
+                : "Эти правила автоматически применяются на игровом сервере в каждом матче."
             }
           >
             <div className="grid sm:grid-cols-2 gap-6">
               {(
                 <div>
-                  <Label>Стороны на карте</Label>
+                  <Label>Кто за какую сторону играет</Label>
                   <Segmented
                     value={knife ? "knife" : "fixed"}
                     onChange={(v) => setKnife(v === "knife")}
-                    options={[{ value: "knife", label: "Ножевой раунд" }, { value: "fixed", label: "Фиксированные" }]}
+                    options={[{ value: "knife", label: "Решает ножевой раунд" }, { value: "fixed", label: "Заранее заданы" }]}
                   />
-                  <p className="mt-1.5 text-xs text-fg-3">
-                    {knife ? "Победитель ножа выбирает .stay / .switch" : "Команда 1 начинает за CT, на следующей карте — наоборот"}
+                  <p className="mt-1.5 text-[13.5px] text-fg-3">
+                    {knife ? "Команды сыграют раунд на ножах — победитель выбирает сторону" : "Первая команда начинает за CT, на следующей карте стороны меняются"}
                   </p>
                 </div>
               )}
               <div>
-                <Label>Овертайм</Label>
+                <Label>Овертайм (если счёт 12:12)</Label>
                 <Segmented
                   value={overtime ? "on" : "off"}
                   onChange={(v) => setOvertime(v === "on")}
-                  options={[{ value: "on", label: "MR3 при 12:12" }, { value: "off", label: "Без овертайма" }]}
+                  options={[{ value: "on", label: "Играем овертайм" }, { value: "off", label: "Без овертайма" }]}
                 />
               </div>
               {format !== "1v1" && (
                 <div>
-                  <Label>Тактические паузы на команду</Label>
+                  <Label>Тактические паузы (сколько и на сколько секунд)</Label>
                   <Segmented value={timeouts} onChange={setTimeouts} options={[0, 1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
                   <div className="mt-2">
                     <Segmented value={timeoutSec} onChange={setTimeoutSec} options={[30, 45, 60].map((n) => ({ value: n, label: `${n} с` }))} />
@@ -592,14 +611,14 @@ export function TournamentForm({
                 </div>
               )}
               <div>
-                <Label>{format === "1v1" ? "Технические паузы на игрока" : "Технические паузы на команду"}</Label>
+                <Label>{format === "1v1" ? "Технические паузы на игрока: при сбое, сколько и на сколько" : "Технические паузы: при сбое, сколько и на сколько"}</Label>
                 <Segmented value={techPauses} onChange={setTechPauses} options={[0, 1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
                 <div className="mt-2">
                   <Segmented value={techSec} onChange={setTechSec} options={[180, 300, 600].map((n) => ({ value: n, label: `${n / 60} мин` }))} />
                 </div>
               </div>
             </div>
-            <p className="mt-4 text-xs text-fg-3">
+            <p className="mt-4 text-[13.5px] text-fg-3">
               На турнирных картах de_* обе команды слышат друг друга только при смене сторон.
               {format === "5v5" && " Для карт 5×5: MR12, при включённом овертайме MR3, фризтайм 20 с и соревновательная экономика."}
             </p>
@@ -634,16 +653,16 @@ export function TournamentForm({
               const modeLabel = size === 1 ? "1×1" : size === 2 ? "2×2" : "5×5";
               return (
                 <>
-                  <Field label="Требования к участникам" hint="Если пусто — показываются стандартные">
+                  <Field label="Требования к участникам" hint="Кто может участвовать. Если оставить пустым — покажем стандартные требования.">
                     <textarea name="requirements" rows={4} value={reqText} onChange={(e) => setReqText(e.target.value)} className="field resize-y" />
                   </Field>
-                  <button type="button" onClick={() => ask("requirements")} className={buttonClass("outline", "sm", "-mt-2")}>
+                  <button type="button" onClick={() => ask("requirements")} className={buttonClass("outline", "sm", "-mt-2 !h-11 !px-4 !text-[14.5px]")}>
                     Вставить шаблон требований · {modeLabel}
                   </button>
-                  <Field label="Регламент" hint="Шаблон подставит формат, BO, паузы, нож и овертайм из настроек выше — потом можно править">
+                  <Field label="Регламент (правила турнира)" hint="Игроки читают его на странице турнира. Кнопка под полем заполнит текст по вашим настройкам выше — потом его можно поправить.">
                     <textarea name="rules" rows={14} value={rulesText} onChange={(e) => setRulesText(e.target.value)} className="field resize-y" />
                   </Field>
-                  <button type="button" onClick={() => ask("rules")} className={buttonClass("outline", "sm", "-mt-2")}>
+                  <button type="button" onClick={() => ask("rules")} className={buttonClass("outline", "sm", "-mt-2 !h-11 !px-4 !text-[14.5px]")}>
                     Вставить шаблон регламента · {modeLabel}
                   </button>
                   <ConfirmModal
@@ -665,7 +684,7 @@ export function TournamentForm({
             })()}
           </Section>
 
-          <Section show={step === 4} title="Карты" hint="Нажмите на карту, чтобы включить или убрать её">
+          <Section show={step === 4} title="Карты" hint="Нажмите на карту, чтобы добавить её в турнир или убрать. Выбранные карты отмечены зелёным.">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {officialMaps.map((m) => {
                 const on = maps.includes(m.id);
@@ -676,8 +695,8 @@ export function TournamentForm({
                     type="button"
                     onClick={() => setMaps((list) => (on ? list.filter((x) => x !== m.id) : [...list, m.id]))}
                     className={cn(
-                      "relative h-16 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition",
-                      on ? "border-accent/50 bg-accent-dim" : "border-line bg-bg-2 opacity-50 hover:opacity-80",
+                      "relative h-20 overflow-hidden rounded-control border-2 px-3.5 py-3 text-left transition",
+                      on ? "border-accent bg-accent-dim" : "border-line bg-surface-2 opacity-60 hover:opacity-90",
                     )}
                   >
                     {img && (
@@ -687,12 +706,12 @@ export function TournamentForm({
                         <span className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
                       </>
                     )}
-                    <span className={cn("relative text-[14px] font-bold", img ? "text-white drop-shadow-sm" : "text-fg")}>{m.name}</span>
-                    <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-bg" : "border border-line-strong")}>
+                    <span className={cn("relative text-[16px] font-bold", img ? "text-white drop-shadow-sm" : "text-fg")}>{m.name}</span>
+                    <span className={cn("absolute top-3 right-3 size-5 rounded grid place-items-center text-[12.5px] font-bold", on ? "bg-accent text-accent-ink" : "border border-line-strong")}>
                       {on ? "✓" : ""}
                     </span>
                     {(MODES[format as ModeKey]?.maps as readonly string[] | undefined)?.includes(m.id) && (
-                      <span className="absolute bottom-2 left-3 text-[10px] text-fg-3">пул режима</span>
+                      <span className="absolute bottom-2 left-3.5 text-[12.5px] font-medium text-fg-3">стандартная для режима</span>
                     )}
                   </button>
                 );
@@ -700,7 +719,7 @@ export function TournamentForm({
             </div>
             {workshopMaps.length > 0 && (
               <div>
-                <Label>Карты из Workshop</Label>
+                <Label>Свои карты (из Steam Workshop)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {workshopMaps.map((w) => {
                     const on = maps.includes(w);
@@ -710,13 +729,13 @@ export function TournamentForm({
                         type="button"
                         onClick={() => setMaps((list) => (on ? list.filter((x) => x !== w) : [...list, w]))}
                         className={cn(
-                          "relative h-16 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition",
-                          on ? "border-accent/50 bg-accent-dim" : "border-line bg-bg-2 opacity-50 hover:opacity-80",
+                          "relative h-20 overflow-hidden rounded-control border-2 px-3.5 py-3 text-left transition",
+                          on ? "border-accent bg-accent-dim" : "border-line bg-surface-2 opacity-60 hover:opacity-90",
                         )}
                       >
-                        <span className="text-[14px] font-semibold">{w.split("@")[0]}</span>
-                        <span className="absolute bottom-2 left-3 text-[10px] text-fg-3">workshop</span>
-                        <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-bg" : "border border-line-strong")}>
+                        <span className="text-[16px] font-bold text-fg">{w.split("@")[0]}</span>
+                        <span className="absolute bottom-2 left-3.5 text-[12.5px] font-medium text-fg-3">из Workshop</span>
+                        <span className={cn("absolute top-3 right-3 size-5 rounded grid place-items-center text-[12.5px] font-bold", on ? "bg-accent text-accent-ink" : "border border-line-strong")}>
                           {on ? "✓" : ""}
                         </span>
                       </button>
@@ -730,14 +749,14 @@ export function TournamentForm({
                 {maps
                   .filter((m) => m.includes("@") && !workshopMaps.includes(m))
                   .map((m) => (
-                    <span key={m} className="h-8 pl-3 pr-1 inline-flex items-center gap-2 rounded-md border border-accent/50 bg-accent-dim text-[13px]">
+                    <span key={m} className="h-10 pl-3.5 pr-1 inline-flex items-center gap-2 rounded-control border border-accent/50 bg-accent-dim text-[15px]">
                       {m.split("@")[0]}
-                      <span className="text-[10px] text-fg-3">Workshop</span>
+                      <span className="text-[12.5px] text-fg-3">Workshop</span>
                       <button
                         type="button"
                         onClick={() => setMaps((l) => l.filter((x) => x !== m))}
-                        className="size-6 grid place-items-center rounded text-fg-3 hover:text-danger"
-                        aria-label="Убрать"
+                        className="size-8 grid place-items-center rounded text-fg-3 hover:text-danger"
+                        aria-label="Убрать карту"
                       >
                         ✕
                       </button>
@@ -745,17 +764,18 @@ export function TournamentForm({
                   ))}
               </div>
             )}
-            <div className="rounded-[8px] bg-shell border border-ink/[0.06] p-4">
-              <div className="text-[13px] font-medium text-fg-2">Своя карта из Steam Workshop</div>
-              <p className="mt-1 text-xs text-fg-3">
-                Только для этого турнира. Чтобы карта была всегда под рукой и прошла проверку на сервере — добавьте её в Настройки → Workshop-карты.
+            <div className="rounded-control bg-surface-2 border border-line-subtle p-5">
+              <div className="text-[16px] font-bold text-fg">Добавить свою карту из Steam Workshop</div>
+              <p className="mt-1 text-[13.5px] text-fg-3">
+                Карта добавится только в этот турнир. Чтобы она всегда была под рукой и её проверили на сервере, добавьте её в «Настройки» → «Workshop-карты».
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder="aim_map" className="field w-40" />
+                <input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder="Название, например aim_map" aria-label="Название карты" className="field w-60" />
                 <input
                   value={wsId}
                   onChange={(e) => setWsId(e.target.value)}
-                  placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…"
+                  placeholder="Ссылка на карту в Steam Workshop"
+                  aria-label="Ссылка на карту в Steam Workshop"
                   className="field flex-1 min-w-[220px]"
                 />
                 <button
@@ -774,24 +794,24 @@ export function TournamentForm({
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <span className={mapWarning ? "text-warn" : "text-fg-3"}>
-                Выбрано {maps.length}
+            <div className="flex flex-wrap items-center gap-3 text-[15px]">
+              <span className={mapWarning ? "font-medium text-warn" : "text-fg-2"}>
+                Выбрано карт: {maps.length}
                 {mapWarning ? ` · ${mapWarning}` : ""}
               </span>
-              <button type="button" onClick={() => setMaps([...(MODES[format as ModeKey]?.maps ?? ACTIVE_POOL)])} className="text-accent hover:underline">
-                Стандартный пул режима
+              <button type="button" onClick={() => setMaps([...(MODES[format as ModeKey]?.maps ?? ACTIVE_POOL)])} className="font-semibold text-accent hover:underline">
+                Вернуть стандартный набор карт
               </button>
             </div>
           </Section>
 
-          <Section show={step === 5} title="Регистрация" hint="Взнос, призы и контакты для участников">
-            <div className="rounded-[8px] bg-shell border border-ink/[0.06] p-4 space-y-4">
+          <Section show={step === 5} title="Регистрация" hint="Что нужно знать участникам: взнос, призы, ссылки и контакты. Всё необязательно — заполняйте, что есть.">
+            <div className="rounded-control bg-surface-2 border border-line-subtle p-5 space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="max-w-lg">
-                  <div className="text-[14px] font-semibold text-fg">Официальный турнир</div>
-                  <p className="mt-1 text-xs text-fg-3 leading-relaxed">
-                    Городской турнир по положению (например, с акиматом): заявка от организации, анкеты игроков, проверка возраста, тренер,
+                  <div className="text-[17px] font-bold text-fg">Официальный турнир (по положению, например с акиматом)</div>
+                  <p className="mt-1 text-[13.5px] text-fg-3 leading-relaxed">
+                    Включайте только для городских турниров: заявка подаётся от организации, анкеты игроков, проверка возраста, тренер,
                     отметки о бумажных документах, выгрузка в Excel и печать заявок (Приложение №1).
                   </p>
                 </div>
@@ -806,7 +826,7 @@ export function TournamentForm({
               </div>
               {official && (
                 <>
-                  <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="grid sm:grid-cols-3 gap-5">
                     <Field label="Возраст от" hint="включительно, на дату старта">
                       <input type="number" min={0} max={120} value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} className="field num" />
                     </Field>
@@ -819,7 +839,7 @@ export function TournamentForm({
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
-                      <Label>Тренер в заявке</Label>
+                      <Label>Тренер в заявке команды</Label>
                       <Segmented
                         value={requireCoach ? "on" : "off"}
                         onChange={(v) => setRequireCoach(v === "on")}
@@ -827,7 +847,7 @@ export function TournamentForm({
                       />
                     </div>
                     <div>
-                      <Label>Запасные</Label>
+                      <Label>Запасные игроки</Label>
                       <Segmented
                         value={allowSubs ? "on" : "off"}
                         onChange={(v) => setAllowSubs(v === "on")}
@@ -835,35 +855,36 @@ export function TournamentForm({
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-fg-3">
+                  <p className="text-[13.5px] text-fg-3">
                     {format === "1v1"
                       ? "Официальный турнир — только командный режим."
                       : `Команда: ${MODES[format as ModeKey]?.size ?? 5} игроков${requireCoach ? " + тренер" : ""}${allowSubs ? `, до ${MODES[format as ModeKey]?.subs ?? 0} запасных` : ", без запасных — состав в заявке окончательный"}. Игроки ${minAge}–${maxAge} лет.`}
                   </p>
-                  {officialIssue && <p className="text-[13px] text-warn">{officialIssue}</p>}
+                  {officialIssue && <p className="text-[15px] font-medium text-warn">{officialIssue}</p>}
                 </>
               )}
             </div>
             <div>
-              <Label>Взнос за участие</Label>
+              <Label>Сколько стоит участие</Label>
               <div className="flex flex-wrap items-center gap-3">
                 <Segmented
                   value={freeEntry ? "free" : "paid"}
                   onChange={(v) => setFreeEntry(v === "free")}
                   options={[{ value: "free", label: "Бесплатно" }, { value: "paid", label: "Платно" }]}
                 />
-                {!freeEntry && <input value={entryFee} onChange={(e) => setEntryFee(e.target.value)} placeholder="10 000 ₸ с команды" className="field w-64" />}
+                {!freeEntry && <input value={entryFee} onChange={(e) => setEntryFee(e.target.value)} placeholder="10 000 ₸ с команды" aria-label="Размер взноса" className="field w-72" />}
               </div>
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Призовой фонд" className="flex-1 min-w-[200px]">
+              <Field label="Призовой фонд (всего)" hint="Например: 500 000 ₸. Кнопка справа сама разделит сумму по местам." className="flex-1 min-w-[240px]">
                 <input name="prize_pool" value={prizePool} onChange={(e) => setPrizePool(e.target.value)} placeholder="500 000 ₸" className="field font-semibold" />
               </Field>
               <button type="button" onClick={splitPrize} className={ghostBtn}>
-                Разделить 50 / 30 / 20
+                Разделить на три места (50 / 30 / 20 %)
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <Label>Кто что получает</Label>
               {prizes.map((p, i) => (
                 <div key={i} className="flex gap-2">
                   <input
@@ -882,31 +903,31 @@ export function TournamentForm({
                   <button
                     type="button"
                     onClick={() => setPrizes((list) => list.filter((_, j) => j !== i))}
-                    className="size-10 shrink-0 rounded-lg border border-line text-fg-3 hover:text-danger"
+                    className="size-12 shrink-0 rounded-control border border-line-strong bg-surface text-fg-3 hover:text-danger"
                     aria-label="Убрать место"
                   >
                     ✕
                   </button>
                 </div>
               ))}
-              <button type="button" onClick={() => setPrizes((list) => [...list, { place: `${list.length + 1} место`, prize: "" }])} className="text-[13px] text-accent hover:underline">
+              <button type="button" onClick={() => setPrizes((list) => [...list, { place: `${list.length + 1} место`, prize: "" }])} className="text-[15px] font-semibold text-accent hover:underline">
                 + Добавить место
               </button>
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 gap-5">
               <Field label="Трансляция" hint="Twitch или YouTube — встроится в страницу турнира">
                 <input name="stream_url" defaultValue={t?.stream_url ?? ""} placeholder="https://twitch.tv/f16arena" className="field" />
               </Field>
               <Field label="Discord" hint="Сервер для участников">
                 <input name="discord_url" defaultValue={t?.discord_url ?? ""} placeholder="https://discord.gg/…" className="field" />
               </Field>
-              <Field label="Связь с организатором" hint="Telegram, WhatsApp или телефон">
+              <Field label="Как связаться с организатором" hint="Telegram, WhatsApp или телефон — для вопросов от участников">
                 <input name="contact" defaultValue={t?.contact ?? ""} placeholder="@f16arena или +7 …" className="field" />
               </Field>
             </div>
             <div>
-              <Label>Спонсоры и партнёры</Label>
-              <div className="space-y-2">
+              <Label>Спонсоры и партнёры (по желанию)</Label>
+              <div className="space-y-3">
                 {sponsors.map((sp, i) => (
                   <div key={i} className="flex gap-2">
                     <input
@@ -924,55 +945,55 @@ export function TournamentForm({
                     <button
                       type="button"
                       onClick={() => setSponsors((l) => l.filter((_, j) => j !== i))}
-                      className="size-10 shrink-0 rounded-lg border border-line text-fg-3 hover:text-danger"
-                      aria-label="Убрать"
+                      className="size-12 shrink-0 rounded-control border border-line-strong bg-surface text-fg-3 hover:text-danger"
+                      aria-label="Убрать спонсора"
                     >
                       ✕
                     </button>
                   </div>
                 ))}
-                <button type="button" onClick={() => setSponsors((l) => [...l, { name: "", url: "" }])} className="text-[13px] text-accent hover:underline">
+                <button type="button" onClick={() => setSponsors((l) => [...l, { name: "", url: "" }])} className="text-[15px] font-semibold text-accent hover:underline">
                   + Добавить спонсора
                 </button>
               </div>
             </div>
           </Section>
 
-          <Section show={step === 6} title="Публикация" hint="Проверьте турнир перед сохранением">
-            <div className="text-[14px] text-fg-2 leading-relaxed max-w-xl">
+          <Section show={step === 6} title="Публикация" hint="Последний шаг: проверьте итог справа и нажмите зелёную кнопку.">
+            <div className="text-[16px] text-fg-2 leading-relaxed max-w-xl">
               {t
-                ? "Изменения сразу появятся на странице турнира."
-                : "Турнир сохранится как черновик и не будет виден игрокам. Регистрацию открывают на странице турнира — переключением этапа."}
+                ? "Изменения сразу появятся на странице турнира. Нажмите «Сохранить изменения» справа."
+                : "Турнир сохранится как черновик и пока не будет виден игрокам. Когда будете готовы, откройте регистрацию на странице турнира."}
             </div>
             {Object.entries(missing).filter(([, v]) => v).length > 0 && (
               <div className="space-y-1.5">
                 {Object.entries(missing)
                   .filter(([, v]) => v)
                   .map(([k, v]) => (
-                    <button key={k} type="button" onClick={() => setStep(Number(k))} className="block text-[13px] text-warn hover:underline">
-                      {STEPS[Number(k)]}: {v} →
+                    <button key={k} type="button" onClick={() => setStep(Number(k))} className="block text-[15.5px] font-medium text-warn hover:underline">
+                      Исправить в шаге «{STEPS[Number(k)]}»: {v} →
                     </button>
                   ))}
               </div>
             )}
           </Section>
 
-          <div className="mt-10 pt-5 border-t border-ink/[0.06] flex items-center justify-between gap-3">
+          <div className="mt-10 pt-6 border-t border-ink/[0.06] flex items-center justify-between gap-3">
             <button type="button" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className={ghostBtn}>
               ← Назад
             </button>
             {step < STEPS.length - 1 ? (
-              <button type="button" onClick={() => setStep((s) => s + 1)} className={buttonClass("secondary")}>
-                {STEPS[step + 1]} →
+              <button type="button" onClick={() => setStep((s) => s + 1)} className={buttonClass("primary", "md", "!h-12 !px-6 !text-[16px]")}>
+                Дальше: {STEPS[step + 1]} →
               </button>
             ) : null}
           </div>
         </div>
 
         {/* сводка */}
-        <aside className="xl:sticky xl:top-8 rounded-[12px] border border-line bg-surface p-5">
-          <div className="text-[12px] font-medium text-eyebrow">Сводка</div>
-          <div className="mt-2 text-[18px] font-semibold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
+        <aside className={cn(ADMIN_CARD, "p-6 xl:sticky xl:top-8")}>
+          <div className="text-[14px] font-semibold text-fg-3">Коротко о турнире</div>
+          <div className="mt-1.5 text-[20px] font-bold tracking-[-0.015em] truncate">{name || "Новый турнир"}</div>
           <div className="mt-4">
             <SummaryRow label="Режим" value={MODES[format as ModeKey]?.title ?? format} />
             <SummaryRow label="Система" value={FORMATS[bracket].title} />
@@ -987,13 +1008,13 @@ export function TournamentForm({
             {official && <SummaryRow label="Официальный" value={`${minAge}–${maxAge} лет · ${city || "—"}`} warn={!!officialIssue} />}
             {singleElim && thirdPlace && <SummaryRow label="3-е место" value="матч за бронзу" />}
           </div>
-          <div className="mt-5">
+          <div className="mt-6">
             {canSubmit ? (
-              <SubmitButton className="w-full" pendingText="Сохраняем…">
-                {t ? "Сохранить" : "Создать турнир"}
+              <SubmitButton size="lg" className="w-full !text-[16px]" pendingText="Сохраняем…">
+                {t ? "Сохранить изменения" : "Создать турнир"}
               </SubmitButton>
             ) : (
-              <button type="button" onClick={() => setStep(0)} className={buttonClass("primary", "md", "w-full opacity-50")}>
+              <button type="button" onClick={() => setStep(0)} className={buttonClass("primary", "lg", "w-full !text-[16px] opacity-50")}>
                 Укажите название
               </button>
             )}

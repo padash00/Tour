@@ -4,21 +4,20 @@ import { PageTitle } from "@/components/ds";
 import { cn } from "@/components/ui";
 
 /**
- * F16 Control — плотные операционные примитивы админки.
- * Язык публичного сайта (подписи разрядкой, карточки #0b1420, акцент #8AB8FF),
- * но мельче шрифт и больше данных на экране.
+ * F16 Control — примитивы пульта в стиле сайта (F16 DS): белые карточки, крупный шрифт,
+ * заголовки обычным регистром. Пульт должен быть понятен с первого взгляда, а не «плотным».
  */
 
 /** Карточка админки — общая поверхность F16 DS */
-export const ADMIN_CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
+export const ADMIN_CARD = "rounded-surface bg-surface shadow-[inset_0_0_0_1px_var(--color-line-subtle),var(--shadow-soft)]";
 
 /** Заголовки колонок таблиц: спокойные, без капса — данные важнее подписей */
 export const TH =
-  "[&_th]:text-[12px] [&_th]:font-medium [&_th]:text-fg-3 [&_th]:h-10";
+  "[&_th]:text-[13px] [&_th]:font-semibold [&_th]:text-fg-3 [&_th]:h-11";
 
 /** Подпись раздела: обычный регистр, без разрядки — меньше визуального шума */
 export function AdminLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-[13px] font-semibold text-fg-2", className)}>{children}</div>;
+  return <div className={cn("text-[18px] font-bold tracking-[-0.01em] text-fg", className)}>{children}</div>;
 }
 
 export function AdminHeader({
@@ -35,16 +34,16 @@ export function AdminHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-7 border-b border-ink/[0.06]">
+    <div className="flex flex-col gap-4 pb-2 md:flex-row md:items-end md:justify-between">
       <div className="min-w-0">
         {back && (
-          <Link href={back.href} className="rounded-sm text-[12px] text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+          <Link href={back.href} className="rounded-sm text-[14px] font-semibold text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
             ← {back.label}
           </Link>
         )}
-        {eyebrow && <AdminLabel className={cn(back && "mt-3")}>{eyebrow}</AdminLabel>}
+        {eyebrow && <div className={cn("text-[14px] font-semibold text-fg-3", back && "mt-3")}>{eyebrow}</div>}
         <PageTitle className="mt-2.5">{title}</PageTitle>
-        {description && <div className="mt-2 text-[13px] text-fg-3">{description}</div>}
+        {description && <div className="mt-2 max-w-read text-[15px] text-fg-2">{description}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -68,7 +67,7 @@ export function Panel({
   return (
     <section className={className}>
       {(title || action) && (
-        <div className="flex items-center justify-between gap-3 mb-3.5">
+        <div className="mb-4 flex items-center justify-between gap-3">
           {title && <AdminLabel>{title}</AdminLabel>}
           {action}
         </div>
@@ -135,7 +134,7 @@ export function AlertRow({
     <div
       className={cn(
         // текст — отдельным блоком на всю ширину, кнопки — строкой под ним (в узкой колонке текст не сжимается в столбик)
-        "flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 rounded-[10px] border text-[13px]",
+        "flex flex-wrap items-center gap-x-4 gap-y-3 rounded-surface border px-4 py-3.5 text-[14.5px]",
         tone === "danger"
           ? "border-danger/30 bg-danger/[0.06]"
           : tone === "warn"
@@ -153,7 +152,7 @@ export function AlertRow({
           <Link
             href={action.href}
             className={cn(
-              "inline-flex h-9 items-center rounded-[8px] border px-3 text-[12px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+              "inline-flex h-10 items-center rounded-control border px-3.5 text-[14px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
               tone === "danger"
                 ? "border-danger/40 text-danger hover:bg-danger/[0.1]"
                 : tone === "warn"
@@ -173,16 +172,16 @@ export function AlertRow({
 export function Metric({ label, value, tone, hint }: { label: ReactNode; value: ReactNode; tone?: DotTone; hint?: ReactNode }) {
   return (
     <div className="min-w-0">
-      <AdminLabel className="text-[12px] font-medium text-fg-3">{label}</AdminLabel>
+      <div className="text-[13.5px] font-semibold text-fg-3">{label}</div>
       <div
         className={cn(
-          "mt-2 text-[22px] font-semibold tracking-[-0.02em] num",
+          "mt-2 text-[26px] font-bold tracking-[-0.02em] num",
           tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : tone === "accent" ? "text-accent" : "text-fg",
         )}
       >
         {value}
       </div>
-      {hint && <div className="mt-0.5 text-[12px] text-fg-3 truncate">{hint}</div>}
+      {hint && <div className="mt-1 truncate text-[13px] text-fg-3">{hint}</div>}
     </div>
   );
 }
@@ -194,7 +193,7 @@ export { SubTabs } from "./sub-tabs";
 export function TableSkeleton({ rows = 8, cols = 6 }: { rows?: number; cols?: number }) {
   return (
     <div className="space-y-6">
-      <div className="pb-7 border-b border-ink/[0.06]">
+      <div className="pb-2">
         <div className="skeleton h-3 w-24" />
         <div className="skeleton mt-3 h-8 w-56" />
       </div>

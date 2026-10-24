@@ -31,10 +31,10 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
     <div className="space-y-6">
       <AdminHeader
         title="Команды"
-        description={`${all.length} активных`}
+        description={`Активных команд: ${all.length}. Найдите команду по названию или тегу.`}
         actions={
-          <form className="w-72" role="search">
-            <input name="q" defaultValue={q} placeholder="Название или тег" aria-label="Поиск команды" className="field !h-10 text-[13px]" />
+          <form className="w-full sm:w-80" role="search">
+            <input name="q" defaultValue={q} placeholder="Название или тег" aria-label="Поиск команды" className="field !h-11 text-[15px]" />
           </form>
         }
       />
@@ -47,10 +47,10 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
               <th>Команда</th>
               <th>Капитан</th>
               <th className="text-right">Игроков</th>
-              <th className="text-right">Avg ELO</th>
+              <th className="text-right">Средний ELO</th>
               <th>Турнир</th>
               <th>Статус</th>
-              <th>Инвайт</th>
+              <th>Код приглашения</th>
               <th>Создана</th>
             </tr>
           </thead>
@@ -63,7 +63,7 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
                     <Link href={`/teams/${t.tag}`} className="flex items-center gap-2.5 text-fg hover:text-accent">
                       <TeamLogo src={t.logo_url} tag={t.tag} size={24} />
                       <span className="font-medium">{t.name}</span>
-                      <span className="text-[12px] text-fg-3">{t.tag}</span>
+                      <span className="text-[13px] text-fg-3">{t.tag}</span>
                     </Link>
                   </td>
                   <td>{captainName.get(t.captain_id) ?? "—"}</td>
@@ -77,7 +77,7 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
                       <span className="text-fg-3">—</span>
                     )}
                   </td>
-                  <td className="num text-[12px]">{t.invite_code}</td>
+                  <td className="num text-[14px]">{t.invite_code}</td>
                   <td className="num">{formatDate(t.created_at)}</td>
                 </tr>
               );

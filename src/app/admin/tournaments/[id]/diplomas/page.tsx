@@ -66,29 +66,29 @@ export default async function DiplomasPage(props: PageProps<"/admin/tournaments/
         <AdminHeader
           back={{ href: `/admin/tournaments/${t.id}?tab=awards`, label: t.name }}
           title="Дипломы"
-          description={`${diplomas.length} шт. · A4 альбомная · одна страница — один диплом`}
+          description={`Дипломов: ${diplomas.length}. Каждый печатается на отдельном листе A4 (альбомная ориентация). Проверьте данные ниже, нажмите «Применить», затем «Печать».`}
           actions={<PrintButton />}
         />
-        <form method="get" className="grid gap-3 rounded-[12px] border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr_1fr_auto] lg:items-end">
+        <form method="get" className="grid gap-4 rounded-surface border border-line-subtle bg-surface p-5 shadow-[var(--shadow-soft)] sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr_1fr_auto] lg:items-end">
           {[
-            ["place", "Место проведения", place, "г. …"],
+            ["place", "Где проходит награждение", place, "г. …"],
             ["date", "Дата", date, "1 января 2026 г."],
-            ["signer", "Подпись: должность", signer, DEFAULT_SIGNER],
-            ["signerName", "Подпись: ФИО", signerName, "оставить пустым"],
+            ["signer", "Кто подписывает: должность", signer, DEFAULT_SIGNER],
+            ["signerName", "Кто подписывает: ФИО", signerName, "можно оставить пустым"],
           ].map(([name, label, value, hint]) => (
-            <label key={name} className="block text-[12px] text-fg-3">
+            <label key={name} className="block text-[14px] font-semibold text-fg">
               {label}
-              <input name={name} defaultValue={value} placeholder={hint} className="field mt-1 h-9 w-full text-[13px]" />
+              <input name={name} defaultValue={value} placeholder={hint} className="field mt-2 w-full font-normal" />
             </label>
           ))}
-          <button type="submit" className="h-9 rounded-[8px] border border-line px-4 text-[13px] text-fg hover:bg-surface-2">
+          <button type="submit" className="h-12 rounded-control bg-accent px-6 text-[15.5px] font-semibold text-accent-ink hover:bg-accent-strong">
             Применить
           </button>
         </form>
         {diplomas.length === 0 && (
-          <p className="text-[13px] text-fg-3">
+          <p className="text-[15px] text-fg-2">
             Пока некого награждать: места появятся после финала, номинации — во вкладке{" "}
-            <Link href={`/admin/tournaments/${t.id}?tab=awards`} className="text-accent hover:underline">
+            <Link href={`/admin/tournaments/${t.id}?tab=awards`} className="font-semibold text-accent hover:underline">
               «Награды»
             </Link>
             .
@@ -128,7 +128,7 @@ const PRINT_CSS = `
 .diplomas-root { display: flex; flex-direction: column; align-items: center; gap: 24px; overflow-x: auto; padding-bottom: 8px; }
 .diploma-sheet {
   width: 297mm; height: 210mm; box-sizing: border-box; padding: 12mm; background: #fff; color: #111;
-  box-shadow: 0 10px 40px rgba(0,0,0,.35); font-family: inherit;
+  box-shadow: 0 10px 40px rgba(18,20,23,.18), 0 0 0 1px #dcdfe4; font-family: inherit;
 }
 .diploma-frame {
   height: 100%; box-sizing: border-box; border: 1.2mm solid #111; outline: 0.4mm solid #111; outline-offset: -3.5mm;

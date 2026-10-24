@@ -5,7 +5,7 @@ import { approvedCounts } from "@/lib/data";
 import { formatShortDateTime } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import type { Tournament, TournamentStatus } from "@/lib/types";
-import { ButtonLink, EmptyState } from "@/components/ui";
+import { ButtonLink, EmptyState, buttonClass } from "@/components/ui";
 import { TournamentStatusChip } from "@/components/primitives";
 import { AdminHeader, TableBox } from "@/components/admin/control";
 import { MiniLifecycle } from "@/components/admin/kit";
@@ -59,10 +59,10 @@ export default async function AdminTournamentsPage() {
       <LiveRefresh watch="matches" intervalMs={8000} />
       <AdminHeader
         title="Турниры"
-        description={`${tournaments.length} всего · ${tournaments.filter((t) => !["finished", "cancelled", "draft"].includes(t.status)).length} в работе`}
+        description={`Всего турниров: ${tournaments.length}, сейчас в работе: ${tournaments.filter((t) => !["finished", "cancelled", "draft"].includes(t.status)).length}. Нажмите на название, чтобы открыть турнир и управлять им.`}
         actions={
-          <ButtonLink href="/admin/tournaments/new" size="sm">
-            Новый турнир
+          <ButtonLink href="/admin/tournaments/new" size="md">
+            + Создать турнир
           </ButtonLink>
         }
       />
@@ -71,22 +71,23 @@ export default async function AdminTournamentsPage() {
           title="Турниров ещё нет"
           description="Новый турнир сохраняется как черновик и не виден игрокам, пока вы не откроете регистрацию."
           action={
-            <ButtonLink href="/admin/tournaments/new" size="sm">
-              Новый турнир
+            <ButtonLink href="/admin/tournaments/new" size="md">
+              + Создать турнир
             </ButtonLink>
           }
         />
       ) : (
+        <div className="[&_td]:!h-16 [&_td]:!px-4 [&_td]:!text-[15px] [&_th]:!px-4">
         <TableBox minWidth={980}>
           <thead>
             <tr>
               <th>Турнир</th>
               <th>Этап</th>
-              <th className="text-right">Команды</th>
-              <th className="text-right">Заявки</th>
-              <th>Старт</th>
+              <th className="text-right">Команд одобрено</th>
+              <th className="text-right">Новых заявок</th>
+              <th>Начало</th>
               <th>Следующий шаг</th>
-              <th className="text-right">Ещё</th>
+              <th className="text-right">Ссылки</th>
             </tr>
           </thead>
           <tbody>
@@ -95,11 +96,11 @@ export default async function AdminTournamentsPage() {
               const base = `/admin/tournaments/${t.id}`;
               return (
                 <tr key={t.id} className={t.status === "live" ? "bg-danger/[0.03]" : undefined}>
-                  <td>
-                    <Link href={base} className="font-semibold text-fg hover:text-accent">
+                  <td className="min-w-[240px]">
+                    <Link href={base} className="text-[16px] font-bold text-fg hover:text-accent">
                       {t.name}
                     </Link>
-                    <div className="text-[11px] text-fg-3 num">/{t.slug}</div>
+                    <div className="mt-0.5 text-[13px] text-fg-3 num">/{t.slug}</div>
                   </td>
                   <td>
                     <div className="flex flex-col gap-1.5">
@@ -112,22 +113,22 @@ export default async function AdminTournamentsPage() {
                     <span className="text-fg-3">/{t.max_teams}</span>
                   </td>
                   <td className={`text-right num ${pending[t.id] ? "text-warn" : "text-fg-3"}`}>{pending[t.id] ?? 0}</td>
-                  <td className="num">{formatShortDateTime(t.starts_at)}</td>
+                  <td className="num whitespace-nowrap">{formatShortDateTime(t.starts_at)}</td>
                   <td>
                     {next ? (
-                      <Link href={next.tab ? `${base}?tab=${next.tab}` : base} className="text-[12px] font-medium text-accent hover:underline">
+                      <Link href={next.tab ? `${base}?tab=${next.tab}` : base} className={buttonClass("secondary", "sm", "!h-10 !px-3.5 !text-[14px] text-accent")}>
                         {next.text} →
                       </Link>
                     ) : (
-                      <span className="text-[12px] text-fg-3">—</span>
+                      <span className="text-[14px] text-fg-3">Ничего делать не нужно</span>
                     )}
                   </td>
                   <td className="text-right whitespace-nowrap">
-                    <Link href={t.status === "draft" ? `/tournaments/${t.slug}/preview` : `/tournaments/${t.slug}`} className="text-[12px] text-fg-3 hover:text-fg">
-                      На сайте ↗
+                    <Link href={t.status === "draft" ? `/tournaments/${t.slug}/preview` : `/tournaments/${t.slug}`} className="text-[14px] font-medium text-fg-2 hover:text-fg">
+                      Как видят игроки ↗
                     </Link>
                     <span className="text-fg-3 mx-2">·</span>
-                    <Link href={`${base}?tab=settings#danger`} className="text-[12px] text-danger/80 hover:text-danger">
+                    <Link href={`${base}?tab=settings#danger`} className="text-[14px] text-danger/80 hover:text-danger">
                       Удалить
                     </Link>
                   </td>
@@ -136,6 +137,7 @@ export default async function AdminTournamentsPage() {
             })}
           </tbody>
         </TableBox>
+        </div>
       )}
     </div>
   );

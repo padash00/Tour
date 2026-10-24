@@ -10,7 +10,8 @@ import type { MatchWithTeams } from "@/lib/matches";
 import { MatchStatusBadge, matchStage } from "@/components/match-bits";
 import { ADMIN_CARD, AdminHeader, Metric, Panel, TableBox } from "@/components/admin/control";
 import { instanceState, minutesSince, serverNow, toneBar, toneText } from "@/components/admin/kit";
-import { humanPlayers } from "@/components/admin/instance-card";
+import { humanPlayers, plainState } from "@/components/admin/instance-card";
+import { buttonClass } from "@/components/ds";
 import { EmptyState, cn } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Табло турнира — F16 Control" };
@@ -38,8 +39,8 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
   if (!t) {
     return (
       <div className="space-y-6">
-        <AdminHeader title="Табло турнира" />
-        <EmptyState compact title="Нет идущих турниров" description="Табло показывает турнир в статусе «идёт», check-in или с открытой регистрацией." />
+        <AdminHeader title="Табло турнира" description="Один экран на день турнира: что идёт на каждом сервере и что дальше." />
+        <EmptyState compact title="Сейчас нет идущих турниров" description="Табло показывает турнир, который идёт, на отметке участников или с открытой регистрацией." />
       </div>
     );
   }
@@ -94,38 +95,38 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
         title="Табло турнира"
         description={
           <>
-            {t.name} · начало {formatTime(t.starts_at)}
-            {eta?.finishAt ? ` · окончание ≈ ${formatTime(new Date(eta.finishAt).toISOString())}` : ""}
-            {eta ? ` · карта в среднем ${eta.mapMinutes} мин` : ""}
+            {t.name} · начало в {formatTime(t.starts_at)}
+            {eta?.finishAt ? ` · закончится примерно в ${formatTime(new Date(eta.finishAt).toISOString())}` : ""}
+            {eta ? ` · одна карта в среднем ${eta.mapMinutes} мин` : ""}
           </>
         }
         actions={
           tournaments.length > 1 ? (
-            <div className="flex flex-wrap gap-3 text-[13px]">
+            <div className="flex flex-wrap gap-2">
               {tournaments.map((x) => (
-                <Link key={x.id} href={`/admin/board?t=${x.id}`} className={cn(x.id === t.id ? "text-fg font-medium" : "text-fg-3 hover:text-fg-2")}>
+                <Link key={x.id} href={`/admin/board?t=${x.id}`} className={buttonClass(x.id === t.id ? "primary" : "secondary", "sm", "sm:h-10")}>
                   {x.name}
                 </Link>
               ))}
             </div>
           ) : (
-            <Link href={`/admin/tournaments/${t.id}`} className="text-[13px] text-fg-3 hover:text-accent">
-              Пульт турнира →
+            <Link href={`/admin/tournaments/${t.id}`} className={buttonClass("secondary", "md")}>
+              Открыть турнир →
             </Link>
           )
         }
       />
 
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
-        <Metric label="Идут" value={live.length} tone={live.length ? "danger" : undefined} />
-        <Metric label="Ждут игроков" value={waitingPlayers.length} tone={noShow.length ? "danger" : waitingPlayers.length ? "warn" : undefined} hint={noShow.length ? `неявка: ${noShow.length}` : undefined} />
+      <div className={cn(ADMIN_CARD, "grid grid-cols-2 gap-x-6 gap-y-6 p-6 sm:grid-cols-3 lg:grid-cols-6")}>
+        <Metric label="Идут сейчас" value={live.length} tone={live.length ? "danger" : undefined} />
+        <Metric label="Ждут игроков" value={waitingPlayers.length} tone={noShow.length ? "danger" : waitingPlayers.length ? "warn" : undefined} hint={noShow.length ? `не пришли: ${noShow.length}` : undefined} />
         <Metric label="Ждут сервер" value={needServer.length} tone={needServer.length && !freeServers.length ? "warn" : undefined} />
-        <Metric label="Вето" value={inVeto.length} />
-        <Metric label="Свободно серверов" value={servers.online ? freeServers.length : "—"} tone={servers.online ? undefined : "danger"} hint={servers.online ? undefined : "агент не на связи"} />
+        <Metric label="Выбирают карты" value={inVeto.length} />
+        <Metric label="Серверов свободно" value={servers.online ? freeServers.length : "—"} tone={servers.online ? undefined : "danger"} hint={servers.online ? undefined : "серверный ПК не на связи"} />
         <Metric label="Сыграно" value={`${finished.length} / ${real.length}`} />
       </div>
 
-      <Panel title="Серверы">
+      <Panel title="Что сейчас на серверах">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {servers.instances.map((i) => {
             const m = onServer.get(i.name);
@@ -134,20 +135,20 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
             const waited = m && m.status === "ready" && m.server_state === "ready" ? minutesSince(m.server_ready_at, now) : null;
             const playing = m?.status === "live" ? minutesSince(m.started_at, now) : null;
             return (
-              <div key={i.name} className={cn(ADMIN_CARD, "relative overflow-hidden px-5 py-4")}>
-                <span className={cn("absolute left-0 inset-y-0 w-[3px]", m ? (m.status === "live" ? "bg-danger" : "bg-warn") : toneBar[st.tone])} />
+              <div key={i.name} className={cn(ADMIN_CARD, "relative overflow-hidden px-6 py-5")}>
+                <span className={cn("absolute left-0 inset-y-0 w-1", m ? (m.status === "live" ? "bg-danger" : "bg-warn") : toneBar[st.tone])} />
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="num text-[15px] font-semibold">{i.name}</span>
-                  <span className={cn("text-[12px]", m ? "text-fg-3" : toneText[st.tone])}>
-                    {m ? `${humanPlayers(i) ?? 0} игроков` : lobbyOn.has(i.name) ? "игра лобби" : i.running && (i.gamestate ?? "none") === "none" ? "свободен" : st.text}
+                  <span className="num text-[18px] font-bold">{i.name}</span>
+                  <span className={cn("text-[14px] font-medium", m ? "text-fg-3" : toneText[st.tone])}>
+                    {m ? `игроков: ${humanPlayers(i) ?? 0}` : lobbyOn.has(i.name) ? "идёт игра лобби" : i.running && (i.gamestate ?? "none") === "none" ? "свободен" : plainState(st.text)}
                   </span>
                 </div>
                 {m ? (
                   <Link href={`/admin/matches/${m.id}`} className="mt-2 block hover:text-accent">
-                    <div className="truncate text-[14px] font-medium">
-                      #{m.number} {m.team1?.tag ?? "TBD"} <span className="text-fg-3">vs</span> {m.team2?.tag ?? "TBD"}
+                    <div className="truncate text-[17px] font-bold">
+                      №{m.number} {m.team1?.tag ?? "TBD"} <span className="font-normal text-fg-3">против</span> {m.team2?.tag ?? "TBD"}
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[12px] text-fg-3">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[14px] text-fg-3">
                       <span>{matchStage(m, matches)}</span>
                       {m.best_of > 1 && <span className="num">серия {m.team1_score}:{m.team2_score}</span>}
                       {cur && (
@@ -156,20 +157,20 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 text-[12px]">
+                    <div className="mt-1 text-[14px]">
                       {m.server_state === "loading" ? (
-                        <span className="text-warn">грузится карта…</span>
+                        <span className="font-medium text-warn">Загружается карта…</span>
                       ) : waited != null ? (
                         <span className={waited >= NO_SHOW_MIN ? "font-semibold text-danger" : waited >= 10 ? "text-warn" : "text-fg-3"}>
-                          ждём игроков {waited} мин{waited >= NO_SHOW_MIN ? " — неявка?" : ""}
+                          Ждём игроков {waited} мин{waited >= NO_SHOW_MIN ? " — похоже, не пришли" : ""}
                         </span>
                       ) : playing != null ? (
-                        <span className="text-fg-3">идёт {playing} мин</span>
+                        <span className="text-fg-3">Играют уже {playing} мин</span>
                       ) : null}
                     </div>
                   </Link>
                 ) : (
-                  <div className="mt-2 text-[12px] text-fg-4">{i.for_lobby ? "отдан лобби · авто" : "для турнира · авто"}</div>
+                  <div className="mt-2 text-[14px] text-fg-3">{i.for_lobby ? "Сейчас отдан под лобби" : "Сейчас для турнира"} (переключается само)</div>
                 )}
               </div>
             );
@@ -178,16 +179,16 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
       </Panel>
 
       {stageList.length > 0 && (
-        <Panel title="Стадии">
+        <Panel title="Сколько матчей сыграно по этапам">
           <div className="flex flex-wrap gap-x-8 gap-y-3">
             {stageList.map(([label, s]) => (
               <div key={label} className="min-w-[120px]">
-                <div className="text-[12px] text-fg-3">{label}</div>
+                <div className="text-[14px] font-medium text-fg-2">{label}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="h-1.5 w-24 overflow-hidden rounded-full bg-ink/[0.06]">
+                  <div className="h-2 w-28 overflow-hidden rounded-full bg-ink/[0.06]">
                     <div className={cn("h-full rounded-full", s.done === s.total ? "bg-ok" : "bg-accent")} style={{ width: `${(s.done / s.total) * 100}%` }} />
                   </div>
-                  <span className="num text-[13px]">
+                  <span className="num text-[15px] font-semibold">
                     {s.done}/{s.total}
                   </span>
                 </div>
@@ -197,19 +198,19 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
         </Panel>
       )}
 
-      <Panel title="Очередь">
+      <Panel title="Очередь матчей">
         {queue.length === 0 ? (
           <EmptyState compact title="Очередь пуста" description={matches.length ? "Все матчи на серверах или сыграны." : "Сетка ещё не создана."} />
         ) : (
           <TableBox minWidth={720} maxHeight={560}>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Стадия</th>
+                <th>№</th>
+                <th>Этап</th>
                 <th>Команды</th>
                 <th>Статус</th>
                 <th>Формат</th>
-                <th>Начало ≈</th>
+                <th>Начнётся примерно</th>
               </tr>
             </thead>
             <tbody>
@@ -221,20 +222,20 @@ export default async function AdminBoardPage(props: PageProps<"/admin/board">) {
                     <td className="text-fg-3">{matchStage(m, matches)}</td>
                     <td>
                       <Link href={`/admin/matches/${m.id}`} className="font-medium text-fg hover:text-accent">
-                        {m.team1?.name ?? "TBD"} <span className="text-fg-3">vs</span> {m.team2?.name ?? "TBD"}
+                        {m.team1?.name ?? "TBD"} <span className="font-normal text-fg-3">против</span> {m.team2?.name ?? "TBD"}
                       </Link>
                     </td>
                     <td>
                       {m.status === "ready" ? (
-                        <span className={cn("text-[12px] font-medium", m.server_state === "error" ? "text-danger" : "text-warn")}>
-                          {m.server_state === "error" ? "ошибка сервера" : "ждёт сервер"}
+                        <span className={cn("text-[14px] font-semibold", m.server_state === "error" ? "text-danger" : "text-warn")}>
+                          {m.server_state === "error" ? "Сервер не запустился" : "Ждёт свободный сервер"}
                         </span>
                       ) : (
                         <MatchStatusBadge status={m.status} />
                       )}
                     </td>
                     <td className="num">BO{m.best_of}</td>
-                    <td className="num">{m.status === "ready" || m.status === "veto" ? "сейчас" : start ? formatTime(new Date(start).toISOString()) : "—"}</td>
+                    <td className="num">{m.status === "ready" || m.status === "veto" ? "уже сейчас" : start ? formatTime(new Date(start).toISOString()) : "—"}</td>
                   </tr>
                 );
               })}

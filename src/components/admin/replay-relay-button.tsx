@@ -17,8 +17,8 @@ export function ReplayRelayButton() {
 
   return (
     <form action={action}>
-      <SubmitButton size="sm" variant="secondary" confirm="Вернуть отложенные события в очередь? Сайт обработает их заново.">
-        Повторить
+      <SubmitButton size="sm" variant="secondary" className="sm:h-10" confirm="Отправить отложенные события на сайт ещё раз? Сайт обработает их заново.">
+        Отправить снова
       </SubmitButton>
     </form>
   );

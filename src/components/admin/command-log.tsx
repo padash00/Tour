@@ -17,9 +17,9 @@ const TITLE: Record<AgentCommand["type"], string> = {
 };
 
 export function CommandLog({ commands }: { commands: AgentCommand[] }) {
-  if (!commands.length) return <p className="rounded-surface border border-dashed border-line p-6 text-sm text-fg-3">Команд ещё не было. Здесь появятся состояние выполнения и ответы агента.</p>;
+  if (!commands.length) return <p className="rounded-surface border border-dashed border-line p-6 text-[15px] text-fg-3">Команд ещё не было. Здесь появятся состояние выполнения и ответы агента.</p>;
   return (
-    <ol className="divide-y divide-line overflow-hidden rounded-surface border border-line bg-surface">
+    <ol className="divide-y divide-ink/[0.06] overflow-hidden rounded-surface bg-surface shadow-[inset_0_0_0_1px_var(--color-line-subtle),var(--shadow-soft)]">
       {commands.map((command) => {
         const status = STATUS[command.status];
         const seconds = command.done_at && command.sent_at ? Math.max(0, (Date.parse(command.done_at) - Date.parse(command.sent_at)) / 1000) : null;
@@ -27,18 +27,18 @@ export function CommandLog({ commands }: { commands: AgentCommand[] }) {
         return (
           <li key={command.id} className="grid gap-3 px-4 py-4 sm:px-5 lg:grid-cols-[150px_220px_minmax(0,1fr)] lg:gap-5">
             <div className="flex items-center justify-between gap-3 lg:block">
-              <span className={cn("inline-flex rounded-md px-2 py-1 text-xs font-medium", status.color)}>{status.label}</span>
-              <time dateTime={command.created_at} className="text-xs text-fg-3 lg:mt-2 lg:block">{formatShortDateTime(command.created_at)}</time>
+              <span className={cn("inline-flex rounded-full px-3 py-1 text-[13px] font-semibold", status.color)}>{status.label}</span>
+              <time dateTime={command.created_at} className="text-[13px] text-fg-3 lg:mt-2 lg:block">{formatShortDateTime(command.created_at)}</time>
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-medium">{TITLE[command.type] ?? command.type}</div>
-              <div className="mt-1 text-xs text-fg-3"><span className="num">{command.instance ?? "Серверный ПК"}</span>{seconds !== null ? ` · ${seconds.toFixed(1)} с` : ""}</div>
-              {command.type === "rcon" && <code className="mt-1 block break-all text-xs text-fg-3">{String(command.payload.command ?? "")}</code>}
-              {command.delivery_attempts > 1 && <div className="mt-1 text-xs text-fg-3">Доставок: {command.delivery_attempts}</div>}
+              <div className="text-[15px] font-semibold">{TITLE[command.type] ?? command.type}</div>
+              <div className="mt-1 text-[13px] text-fg-3"><span className="num">{command.instance ?? "Серверный ПК"}</span>{seconds !== null ? ` · ${seconds.toFixed(1)} с` : ""}</div>
+              {command.type === "rcon" && <code className="mt-1 block break-all font-mono text-[13px] text-fg-3">{String(command.payload.command ?? "")}</code>}
+              {command.delivery_attempts > 1 && <div className="mt-1 text-[13px] text-fg-3">Доставок: {command.delivery_attempts}</div>}
             </div>
-            <div className="min-w-0 text-xs leading-relaxed text-fg-2">
+            <div className="min-w-0 text-[14px] leading-relaxed text-fg-2">
               {reply.length > 160 ? (
-                <details><summary className="cursor-pointer break-words focus-visible:outline-accent">{reply.split(/\r?\n/)[0].slice(0, 160)}…</summary><pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-bg p-3">{reply}</pre></details>
+                <details><summary className="cursor-pointer break-words focus-visible:outline-accent">{reply.split(/\r?\n/)[0].slice(0, 160)}…</summary><pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-control bg-surface-2 p-3 text-[13px]">{reply}</pre></details>
               ) : <p className="whitespace-pre-wrap break-words">{reply}</p>}
             </div>
           </li>

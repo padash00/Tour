@@ -22,14 +22,14 @@ export function SubTabs({ items, active }: { items: { key: string; label: ReactN
           onClick={() => t.key !== active && setPending({ key: t.key, from: active })}
           aria-current={t.key === active ? "page" : undefined}
           className={cn(
-            "relative h-11 inline-flex items-center rounded-sm text-[13px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-            t.key === current ? "text-fg" : "text-fg-3 hover:text-fg-2",
+            "relative h-12 inline-flex items-center rounded-sm text-[15px] font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+            t.key === current ? "text-fg" : "text-fg-3 hover:text-fg",
           )}
         >
           {t.label}
           <span
             className={cn(
-              "absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent transition-[opacity,transform] duration-200",
+              "absolute inset-x-0 -bottom-px h-[3px] rounded-full bg-accent transition-[opacity,transform] duration-200",
               t.key === current ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50",
             )}
           />

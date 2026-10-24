@@ -32,6 +32,7 @@ function severityOf(action: string): Severity {
   return "info";
 }
 
+const sevLabel: Record<Severity, string> = { info: "Обычное", warn: "Важное", error: "Опасное" };
 const sevCls: Record<Severity, string> = { info: "text-fg-3", warn: "text-warn", error: "text-danger" };
 
 type Row = AuditLog & { actor: Pick<Player, "nickname" | "steam_id"> | null };
@@ -80,7 +81,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
     <div className="space-y-6">
       <AdminHeader
         title="Журнал"
-        description="Действия администраторов, участников, автопилота и серверов. Ответы агента — на странице «Серверы»."
+        description="Кто и что делал на сайте: администраторы, игроки, автопилот и серверы. Ответы серверов — на странице «Серверы»."
       />
 
       {/* фильтры */}
@@ -88,44 +89,44 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
         <form className="flex flex-wrap gap-2" role="search">
           {filter !== "all" && <input type="hidden" name="f" value={filter} />}
           {sev && <input type="hidden" name="s" value={sev} />}
-          <input name="q" defaultValue={q} placeholder="Поиск по действию и данным" aria-label="Поиск" className="field !h-10 flex-1 min-w-[220px] text-[13px]" />
-          <input name="a" defaultValue={actor} placeholder="Кто (ник или system)" aria-label="Кто" className="field !h-10 w-56 text-[13px]" />
-          <button type="submit" className="h-10 rounded-[8px] border border-ink/[0.14] bg-ink/[0.03] px-4 text-[13px] font-medium hover:border-ink/[0.26]">
+          <input name="q" defaultValue={q} placeholder="Поиск по действию и данным" aria-label="Поиск" className="field !h-11 flex-1 min-w-[220px] text-[15px]" />
+          <input name="a" defaultValue={actor} placeholder="Кто (ник или system)" aria-label="Кто" className="field !h-11 w-56 text-[15px]" />
+          <button type="submit" className="h-11 rounded-control bg-accent px-6 text-[15px] font-semibold text-white hover:bg-accent-strong">
             Найти
           </button>
           {(q || actor) && (
-            <Link href={href({ q: null, a: null })} className="h-10 inline-flex items-center px-3 text-[12px] text-fg-3 hover:text-fg">
+            <Link href={href({ q: null, a: null })} className="h-11 inline-flex items-center px-3 text-[14px] font-semibold text-fg-3 hover:text-fg">
               Сбросить
             </Link>
           )}
         </form>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-2">
             {FILTERS.map((f) => (
               <Link
                 key={f.key}
                 href={href({ f: f.key === "all" ? null : f.key })}
                 className={cn(
-                  "h-8 px-3 inline-flex items-center rounded-[7px] text-[12px] transition",
-                  filter === f.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-ink/[0.03]",
+                  "h-10 px-4 inline-flex items-center rounded-control text-[14px] font-semibold transition",
+                  filter === f.key ? "bg-accent text-white" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
                 )}
               >
                 {f.label}
               </Link>
             ))}
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-2">
             {([null, "info", "warn", "error"] as const).map((s) => (
               <Link
                 key={s ?? "any"}
                 href={href({ s })}
                 className={cn(
-                  "h-8 px-3 inline-flex items-center rounded-[7px] text-[12px] font-mono transition",
-                  sev === s ? "bg-ink/[0.07]" : "hover:bg-ink/[0.03]",
+                  "h-10 px-4 inline-flex items-center rounded-control text-[14px] font-semibold transition",
+                  sev === s ? "bg-ink/[0.09]" : "hover:bg-ink/[0.04]",
                   s ? sevCls[s] : "text-fg-2",
                 )}
               >
-                {s ?? "все уровни"}
+                {s ? sevLabel[s] : "Любая важность"}
               </Link>
             ))}
           </div>
@@ -135,27 +136,27 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
       {logs.length === 0 ? (
         <EmptyState compact title="Записей нет" description={q || actor || sev || filter !== "all" ? "Попробуйте снять фильтры." : undefined} />
       ) : (
-        <div className="rounded-[12px] border border-line-subtle bg-[#04070c] overflow-x-auto">
-          <div className="min-w-[820px] font-mono text-[12px] leading-[22px]">
+        <div className="overflow-x-auto rounded-surface bg-surface shadow-[inset_0_0_0_1px_var(--color-line-subtle),var(--shadow-soft)]">
+          <div className="min-w-[820px] py-2 text-[14px] leading-[30px]">
             {[...days.entries()].map(([day, rows]) => (
               <div key={day}>
-                <div className="sticky left-0 px-4 pt-3 pb-1 text-[12px] font-sans font-medium text-fg-3">
+                <div className="sticky left-0 px-5 pt-4 pb-1 text-[15px] font-bold text-fg">
                   {day} <span className="num tracking-normal text-fg-3">· {rows.length}</span>
                 </div>
                 {rows.map((l) => {
                   const s = severityOf(l.action);
                   const payload = l.payload && Object.keys(l.payload).length ? l.payload : null;
                   return (
-                    <details key={l.id} className="group px-4 hover:bg-ink/[0.03] open:bg-ink/[0.02]">
+                    <details key={l.id} className="group px-5 hover:bg-surface-2 open:bg-surface-2">
                       <summary className={cn("flex gap-4 list-none", payload ? "cursor-pointer" : "cursor-default")}>
-                        <span className="text-fg-3 shrink-0 w-[52px]">{formatTime(l.created_at)}</span>
-                        <span className={cn("shrink-0 w-11 uppercase", sevCls[s])}>{s}</span>
-                        <span className="text-fg-3 shrink-0 w-28 truncate">{l.actor?.nickname ?? "system"}</span>
-                        <span className="text-fg-2 shrink-0">{l.action}</span>
-                        <span className="text-fg-3 truncate">{payload ? JSON.stringify(payload) : ""}</span>
+                        <span className="num text-fg-3 shrink-0 w-[60px]">{formatTime(l.created_at)}</span>
+                        <span className={cn("shrink-0 w-20 font-semibold", sevCls[s])}>{sevLabel[s]}</span>
+                        <span className="text-fg-2 shrink-0 w-32 truncate">{l.actor?.nickname ?? "system"}</span>
+                        <span className="shrink-0 font-mono text-[14px] text-fg">{l.action}</span>
+                        <span className="truncate font-mono text-[14px] text-fg-3">{payload ? JSON.stringify(payload) : ""}</span>
                       </summary>
                       {payload && (
-                        <pre className="ml-[200px] mb-2 mt-1 max-h-72 overflow-auto rounded-[6px] bg-ink/[0.03] px-3 py-2 whitespace-pre-wrap break-all text-fg-2">
+                        <pre className="ml-[230px] mb-3 mt-1 max-h-72 overflow-auto rounded-control bg-ink/[0.05] px-4 py-3 font-mono text-[14px] leading-6 whitespace-pre-wrap break-all text-fg-2">
                           {JSON.stringify(payload, null, 2)}
                           {l.entity_type ? `\n\n${l.entity_type}: ${l.entity_id ?? ""}` : ""}
                         </pre>
@@ -168,8 +169,8 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
           </div>
         </div>
       )}
-      <p className="text-[12px] text-fg-3">
-        Показано {logs.length} из последних {all.length} записей.
+      <p className="text-[13px] text-fg-3">
+        Показано записей: {logs.length} из последних {all.length}. Нажмите на строку, чтобы увидеть подробности.
       </p>
     </div>
   );

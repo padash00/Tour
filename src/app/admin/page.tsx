@@ -10,12 +10,13 @@ import type { MatchWithTeams } from "@/lib/matches";
 import { getServerState } from "@/lib/server-control";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { LiveRefresh } from "@/components/live-refresh";
-import { ButtonLink, cn } from "@/components/ui";
+import { cn } from "@/components/ui";
+import { ButtonLink } from "@/components/ui";
 import { MatchStatusChip, TournamentStatusChip } from "@/components/primitives";
 import { ADMIN_CARD, AdminHeader, AlertRow } from "@/components/admin/control";
-import { InstanceCard, type InstanceMatch } from "@/components/admin/instance-card";
+import { InstanceCard, ServerStatus, type InstanceMatch } from "@/components/admin/instance-card";
 import { ServerActions } from "@/components/admin/server-actions";
-import { Quiet, Section, SectionLink, Strip, StripCell, minutesSince, serverNow } from "@/components/admin/kit";
+import { Quiet, Section, SectionLink, Strip, StripCell, instanceState, minutesSince, serverNow } from "@/components/admin/kit";
 import { requireAdmin } from "@/lib/auth";
 import { getCs2UpdateCheck } from "@/lib/server/ops";
 import { OpsAlerts, opsAlertCount, type OpsInfo } from "@/components/admin/ops-alerts";
@@ -82,11 +83,11 @@ export default async function AdminOverview() {
     <div className="space-y-8">
       <LiveRefresh intervalMs={10000} />
       <AdminHeader
-        title="Пульт турнира"
-        description={`${players.count ?? 0} игроков · ${teams.count ?? 0} команд · обновляется каждые 10 секунд`}
+        title="Главная"
+        description={`Здесь видно всё важное: серверы, матчи и то, что ждёт вашего решения. Игроков: ${players.count ?? 0}, команд: ${teams.count ?? 0}. Страница обновляется сама каждые 10 секунд.`}
         actions={
-          <ButtonLink href="/admin/tournaments/new" size="sm">
-            Новый турнир
+          <ButtonLink href="/admin/tournaments/new" size="md">
+            Создать турнир
           </ButtonLink>
         }
       />
@@ -94,38 +95,38 @@ export default async function AdminOverview() {
       {/* ── полоса статуса ── */}
       <Strip className="grid-cols-2 lg:grid-cols-6">
         <StripCell
-          label="Агент"
-          value={servers.online ? "Online" : "Offline"}
+          label="Серверный ПК"
+          value={servers.online ? "На связи" : "Не на связи"}
           tone={servers.online ? "ok" : "danger"}
           pulse={!servers.online}
-          hint={servers.host?.last_seen_at ? `сигнал ${formatTime(servers.host.last_seen_at)}` : "ни разу"}
+          hint={servers.host?.last_seen_at ? `последний сигнал в ${formatTime(servers.host.last_seen_at)}` : "ещё ни разу не выходил на связь"}
           href="/admin/servers"
         />
         <StripCell
-          label="Хост"
+          label="Нагрузка ПК"
           value={cpu != null ? `${cpu}%` : "—"}
           tone={cpu == null ? undefined : cpu > 85 ? "danger" : cpu > 65 ? "warn" : undefined}
-          hint={info.ram_used_gb != null ? `RAM ${info.ram_used_gb} / ${info.ram_total_gb ?? "?"} GB` : "CPU / RAM"}
+          hint={info.ram_used_gb != null ? `память ${info.ram_used_gb} из ${info.ram_total_gb ?? "?"} ГБ` : "процессор и память"}
           href="/admin/servers"
         />
         <StripCell
-          label="Серверы"
-          value={`${running.length}/${servers.instances.length}`}
-          hint={`${onServers.length} с матчем`}
+          label="Серверы включены"
+          value={`${running.length} из ${servers.instances.length}`}
+          hint={`с матчем: ${onServers.length}`}
           tone={servers.online && running.length ? "ok" : "muted"}
         />
-        <StripCell label="Live" value={live.length} tone={live.length ? "danger" : undefined} pulse={live.length > 0} hint={`${active.length} в работе`} href="/admin/matches" />
+        <StripCell label="Идут сейчас" value={live.length} tone={live.length ? "danger" : undefined} pulse={live.length > 0} hint={`матчей в работе: ${active.length}`} href="/admin/matches" />
         <StripCell
           label="Ждут игроков"
           value={ready.length}
           tone={noShow.length ? "danger" : ready.length ? "warn" : undefined}
-          hint={noShow.length ? `${noShow.length} дольше 10 мин` : "сервер выдан"}
+          hint={noShow.length ? `${noShow.length} ждут дольше 10 минут` : "сервер уже выдан"}
         />
         <StripCell
-          label="Заявки · споры"
-          value={`${pending.length} · ${disputes.length}`}
+          label="Ждут вашего решения"
+          value={pending.length + disputes.length}
           tone={disputes.length ? "warn" : pending.length ? "accent" : undefined}
-          hint="ждут решения"
+          hint={`заявок: ${pending.length} · споров: ${disputes.length}`}
         />
       </Strip>
 
@@ -133,21 +134,15 @@ export default async function AdminOverview() {
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.75fr)_minmax(340px,1fr)]">
         <div className="min-w-0 space-y-8">
         {/* ── живая сетка серверов ── */}
-        {running.length > 0 && servers.online && (
-          <Section title="Сообщение в чат игры">
-            <div className="rounded-[12px] border border-line bg-surface p-4">
-              <ChatBox instances={running.map((i) => i.name)} />
-            </div>
-          </Section>
-        )}
-        <Section title="Серверы" action={<SectionLink href="/admin/servers">Стойка</SectionLink>}>
+        <Section title="Игровые серверы" action={<SectionLink href="/admin/servers">Все серверы и настройки</SectionLink>}>
+          <p className="-mt-2 mb-4 text-[14.5px] text-fg-3">«Освободить сервер» убирает с него матч, «Перезапустить» включает заново, если завис, «Выключить» останавливает совсем.</p>
           {servers.instances.length === 0 ? (
-            <Quiet>Инстансы появятся, когда агент на серверном ПК выйдет на связь.</Quiet>
+            <Quiet>Серверы появятся здесь, когда серверный ПК выйдет на связь.</Quiet>
           ) : (
             <div className="space-y-4">
               {/* работающие — карточками с матчем и управлением; выключенные — одним списком, чтобы не забивали экран */}
               {servers.instances.some((i) => i.running || byInstance.has(i.name)) && (
-                <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                <div className="grid gap-5 lg:grid-cols-2">
                   {servers.instances
                     .filter((i) => i.running || byInstance.has(i.name))
                     .map((i) => (
@@ -160,10 +155,11 @@ export default async function AdminOverview() {
                   {servers.instances
                     .filter((i) => !i.running && !byInstance.has(i.name))
                     .map((i) => (
-                      <div key={i.name} className="flex items-center gap-4 px-4 py-2">
-                        <span className="num w-16 text-[14px] font-semibold text-fg">{i.name}</span>
-                        <span className="num flex-1 text-[12px] text-fg-3">
-                          :{i.port} · {i.role === "reserve" ? "резерв" : "выключен"}
+                      <div key={i.name} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5">
+                        <span className="num w-20 text-[16px] font-bold text-fg">{i.name}</span>
+                        <span className="flex-1 basis-40">
+                          <ServerStatus {...instanceState(i, servers.online)} size="sm" />
+                          <span className="ml-3 text-[13.5px] text-fg-3">порт <span className="font-mono">{i.port}</span></span>
                         </span>
                         {servers.online && <ServerActions instance={i.name} running={false} align="end" />}
                       </div>
@@ -173,63 +169,73 @@ export default async function AdminOverview() {
             </div>
           )}
         </Section>
+        {/* ── сообщение игрокам ── */}
+        {running.length > 0 && servers.online && (
+          <Section title="Написать игрокам в чат игры">
+            <div className={cn(ADMIN_CARD, "p-5")}>
+              <ChatBox instances={running.map((i) => i.name)} />
+            </div>
+          </Section>
+        )}
         </div>
         <div className="min-w-0 space-y-8">
         {/* ── очередь тревог по приоритету ── */}
         <Section title="Требует внимания" count={alerts}>
           {alerts === 0 ? (
             <Quiet>
-              <span className="text-ok">●</span> Всё спокойно: агент на связи, матчи идут, решений не ждём.
+              <span className="font-semibold text-ok">Всё спокойно.</span> Серверный ПК на связи, ничего не требует вашего решения.
             </Quiet>
           ) : (
             <div className="space-y-2">
               {!servers.online && (
-                <AlertRow tone="danger" title="Агент не на связи" action={{ href: "/admin/servers", label: "Серверы" }}>
-                  Матчи не загрузятся, пока серверный ПК не выйдет на связь
+                <AlertRow tone="danger" title="Серверный ПК не на связи" action={{ href: "/admin/servers", label: "Что делать" }}>
+                  Матчи не загрузятся на серверы, пока компьютер с серверами не выйдет на связь
                   {servers.host?.last_seen_at ? ` (последний сигнал ${formatShortDateTime(servers.host.last_seen_at)})` : ""}.
                 </AlertRow>
               )}
               {servers.online && <OpsAlerts info={opsInfo} cs2={cs2Check} />}
               {serverErrors.map((m) => (
-                <AlertRow key={m.id} tone="danger" title={`Матч #${m.number}: сервер`} action={{ href: `/admin/matches/${m.id}`, label: "Перенести" }}>
-                  {m.team1?.tag} vs {m.team2?.tag} — карта не загрузилась, нужен другой сервер.
+                <AlertRow key={m.id} tone="danger" title={`Матч №${m.number}: сервер не запустился`} action={{ href: `/admin/matches/${m.id}`, label: "Выбрать другой сервер" }}>
+                  {m.team1?.tag} против {m.team2?.tag}: карта не загрузилась, матч нужно перенести на другой сервер.
                 </AlertRow>
               ))}
               {noShow.map((m) => (
-                <AlertRow key={m.id} tone="warn" title={`Матч #${m.number}: неявка`} action={{ href: `/admin/matches/${m.id}`, label: "Открыть" }}>
-                  {m.team1?.tag} vs {m.team2?.tag} — игроки не подключились {minutesSince(m.server_ready_at, now)} мин.
+                <AlertRow key={m.id} tone="warn" title={`Матч №${m.number}: игроки не пришли`} action={{ href: `/admin/matches/${m.id}`, label: "Открыть" }}>
+                  {m.team1?.tag} против {m.team2?.tag}: игроки не подключились уже {minutesSince(m.server_ready_at, now)} мин.
                 </AlertRow>
               ))}
               {disputeMatches.map((m) => (
-                <AlertRow key={m.id} tone="warn" title={`Спор · матч #${m.number}`} action={{ href: `/admin/matches/${m.id}`, label: "Разобрать" }}>
-                  Капитан оспаривает результат или ход матча.
+                <AlertRow key={m.id} tone="warn" title={`Спор по матчу №${m.number}`} action={{ href: `/admin/matches/${m.id}`, label: "Разобрать" }}>
+                  Капитан не согласен с результатом или ходом матча.
                 </AlertRow>
               ))}
               {pendingTournaments.map((t) => (
                 <AlertRow
                   key={t.id}
                   tone="accent"
-                  title={`Заявки: ${pending.filter((p) => p.tournament.id === t.id).length}`}
+                  title={`Новые заявки на участие: ${pending.filter((p) => p.tournament.id === t.id).length}`}
                   action={{ href: `/admin/tournaments/${t.id}?tab=registration`, label: "Рассмотреть" }}
                 >
-                  {t.name} — команды ждут одобрения.
+                  {t.name}: команды ждут, пока вы их одобрите.
                 </AlertRow>
               ))}
             </div>
           )}
         </Section>
         {/* ── очередь матчей ── */}
-        <Section title="Очередь матчей" count={queue.length} action={<SectionLink href="/admin/matches">Все матчи</SectionLink>}>
+        <Section title="Матчи в очереди" count={queue.length} action={<SectionLink href="/admin/matches">Все матчи</SectionLink>}>
           {queue.length === 0 ? (
-            <Quiet>Очередь пуста: новые матчи появятся, когда определятся соперники.</Quiet>
+            <Quiet>Очередь пуста. Новые матчи появятся, когда определятся соперники.</Quiet>
           ) : (
             <div className={`${ADMIN_CARD} divide-y divide-ink/[0.06]`}>
               {queue.map((m) => (
-                <div key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-[13px]">
-                  <span className="num text-fg-3 w-9">#{m.number}</span>
-                  <Link href={`/admin/matches/${m.id}`} className="min-w-0 flex-1 truncate font-medium hover:text-accent">
-                    {m.team1?.name ?? "TBD"} <span className="text-fg-3">vs</span> {m.team2?.name ?? "TBD"}
-                    <span className="ml-2 text-[12px] font-normal text-fg-3">
+                <div key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-5 py-4 text-[15px]">
+                  <span className="num w-10 text-[14px] font-semibold text-fg-3">№{m.number}</span>
+                  <Link href={`/admin/matches/${m.id}`} className="min-w-0 flex-1 basis-56 font-semibold hover:text-accent">
+                    <span className="block truncate">
+                      {m.team1?.name ?? "TBD"} <span className="font-normal text-fg-3">против</span> {m.team2?.name ?? "TBD"}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[13.5px] font-normal text-fg-3">
                       {m.tournament?.name} · раунд {m.round}
                       {m.scheduled_at ? ` · ${formatShortDateTime(m.scheduled_at)}` : ""}
                     </span>
@@ -238,15 +244,15 @@ export default async function AdminOverview() {
                   {m.status === "upcoming" ? (
                     <ActionForm action={startVeto}>
                       <input type="hidden" name="matchId" value={m.id} />
-                      <SubmitButton size="sm" variant="secondary">
-                        Начать вето
+                      <SubmitButton size="sm" variant="secondary" className="sm:h-10">
+                        Начать выбор карт
                       </SubmitButton>
                     </ActionForm>
                   ) : (
                     <ActionForm action={sendMatchToServer}>
                       <input type="hidden" name="matchId" value={m.id} />
                       <input type="hidden" name="instance" value="" />
-                      <SubmitButton size="sm">На сервер</SubmitButton>
+                      <SubmitButton size="sm" className="sm:h-10">Отправить на сервер</SubmitButton>
                     </ActionForm>
                   )}
                 </div>
@@ -260,23 +266,24 @@ export default async function AdminOverview() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         <div className="contents">
           {/* ── текущий турнир ── */}
-          <Section title="Текущий турнир" action={<SectionLink href="/admin/tournaments">Все турниры</SectionLink>}>
+          <Section title="Ближайший турнир" action={<SectionLink href="/admin/tournaments">Все турниры</SectionLink>}>
             {current ? (
-              <Link href={`/admin/tournaments/${current.id}`} className={`${ADMIN_CARD} block p-5 transition-colors hover:border-line-strong`}>
+              <Link href={`/admin/tournaments/${current.id}`} className={`${ADMIN_CARD} block p-6 transition-shadow hover:shadow-[inset_0_0_0_1px_var(--color-line-strong),var(--shadow-soft)]`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-[18px] font-semibold tracking-[-0.01em]">{current.name}</div>
-                    <div className="mt-1 num text-[12px] text-fg-3">старт {formatShortDateTime(current.starts_at)}</div>
+                    <div className="truncate text-[20px] font-bold tracking-[-0.01em]">{current.name}</div>
+                    <div className="mt-1 text-[14px] text-fg-3">Начало: {formatShortDateTime(current.starts_at)}</div>
                   </div>
-                  <TournamentStatusChip status={current.status} size="sm" />
+                  <TournamentStatusChip status={current.status} size="md" />
                 </div>
-                {tournaments.length > 1 && <div className="mt-3 text-[12px] text-fg-3">ещё активных: {tournaments.length - 1}</div>}
+                {tournaments.length > 1 && <div className="mt-3 text-[14px] text-fg-3">Ещё активных турниров: {tournaments.length - 1}</div>}
+                <div className="mt-4 text-[14px] font-semibold text-accent">Открыть турнир →</div>
               </Link>
             ) : (
               <Quiet>
-                Активного турнира нет —{" "}
+                Активных турниров нет.{" "}
                 <Link href="/admin/tournaments/new" className="text-accent hover:underline">
-                  создать
+                  Создать турнир
                 </Link>
                 .
               </Quiet>
@@ -284,16 +291,16 @@ export default async function AdminOverview() {
           </Section>
 
           {/* ── лента действий ── */}
-          <Section title="Последние действия" action={<SectionLink href="/admin/logs">Журнал</SectionLink>}>
+          <Section title="Что происходило недавно" action={<SectionLink href="/admin/logs">Весь журнал</SectionLink>}>
             {logs.length === 0 ? (
-              <Quiet>Журнал пуст.</Quiet>
+              <Quiet>Пока ничего не происходило.</Quiet>
             ) : (
-              <div className="rounded-[12px] border border-line-subtle bg-[#05080d] px-4 py-3 font-mono text-[12px] leading-6 overflow-x-auto">
+              <div className={cn(ADMIN_CARD, "divide-y divide-ink/[0.06] overflow-x-auto")}>
                 {logs.map((l) => (
-                  <div key={l.id} className="flex gap-3 min-w-0 whitespace-nowrap">
-                    <span className="text-fg-3 shrink-0">{formatTime(l.created_at)}</span>
-                    <span className="text-fg-2 shrink-0 w-24 truncate">{l.actor?.nickname ?? "system"}</span>
-                    <span className="text-fg truncate">{l.action}</span>
+                  <div key={l.id} className="flex min-w-0 items-baseline gap-4 px-5 py-2.5 text-[14px] whitespace-nowrap">
+                    <span className="num shrink-0 text-fg-3">{formatTime(l.created_at)}</span>
+                    <span className="w-28 shrink-0 truncate font-semibold text-fg-2">{l.actor?.nickname ?? "система"}</span>
+                    <span className="truncate text-fg">{l.action}</span>
                   </div>
                 ))}
               </div>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { decideRegistration } from "@/app/actions/admin";
 import { purgeApplicationData, remindCaptains, setDocuments } from "@/app/actions/official";
 import { ActionToggle } from "@/components/admin/action-toggle";
-import { BarCell, CARD } from "@/components/admin/tournament-kit";
+import { BTN, BarCell, CARD } from "@/components/admin/tournament-kit";
 import { Panel, TableBox } from "@/components/admin/control";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { EmptyState, buttonClass, cn } from "@/components/ui";
@@ -33,41 +33,41 @@ export async function OfficialTab({ t, admin }: { t: Tournament; admin: Player }
   const ended = t.status === "finished" || t.status === "cancelled";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-ink/[0.06]`}>
-        <BarCell label="Команды" value={`${teams.length} из ${t.max_teams}`} hint={`одобрено ${approved}`} />
-        <BarCell label="Организации" value={orgs.size} />
-        <BarCell label="Участники" value={participants.length} hint={t.require_coach ? "игроки и тренеры" : "игроки"} />
+        <BarCell label="Команд" value={`${teams.length} из ${t.max_teams}`} hint={`одобрено ${approved}`} />
+        <BarCell label="Организаций" value={orgs.size} />
+        <BarCell label="Человек в заявках" value={participants.length} hint={t.require_coach ? "игроки и тренеры" : "игроки"} />
         <BarCell
-          label="Документы сданы"
+          label="Сдали документы"
           value={`${docsDone} / ${participants.length}`}
           tone={participants.length && docsDone === participants.length ? "ok" : docsDone < participants.length ? "warn" : undefined}
         />
-        <BarCell label="Анкеты и возраст" value={problems} tone={problems ? "danger" : "ok"} hint={problems ? "участников с проблемами" : `всё в порядке · ${ageRangeLabel(t)}`} />
+        <BarCell label="Проблемы в анкетах" value={problems} tone={problems ? "danger" : "ok"} hint={problems ? "человек: не заполнена анкета или не подходит возраст" : `всё в порядке · возраст ${ageRangeLabel(t)}`} />
       </div>
 
       <Panel title="Документы и отчёты">
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className={`${CARD} p-5`}>
-            <div className="text-[14px] font-semibold text-fg">Excel для организаторов</div>
-            <p className="mt-1 text-[13px] text-fg-3">Листы «Участники», «Команды» и «Итоги». Скачивание записывается в журнал.</p>
-            <a href={`/admin/tournaments/${t.id}/official-export`} className={buttonClass("secondary", "sm", "mt-3")} download>
-              Скачать .xlsx
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className={`${CARD} p-6`}>
+            <div className="text-[17px] font-bold text-fg">Таблица для организаторов</div>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-fg-2">Файл Excel с листами «Участники», «Команды» и «Итоги». Каждое скачивание записывается в журнал.</p>
+            <a href={`/admin/tournaments/${t.id}/official-export`} className={buttonClass("secondary", "md", "mt-4")} download>
+              Скачать таблицу (Excel)
             </a>
           </div>
-          <div className={`${CARD} p-5`}>
-            <div className="text-[14px] font-semibold text-fg">Заявки — Приложение №1</div>
-            <p className="mt-1 text-[13px] text-fg-3">Все заявки на печать (каждая с новой страницы, A4) или сохранение в PDF.</p>
-            <Link href={`/admin/tournaments/${t.id}/application`} className={buttonClass("secondary", "sm", "mt-3")}>
-              Открыть для печати
+          <div className={`${CARD} p-6`}>
+            <div className="text-[17px] font-bold text-fg">Заявки на печать (Приложение №1)</div>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-fg-2">Все заявки готовы к печати на листах A4, каждая с новой страницы. Можно сохранить в PDF.</p>
+            <Link href={`/admin/tournaments/${t.id}/application`} className={buttonClass("secondary", "md", "mt-4")}>
+              Открыть заявки для печати
             </Link>
           </div>
-          <div className={`${CARD} p-5`}>
-            <div className="text-[14px] font-semibold text-fg">Напомнить капитанам</div>
-            <p className="mt-1 text-[13px] text-fg-3">Уведомление на сайте капитанам команд, у которых не хватает анкет, данных заявки или документов.</p>
-            <ActionForm action={remindCaptains} className="mt-3">
+          <div className={`${CARD} p-6`}>
+            <div className="text-[17px] font-bold text-fg">Напомнить капитанам</div>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-fg-2">Капитаны команд, где не хватает анкет, данных заявки или документов, получат уведомление на сайте.</p>
+            <ActionForm action={remindCaptains} className="mt-4">
               <input type="hidden" name="tournamentId" value={t.id} />
-              <SubmitButton size="sm" variant="secondary" confirm="Отправить напоминание капитанам команд с незаполненными данными?">
+              <SubmitButton size="md" variant="secondary" confirm="Отправить напоминание капитанам команд с незаполненными данными?">
                 Напомнить капитанам
               </SubmitButton>
             </ActionForm>
@@ -81,9 +81,9 @@ export async function OfficialTab({ t, admin }: { t: Tournament; admin: Player }
         teams.map((team) => <TeamBlock key={team.registration.id} t={t} team={team} />)
       )}
 
-      <div className="max-w-2xl rounded-[12px] border border-danger/25 bg-danger/[0.03] p-5">
-        <div className="text-[14px] font-semibold text-danger/90">Удалить персональные данные заявок</div>
-        <p className="mt-1 mb-3 text-[13px] text-fg-3">
+      <div className="max-w-2xl rounded-surface border border-danger/30 bg-danger-dim/60 p-6">
+        <div className="text-[18px] font-bold text-danger">Удалить личные данные из заявок</div>
+        <p className="mt-2 mb-4 text-[15px] leading-relaxed text-fg-2">
           Удалятся организация, ответственное лицо, телефон капитана, данные тренеров и отметки о документах этого турнира. Составы, матчи и
           статистика останутся. Анкеты игроков удаляются отдельно — кнопкой «Удалить анкету» у игрока.
           {!ended && " Доступно после завершения турнира."}
@@ -91,11 +91,11 @@ export async function OfficialTab({ t, admin }: { t: Tournament; admin: Player }
         <ActionForm action={purgeApplicationData}>
           <input type="hidden" name="tournamentId" value={t.id} />
           {ended ? (
-            <SubmitButton size="sm" variant="danger" confirm={`Удалить данные заявок турнира «${t.name}»? Это нельзя отменить.`}>
+            <SubmitButton size="md" variant="danger" confirm={`Удалить данные заявок турнира «${t.name}»? Это нельзя отменить.`}>
               Удалить данные заявок
             </SubmitButton>
           ) : (
-            <button type="button" disabled className={buttonClass("danger", "sm", "opacity-40")}>
+            <button type="button" disabled className={buttonClass("danger", "md", "opacity-40")}>
               Удалить данные заявок
             </button>
           )}
@@ -112,28 +112,28 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
     <Panel
       title={
         <span>
-          {r.team.name} <span className="normal-case tracking-normal text-fg-3">· {a?.organization ?? "организация не указана"}</span>
+          {r.team.name} <span className="text-[15px] font-medium text-fg-3">· {a?.organization ?? "организация не указана"}</span>
         </span>
       }
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <span className={cn("text-[12px]", r.status === "approved" ? "text-ok" : "text-warn")}>{registrationStatusLabel[r.status]}</span>
+          <span className={cn("text-[14.5px] font-semibold", r.status === "approved" ? "text-ok" : "text-warn")}>{registrationStatusLabel[r.status]}</span>
           {r.status === "pending" && (
             <ActionForm action={decideRegistration}>
               <input type="hidden" name="registrationId" value={r.id} />
               <input type="hidden" name="decision" value="approve" />
-              <SubmitButton size="sm" confirm={approveWarningOf(team)}>
-                Одобрить
+              <SubmitButton size="sm" className={BTN} confirm={approveWarningOf(team)}>
+                Принять
               </SubmitButton>
             </ActionForm>
           )}
-          <Link href={`/admin/tournaments/${t.id}/application?reg=${r.id}`} className="text-[12px] text-accent hover:underline">
+          <Link href={`/admin/tournaments/${t.id}/application?reg=${r.id}`} className="text-[14.5px] font-semibold text-accent hover:underline">
             Заявка для печати
           </Link>
         </div>
       }
     >
-      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-fg-3">
+      <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-[14.5px] text-fg-3">
         <span>
           Ответственное лицо: <span className="text-fg-2">{a?.responsible_name || "—"}</span> <span className="num">{formatPhone(a?.responsible_phone)}</span>
         </span>
@@ -142,6 +142,7 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
         </span>
         {team.applicationIssues.length > 0 && <span className="text-danger">Не заполнено: {team.applicationIssues.join(", ")}</span>}
       </div>
+      <div className="[&_td]:!text-[14.5px] [&_td]:!px-3.5 [&_th]:!px-3.5">
       <TableBox minWidth={980}>
         <thead>
           <tr>
@@ -151,7 +152,7 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
             <th>Место работы / учёбы</th>
             <th>Должность / курс</th>
             <th>Телефон</th>
-            <th>Документы</th>
+            <th>Документы сданы</th>
             <th />
           </tr>
         </thead>
@@ -161,21 +162,21 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
               <td className="whitespace-nowrap text-fg-3">{ROLE[p.role]}</td>
               <td>
                 <div className="font-medium text-fg">{p.name || <span className="text-danger">не указано</span>}</div>
-                {p.nickname && <div className="text-[11px] text-fg-3">{p.nickname}</div>}
+                {p.nickname && <div className="text-[13px] text-fg-3">{p.nickname}</div>}
                 {p.issues.map((x) => (
-                  <div key={x} className="text-[11px] text-danger">
+                  <div key={x} className="text-[13px] text-danger">
                     {x}
                   </div>
                 ))}
                 {p.warnings.map((x) => (
-                  <div key={x} className="text-[11px] text-warn">
+                  <div key={x} className="text-[13px] text-warn">
                     {x}
                   </div>
                 ))}
               </td>
               <td className="num whitespace-nowrap">
                 {p.birthDate ? formatDay(p.birthDate) : "—"}
-                {p.age != null && <div className={cn("text-[11px]", p.age < t.min_age || p.age > t.max_age ? "text-danger" : "text-fg-3")}>{yearsLabel(p.age)}</div>}
+                {p.age != null && <div className={cn("text-[13px]", p.age < t.min_age || p.age > t.max_age ? "text-danger" : "text-fg-3")}>{yearsLabel(p.age)}</div>}
               </td>
               <td>{p.organization || "—"}</td>
               <td>{p.position || "—"}</td>
@@ -194,7 +195,7 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
               </td>
               <td className="whitespace-nowrap text-right">
                 {p.playerId && (
-                  <Link href={`/admin/players/${p.playerId}/profile?back=${encodeURIComponent(`/admin/tournaments/${t.id}?tab=official`)}`} className="text-[12px] text-accent hover:underline">
+                  <Link href={`/admin/players/${p.playerId}/profile?back=${encodeURIComponent(`/admin/tournaments/${t.id}?tab=official`)}`} className="text-[14.5px] font-semibold text-accent hover:underline">
                     Анкета
                   </Link>
                 )}
@@ -203,6 +204,7 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
           ))}
         </tbody>
       </TableBox>
+      </div>
     </Panel>
   );
 }

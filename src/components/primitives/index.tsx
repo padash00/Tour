@@ -370,7 +370,7 @@ export const tournamentTone: Record<TournamentStatus, Tone> = {
 export function TournamentStatusChip({ status, size }: { status: TournamentStatus; size?: "sm" | "md" }) {
   return (
     <StatusChip tone={tournamentTone[status]} size={size}>
-      {status === "live" ? "Live" : tournamentStatusLabel[status]}
+      {status === "live" ? "Турнир идёт" : tournamentStatusLabel[status]}
     </StatusChip>
   );
 }
@@ -390,7 +390,7 @@ export const matchStatusLabel: Record<MatchStatus, string> = {
   upcoming: "Скоро",
   veto: "Вето",
   ready: "Сервер готов",
-  live: "Live",
+  live: "Идёт игра",
   finished: "Завершён",
   cancelled: "Отменён",
 };

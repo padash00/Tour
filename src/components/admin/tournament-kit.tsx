@@ -2,45 +2,51 @@ import type { ReactNode } from "react";
 import { tournamentStatusLabel } from "@/lib/format";
 import type { TournamentStatus } from "@/lib/types";
 import { cn } from "@/components/ui";
+import { ADMIN_CARD } from "./control";
 
 /*
- * F16 Control — общий визуальный язык с публичным сайтом (src/components/public/home.tsx),
- * но плотнее: компактные строки, мелкий шрифт, статусы точкой.
+ * F16 Control — общий визуальный язык страницы турнира: белые карточки как на сайте,
+ * крупный читаемый текст (подписи 14 px, основной текст 15 px), статусы цветной точкой.
  */
 
 /** Поверхность-карточка как на сайте */
-export const CARD = "rounded-surface border border-line bg-surface shadow-[0_1px_0_0_#ffffff08_inset]";
+export const CARD = ADMIN_CARD;
 /** Карточка-список со строками */
-export const CARD_LIST = `${CARD} divide-y divide-ink/[0.06]`;
+export const CARD_LIST = `${ADMIN_CARD} divide-y divide-ink/[0.06]`;
 
-/** Подпись-надзаголовок раздела: обычный регистр, без разрядки */
+/** Размер кнопок в пульте: крупнее стандартного «sm», чтобы попасть пальцем и прочитать с первого раза */
+export const BTN = "!h-11 !px-4 !text-[15px] !rounded-control";
+/** Совсем маленькая кнопка внутри плотной строки (например, «OK» у номера посева) */
+export const BTN_SM = "!h-10 !px-3.5 !text-[14px] !rounded-control";
+
+/** Подпись-надзаголовок: обычный регистр, 14 px */
 export function Label({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("text-[13px] font-semibold text-fg-2", className)}>{children}</div>;
+  return <div className={cn("text-[14px] font-semibold text-fg-2", className)}>{children}</div>;
 }
 
 const TONE: Partial<Record<TournamentStatus, string>> = {
-  registration: "text-ok border-ok/35 bg-ok/[0.07]",
-  checkin: "text-warn border-warn/35 bg-warn/[0.07]",
-  live: "text-danger border-danger/35 bg-danger/[0.07]",
-  cancelled: "text-danger/80 border-danger/25 bg-danger/[0.04]",
+  registration: "text-ok border-ok/35 bg-ok-dim",
+  checkin: "text-warn border-warn/35 bg-warn-dim",
+  live: "text-danger border-danger/35 bg-danger-dim",
+  cancelled: "text-danger border-danger/25 bg-danger-dim",
 };
 
-/** Статус турнира: компактный чип с точкой, тот же стиль, что на главной */
+/** Статус турнира: чип с точкой, тот же стиль, что на главной */
 export function StatusChip({ status }: { status: TournamentStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 text-[11px] font-medium whitespace-nowrap",
-        TONE[status] ?? "text-fg-2 border-ink/15 bg-ink/[0.03]",
+        "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-[13.5px] font-semibold whitespace-nowrap",
+        TONE[status] ?? "text-fg-2 border-line bg-ink/[0.04]",
       )}
     >
-      <span className={cn("size-1.5 rounded-full bg-current", status === "live" && "animate-pulse")} />
+      <span className={cn("size-2 rounded-full bg-current", status === "live" && "animate-pulse")} />
       {tournamentStatusLabel[status]}
     </span>
   );
 }
 
-/** Ячейка операционной полосы: подпись + крупная цифра + пояснение */
+/** Ячейка полосы показателей: подпись + крупная цифра + пояснение */
 export function BarCell({
   label,
   value,
@@ -55,17 +61,17 @@ export function BarCell({
   className?: string;
 }) {
   return (
-    <div className={cn("p-5 min-w-0", className)}>
-      <Label className="text-[10px]">{label}</Label>
+    <div className={cn("min-w-0 p-5", className)}>
+      <div className="text-[14px] font-semibold text-fg-3">{label}</div>
       <div
         className={cn(
-          "mt-2.5 num text-[24px] font-semibold leading-none tracking-[-0.02em]",
+          "mt-2 num text-[28px] font-bold leading-none tracking-[-0.02em]",
           tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : tone === "danger" ? "text-danger" : "text-fg",
         )}
       >
         {value}
       </div>
-      {hint && <div className="mt-1.5 text-[12px] text-fg-3">{hint}</div>}
+      {hint && <div className="mt-2 text-[13.5px] text-fg-3">{hint}</div>}
     </div>
   );
 }

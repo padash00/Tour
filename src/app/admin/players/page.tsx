@@ -24,8 +24,8 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
     .filter((p) => role === "all" || (role === "admin" ? isAdm(p) : p.is_banned));
   const ROLES = [
     { key: "all", label: "Все", n: all.length },
-    { key: "admin", label: "Админы", n: all.filter(isAdm).length },
-    { key: "banned", label: "Бан", n: all.filter((p) => p.is_banned).length },
+    { key: "admin", label: "Администраторы", n: all.filter(isAdm).length },
+    { key: "banned", label: "Заблокированные", n: all.filter((p) => p.is_banned).length },
   ];
   const roleHref = (r: string) => {
     const p = new URLSearchParams();
@@ -39,20 +39,20 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
     <div className="space-y-6">
       <AdminHeader
         title="Игроки"
-        description={`${all.length} зарегистрировано`}
+        description={`Зарегистрировано: ${all.length}. Здесь можно выдать права админа или заблокировать игрока.`}
         actions={
-          <form className="w-72" role="search">
+          <form className="w-full sm:w-80" role="search">
             {role !== "all" && <input type="hidden" name="r" value={role} />}
-            <input name="q" defaultValue={q} placeholder="Ник или SteamID" aria-label="Поиск игрока" className="field !h-10 text-[13px]" />
+            <input name="q" defaultValue={q} placeholder="Ник или SteamID" aria-label="Поиск игрока" className="field !h-11 text-[15px]" />
           </form>
         }
       />
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-2">
         {ROLES.map((r) => (
           <Link
             key={r.key}
             href={roleHref(r.key)}
-            className={`h-8 px-3 inline-flex items-center gap-1.5 rounded-[7px] text-[12px] transition ${role === r.key ? "bg-accent/[0.1] text-accent" : "text-fg-3 hover:text-fg-2 hover:bg-ink/[0.03]"}`}
+            className={`h-11 px-5 inline-flex items-center gap-2 rounded-control text-[15px] font-semibold transition ${role === r.key ? "bg-accent text-white" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2"}`}
           >
             {r.label} <span className="num opacity-70">{r.n}</span>
           </Link>
@@ -61,17 +61,17 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
       {players.length === 0 ? (
         <EmptyState compact title="Игроков не найдено" />
       ) : (
-        <TableBox minWidth={940} maxHeight={720}>
+        <TableBox minWidth={1100} maxHeight={720}>
           <thead>
             <tr>
-              <th>SteamID64</th>
+              <th>Steam ID</th>
               <th>Ник</th>
               <th className="text-center">FACEIT</th>
               <th className="text-right">ELO</th>
               <th>Команда</th>
-              <th>Вход</th>
+              <th>Был на сайте</th>
               <th>Статус</th>
-              <th className="text-right">Действия</th>
+              <th className="text-right">Что сделать</th>
             </tr>
           </thead>
           <tbody>
@@ -79,7 +79,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
               const envAdmin = envAdmins.includes(p.steam_id);
               return (
                 <tr key={p.id}>
-                  <td className="num text-[12px] text-fg-3">{p.steam_id}</td>
+                  <td className="num text-[13px] text-fg-3">{p.steam_id}</td>
                   <td>
                     <Link href={`/players/${p.steam_id}`} className="flex items-center gap-2.5 text-fg hover:text-accent">
                       <Avatar src={p.avatar_url} name={p.nickname} size={24} />
@@ -93,15 +93,15 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                   <td>{p.team?.name ?? <span className="text-fg-3">—</span>}</td>
                   <td className="num">{formatDate(p.last_login_at)}</td>
                   <td>
-                    <span className="flex items-center gap-2 text-[12px]">
-                      {(p.is_admin || envAdmin) && <span className="text-accent">admin</span>}
-                      {p.is_banned && <span className="text-danger">бан</span>}
+                    <span className="flex items-center gap-2 text-[13px]">
+                      {(p.is_admin || envAdmin) && <span className="font-semibold text-accent">админ</span>}
+                      {p.is_banned && <span className="font-semibold text-danger">заблокирован</span>}
                       {!p.is_admin && !envAdmin && !p.is_banned && <span className="text-fg-3">игрок</span>}
                     </span>
                   </td>
                   <td>
-                    <div className="flex justify-end items-center gap-1">
-                      <Link href={`/admin/players/${p.id}/profile`} className="px-2 text-[12px] text-accent hover:underline">
+                    <div className="flex flex-wrap justify-end items-center gap-1.5">
+                      <Link href={`/admin/players/${p.id}/profile`} className="px-2 text-[13px] text-accent hover:underline">
                         Анкета
                       </Link>
                       {!envAdmin && (
@@ -114,7 +114,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                             variant="ghost"
                             confirm={p.is_admin ? `Снять права админа с ${p.nickname}?` : `Сделать ${p.nickname} администратором?`}
                           >
-                            {p.is_admin ? "− admin" : "+ admin"}
+                            {p.is_admin ? "Снять права админа" : "Сделать админом"}
                           </SubmitButton>
                         </ActionForm>
                       )}
@@ -128,7 +128,7 @@ export default async function AdminPlayersPage(props: PageProps<"/admin/players"
                           className={p.is_banned ? undefined : "text-danger/80 hover:text-danger"}
                           confirm={p.is_banned ? `Разблокировать ${p.nickname}?` : `Заблокировать ${p.nickname}?`}
                         >
-                          {p.is_banned ? "Разбан" : "Бан"}
+                          {p.is_banned ? "Разблокировать" : "Заблокировать"}
                         </SubmitButton>
                       </ActionForm>
                     </div>

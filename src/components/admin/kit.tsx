@@ -5,7 +5,7 @@ import { ADMIN_CARD, AdminLabel } from "./control";
 
 /*
  * F16 Control — композиционные блоки «пульта»: полоса статуса, секции, жизненный цикл, хронология.
- * Цвета — токены сайта; плотность выше, чем на публичных страницах.
+ * Цвета, шрифт и размеры — как на сайте (F16 DS).
  */
 
 export type KitTone = "ok" | "warn" | "danger" | "accent" | "muted";
@@ -56,20 +56,20 @@ export function StripCell({
     <>
       <div className="flex items-center gap-2 min-w-0">
         {tone && <span className={cn("size-1.5 shrink-0 rounded-full", toneBar[tone], pulse && "animate-pulse")} />}
-        <AdminLabel className="truncate text-[12px] font-medium text-fg-3">{label}</AdminLabel>
+        <div className="truncate text-[13.5px] font-semibold text-fg-3">{label}</div>
       </div>
-      <div className={cn("mt-2.5 num text-[24px] font-semibold leading-none tracking-[-0.02em]", tone ? toneText[tone] : "text-fg")}>
+      <div className={cn("mt-2.5 num text-[28px] font-bold leading-none tracking-[-0.02em]", tone ? toneText[tone] : "text-fg")}>
         {value}
       </div>
-      {hint && <div className="mt-1.5 text-[12px] text-fg-3 truncate">{hint}</div>}
+      {hint && <div className="mt-2 truncate text-[13px] text-fg-3">{hint}</div>}
     </>
   );
   return href ? (
-    <Link href={href} className="block px-5 py-4 min-w-0 transition-colors hover:bg-ink/[0.025]">
+    <Link href={href} className="block min-w-0 px-5 py-5 transition-colors hover:bg-surface-2">
       {body}
     </Link>
   ) : (
-    <div className="px-5 py-4 min-w-0">{body}</div>
+    <div className="min-w-0 px-5 py-5">{body}</div>
   );
 }
 
@@ -93,11 +93,11 @@ export function Section({
 }) {
   return (
     <section id={id} className={cn("min-w-0 scroll-mt-6", className)}>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-4 flex items-center justify-between gap-3">
         {/* заголовок и счётчик — в одну строку, даже если заголовок сам flex-блок */}
         <AdminLabel className="flex items-center gap-2">
           {title}
-          {count != null && <span className="num font-medium text-fg-3">{count}</span>}
+          {count != null && <span className="num rounded-full bg-ink/[0.06] px-2 py-0.5 text-[14px] font-bold text-fg-2">{count}</span>}
         </AdminLabel>
         {action}
       </div>
@@ -108,7 +108,7 @@ export function Section({
 
 export function SectionLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="text-[12px] text-fg-3 hover:text-fg transition-colors">
+    <Link href={href} className="text-[14px] font-semibold text-accent transition-colors hover:text-accent-strong">
       {children} →
     </Link>
   );
@@ -116,7 +116,7 @@ export function SectionLink({ href, children }: { href: string; children: ReactN
 
 /** Пустая полоса-подсказка внутри секции */
 export function Quiet({ children }: { children: ReactNode }) {
-  return <div className={cn(ADMIN_CARD, "px-4 py-5 text-[13px] text-fg-3")}>{children}</div>;
+  return <div className={cn(ADMIN_CARD, "px-5 py-6 text-[15px] text-fg-3")}>{children}</div>;
 }
 
 // ───────────────────────── жизненный цикл
@@ -141,30 +141,30 @@ export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; cu
               <span
                 aria-hidden
                 className={cn(
-                  "absolute left-[30px] right-0 top-[13px] h-[2px] rounded-full",
+                  "absolute left-[34px] right-0 top-[15px] h-[3px] rounded-full",
                   cancelled ? "bg-danger/25" : done ? "bg-accent/70" : "bg-ink/[0.08]",
                 )}
               />
             )}
             <span
               className={cn(
-                "relative z-[1] grid size-7 place-items-center rounded-full border text-[12px] font-semibold num",
+                "relative z-[1] grid size-8 place-items-center rounded-full border text-[13px] font-bold num",
                 cancelled
-                  ? "border-danger/40 bg-[#1a0f12] text-danger/80"
+                  ? "border-danger/40 bg-danger-dim text-danger"
                   : done
-                    ? "border-accent bg-accent text-[#07101b]"
+                    ? "border-accent bg-accent text-white"
                     : now
-                      ? "border-accent bg-[#0d1a2c] text-accent ring-4 ring-accent/15"
+                      ? "border-accent bg-white text-accent ring-4 ring-accent/15"
                       : "border-line-strong bg-shell text-fg-3",
               )}
             >
               {done ? "✓" : i + 1}
             </span>
-            <div className={cn("mt-2.5 text-[13px] font-semibold leading-tight", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
+            <div className={cn("mt-2.5 text-[15px] font-bold leading-tight", now ? "text-fg" : done ? "text-fg-2" : "text-fg-3")}>
               {s.label}
             </div>
-            {now && <div className="mt-0.5 text-[12px] font-medium text-accent">сейчас</div>}
-            {s.hint && <div className="mt-1 text-[11px] leading-snug text-fg-3">{s.hint}</div>}
+            {now && <div className="mt-0.5 text-[13px] font-bold text-accent">сейчас</div>}
+            {s.hint && <div className="mt-1 text-[12.5px] leading-snug text-fg-3">{s.hint}</div>}
           </li>
         );
       })}
@@ -226,8 +226,8 @@ export function Timeline({ items, format }: { items: TimelineItem[]; format: (is
 /** Группа действий в правой колонке пульта */
 export function RailGroup({ title, children, tone }: { title: string; children: ReactNode; tone?: "danger" }) {
   return (
-    <div className={cn("p-4 space-y-2.5", tone === "danger" && "bg-danger/[0.04]")}>
-      <div className={cn("text-[12px] font-medium", tone === "danger" ? "text-danger" : "text-eyebrow")}>
+    <div className={cn("space-y-3 p-5", tone === "danger" && "bg-danger-dim/60")}>
+      <div className={cn("text-[15px] font-bold", tone === "danger" ? "text-danger" : "text-fg")}>
         {title}
       </div>
       {children}

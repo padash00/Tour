@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ServerInstance } from "@/lib/server-control";
 import { cn } from "@/components/ui";
+import { Status, type StatusTone } from "@/components/ds";
 import { ADMIN_CARD } from "./control";
-import { instanceState, minutesSince, toneBar, toneText } from "./kit";
+import { instanceState, minutesSince, toneBar, type KitTone } from "./kit";
 import { ServerActions } from "./server-actions";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { restoreRound, serverRcon } from "@/app/actions/admin-server";
@@ -28,9 +29,31 @@ export function humanPlayers(i: Pick<ServerInstance, "running" | "players">) {
   return i.running ? Math.max(0, (i.players ?? 0) - 1) : null;
 }
 
+/** Состояние сервера простыми словами (kit.instanceState отдаёт технические подписи) */
+const PLAIN_STATE: Record<string, string> = {
+  LIVE: "Идёт игра",
+  "Агент офлайн": "Нет связи",
+  Нож: "Раунд на ножах",
+  Старт: "Игра начинается",
+  Подготовка: "Выбор карт",
+};
+
+const STATUS_TONE: Record<KitTone, StatusTone> = { ok: "ok", warn: "warn", danger: "danger", accent: "accent", muted: "neutral" };
+
+/** Подпись состояния сервера для оператора */
+export function plainState(text: string) {
+  return PLAIN_STATE[text] ?? text;
+}
+
+/** Плашка состояния сервера — одинаковая на всех экранах пульта */
+export function ServerStatus({ text, tone, size = "md" }: { text: string; tone: KitTone; size?: "sm" | "md" }) {
+  const live = text === "LIVE";
+  return <Status info={{ label: plainState(text), tone: live ? "live" : STATUS_TONE[tone], pulse: live }} size={size} />;
+}
+
 /**
- * Карточка инстанса в «живой сетке» обзора: цветная полоса состояния, матч и счёт,
- * карта, игроки, таймер ожидания, быстрые действия.
+ * Карточка сервера в «живой сетке» обзора: состояние, матч и счёт, карта, игроки,
+ * таймер ожидания, управление игрой и сервером кнопками с подписями.
  */
 export function InstanceCard({
   i,
@@ -55,47 +78,32 @@ export function InstanceCard({
   const round = liveMap ? liveMap.team1_score + liveMap.team2_score + 1 : null;
 
   return (
-    <div
-      className={cn(
-        ADMIN_CARD,
-        "relative flex flex-col overflow-hidden pl-[3px]",
-        live && "bg-danger/[0.04] border-danger/30",
-        hero && "min-h-[228px]",
-      )}
-    >
-      {/* полоса состояния слева */}
-      <span className={cn("absolute inset-y-0 left-0 w-[3px]", toneBar[st.tone], live && "animate-pulse")} />
+    <div className={cn(ADMIN_CARD, "relative flex flex-col overflow-hidden", live && "bg-danger/[0.04]")}>
+      {/* полоса состояния сверху */}
+      <span className={cn("absolute inset-x-0 top-0 h-1", toneBar[st.tone], live && "animate-pulse")} />
 
-      <div className={cn("flex items-start justify-between gap-3", hero ? "px-5 pt-5" : "px-4 pt-4")}>
+      <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-6">
         <div className="min-w-0">
-          <div className={cn("num font-semibold text-fg", hero ? "text-[18px]" : "text-[15px]")}>{i.name}</div>
-          <div className="num text-[11px] text-fg-3">
-            :{i.port}
-            {i.role === "reserve" ? " · резерв" : ""}
+          <div className="text-[13.5px] font-semibold text-fg-3">Игровой сервер</div>
+          <div className={cn("num font-bold tracking-[-0.01em] text-fg", hero ? "text-[22px]" : "text-[18px]")}>{i.name}</div>
+          <div className="mt-0.5 text-[13px] text-fg-3">
+            порт <span className="font-mono">{i.port}</span>
+            {i.role === "reserve" ? " · запасной" : ""}
           </div>
         </div>
-        <span
-          className={cn(
-            "inline-flex h-6 items-center gap-1.5 rounded-[5px] border px-2 text-[12px] font-medium",
-            toneText[st.tone],
-            "border-current/30 bg-current/[0.06]",
-          )}
-        >
-          <span className={cn("size-1.5 rounded-full bg-current", live && "animate-pulse")} />
-          {st.text}
-        </span>
+        <ServerStatus text={st.text} tone={st.tone} />
       </div>
 
-      <div className={cn("flex-1 space-y-2", hero ? "px-5 pt-4 pb-4" : "px-4 pt-3 pb-3 text-[13px]")}>
+      <div className="flex-1 space-y-3 px-5 pb-5 pt-3">
         {match ? (
-          <Link href={`/admin/matches/${match.id}`} className="group block">
-            <div className="text-[12px] font-medium text-fg-3">Матч #{match.number}</div>
+          <Link href={`/admin/matches/${match.id}`} className="group block rounded-control bg-surface-2 p-4 transition-colors hover:bg-ink/[0.06]">
+            <div className="text-[13.5px] font-semibold text-fg-3">Матч №{match.number}</div>
             <div className="mt-1 flex items-center justify-between gap-3">
-              <span className={cn("truncate font-semibold group-hover:text-accent", hero ? "text-[20px]" : "text-[14px]")}>
-                {match.team1?.tag ?? "TBD"} <span className="font-normal text-fg-3">vs</span> {match.team2?.tag ?? "TBD"}
+              <span className={cn("truncate font-bold group-hover:text-accent", hero ? "text-[20px]" : "text-[17px]")}>
+                {match.team1?.tag ?? "TBD"} <span className="font-normal text-fg-3">против</span> {match.team2?.tag ?? "TBD"}
               </span>
               {(match.status === "live" || match.team1_score + match.team2_score > 0) && (
-                <span className={cn("num shrink-0 font-semibold", hero ? "text-[30px] leading-none" : "text-[15px]", live && "text-fg")}>
+                <span className={cn("num shrink-0 font-bold", hero ? "text-[30px] leading-none" : "text-[22px]")}>
                   {match.team1_score}
                   <span className="text-fg-3">:</span>
                   {match.team2_score}
@@ -104,62 +112,71 @@ export function InstanceCard({
             </div>
           </Link>
         ) : (
-          <div className={cn("text-fg-3", hero && "text-[15px] pt-1")}>{i.running ? "Свободен — матча нет" : "Не запущен"}</div>
+          <div className="rounded-control bg-surface-2 px-4 py-3 text-[15px] text-fg-2">
+            {i.running ? "Сервер включён, матча на нём нет." : "Сервер выключен."}
+          </div>
         )}
 
-        <div className="flex items-center justify-between gap-2 font-mono text-[12px] text-fg-3">
-          <span className="truncate">{i.map ?? "—"}</span>
-          <span className={cn(players ? "text-fg-2" : undefined)}>{players != null ? `${players}/10` : "—"}</span>
+        <div className="flex items-center justify-between gap-3 text-[14px]">
+          <span className="text-fg-3">
+            Карта: <span className="font-mono text-fg-2">{i.map ?? "—"}</span>
+          </span>
+          <span className={cn("font-semibold", players ? "text-fg" : "text-fg-3")}>{players != null ? `Игроков: ${players} из 10` : "Игроков нет"}</span>
         </div>
         {hero && players != null && (
-          <div className="h-1 overflow-hidden rounded-full bg-ink/[0.06]">
-            <div className={cn("h-full rounded-full", live ? "bg-danger/80" : "bg-accent/70")} style={{ width: `${Math.min(100, players * 10)}%` }} />
+          <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.06]">
+            <div className={cn("h-full rounded-full", live ? "bg-danger" : "bg-accent")} style={{ width: `${Math.min(100, players * 10)}%` }} />
           </div>
         )}
         {liveMap && (
-          <div className="flex items-center justify-between gap-2 text-[12px]">
+          <div className="flex items-center justify-between gap-2 text-[14px]">
             <span className="truncate text-fg-2">
               Карта {liveMap.map_number} · {mapName(liveMap.map_name)}
             </span>
-            <span className="num shrink-0 text-fg">
-              {liveMap.team1_score}:{liveMap.team2_score} <span className="text-fg-3">· раунд {round}</span>
+            <span className="num shrink-0 font-semibold text-fg">
+              {liveMap.team1_score}:{liveMap.team2_score} <span className="font-normal text-fg-3">· раунд {round}</span>
             </span>
           </div>
         )}
-        {match?.server_state === "loading" && <div className="text-[12px] text-warn">загружает матч…</div>}
-        {match?.server_state === "error" && <div className="text-[12px] text-danger">карта не загрузилась</div>}
+        {match?.server_state === "loading" && <div className="text-[14px] font-medium text-warn">Загружаем матч на сервер…</div>}
+        {match?.server_state === "error" && <div className="text-[14px] font-medium text-danger">Карта не загрузилась — нужен другой сервер.</div>}
         {waited != null && (
-          <div className={cn("num text-[12px]", waited >= 15 ? "font-semibold text-danger" : waited >= 10 ? "text-warn" : "text-ok")}>
-            ждём игроков {waited} мин{waited >= 15 ? " · неявка" : ""}
+          <div className={cn("num text-[14px]", waited >= 15 ? "font-semibold text-danger" : waited >= 10 ? "font-medium text-warn" : "text-ok")}>
+            Ждём игроков {waited} мин{waited >= 15 ? " · похоже, неявка" : ""}
           </div>
         )}
       </div>
 
       {online && liveMap && match && (
-        <div className="flex flex-wrap gap-1 border-t border-ink/[0.06] px-2 py-2">
-          {[
-            { cmd: "css_forcepause", label: "Пауза" },
-            { cmd: "css_forceunpause", label: "Снять паузу" },
-          ].map((c) => (
-            <ActionForm key={c.cmd} action={serverRcon} inline>
-              <input type="hidden" name="instance" value={i.name} />
-              <input type="hidden" name="command" value={c.cmd} />
-              <SubmitButton size="sm" variant="secondary">
-                {c.label}
+        <div className="border-t border-line-subtle px-5 py-4">
+          <div className="mb-2.5 text-[14px] font-bold text-fg">Управление игрой</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { cmd: "css_forcepause", label: "Поставить на паузу" },
+              { cmd: "css_forceunpause", label: "Продолжить игру" },
+            ].map((c) => (
+              <ActionForm key={c.cmd} action={serverRcon} inline>
+                <input type="hidden" name="instance" value={i.name} />
+                <input type="hidden" name="command" value={c.cmd} />
+                <SubmitButton size="sm" variant="secondary" className="sm:h-10">
+                  {c.label}
+                </SubmitButton>
+              </ActionForm>
+            ))}
+            <ActionForm action={restoreRound} inline>
+              <input type="hidden" name="matchId" value={match.id} />
+              <input type="hidden" name="round" value={round ?? 1} />
+              <SubmitButton size="sm" variant="secondary" className="sm:h-10" confirm={`Переиграть раунд ${round} на ${i.name}? Счёт и деньги вернутся на его начало.`}>
+                Переиграть раунд
               </SubmitButton>
             </ActionForm>
-          ))}
-          <ActionForm action={restoreRound} inline>
-            <input type="hidden" name="matchId" value={match.id} />
-            <input type="hidden" name="round" value={round ?? 1} />
-            <SubmitButton size="sm" variant="ghost" confirm={`Переиграть раунд ${round} на ${i.name}? Счёт и деньги вернутся на его начало.`}>
-              Переиграть раунд
-            </SubmitButton>
-          </ActionForm>
+          </div>
+          <p className="mt-2 text-[13px] text-fg-3">Пауза останавливает игру для всех. «Переиграть раунд» возвращает счёт и деньги на начало текущего раунда.</p>
         </div>
       )}
       {online && (
-        <div className="border-t border-ink/[0.06] bg-black/20 px-2 py-2">
+        <div className="border-t border-line-subtle bg-surface-2 px-5 py-4">
+          <div className="mb-2.5 text-[14px] font-bold text-fg">Управление сервером</div>
           <ServerActions instance={i.name} running={!!i.running} align="start" />
         </div>
       )}

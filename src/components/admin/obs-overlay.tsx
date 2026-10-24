@@ -21,7 +21,7 @@ export const broadcastUrl = (slug: string, scene?: "bracket" | "schedule" | "liv
 
 export function ObsHowTo() {
   return (
-    <p className="text-[12px] leading-relaxed text-fg-3">
+    <p className="text-[13.5px] leading-relaxed text-fg-3">
       OBS → Источник → <span className="text-fg-2">Браузер</span> → URL, ширина <span className="num">1920</span>, высота{" "}
       <span className="num">1080</span>, галочка «Обновлять браузер при активации». Фон прозрачный — источник ставится поверх
       захвата CS2 (GOTV). Параметры: <span className="num">&amp;lower=1</span> — плашка F16 Arena внизу,{" "}
@@ -37,17 +37,17 @@ export const F16_HUD_DOWNLOAD = "https://github.com/padash00/Tour/releases/downl
 /** Скачать F16 HUD и как им пользоваться */
 export function F16HudPanel() {
   return (
-    <div className={`${ADMIN_CARD} flex flex-wrap items-start justify-between gap-4 p-4`}>
+    <div className={`${ADMIN_CARD} flex flex-wrap items-start justify-between gap-4 p-5`}>
       <div className="max-w-2xl">
-        <div className="text-[14px] font-semibold text-fg">F16 HUD — интерфейс трансляции</div>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-[12px] leading-relaxed text-fg-3">
-          <li>Скачайте и запустите на ПК трансляции (не на серверном) — пульт откроется в браузере, CS2 настроится сам.</li>
+        <div className="text-[17px] font-bold text-fg">F16 HUD — интерфейс трансляции</div>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 text-[13.5px] leading-relaxed text-fg-3">
+          <li>Скачайте и запустите на компьютере трансляции (не на серверном) — пульт откроется в браузере, CS2 настроится сам.</li>
           <li>Перезапустите CS2. В пульте выберите сервер и нажмите «Смотреть через GOTV».</li>
           <li>
             OBS → Браузер → <span className="num text-fg-2">http://localhost:31982/hud?transparent</span>, 1920×1080, поверх захвата CS2.
           </li>
         </ol>
-        <p className="mt-2 text-[11px] text-fg-4">
+        <p className="mt-2 text-[13px] text-fg-3">
           ПК в сети игроков (192.168.100.*) подключаются к серверам через 192.168.100.210 — пульт подставляет адрес сам.
         </p>
       </div>
@@ -61,14 +61,14 @@ export function F16HudPanel() {
 /** Карточка на странице «Серверы»: по ссылке на каждый инстанс */
 export function ObsOverlayPanel({ instances }: { instances: { name: string; match?: string | null }[] }) {
   return (
-    <div className={`${ADMIN_CARD} space-y-4 p-4`}>
+    <div className={`${ADMIN_CARD} space-y-4 p-5`}>
       <ObsHowTo />
       <div className="grid gap-x-6 gap-y-3 xl:grid-cols-2">
         {instances.map((s) => (
-          <div key={s.name} className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-3">
+          <div key={s.name} className="grid grid-cols-[110px_minmax(0,1fr)] items-center gap-3">
             <div className="min-w-0">
-              <div className="num text-[13px] font-semibold">{s.name}</div>
-              <div className="truncate text-[11px] text-fg-3">{s.match ?? "матча нет"}</div>
+              <div className="num text-[15px] font-semibold">{s.name}</div>
+              <div className="truncate text-[13px] text-fg-3">{s.match ?? "матча нет"}</div>
             </div>
             <CopyField value={overlayUrl({ server: s.name })} />
           </div>
@@ -92,7 +92,7 @@ const BROADCAST_SCENES = [
 export function BroadcastPanel({ slug }: { slug: string }) {
   return (
     <div className="space-y-4">
-      <p className="text-[12px] leading-relaxed text-fg-3">
+      <p className="text-[13.5px] leading-relaxed text-fg-3">
         OBS → Источник → <span className="text-fg-2">Браузер</span> → URL, ширина <span className="num">1920</span>, высота{" "}
         <span className="num">1080</span>. Экран перерыва — на фирменном фоне, для сцены «Перерыв» между картами и матчами: сам
         крутит сетку, расписание, идущие матчи и лидеров (пустые сцены пропускает). Параметры:{" "}
@@ -114,8 +114,8 @@ function BroadcastLink({ label, hint, value }: { label: string; hint: string; va
   return (
     <div className="grid items-center gap-x-4 gap-y-1.5 md:grid-cols-[180px_minmax(0,1fr)]">
       <div className="min-w-0">
-        <div className="text-[13px] font-semibold text-fg">{label}</div>
-        <div className="text-[11px] text-fg-3">{hint}</div>
+        <div className="text-[15px] font-semibold text-fg">{label}</div>
+        <div className="text-[13px] text-fg-3">{hint}</div>
       </div>
       <CopyField value={value} />
     </div>

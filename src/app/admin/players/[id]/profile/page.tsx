@@ -39,8 +39,8 @@ export default async function AdminPlayerProfilePage(props: PageProps<"/admin/pl
           </span>
         }
       />
-      <div className={`${ADMIN_CARD} max-w-3xl p-6`}>
-        {!isProfileComplete(profile) && <p className="mb-5 text-[13px] text-warn">Не заполнено: {missing.join(", ")}.</p>}
+      <div className={`${ADMIN_CARD} max-w-3xl p-6 sm:p-8`}>
+        {!isProfileComplete(profile) && <p className="mb-5 rounded-control bg-warn-dim px-4 py-3 text-[14.5px] font-medium text-warn">Не заполнено: {missing.join(", ")}.</p>}
         <ProfileForm
           key={profile?.updated_at ?? "new"}
           action={adminSaveProfile}
@@ -52,9 +52,9 @@ export default async function AdminPlayerProfilePage(props: PageProps<"/admin/pl
         />
       </div>
       {profile && (profile.last_name || profile.birth_date || profile.phone) && (
-        <div className="max-w-3xl rounded-[12px] border border-danger/25 bg-danger/[0.03] p-5">
-          <div className="text-[14px] font-semibold text-danger/90">Удалить персональные данные игрока</div>
-          <p className="mt-1 mb-3 text-[13px] text-fg-3">
+        <div className="max-w-3xl rounded-surface border border-danger/30 bg-danger-dim/60 p-6">
+          <div className="text-[17px] font-bold text-danger">Удалить персональные данные игрока</div>
+          <p className="mt-1.5 mb-4 text-[14.5px] text-fg-2">
             ФИО, дата рождения, телефон, место учёбы или работы и согласие будут удалены. Аккаунт, команда и статистика останутся.
             {lock ? ` Игрок заявлен на «${lock.name}» — без анкеты заявка не пройдёт проверку.` : ""}
           </p>

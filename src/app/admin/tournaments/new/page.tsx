@@ -11,7 +11,9 @@ export default async function NewTournamentPage() {
   await requireAdmin("/admin/tournaments/new"); // права проверяются в каждой странице, не только в layout
   return (
     <div className="space-y-8">
-      <AdminHeader back={{ href: "/admin/tournaments", label: "Турниры" }} title="Новый турнир" />
+      <AdminHeader back={{ href: "/admin/tournaments", label: "Турниры" }} title="Новый турнир"
+        description="Пройдите шаги слева направо и в конце нажмите «Создать турнир». Турнир сохранится как черновик, игроки его не увидят, пока вы не откроете регистрацию."
+      />
       <TournamentForm
         action={createTournament}
         workshopMaps={await getWorkshopMaps()}

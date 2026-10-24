@@ -3,9 +3,10 @@ import Link from "next/link";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { getServerState } from "@/lib/server-control";
-import { BrandSymbol, ControlLogo } from "@/components/brand";
-import { Avatar, cn } from "@/components/ui";
-import { AdminCrumbs, AdminMobileNav, AdminRail, CommandPalette, type PaletteItem } from "@/components/admin/shell";
+import { AlertTriangle, ChevronRight } from "lucide-react";
+import { BrandLogo } from "@/components/brand";
+import { Avatar } from "@/components/ui";
+import { AdminCrumbs, AdminMobileNav, AdminRail, CommandPalette, VenueStatus, type PaletteItem } from "@/components/admin/shell";
 import { serverNow } from "@/components/admin/kit";
 import { recentSiteErrors } from "@/lib/site-errors";
 
@@ -13,8 +14,8 @@ import { recentSiteErrors } from "@/lib/site-errors";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
- * F16 Control — отдельный «режим пульта»: иконочная панель, командная строка с поиском (Ctrl+K)
- * и глобальным статусом площадки на каждой странице.
+ * F16 Control — пульт организатора в стиле сайта: меню с подписями, шапка с поиском (Ctrl+K)
+ * и состоянием площадки словами, сверху — «Требует внимания» на любой странице.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // перенаправление на вход делает сама страница (requireAdmin с точным адресом) — так ссылка не теряется
@@ -39,7 +40,6 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
   const live = matches.filter((m) => m.status === "live").length;
   const busy = servers.instances.filter((i) => i.running && i.match_id).length;
-  const running = servers.instances.filter((i) => i.running).length;
   const waiting = matches.filter(
     (m) => m.status === "ready" && m.server_state === "ready" && m.server_ready_at && now - new Date(m.server_ready_at).getTime() > 10 * 60_000,
   ).length;
@@ -87,76 +87,38 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     <div className="control-mode flex min-h-screen [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-2 [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-offset-2 [&_:is(a,button,input,select,textarea,summary):focus-visible]:outline-accent/80">
       <AdminRail
         logo={
-          <Link href="/admin" aria-label="F16 Control" className="flex shrink-0 items-center gap-3">
-            <BrandSymbol height={24} />
-            <span className="flex flex-col leading-none opacity-0 transition-opacity duration-150 group-hover/rail:opacity-100 group-data-[pinned=true]/rail:opacity-100">
-              <span className="text-[13px] font-bold tracking-[0.04em] text-fg">F16</span>
-              <span className="mt-1 font-mono text-[9px] tracking-[0.32em] text-fg-3">CONTROL</span>
-            </span>
+          <Link href="/admin" aria-label="F16 Control — главная пульта" className="flex items-center gap-3">
+            <BrandLogo height={28} />
+            <span className="rounded-full bg-fg px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.06em] text-white">Пульт</span>
           </Link>
         }
         profile={
-          <Link
-            href="/"
-            title="На сайт"
-            className="flex h-11 items-center gap-3 overflow-hidden rounded-[8px] px-[9px] text-[13px] text-fg-2 transition-colors hover:bg-ink/[0.04] hover:text-fg"
-          >
-            <span className="shrink-0">
-              <Avatar src={admin.avatar_url} name={admin.nickname} size={30} />
-            </span>
+          <div className="flex items-center gap-3 rounded-surface bg-surface-2 p-2.5">
+            <Avatar src={admin.avatar_url} name={admin.nickname} size={36} />
             <span className="min-w-0 leading-tight">
-              <span className="block truncate font-medium text-fg">{admin.nickname}</span>
-              <span className="block text-[11px] text-fg-3">← на сайт</span>
+              <span className="block truncate text-[15px] font-bold text-fg">{admin.nickname}</span>
+              <span className="block text-[12.5px] text-fg-3">Администратор</span>
             </span>
-          </Link>
+          </div>
         }
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* командная строка */}
-        <header className="sticky top-0 z-30 border-b border-surface-2 bg-bg/90 backdrop-blur-xl">
-          <div className="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
-            <Link href="/admin" className="lg:hidden shrink-0" aria-label="F16 Control">
-              <ControlLogo />
+        {/* шапка: где я, поиск, состояние площадки */}
+        <header className="sticky top-0 z-30 border-b border-line-subtle bg-shell/95 backdrop-blur-xl">
+          <div className="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+            <Link href="/admin" className="flex shrink-0 items-center gap-2 lg:hidden" aria-label="F16 Control">
+              <BrandLogo height={24} />
             </Link>
-            <div className="hidden min-w-0 lg:block">
+            <div className="hidden min-w-0 flex-1 lg:block">
               <AdminCrumbs names={names} />
             </div>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <CommandPalette items={palette} />
-              {/* глобальный статус площадки */}
-              <Link
-                href="/admin/servers"
-                className="flex h-9 items-center gap-3 rounded-control border border-line-strong bg-shell px-3 font-mono text-[11px] text-fg-2 transition-colors hover:border-line-hover"
-                title="Агент и серверы"
-              >
-                <span className="flex items-center gap-1.5">
-                  <span className={cn("size-2 rounded-full", servers.online ? "bg-ok" : "bg-danger animate-pulse")} />
-                  <span className={servers.online ? "text-fg-2" : "text-danger"}>
-                    {servers.online ? "агент" : "офлайн"}
-                    {lastSync != null && (
-                      <span className="hidden sm:inline text-fg-3"> · {lastSync < 120 ? `${lastSync}с` : `${Math.round(lastSync / 60)}м`}</span>
-                    )}
-                  </span>
-                </span>
-                <span className="hidden sm:flex items-center gap-1.5 border-l border-surface-3 pl-3">
-                  <span className="text-fg-3">SRV</span>
-                  <span className="text-fg">
-                    {busy}/{servers.instances.length}
-                  </span>
-                  <span className="text-fg-3">· {running} вкл</span>
-                </span>
-                <span className="flex items-center gap-1.5 border-l border-surface-3 pl-3">
-                  <span className={cn("size-1.5 rounded-full", live ? "bg-danger animate-pulse" : "bg-fg-3/50")} />
-                  <span className={live ? "text-danger" : "text-fg-3"}>LIVE {live}</span>
-                </span>
-              </Link>
+              <VenueStatus online={servers.online} lastSync={lastSync} busy={busy} total={servers.instances.length} live={live} />
               {(waiting > 0 || errors > 0) && (
-                <Link
-                  href="/admin"
-                  className="hidden sm:flex h-9 items-center gap-2 rounded-[8px] border border-warn/40 bg-warn/[0.08] px-3 text-[12px] font-medium text-warn"
-                >
-                  <span className="size-1.5 rounded-full bg-current animate-pulse" />
+                <Link href="/admin" className="hidden h-10 items-center gap-2 rounded-full bg-warn-dim px-3.5 text-[13.5px] font-semibold text-warn sm:inline-flex">
+                  <span className="size-2 animate-pulse rounded-full bg-current" />
                   {errors > 0 ? `Ошибка сервера: ${errors}` : `Ждут игроков: ${waiting}`}
                 </Link>
               )}
@@ -167,21 +129,29 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
 
         <main className="flex-1">
           {alarms.length > 0 && (
-            <div className="border-b border-danger/30 bg-danger/[0.08]">
-              <ul className="mx-auto max-w-[1560px] space-y-1 px-4 py-2.5 sm:px-6 lg:px-8">
-                {alarms.slice(0, 5).map((a) => (
-                  <li key={a.key}>
-                    <Link href={a.href} className="flex items-center gap-2.5 text-[13px] font-medium text-danger hover:underline">
-                      <span className="size-1.5 shrink-0 rounded-full bg-current animate-pulse" />
-                      {a.text}
-                      <span className="text-danger/70">→</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+            <div className="mx-auto max-w-[1560px] px-4 pt-6 sm:px-6 lg:px-8">
+              <div className="rounded-surface bg-danger-dim p-4 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-danger)_25%,transparent)]">
+                <div className="mb-2 flex items-center gap-2 text-[15px] font-bold text-danger">
+                  <AlertTriangle className="size-5" />
+                  Требует внимания: {alarms.length}
+                </div>
+                <ul className="space-y-1">
+                  {alarms.slice(0, 5).map((a) => (
+                    <li key={a.key}>
+                      <Link href={a.href} className="flex items-center gap-2 rounded-control px-2 py-1.5 text-[14.5px] font-medium text-fg transition-colors hover:bg-white/60">
+                        <span className="size-2 shrink-0 animate-pulse rounded-full bg-danger" />
+                        <span className="min-w-0 flex-1">{a.text}</span>
+                        <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-danger">
+                          Открыть <ChevronRight className="size-4" />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
-          <div className="mx-auto max-w-[1560px] px-4 py-7 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+          <div className="mx-auto max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
         </main>
       </div>
     </div>

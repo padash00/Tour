@@ -68,7 +68,7 @@ export function ActionToggle({
     <div
       data-f16-action-pending={pending ? "true" : undefined}
       aria-busy={pending || undefined}
-      className={cn("inline-flex min-h-9 items-center gap-2.5", className)}
+      className={cn("inline-flex min-h-10 items-center gap-3", className)}
     >
       <button
         type="button"
@@ -80,7 +80,7 @@ export function ActionToggle({
         className={cn(
           "group relative h-7 w-12 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-[var(--dur-state)] ease-out",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
-          value ? "border-accent/70 bg-accent shadow-[0_0_14px_-7px_var(--color-accent)]" : "border-line-strong bg-surface-3 hover:border-line-hover",
+          value ? "border-accent bg-accent" : "border-line-strong bg-surface-3 hover:border-line-hover",
           (disabled || pending) && "cursor-not-allowed opacity-60",
         )}
       >
@@ -91,7 +91,7 @@ export function ActionToggle({
           )}
         />
       </button>
-      <span className={cn("whitespace-nowrap text-meta font-medium", value ? "text-ok" : "text-fg-3")}>{value ? onLabel : offLabel}</span>
+      <span className={cn("whitespace-nowrap text-[14.5px] font-semibold", value ? "text-ok" : "text-fg-3")}>{value ? onLabel : offLabel}</span>
       <span className="grid size-4 place-items-center">
         {pending && <Spinner className="size-3.5 text-fg-3" />}
       </span>

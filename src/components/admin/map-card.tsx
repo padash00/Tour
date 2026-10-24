@@ -73,7 +73,7 @@ export function MapCard({
           }}
         />
       </form>
-      <div className="flex items-center justify-between gap-2 text-[12px]">
+      <div className="flex items-center justify-between gap-2 text-[14px]">
         {toggleable ? (
           <ActionToggle
             action={toggleMapEnabled}
@@ -86,7 +86,7 @@ export function MapCard({
             onOptimisticChange={setOptimisticEnabled}
           />
         ) : (
-          <span className="text-fg-3">Workshop</span>
+          <span className="text-fg-3">Карта из Workshop</span>
         )}
         {image && (
           <form action={remove} data-f16-action-pending={removing ? "true" : undefined}>
@@ -94,9 +94,9 @@ export function MapCard({
             <button
               type="submit"
               disabled={removing}
-              className="h-8 rounded-md px-2 text-fg-3 transition-colors hover:bg-ink/[0.04] hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="h-10 rounded-control px-3 font-medium text-fg-3 transition-colors hover:bg-danger-dim hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
-              убрать картинку
+              Убрать картинку
             </button>
           </form>
         )}

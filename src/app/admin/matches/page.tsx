@@ -44,19 +44,18 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
   return (
     <div className="space-y-6">
       <LiveRefresh watch="matches" intervalMs={4000} />
-      <AdminHeader title="Матчи" />
-      <div className="flex gap-5 border-b border-ink/[0.06]">
+      <AdminHeader title="Матчи" description="Выберите матч, чтобы управлять им: поставить на паузу, изменить счёт, завершить." />
+      <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Link
             key={f.key}
             href={`/admin/matches?f=${f.key}`}
             className={cn(
-              "relative h-10 inline-flex items-center text-[13px] font-medium transition-colors",
-              filter.key === f.key ? "text-fg" : "text-fg-3 hover:text-fg-2",
+              "inline-flex h-11 items-center rounded-control px-5 text-[15px] font-semibold transition-colors",
+              filter.key === f.key ? "bg-accent text-white" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
             )}
           >
             {f.label}
-            {filter.key === f.key && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
           </Link>
         ))}
       </div>
@@ -75,6 +74,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
               <th>Карта</th>
               <th>Время</th>
               <th>Ожидание</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -115,6 +115,11 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
                     ) : (
                       "—"
                     )}
+                  </td>
+                  <td className="text-right">
+                    <Link href={`/admin/matches/${m.id}`} className="text-[14px] font-semibold text-accent hover:text-accent-strong">
+                      Управлять →
+                    </Link>
                   </td>
                 </tr>
               );
