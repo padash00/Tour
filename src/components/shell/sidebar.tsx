@@ -2,32 +2,50 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Copy, Crosshair, Home, Shield, Trophy, User, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, ChevronRight, CircleHelp, Copy, Crosshair, Home, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 import { useToast } from "../toast";
 import { useViewer, type Activity } from "../viewer";
-import { PRIMARY_NAV, SECONDARY_NAV, isActive, noChrome } from "./nav";
+import { isActive, noChrome, type NavItem } from "./nav";
 
 /*
  * Каркас сайта: боковое меню слева (от 1024px) и нижняя панель на телефоне.
  * Вверху меню — «Мой матч»: самое срочное действие игрока (lib/activity.ts) — подключиться, ход в вето, check-in.
  */
 
-const ICON: Record<string, LucideIcon> = {
-  "/": Home,
-  "/tournaments": Trophy,
-  "/matches": Crosshair,
-  "/lobbies": Users,
-  "/stats": BarChart3,
-  "/teams": Shield,
-};
+type SideItem = NavItem & { hint: string; Icon: LucideIcon };
 
-const NAV = [{ href: "/", label: "Главная", match: ["/"] }, ...PRIMARY_NAV];
+/** Разделы бокового меню: группы и короткое пояснение под каждым пунктом — понятно, куда ведёт */
+const GROUPS: { title: string; items: SideItem[] }[] = [
+  {
+    title: "Играть",
+    items: [
+      { href: "/", label: "Главная", hint: "что идёт сейчас", match: ["/"], Icon: Home },
+      { href: "/tournaments", label: "Турниры", hint: "заявки, сетка, итоги", match: ["/tournaments"], Icon: Trophy },
+      { href: "/matches", label: "Матчи", hint: "счёт и расписание", match: ["/matches"], Icon: Crosshair },
+      { href: "/lobbies", label: "Лобби", hint: "сыграть без турнира", match: ["/lobbies", "/lobby"], Icon: Users },
+    ],
+  },
+  {
+    title: "Сообщество",
+    items: [
+      { href: "/stats", label: "Рейтинг", hint: "лучшие игроки и статистика", match: ["/stats"], Icon: BarChart3 },
+      { href: "/teams", label: "Команды", hint: "составы и капитаны", match: ["/teams", "/team", "/join"], Icon: Shield },
+      { href: "/find", label: "Поиск команды", hint: "найти тиммейтов", match: ["/find"], Icon: Search },
+      { href: "/players", label: "Игроки", hint: "все игроки сайта", match: ["/players"], Icon: UserRound },
+    ],
+  },
+];
 
-const navActive = (pathname: string, item: (typeof NAV)[number]) => (item.href === "/" ? pathname === "/" : isActive(pathname, item));
+const HELP = [
+  { href: "/help", label: "Как это работает", Icon: CircleHelp },
+  { href: "/rules", label: "Правила и FAQ", Icon: BookOpen },
+];
+
+const navActive = (pathname: string, item: NavItem) => (item.href === "/" ? pathname === "/" : isActive(pathname, item));
 
 /** Отступ под боковое меню и нижнюю панель — только на страницах с оболочкой сайта */
 export function ShellFrame({ children }: { children: ReactNode }) {
@@ -95,46 +113,66 @@ export function SiteSidebar() {
 
       {activity && <MyMatchCard activity={activity} more={moreActivity} />}
 
-      <nav className="flex flex-col gap-0.5" aria-label="Разделы">
-        {NAV.map((item) => {
-          const Icon = ICON[item.href] ?? Home;
-          const active = navActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex h-12 items-center gap-3 rounded-control px-3 text-[16px] font-semibold transition-colors duration-[var(--dur-hover)]",
-                active ? "bg-accent-dim text-fg [&>svg]:text-accent" : "text-fg-2 hover:bg-surface-2 hover:text-fg [&>svg]:text-fg-3",
-              )}
-            >
-              <Icon className="size-[22px]" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {GROUPS.map((g) => (
+        <nav key={g.title} className="flex flex-col gap-0.5" aria-label={g.title}>
+          <div className="px-3 pb-1.5 text-[12px] font-bold uppercase tracking-[0.06em] text-fg-4">{g.title}</div>
+          {g.items.map((item) => {
+            const active = navActive(pathname, item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-control px-3 py-2 transition-colors duration-[var(--dur-hover)]",
+                  active ? "bg-accent-dim text-fg" : "text-fg-2 hover:bg-surface-2 hover:text-fg",
+                )}
+              >
+                <item.Icon className={cn("size-[22px] shrink-0", active ? "text-accent" : "text-fg-3")} />
+                <span className="min-w-0">
+                  <span className="block text-[15.5px] font-semibold leading-tight">{item.label}</span>
+                  <span className="block truncate text-[12.5px] leading-snug text-fg-3">{item.hint}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      ))}
 
       <div className="flex-1" />
 
-      <nav className="flex flex-wrap gap-x-3 gap-y-1 px-3 text-[13.5px] text-fg-3" aria-label="Помощь">
-        {SECONDARY_NAV.map((l) => (
-          <Link key={l.href} href={l.href} className="hover:text-fg">
-            {l.label}
+      <div className="rounded-surface bg-surface-2 p-1.5">
+        {HELP.map(({ href, label, Icon }) => (
+          <Link key={href} href={href} className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-[14px] font-semibold text-fg-2 transition-colors hover:bg-surface hover:text-fg">
+            <Icon className="size-[18px] text-fg-3" />
+            {label}
+            <ChevronRight className="ml-auto size-4 text-fg-4" />
           </Link>
         ))}
-      </nav>
+        <div className="flex flex-wrap gap-x-3 px-2.5 pb-1 pt-1.5 text-[12.5px] text-fg-3">
+          <Link href="/about" className="hover:text-fg">
+            О платформе
+          </Link>
+          <Link href="/privacy" className="hover:text-fg">
+            Персональные данные
+          </Link>
+        </div>
+      </div>
 
       {status === "loading" ? (
         <span aria-hidden className="h-[60px] rounded-surface bg-ink/[0.04]" />
       ) : player ? (
-        <Link href="/me" className="flex items-center gap-3 rounded-surface bg-surface-2 p-2.5 transition-colors hover:bg-surface-4">
-          <Avatar src={player.avatar_url} name={player.nickname} size="md" />
-          <span className="min-w-0">
+        <Link
+          href="/me"
+          aria-current={pathname === "/me" ? "page" : undefined}
+          className="flex items-center gap-3 rounded-surface p-2.5 shadow-[inset_0_0_0_1px_var(--color-line)] transition-colors hover:bg-surface-2 aria-[current=page]:bg-accent-dim aria-[current=page]:shadow-none"
+        >
+          <Avatar src={player.avatar_url} name={player.nickname} size="md" className="!rounded-full" />
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{player.nickname}</span>
-            <span className="block text-meta text-fg-3">Моя игра</span>
+            <span className="block text-[12.5px] text-fg-3">Моя игра</span>
           </span>
+          <ChevronRight className="size-4 shrink-0 text-fg-4" />
         </Link>
       ) : (
         <Link
