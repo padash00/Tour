@@ -518,7 +518,7 @@ function BracketTab({
   ) : null;
   const checkedInBox = (
     <label className="flex items-center gap-2 text-[13px] text-fg-2">
-      <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-4 accent-[#8ab8ff]" />
+      <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-4 accent-[var(--color-accent)]" />
       Только прошедшие check-in ({checkedIn})
     </label>
   );

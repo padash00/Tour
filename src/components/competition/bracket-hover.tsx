@@ -24,9 +24,9 @@ export function BracketHover({ children }: { children: ReactNode }) {
     >
       {team && (
         <style>{`
-[data-bracket][data-hl] [data-team]{opacity:.38;transition:opacity .15s}
-[data-bracket][data-hl] [data-team="${team}"]{opacity:1;background:#8ab8ff1a;color:#f4f7fb}
-[data-bracket][data-hl] [data-node]:has([data-team="${team}"]){border-color:#8ab8ff80}
+[data-bracket][data-hl] [data-team]{opacity:.4;transition:opacity .15s}
+[data-bracket][data-hl] [data-team="${team}"]{opacity:1;background:var(--color-accent-dim);color:var(--color-fg)}
+[data-bracket][data-hl] [data-node]:has([data-team="${team}"]){border-color:var(--color-accent);box-shadow:0 0 0 1px var(--color-accent)}
 `}</style>
       )}
       {children}

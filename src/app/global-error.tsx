@@ -8,8 +8,8 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
         style={{
           margin: 0,
           minHeight: "100vh",
-          background: "#070b12",
-          color: "#f4f7fb",
+          background: "#f3f4f6",
+          color: "#121417",
           fontFamily: "ui-sans-serif, system-ui, sans-serif",
           display: "flex",
           alignItems: "center",
@@ -18,12 +18,12 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
         }}
       >
         <div style={{ maxWidth: 560 }}>
-          <div style={{ fontSize: 12, letterSpacing: "0.34em", textTransform: "uppercase", color: "#7f93b0" }}>F16 Arena</div>
+          <div style={{ fontSize: 12, letterSpacing: "0.34em", textTransform: "uppercase", color: "#6b727d" }}>F16 Arena</div>
           <h1 style={{ fontSize: 40, fontWeight: 600, margin: "20px 0 0" }}>Сайт временно недоступен</h1>
-          <p style={{ color: "#a8b2c2", fontSize: 17, lineHeight: 1.6, marginTop: 20 }}>
+          <p style={{ color: "#454b55", fontSize: 17, lineHeight: 1.6, marginTop: 20 }}>
             Мы уже видим ошибку. Обновите страницу через минуту.
           </p>
-          {error.digest && <p style={{ color: "#687588", fontSize: 13 }}>Код: {error.digest}</p>}
+          {error.digest && <p style={{ color: "#6b727d", fontSize: 13 }}>Код: {error.digest}</p>}
           <button
             type="button"
             onClick={() => retry()}
@@ -33,8 +33,8 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
               padding: "0 32px",
               borderRadius: 8,
               border: 0,
-              background: "#8ab8ff",
-              color: "#07101b",
+              background: "#5f9a00",
+              color: "#ffffff",
               fontSize: 15,
               fontWeight: 600,
               cursor: "pointer",

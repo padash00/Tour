@@ -378,7 +378,7 @@ export function TournamentForm({
             </label>
             {t?.cover_url && (
               <label className="flex items-center gap-2 text-[13px] text-fg-2">
-                <input type="checkbox" name="removeCover" className="size-4 accent-[#8ab8ff]" onChange={(e) => setCover(e.target.checked ? null : t.cover_url)} />
+                <input type="checkbox" name="removeCover" className="size-4 accent-[var(--color-accent)]" onChange={(e) => setCover(e.target.checked ? null : t.cover_url)} />
                 Убрать обложку
               </label>
             )}
