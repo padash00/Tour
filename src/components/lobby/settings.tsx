@@ -132,7 +132,8 @@ export function AdvancedSettings({
     <Sheet
       open={open}
       onClose={onClose}
-      width={700}
+      width={760}
+      center
       title={
         <span className="flex items-center gap-3">
           {Icon.gear("size-6")} Настройки

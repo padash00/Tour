@@ -173,6 +173,7 @@ export function Sheet({
   footer,
   width = 600,
   nav,
+  center,
 }: {
   open: boolean;
   onClose: () => void;
@@ -183,13 +184,15 @@ export function Sheet({
   width?: number;
   /** внутренняя навигация по разделам (вкладки сверху) */
   nav?: ReactNode;
+  /** окно по центру экрана (большие настройки), а не панель справа */
+  center?: boolean;
 }) {
   const panel = useModal(open, onClose);
   const titleId = useId();
   const descriptionId = useId();
   if (!open || typeof document === "undefined") return null;
   return (
-    <ModalLayer onClose={onClose} align="right">
+    <ModalLayer onClose={onClose} align={center ? "center" : "right"}>
       <div
         ref={panel}
         role="dialog"
@@ -199,8 +202,9 @@ export function Sheet({
         style={{ "--sheet-w": `${width}px` } as React.CSSProperties}
         className={cn(
           "relative flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-feature border border-line bg-elevated shadow-[var(--shadow-pop)]",
-          "sm:h-full sm:max-h-none sm:w-[var(--sheet-w)] sm:max-w-[calc(100vw-48px)] sm:rounded-none sm:rounded-l-feature sm:border-y-0 sm:border-r-0",
-          "animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)] sm:animate-[sheet-in-x_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]",
+          center
+            ? "sm:max-h-[88dvh] sm:w-[var(--sheet-w)] sm:max-w-[calc(100vw-48px)] sm:rounded-feature animate-[pop_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
+            : "sm:h-full sm:max-h-none sm:w-[var(--sheet-w)] sm:max-w-[calc(100vw-48px)] sm:rounded-none sm:rounded-l-feature sm:border-y-0 sm:border-r-0 animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)] sm:animate-[sheet-in-x_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]",
         )}
       >
         <div className="flex items-start gap-4 border-b border-line-subtle px-5 py-4 sm:px-6">
