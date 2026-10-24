@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BrandLogo } from "./brand";
 import { HeaderUser } from "./header-user";
 import { HeaderShell, PublicOnly } from "./nav-links";
-import { PRIMARY_NAV, SECONDARY_NAV } from "./shell/nav";
+import { SECONDARY_NAV } from "./shell/nav";
 import { MobileActivityBar } from "./shell/activity";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
@@ -34,40 +34,22 @@ export function SiteHeader() {
   );
 }
 
-/** Подвал: разделы продукта и второстепенное — о платформе, правила, FAQ */
+/** Подвал: одна строка — логотип, кто мы, год и второстепенные ссылки (разделы — в боковом меню и нижней панели) */
 export function SiteFooter() {
   return (
     <PublicOnly>
-      <footer className="mt-20 border-t border-line-subtle bg-shell">
-        <div className="mx-auto grid w-full max-w-product gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto_auto] md:gap-16 lg:px-8">
-          <div className="flex flex-col gap-4">
-            <Logo height={40} />
-            <p className="max-w-xs text-meta text-fg-3">Турниры и лобби по CS2 на серверах клуба F16 Arena.</p>
-            <span className="text-micro text-fg-4">© {new Date().getFullYear()} F16 Arena</span>
+      <footer className="mt-12 border-t border-line-subtle bg-shell">
+        <div className="flex flex-col gap-4 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Logo height={22} />
+            <span className="text-meta text-fg-3">Турниры и лобби по CS2 на серверах клуба F16 Arena · © {new Date().getFullYear()}</span>
           </div>
-          <nav aria-label="Разделы">
-            <div className="mb-3 text-meta font-medium text-fg-2">Разделы</div>
-            <ul className="space-y-1">
-              {PRIMARY_NAV.map((i) => (
-                <li key={i.href}>
-                  <Link href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
-                    {i.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <nav aria-label="Помощь">
-            <div className="mb-3 text-meta font-medium text-fg-2">Ещё</div>
-            <ul className="space-y-1">
-              {SECONDARY_NAV.map((i) => (
-                <li key={i.href}>
-                  <Link href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
-                    {i.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          <nav aria-label="Помощь" className="flex flex-wrap gap-x-5 gap-y-1">
+            {SECONDARY_NAV.map((i) => (
+              <Link key={i.href} href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
+                {i.label}
+              </Link>
+            ))}
           </nav>
         </div>
       </footer>

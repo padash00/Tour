@@ -6,7 +6,7 @@ import { liveMapOf, mapLabel } from "@/lib/maps";
 import type { MatchWithTeams } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
 import type { Tournament } from "@/lib/types";
-import { Button, Container, Status, cn, tournamentStatus } from "@/components/ds";
+import { Button, CARD_SECTION, Container, Status, cn, tournamentStatus } from "@/components/ds";
 import { HomeMyMatch } from "./home-my-match";
 import { TeamCta } from "./team-cta";
 
@@ -241,7 +241,7 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
     return map ? mapImages[map] : undefined;
   };
   return (
-    <Container className="flex flex-col gap-10 pb-12 pt-6 sm:pt-8">
+    <Container className="flex flex-col gap-5 pb-12 pt-6 sm:pt-8">
       <header>
         <h1 className="text-[30px] font-extrabold tracking-[-0.02em] text-fg sm:text-[34px]">Турниры по CS2 в F16 Arena</h1>
         <p className="mt-1 max-w-[62ch] text-[16px] text-fg-2">Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.</p>
@@ -249,13 +249,13 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
 
       <HomeMyMatch />
 
-      <section className="flex flex-col gap-3">
+      <section className={cn(CARD_SECTION, "flex flex-col gap-3 [&>div:first-child]:mb-1")}>
         <SectionHead title={featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"} href="/tournaments" link="Все турниры" />
         {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard />}
         <NextTournaments list={upcoming} />
       </section>
 
-      <section>
+      <section className={CARD_SECTION}>
         <SectionHead title="Как участвовать" />
         <ol className="grid gap-3 md:grid-cols-3">
           {HOW.map((s, i) => (
@@ -272,7 +272,7 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
       </section>
 
       {live.length > 0 && (
-        <section>
+        <section className={CARD_SECTION}>
           <SectionHead title="Матчи, которые идут сейчас" hint="Счёт текущей карты. Зелёным — кто ведёт." href="/matches" link="Все матчи" />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {live.map((m) => (
@@ -283,9 +283,10 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
       )}
 
       {results.length > 0 && (
-        <section>
+        <section className={cn(CARD_SECTION, "pb-0 sm:pb-0")}>
           <SectionHead title="Последние результаты" hint="Победитель выделен зелёным." href="/matches" link="Все матчи" />
-          <div className="divide-y divide-line-subtle overflow-hidden rounded-surface border border-line-subtle bg-surface">
+          {/* список во всю ширину карточки-раздела, без своей рамки */}
+          <div className="-mx-5 divide-y divide-line-subtle border-t border-line-subtle sm:-mx-6">
             {results.map((m) => (
               <ResultRow key={m.id} m={m} img={firstMap(m)} />
             ))}
