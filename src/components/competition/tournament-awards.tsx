@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Award, Crosshair, Crown, Gavel, HeartHandshake, Target } from "lucide-react";
+import { Activity, Award, Crosshair, Crown, Flame, HeartHandshake, Shield, Target, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Nomination } from "@/lib/nominations";
 import type { NominationKey } from "@/lib/nominations-core";
@@ -8,7 +8,7 @@ import { Avatar, CARD_SECTION, SectionTitle, TeamLogo, cn } from "@/components/d
 
 /*
  * Награды турнира по регламенту (lib/nominations-core): MVP, снайпер, рифлер, опорник — по статистике,
- * капитан и тренер — решение судей. Пока турнир идёт — «лидер сейчас», после финала — победитель.
+ * капитан — решение судей. Пока турнир идёт — «лидер сейчас», после финала — победитель.
  */
 
 const ICON: Record<NominationKey, LucideIcon> = {
@@ -16,8 +16,11 @@ const ICON: Record<NominationKey, LucideIcon> = {
   sniper: Target,
   rifler: Crosshair,
   support: HeartHandshake,
+  entry: Zap,
+  clutch: Shield,
+  stable: Activity,
+  multikill: Flame,
   captain: Award,
-  coach: Gavel,
 };
 
 /** Как выбирается — коротко, простыми словами (полное правило — в регламенте и админке) */
@@ -26,8 +29,11 @@ const HOW: Record<NominationKey, string> = {
   sniper: "Больше всего убийств из AWP и SSG 08",
   rifler: "Лучший рейтинг среди игроков без снайперки",
   support: "Ассисты, ослепления и урон гранатами",
+  entry: "Чаще всех делает первое убийство в раунде",
+  clutch: "Больше всего выиграл раундов последним живым",
+  stable: "Полезен почти в каждом раунде (KAST)",
+  multikill: "Больше всего эйсов и раундов с 4 убийствами",
   captain: "Выбирают судьи после финала",
-  coach: "Выбирают судьи после финала",
 };
 
 export function TournamentAwards({ nominations, rows, finished }: { nominations: Nomination[]; rows: LeaderboardRow[]; finished: boolean }) {
@@ -85,7 +91,7 @@ export function TournamentAwards({ nominations, rows, finished }: { nominations:
                   </span>
                 </div>
               ) : (
-                <div className="text-[14px] text-fg-3">{n.auto ? "Пока мало сыгранных карт" : "Решение ещё не принято"}</div>
+                <div className="text-[14px] text-fg-3">{n.auto ? "Пока никто не отличился" : "Решение ещё не принято"}</div>
               )}
             </div>
           );

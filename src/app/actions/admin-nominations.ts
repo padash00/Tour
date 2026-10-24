@@ -22,7 +22,7 @@ function refresh(t: { id: string; slug: string }) {
 }
 
 /**
- * Решение судей по номинации (Положение 5.5): игрок турнира и/или имя текстом (тренер — не пользователь сайта),
+ * Решение судей по номинации (Положение 5.5): игрок турнира и/или имя текстом,
  * команда (по умолчанию — команда выбранного игрока на турнире), примечание.
  */
 export async function setNomination(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -39,7 +39,7 @@ export async function setNomination(_prev: ActionResult, formData: FormData): Pr
   const note = text(formData.get("note"), 300);
   const rawTeam = String(formData.get("teamId") ?? "");
   let teamId = UUID.test(rawTeam) ? rawTeam : null;
-  if (!playerId && !name) return { error: def.freeText ? "Выберите игрока или впишите ФИО" : "Выберите игрока" };
+  if (!playerId && !name) return { error: "Выберите игрока" };
 
   // игрок и команда — только участники этого турнира
   const { data: roster } = await db()

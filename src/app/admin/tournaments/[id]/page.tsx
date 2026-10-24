@@ -726,7 +726,7 @@ function NominationCard({ t, n, regs }: { t: T; n: Nomination; regs: Registratio
         <input type="hidden" name="tournamentId" value={t.id} />
         <input type="hidden" name="key" value={n.key} />
         <select name="playerId" defaultValue={n.decision?.playerId ?? ""} className="field h-9 w-auto text-[13px]" aria-label="Игрок">
-          <option value="">{n.freeText ? "— не пользователь сайта —" : "— игрок —"}</option>
+          <option value="">— игрок —</option>
           {players.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nickname} · {p.team}
@@ -735,8 +735,8 @@ function NominationCard({ t, n, regs }: { t: T; n: Nomination; regs: Registratio
         </select>
         <input
           name="name"
-          defaultValue={n.decision && (!n.decision.playerId || n.freeText) ? n.decision.name : ""}
-          placeholder={n.freeText ? "ФИО тренера" : "ФИО (необязательно)"}
+          defaultValue={n.decision && !n.decision.playerId ? n.decision.name : ""}
+          placeholder="ФИО (необязательно)"
           maxLength={120}
           className="field h-9 w-56 text-[13px]"
         />

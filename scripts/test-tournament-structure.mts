@@ -14,6 +14,10 @@ import {
   bestRifler,
   bestSniper,
   bestSupport,
+  bestEntry,
+  bestClutch,
+  bestStable,
+  bestMultikill,
   eligibleLines,
   isRifler,
   isSniperWeapon,
@@ -171,6 +175,7 @@ await test("Жеребьёвка: протокол разбирается из �
 
 const line = (key: string, o: Partial<NominationLine> = {}): NominationLine => ({
   key, teamId: "A", maps: 4, teamMaps: 4, rounds: 80, assists: 10, flashAssists: 0, utilityDamage: 0, kast: 70, adr: 75, rating: 1,
+  firstKills: 0, firstDeaths: 0, clutches: 0, k3: 0, k4: 0, k5: 0,
   sniperKills: 0, loggedKills: 50, ...o,
 });
 
@@ -209,6 +214,16 @@ await test("Номинации: опорник — (ассисты + флеш-а
   const d = line("d", { assists: 28, rounds: 100, kast: 75 });
   assert.equal(bestSupport([d, c])?.line.key, "c", "равный индекс — выше KAST");
   assert.equal(bestSupport([line("z", { assists: 0 })]), null);
+});
+
+await test("Номинации: энтри, клатч, стабильность, мультикиллы", () => {
+  assert.equal(bestEntry([line("a", { firstKills: 9, firstDeaths: 9 }), line("b", { firstKills: 9, firstDeaths: 4 })])?.line.key, "b", "равно первых — лучше разница");
+  assert.equal(bestClutch([line("a", { clutches: 2 }), line("b", { clutches: 3 })])?.line.key, "b");
+  assert.equal(bestClutch([line("a")]), null, "ни одного клатча — номинанта нет");
+  assert.equal(bestStable([line("a", { kast: 80 }), line("b", { kast: 75 })])?.line.key, "a");
+  assert.equal(bestMultikill([line("a", { k4: 5 }), line("b", { k5: 1 })])?.line.key, "b", "эйс важнее 4K");
+  assert.equal(bestMultikill([line("a", { k3: 4 })]), null);
+  assert.equal(bestEntry([line("a", { firstKills: 20, maps: 1 }), line("b", { firstKills: 3 })])?.line.key, "b", "меньше половины карт команды — не участвует");
 });
 
 await test("Дипломы: места I–III (3–4 — тоже III), 4-е место без диплома, номинация с командой", () => {

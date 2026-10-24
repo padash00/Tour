@@ -1,9 +1,9 @@
 /**
- * Индивидуальные номинации турнира (Положение: MVP, снайпер, рифлер, опорник, капитан, тренер).
+ * Индивидуальные номинации турнира (MVP, снайпер, рифлер, опорник, энтри, клатч, стабильность, мультикиллы, капитан).
  * Чистая логика без базы — покрыта тестом scripts/test-tournament-structure.mts.
  *
  * Кандидаты по статистике — только подсказка судьям: решение судей (таблица tournament_nominations)
- * всегда главнее. Капитан и тренер — только решением судей.
+ * всегда главнее. Капитан — только решением судей.
  *
  * Общее правило допуска (как у остальных наград): игрок сыграл не меньше половины карт своей команды
  * (минимум одну) и хотя бы один раунд.
@@ -19,7 +19,7 @@
  *   за раунд дают 0,28. При равенстве — KAST.
  */
 
-export type NominationKey = "mvp" | "sniper" | "rifler" | "support" | "captain" | "coach";
+export type NominationKey = "mvp" | "sniper" | "rifler" | "support" | "entry" | "clutch" | "stable" | "multikill" | "captain";
 
 export type NominationDef = {
   key: NominationKey;
@@ -28,8 +28,6 @@ export type NominationDef = {
   auto: boolean;
   /** как выбирается кандидат — показывается судьям в админке */
   rule: string;
-  /** участник — не пользователь сайта (тренер): имя вводится текстом */
-  freeText?: boolean;
 };
 
 export const NOMINATIONS: NominationDef[] = [
@@ -37,8 +35,11 @@ export const NOMINATIONS: NominationDef[] = [
   { key: "sniper", title: "Лучший снайпер", auto: true, rule: "Больше всего убийств из AWP и SSG 08 по логу сервера; при равенстве — за раунд." },
   { key: "rifler", title: "Лучший рифлер", auto: true, rule: "Лучший F16 Rating среди игроков, у кого снайперские убийства < 30% всех; при равенстве — ADR." },
   { key: "support", title: "Лучший опорник", auto: true, rule: "(Ассисты + флеш-ассисты) за раунд + урон гранатами / 100 за раунд; при равенстве — KAST." },
+  { key: "entry", title: "Лучший энтри-фраггер", auto: true, rule: "Больше всего первых убийств в раунде; при равенстве — разница первых убийств и первых смертей." },
+  { key: "clutch", title: "Клатч-мастер", auto: true, rule: "Больше всего выигранных клатчей (последний живой в команде против одного и более); при равенстве — F16 Rating." },
+  { key: "stable", title: "Самый стабильный игрок", auto: true, rule: "Лучший KAST — доля раундов с убийством, ассистом, выживанием или разменом; при равенстве — F16 Rating." },
+  { key: "multikill", title: "Мастер мультикиллов", auto: true, rule: "Больше всего эйсов (5 убийств за раунд), затем раундов с 4 убийствами; при равенстве — 3 убийства за раунд." },
   { key: "captain", title: "Лучший капитан команды", auto: false, rule: "Решение судей." },
-  { key: "coach", title: "Лучший тренер", auto: false, rule: "Решение судей. Тренер может не быть пользователем сайта — укажите ФИО.", freeText: true },
 ];
 
 export const nominationTitle = (key: string) => NOMINATIONS.find((n) => n.key === key)?.title ?? key;
@@ -66,6 +67,12 @@ export type NominationLine = {
   kast: number;
   adr: number;
   rating: number;
+  firstKills: number;
+  firstDeaths: number;
+  clutches: number;
+  k3: number;
+  k4: number;
+  k5: number;
   /** убийства из AWP/SSG 08 по логу; null — лога с оружием нет */
   sniperKills: number | null;
   /** все убийства соперников по логу (для доли снайперских); null — лога нет */
@@ -116,4 +123,26 @@ export function bestSupport(lines: NominationLine[]): NominationPick | null {
     score: supportScore(best),
     value: `индекс ${fixed(supportScore(best))} · ассисты ${fixed(best.assists / r)}/р · флеш ${fixed(best.flashAssists / r)}/р · гранаты ${fixed(best.utilityDamage / r, 1)}/р`,
   };
+}
+
+export function bestEntry(lines: NominationLine[]): NominationPick | null {
+  const best = top(eligibleLines(lines), (l) => l.firstKills, (l) => l.firstKills - l.firstDeaths);
+  return best ? { line: best, score: best.firstKills, value: `${best.firstKills} первых убийств · ${best.firstKills - best.firstDeaths >= 0 ? "+" : ""}${best.firstKills - best.firstDeaths}` } : null;
+}
+
+export function bestClutch(lines: NominationLine[]): NominationPick | null {
+  const best = top(eligibleLines(lines), (l) => l.clutches, (l) => l.rating);
+  return best ? { line: best, score: best.clutches, value: `${best.clutches} выигранных клатчей` } : null;
+}
+
+export function bestStable(lines: NominationLine[]): NominationPick | null {
+  const best = top(eligibleLines(lines), (l) => l.kast, (l) => l.rating);
+  return best ? { line: best, score: best.kast, value: `KAST ${Math.round(best.kast)}%` } : null;
+}
+
+export function bestMultikill(lines: NominationLine[]): NominationPick | null {
+  const best = top(eligibleLines(lines), (l) => l.k5 * 1000 + l.k4, (l) => l.k3);
+  if (!best) return null;
+  const parts = [best.k5 && `${best.k5} эйс`, best.k4 && `${best.k4}×4K`, best.k3 && `${best.k3}×3K`].filter(Boolean);
+  return { line: best, score: best.k5 * 1000 + best.k4, value: parts.join(" · ") };
 }

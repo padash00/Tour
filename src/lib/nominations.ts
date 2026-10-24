@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { bestRifler, bestSniper, bestSupport, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
+import { bestClutch, bestEntry, bestMultikill, bestRifler, bestSniper, bestStable, bestSupport, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
 import { displayFullNames } from "./person-name";
 import { getPlayerLeaderboard, getTournamentWeaponKills, mvpOf } from "./stats";
 import { db } from "./supabase";
@@ -15,7 +15,7 @@ export type NominationTeam = Pick<Team, "id" | "name" | "tag" | "logo_url">;
 
 export type NominationPerson = {
   playerId: string | null;
-  /** имя для документов: displayFullName игрока или введённое судьями (тренер) */
+  /** имя для документов: displayFullName игрока или введённое судьями */
   name: string;
   team: NominationTeam | null;
 };
@@ -49,6 +49,12 @@ async function nominationLines(tournamentId: string) {
         kast: p.kast,
         adr: p.adr,
         rating: p.rating,
+        firstKills: p.firstKills,
+        firstDeaths: p.firstDeaths,
+        clutches: p.clutches,
+        k3: p.k3,
+        k4: p.k4,
+        k5: p.k5,
         sniperKills: hasWeapons ? (w?.sniper ?? 0) : null,
         loggedKills: hasWeapons ? (w?.total ?? 0) : null,
       };
@@ -75,6 +81,10 @@ export const getTournamentNominations = cache(async (tournamentId: string): Prom
     ["sniper", bestSniper(lines)],
     ["rifler", bestRifler(lines)],
     ["support", bestSupport(lines)],
+    ["entry", bestEntry(lines)],
+    ["clutch", bestClutch(lines)],
+    ["stable", bestStable(lines)],
+    ["multikill", bestMultikill(lines)],
   ] as const) {
     if (pick) computed.set(key, { playerId: pick.line.key, teamId: pick.line.teamId, value: pick.value });
   }
