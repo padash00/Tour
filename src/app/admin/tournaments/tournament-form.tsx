@@ -683,11 +683,11 @@ export function TournamentForm({
                     {img && (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="" className="absolute inset-0 size-full object-cover saturate-[0.55] brightness-[0.55]" />
-                        <span className="absolute inset-0 bg-gradient-to-t from-bg/80 to-transparent" />
+                        <img src={img} alt="" className="absolute inset-0 size-full object-cover" />
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
                       </>
                     )}
-                    <span className="relative text-[14px] font-semibold">{m.name}</span>
+                    <span className={cn("relative text-[14px] font-bold", img ? "text-white drop-shadow-sm" : "text-fg")}>{m.name}</span>
                     <span className={cn("absolute top-2.5 right-2.5 size-4 rounded grid place-items-center text-[10px]", on ? "bg-accent text-bg" : "border border-line-strong")}>
                       {on ? "✓" : ""}
                     </span>

@@ -58,19 +58,19 @@ export function MapTile({
       {image ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.55] brightness-[0.7]" />
-          <span className="absolute inset-0 bg-gradient-to-t from-bg via-bg to-transparent" />
+          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
         </>
       ) : (
         <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff0d,transparent_60%)]" />
       )}
-      <span className={cn("relative text-[17px] lg:text-[20px] font-semibold tracking-[-0.01em]", state === "banned" && "line-through decoration-1")}>
+      <span className={cn("relative text-[17px] font-bold tracking-[-0.01em] text-white drop-shadow-sm lg:text-[20px]", state === "banned" && "line-through decoration-1")}>
         {mapName(map)}
       </span>
       <span
         className={cn(
           "relative mt-0.5 text-[12px] h-4",
-          state === "picked" ? "text-accent" : state === "decider" ? "text-ok" : "text-fg-3",
+          state === "picked" || state === "decider" ? "font-semibold text-brand-from" : "text-white/80",
         )}
       >
         {caption ?? ""}

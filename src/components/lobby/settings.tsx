@@ -49,9 +49,9 @@ export function MapThumb({ map, image, className, children }: { map: string; ima
     <div className={cn("relative overflow-hidden", className)} style={{ background: `linear-gradient(135deg, ${a}, ${b})` }}>
       {image && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover saturate-[0.7] brightness-[0.75]" />
+        <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" />
       )}
-      <span className="absolute inset-0 bg-gradient-to-t from-bg/85 via-transparent to-transparent" />
+      <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
       {children}
     </div>
   );
@@ -363,11 +363,11 @@ function MapGrid({ s, ro, patch, maps, images }: { s: LobbySettings; ro: boolean
                 image={m.image ?? images[m.id]}
                 className={cn("h-[78px] rounded-[8px] border transition-all", on ? "border-accent ring-1 ring-accent" : "border-ink/[0.06] group-hover:border-ink/25")}
               >
-                <span className="absolute bottom-1.5 left-1.5 rounded-[4px] bg-black/60 px-1.5 py-0.5 text-[12px] font-medium text-fg">{mapLabel(m.id)}</span>
+                <span className="absolute bottom-1.5 left-2 text-[13.5px] font-bold text-white drop-shadow-sm">{mapLabel(m.id)}</span>
                 {on && s.map_choice === "host" && s.best_of > 1 && (
                   <span className="num absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-accent text-[11px] font-bold text-accent-ink">{idx + 1}</span>
                 )}
-                {m.id.includes("@") && <span className="absolute left-1.5 top-1.5 rounded-[4px] bg-black/60 px-1 text-[10px] text-fg-2">мастерская</span>}
+                {m.id.includes("@") && <span className="absolute left-1.5 top-1.5 rounded-[6px] bg-black/60 px-1.5 py-0.5 text-[11px] font-semibold text-white">мастерская</span>}
               </MapThumb>
             </button>
           );

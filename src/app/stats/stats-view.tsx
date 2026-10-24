@@ -136,16 +136,16 @@ function MapStatCard({ r, rank, image, maxPlayed }: { r: MapAgg; rank: number; i
       <div className="relative h-36 overflow-hidden" style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}>
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" loading="lazy" className={cn("absolute inset-0 h-full w-full object-cover brightness-[0.72] saturate-[0.75]", unplayed && "grayscale")} />
+          <img src={image} alt="" loading="lazy" className={cn("absolute inset-0 h-full w-full object-cover", unplayed && "grayscale")} />
         ) : (
           <span className="absolute inset-0 bg-[radial-gradient(120%_90%_at_100%_0%,#ffffff14,transparent_60%)]" />
         )}
-        <span className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-        <span className={cn("num absolute left-3 top-3 grid h-7 min-w-7 place-items-center rounded-control px-1.5 text-meta font-semibold backdrop-blur-sm", rank === 1 && !unplayed ? "bg-accent text-accent-ink" : "bg-black/45 text-fg-2")}>
+        <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+        <span className={cn("num absolute left-3 top-3 grid h-7 min-w-7 place-items-center rounded-control px-1.5 text-meta font-semibold backdrop-blur-sm", rank === 1 && !unplayed ? "bg-accent text-accent-ink" : "bg-black/55 text-white")}>
           {rank}
         </span>
-        {unplayed && <span className="absolute right-3 top-3 rounded-control bg-black/45 px-2 py-1 text-micro text-fg-3 backdrop-blur-sm">ещё не играли</span>}
-        <div className="absolute inset-x-4 bottom-3 text-[22px] font-semibold tracking-[-0.02em] text-fg">{mapName(r.map)}</div>
+        {unplayed && <span className="absolute right-3 top-3 rounded-control bg-black/55 px-2 py-1 text-micro text-white backdrop-blur-sm">ещё не играли</span>}
+        <div className="absolute inset-x-4 bottom-3 text-[22px] font-bold tracking-[-0.02em] text-white drop-shadow-sm">{mapName(r.map)}</div>
       </div>
 
       <div className="grid grid-cols-4 border-t border-line-subtle">
