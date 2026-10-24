@@ -160,7 +160,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           Открыть в CS2: положите файл в папку game\csgo и введите в консоли playdemo имя_файла.
         </p>
       )}
-      {m.status === "finished" && m.team1 && m.team2 && (
+      {(m.status === "finished" || (m.status === "live" && m.maps.some((x) => x.status === "finished"))) && m.team1 && m.team2 && (
         <div className="mt-5">
           <SocialDownloads
             base={`/matches/${m.id}/image`}

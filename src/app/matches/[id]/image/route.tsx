@@ -98,7 +98,9 @@ async function svgPng(svg: string | Buffer, width: number) {
 export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/image">) {
   const { id } = await ctx.params;
   const m = await getMatch(id);
-  if (!m || m.status !== "finished" || m.tournament.status === "draft" || !m.team1 || !m.team2) {
+  // серия ещё идёт (BO3 на третьей карте) — картинки по уже сыгранным картам можно скачать сразу
+  const seriesLive = m?.status === "live" && m.maps.some((x) => x.status === "finished");
+  if (!m || (m.status !== "finished" && !seriesLive) || m.tournament.status === "draft" || !m.team1 || !m.team2) {
     return new Response("Матч ещё не сыгран", { status: 404 });
   }
   const statsMode = req.nextUrl.searchParams.get("f") === "stats";
@@ -127,6 +129,9 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
   const t1: Side = { id: s1.id, name: s1.name, tag: s1.tag, pic: pic1 };
   const t2: Side = { id: s2.id, name: s2.name, tag: s2.tag, pic: pic2 };
   const w1 = m.winner_id === m.team1_id;
+  // во время серии победителя нет — обе команды яркие
+  const bright1 = seriesLive || w1;
+  const bright2 = seriesLive || !w1;
 
   const maps = m.maps.filter((x) => x.status === "finished").sort((a, b) => a.map_number - b.map_number);
   const rounds = all ?? [];
@@ -169,7 +174,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
     );
     const headers = new Headers(image.headers);
     // админские картинки не должны оседать в общем кэше CDN
-    headers.set("Cache-Control", access.private ? "private, no-store" : "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400");
+    headers.set("Cache-Control", access.private || seriesLive ? "private, no-store" : "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400");
     if (req.nextUrl.searchParams.get("download")) headers.set("Content-Disposition", `attachment; filename="${name}"`);
     return new Response(image.body, { status: 200, headers });
   };
@@ -390,7 +395,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
           letterSpacing: 4,
         }}
       >
-        РЕЗУЛЬТАТ
+        {seriesLive ? "СЧЁТ СЕРИИ" : "РЕЗУЛЬТАТ"}
       </div>
     </div>
   );
@@ -440,18 +445,18 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
 
   const scoreRow = (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: wide ? 14 : 0 }}>
-      {teamCol(t1, w1)}
+      {teamCol(t1, bright1)}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", fontSize: scoreFs, fontWeight: 700, lineHeight: 1, letterSpacing: -4 }}>
-          <span style={{ color: w1 ? WHITE : DIM }}>{m.team1_score}</span>
+          <span style={{ color: bright1 ? WHITE : DIM }}>{m.team1_score}</span>
           <span style={{ color: DIM, margin: wide ? "0 12px" : "0 24px", fontSize: scoreFs * 0.55 }}>–</span>
-          <span style={{ color: w1 ? DIM : WHITE }}>{m.team2_score}</span>
+          <span style={{ color: bright2 ? WHITE : DIM }}>{m.team2_score}</span>
         </div>
         <div style={{ display: "flex", marginTop: wide ? 8 : 18, padding: wide ? "3px 14px" : "6px 22px", border: `2px solid ${LIME}`, color: LIME, fontSize: wide ? 18 : 28, fontWeight: 700, letterSpacing: 2 }}>
           {`BO${m.best_of}`}
         </div>
       </div>
-      {teamCol(t2, !w1)}
+      {teamCol(t2, bright2)}
     </div>
   );
 
