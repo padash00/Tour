@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { liveMapOf, mapLabel, type LiveMap } from "@/lib/maps";
 import type { Match, Team } from "@/lib/types";
 import { Score, Status, TeamLogo, cn, matchStatus } from "@/components/ds";
 
 type RowMatch = Pick<Match, "id" | "status" | "best_of" | "team1_id" | "team2_id" | "team1_score" | "team2_score" | "winner_id" | "server_state" | "under_review"> & {
   team1: Pick<Team, "name" | "tag" | "logo_url"> | null;
   team2: Pick<Team, "name" | "tag" | "logo_url"> | null;
+  live_maps?: LiveMap[];
 };
 
 /**
@@ -14,6 +16,8 @@ type RowMatch = Pick<Match, "id" | "status" | "best_of" | "team1_id" | "team2_id
 export function MatchListRow({ m, meta, highlight }: { m: RowMatch; meta?: string; highlight?: string | null }) {
   const played = m.status === "live" || m.status === "finished";
   const winner = m.winner_id ? (m.winner_id === m.team1_id ? 1 : 2) : null;
+  // идущая карта — счёт по раундам, под ним карта (и счёт серии, если карт больше одной)
+  const lm = liveMapOf(m);
   const statusInfo = matchStatus(m.status, m.server_state === "ready", m.under_review);
   const mobileStatus = ["veto", "ready", "live"].includes(m.status) ? statusInfo : null;
   const mobileTone = mobileStatus
@@ -30,7 +34,19 @@ export function MatchListRow({ m, meta, highlight }: { m: RowMatch; meta?: strin
       <div className="min-w-0 flex-1">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
           {side(m.team1, m.team1_id)}
-          {played ? <Score a={m.team1_score} b={m.team2_score} winner={m.status === "finished" ? winner : null} size="sm" /> : <span className="text-micro font-semibold text-fg-3">VS</span>}
+          {lm ? (
+            <span className="flex flex-col items-center">
+              <Score a={lm.team1_score} b={lm.team2_score} size="sm" />
+              <span className="num text-[10px] text-live">
+                {mapLabel(lm.map_name)}
+                {m.best_of > 1 && ` · ${m.team1_score}:${m.team2_score}`}
+              </span>
+            </span>
+          ) : played ? (
+            <Score a={m.team1_score} b={m.team2_score} winner={m.status === "finished" ? winner : null} size="sm" />
+          ) : (
+            <span className="text-micro font-semibold text-fg-3">VS</span>
+          )}
           {side(m.team2, m.team2_id, true)}
         </div>
         {(meta || mobileStatus) && (

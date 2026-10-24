@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MoveHorizontal } from "lucide-react";
 import { THIRD_PLACE_TITLE, roundTitle } from "@/lib/bracket";
+import { liveMapOf, mapLabel } from "@/lib/maps";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
@@ -53,6 +54,11 @@ function Node({ m }: { m: MatchWithTeams }) {
 
   const live = m.status === "live" || m.status === "veto" || m.status === "ready";
   const showScore = finished || m.status === "live";
+  // идущая карта: в BO1 в слотах — раунды (счёт серии до конца карты 0:0), в BO3 — серия, раунды в шапке
+  const lm = liveMapOf(m);
+  const rounds = lm && m.best_of === 1;
+  const s1 = rounds ? lm.team1_score : m.team1_score;
+  const s2 = rounds ? lm.team2_score : m.team2_score;
 
   return (
     <Link
@@ -67,11 +73,18 @@ function Node({ m }: { m: MatchWithTeams }) {
       <div className="flex h-[14px] items-center justify-between px-2 pt-1 text-[10px] text-fg-3">
         <span className="num">
           #{m.number} · BO{m.best_of}
+          {lm && (
+            <span className="text-live">
+              {" "}
+              · {mapLabel(lm.map_name)}
+              {!rounds && ` ${lm.team1_score}:${lm.team2_score}`}
+            </span>
+          )}
         </span>
         <MatchStatusBadge status={m.status} compact />
       </div>
-      <Slot team={m.team1} score={m.team1_score} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} />
-      <Slot team={m.team2} score={m.team2_score} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} />
+      <Slot team={m.team1} score={s1} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} />
+      <Slot team={m.team2} score={s2} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} />
     </Link>
   );
 }

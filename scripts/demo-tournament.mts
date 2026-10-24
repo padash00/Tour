@@ -3,7 +3,9 @@
 //
 //   npm run demo -- seed               16 команд × 5 игроков, анкеты, заявки, документы, одобрение, check-in
 //   npm run demo -- play [--fast]      жеребьёвка, сетка, вето и матчи (по умолчанию — вживую, ~10–12 минут)
+//   npm run demo -- seed --copy-real   турнир — полная копия oskemen-2026 (настройки, регламент, призы)
 //   npm run demo -- play --servers     то же на настоящих серверах: автопилот, агент, MatchZy (прогон дня турнира)
+//   npm run demo -- play --servers --bots   на серверах по-настоящему играют боты 5×5, вето — в темпе капитанов (часы)
 //   npm run demo -- status             статус турнира, матчи и счёт
 //   npm run demo -- cleanup            удалить все демо-данные и проверить, что ничего не осталось
 //
@@ -28,15 +30,17 @@ const { signedLogQuery } = await import("../src/lib/server/ingest-signature");
 const command = process.argv[2];
 const fast = process.argv.includes("--fast");
 const servers = process.argv.includes("--servers");
+const bots = process.argv.includes("--bots");
+const copyReal = process.argv.includes("--copy-real");
 const site = (process.env.DEMO_SITE_URL ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
 const token = process.env.MATCHZY_TOKEN ?? "";
 
-const options = { transport: httpTransport(site, token, signedLogQuery), fast, site, servers };
+const options = { transport: httpTransport(site, token, signedLogQuery), fast, site, servers, bots, copyReal };
 try {
   if (command === "seed") await seedDemo(options);
   else if (command === "play") {
     if (!token) throw new Error("Нет MATCHZY_TOKEN в .env.local — без него сайт не примет события матчей");
-    console.log(`События → ${site} (${fast ? "быстро" : "вживую"}${servers ? ", на настоящих серверах" : ""})`);
+    console.log(`События → ${site} (${fast ? "быстро" : "вживую"}${servers ? ", на настоящих серверах" : ""}${bots ? ", игра ботами" : ""})`);
     await playDemo(options);
   } else if (command === "status") await statusDemo(options);
   else if (command === "cleanup") {

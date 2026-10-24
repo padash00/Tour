@@ -15,12 +15,15 @@ import {
   type StageMatch,
 } from "./formats";
 import { db } from "./supabase";
+import type { LiveMap } from "./maps";
 import type { BracketSyncRow, Match, MatchMap, SeriesResult, StageCreateMode, SyncBracketResult, Team, Tournament, VetoActionRow } from "./types";
 import { VETO_STEP_SECONDS, vetoState } from "./veto";
 
-export type MatchWithTeams = Match & { team1: Team | null; team2: Team | null };
+export type MatchWithTeams = Match & { team1: Team | null; team2: Team | null; live_maps?: LiveMap[] };
 
 const MATCH_SELECT = "*, team1:teams!matches_team1_id_fkey(*), team2:teams!matches_team2_id_fkey(*)";
+const LIVE_MAPS = "live_maps:match_maps(map_number, map_name, status, team1_score, team2_score)";
+
 
 // Геттеры для страниц обёрнуты в React cache(): generateMetadata и страница в одном рендере делают один
 // запрос. Вне рендера (Server Actions, маршруты API) cache() ничего не кэширует. Логика, которой нужно
@@ -29,7 +32,7 @@ const MATCH_SELECT = "*, team1:teams!matches_team1_id_fkey(*), team2:teams!match
 export const getTournamentMatches = cache(async (tournamentId: string): Promise<MatchWithTeams[]> => {
   const { data } = await db()
     .from("matches")
-    .select(MATCH_SELECT)
+    .select(`${MATCH_SELECT}, ${LIVE_MAPS}`)
     .eq("tournament_id", tournamentId)
     .order("number");
   return (data ?? []) as MatchWithTeams[];
@@ -531,7 +534,7 @@ export async function recomputeSeries(matchId: string) {
 export async function getUpcomingMatches(limit = 6) {
   const { data } = await db()
     .from("matches")
-    .select(`${MATCH_SELECT}, tournament:tournaments!inner(id, name, slug, status)`)
+    .select(`${MATCH_SELECT}, ${LIVE_MAPS}, tournament:tournaments!inner(id, name, slug, status)`)
     .in("status", ["upcoming", "veto", "ready", "live"])
     .neq("tournament.status", "draft")
     .not("team1_id", "is", null)

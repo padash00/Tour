@@ -37,6 +37,7 @@ import {
   invalidDemoTeams,
   type DemoTeam,
 } from "./demo-data";
+import { instancePort, rcon } from "./rcon";
 import { pick, rngFrom, ROLES, simulateMap, type Rng, type SimTeam, type TeamKey } from "./demo-sim";
 
 // ───────────────────────── отправка событий
@@ -104,6 +105,10 @@ export type DemoOptions = {
   journal?: string;
   /** прогон на настоящих серверах: автопилот, агент, MatchZy (см. начало файла) */
   servers?: boolean;
+  /** вместе с servers: на серверах играют боты 5×5 (настоящая игра, события шлёт MatchZy), вето — в темпе капитанов */
+  bots?: boolean;
+  /** seed: турнир — копия настоящего (REAL_SLUG) со всеми настройками, регламентом и призами */
+  copyReal?: boolean;
 };
 
 type Ctx = Required<Omit<DemoOptions, "seed">> & { rng: Rng };
@@ -114,6 +119,8 @@ const context = (o: DemoOptions): Ctx => ({
   log: o.log ?? ((s) => console.log(s)),
   journal: o.journal ?? DEFAULT_INGEST_JOURNAL,
   servers: !!o.servers,
+  bots: !!o.servers && !!o.bots,
+  copyReal: !!o.copyReal,
   rng: rngFrom(o.seed ?? Date.now() % 2 ** 31),
 });
 
@@ -218,6 +225,15 @@ export async function seedDemo(o: DemoOptions) {
     .throwOnError();
   const organizer = org!.id;
 
+  // копия настоящего турнира: все его настройки, регламент, призы и спонсоры; своё — только адрес, имя, статус и даты
+  let copy: Record<string, unknown> = {};
+  if (o.copyReal) {
+    const { data: real } = await db().from("tournaments").select("*").eq("slug", REAL_SLUG).single().throwOnError();
+    const OWN = ["id", "slug", "name", "status", "created_at", "updated_at", "bracket_published_at", "playoff_created_at", "starts_at",
+      "registration_opens_at", "registration_closes_at", "checkin_opens_at", "checkin_closes_at", "autopilot"];
+    const rest = Object.fromEntries(Object.entries(real!).filter(([k]) => !OWN.includes(k)));
+    copy = { ...rest, description: `Генеральный прогон: копия «${real!.name}» со всеми настройками. Команды и игроки вымышлены, на серверах играют боты. Будет удалён после проверки.` };
+  }
   const { data: t } = await db()
     .from("tournaments")
     .insert({
@@ -244,6 +260,7 @@ export async function seedDemo(o: DemoOptions) {
       starts_at: startsAt,
       location: "Усть-Каменогорск",
       description: "Демонстрационный турнир: команды, игроки и матчи вымышлены и будут удалены после показа. Ранние раунды BO1, полуфиналы, матч за 3-е место и финал — BO3.",
+      ...copy,
     })
     .select("*")
     .single()
@@ -350,6 +367,7 @@ async function runVeto(ctx: Ctx, matchId: string, organizer: string) {
     await audit(organizer, "match.veto_start", { type: "match", id: m.id });
     m = (await getMatch(matchId))!;
   }
+  if (ctx.bots) return runCaptainsVeto(ctx, m);
   const steps: string[] = [];
   for (let guard = 0; m.status === "veto" && guard < 20; guard++) {
     const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
@@ -363,6 +381,46 @@ async function runVeto(ctx: Ctx, matchId: string, organizer: string) {
   }
   if (steps.length) ctx.log(`  #${m.number} вето: ${steps.join(" ")} → ${m.maps.map((x) => mapLabel(x.map_name)).join(", ")}`);
   return m;
+}
+
+/**
+ * Вето в темпе капитанов: ход через 5–30 с после начала шага, примерно каждый пятый шаг капитан «молчит» —
+ * тогда карту выбирает таймер сайта (60 с, applyDueVetoTimeouts на синхронизации агента), как на турнире.
+ */
+async function runCaptainsVeto(ctx: Ctx, first: MatchFull) {
+  let m = first;
+  for (let guard = 0; m.status === "veto" && guard < 30; guard++) {
+    const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
+    if (!state.current || state.current.action === "decider") {
+      await sleep(3000); // decider и завершение вето пишет сайт
+    } else if (ctx.rng() < 0.2) {
+      await waitVetoStep(m.id, m.veto.length, (VETO_STEP_SECONDS + 90) * 1000);
+    } else {
+      await sleep(5000 + ctx.rng() * 25_000);
+      const fresh = (await getMatch(m.id))!;
+      if (fresh.status === "veto" && fresh.veto.length === m.veto.length) {
+        const side = state.current.team === 1 ? fresh.team1 : fresh.team2;
+        await insertVetoAction(fresh, pick(ctx.rng, state.remaining), side?.id ?? null, side?.captain_id ?? null, false, new Date(Date.now() + VETO_STEP_SECONDS * 1000));
+      }
+    }
+    m = (await getMatch(m.id))!;
+  }
+  if (m.status === "veto") throw new Error(`Матч #${m.number}: вето не завершилось`);
+  const steps = [...m.veto]
+    .sort((a, b) => a.step - b.step)
+    .map((a) => `${a.action === "ban" ? "−" : a.action === "pick" ? "+" : "="}${mapLabel(a.map_name)}${a.auto ? " (таймер)" : ""}`);
+  ctx.log(`  #${m.number} вето: ${steps.join(" ")} → ${m.maps.map((x) => mapLabel(x.map_name)).join(", ")}`);
+  return m;
+}
+
+async function waitVetoStep(matchId: string, done: number, timeoutMs: number) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    await sleep(3000);
+    const m = (await getMatch(matchId))!;
+    if (m.status !== "veto" || m.veto.length !== done) return;
+  }
+  throw new Error("Таймер вето не сработал за 2,5 минуты — агент не синхронизируется?");
 }
 
 /** Составы матча → команды симуляции (роль и уровень игрока — из demo-data, уровень команды — по тегу) */
@@ -410,6 +468,7 @@ async function playSeries(ctx: Ctx, matchId: string) {
   let m = (await getMatch(matchId))!;
   if (!["ready", "live"].includes(m.status)) return;
   if (ctx.servers) m = await waitForServer(ctx, matchId);
+  if (ctx.bots) return playWithBots(ctx, m);
   else if (m.server_instance) throw new Error(`Матч #${m.number} назначен на сервер ${m.server_instance} — демо такие матчи не трогает`);
   const matchid = Number(m.matchzy_id);
   const { team1, team2 } = await simTeams(m);
@@ -462,6 +521,54 @@ async function playSeries(ctx: Ctx, matchId: string) {
   m = (await getMatch(matchId))!;
   const winnerName = m.winner_id === m.team1_id ? m.team1?.name : m.team2?.name;
   ctx.log(`  #${m.number} ${stageOf(m)}: ${m.team1?.name} ${m.team1_score}:${m.team2_score} ${m.team2?.name} — ${m.status === "finished" ? `победа ${winnerName}` : `статус ${m.status}`}`);
+}
+
+const BOTS_ON = "bot_quota_mode fill;bot_quota 10;bot_join_after_player 0;bot_difficulty 2;bot_chatter off";
+const START_AFTER_MS = 20_000; // разминка с ботами — потом старт, как админ по «.forcestart»
+const KNIFE_DECISION_MS = 20_000; // боты не пишут .stay/.switch — решение снимаем за них
+const MATCH_LIMIT_MS = 3 * 3600_000;
+
+/**
+ * Настоящая игра ботами: MatchZy загрузил матч (разминка), сервер добавляет 10 ботов, через 20 с — старт.
+ * Нож, игру, смену сторон, овертайм, итог карты и серии ведёт MatchZy и сам шлёт события на сайт.
+ * live.cfg на старте ставит bot_quota 0 — ботов возвращаем на каждом шаге.
+ */
+async function playWithBots(ctx: Ctx, m: MatchFull) {
+  const port = instancePort(m.server_instance!);
+  const started = Date.now();
+  let last = "";
+  let since = Date.now();
+  for (;;) {
+    const cur = (await getMatch(m.id))!;
+    if (["finished", "cancelled"].includes(cur.status)) break;
+    if (Date.now() - started > MATCH_LIMIT_MS) throw new Error(`Матч #${m.number}: за 3 часа не закончился`);
+    const status = await rcon(port, "get5_status").catch(() => "");
+    const state = /"gamestate"\s*:\s*"(\w+)"/.exec(status)?.[1] ?? "нет ответа";
+    const mapNo = /"map_number"\s*:\s*(\d+)/.exec(status)?.[1];
+    if (state !== last) {
+      const live = cur.maps.find((x) => x.status === "live");
+      ctx.log(`  #${m.number} ${m.server_instance}: ${state}${mapNo != null ? ` (карта ${Number(mapNo) + 1}${live ? ` ${mapLabel(live.map_name)}` : ""})` : ""} · ${cur.team1?.name} ${cur.team1_score}:${cur.team2_score} ${cur.team2?.name}`);
+      last = state;
+      since = Date.now();
+    }
+    if (["warmup", "knife", "going_live", "live", "waiting_for_knife_decision"].includes(state)) await rcon(port, BOTS_ON).catch(() => "");
+    if (state === "warmup" && Date.now() - since > START_AFTER_MS) {
+      await rcon(port, "css_start").catch(() => "");
+      since = Date.now();
+    }
+    if (state === "waiting_for_knife_decision" && Date.now() - since > KNIFE_DECISION_MS) {
+      await rcon(port, "css_skipveto").catch(() => "");
+      since = Date.now();
+    }
+    await sleep(5000);
+  }
+  await rcon(port, "bot_quota 0;bot_kick").catch(() => "");
+  const done = (await getMatch(m.id))!;
+  for (const x of [...done.maps].sort((a, b) => a.map_number - b.map_number)) {
+    if (x.status === "finished") ctx.log(`  #${m.number} ${mapLabel(x.map_name)}: ${done.team1?.name} ${x.team1_score}:${x.team2_score} ${done.team2?.name}`);
+  }
+  const winnerName = done.winner_id === done.team1_id ? done.team1?.name : done.team2?.name;
+  ctx.log(`  #${m.number} ${stageOf(done)}: ${done.team1?.name} ${done.team1_score}:${done.team2_score} ${done.team2?.name} — ${done.status === "finished" ? `победа ${winnerName}` : `статус ${done.status}`} (${Math.round((Date.now() - started) / 60_000)} мин)`);
 }
 
 /**
@@ -521,7 +628,11 @@ export async function playDemo(o: DemoOptions) {
   if (ctx.servers) {
     // карты и раунды — как у настоящего турнира, чтобы прогон грузил те же карты (в том числе Workshop)
     const { data: real } = await db().from("tournaments").select("map_pool, knife_round, overtime").eq("slug", REAL_SLUG).maybeSingle().throwOnError();
-    await db().from("tournaments").update({ autopilot: true, ...(real ?? {}), updated_at: now() }).eq("id", t.id).throwOnError();
+    // боты не умеют выбрать сторону после ножа (.stay/.switch пишет только игрок команды-победителя, админской
+    // команды у MatchZy нет) — с ботами стороны чередуются, нож проверяется в матче с людьми
+    const knife = ctx.bots ? { knife_round: false } : {};
+    await db().from("tournaments").update({ autopilot: true, ...(real ?? {}), ...knife, updated_at: now() }).eq("id", t.id).throwOnError();
+    if (ctx.bots && real?.knife_round) ctx.log("Нож выключен: боты не выбирают сторону после ножа — стороны чередуются");
     const { data: insts } = await db().from("server_instances").select("name, running").order("name").throwOnError();
     stoppedBefore = (insts ?? []).filter((i) => !i.running).map((i) => i.name);
     ctx.log(`Режим серверов: автопилот включён${real ? `, карты как у ${REAL_SLUG}: ${real.map_pool.map(mapLabel).join(", ")}` : ""}`);

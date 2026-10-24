@@ -54,3 +54,12 @@ export function slugify(text: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
 }
+
+/** Карта матча для счёта в списках: у идущего матча — раунды текущей карты */
+export type LiveMap = { map_number: number; map_name: string; status: string; team1_score: number; team2_score: number };
+
+/** Идущая карта матча (счёт по раундам) — для сетки и списков, где иначе виден только счёт серии */
+export function liveMapOf(m: { status: string; live_maps?: LiveMap[] }): LiveMap | null {
+  if (m.status !== "live") return null;
+  return m.live_maps?.find((x) => x.status === "live") ?? null;
+}
