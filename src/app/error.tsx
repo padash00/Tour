@@ -3,9 +3,24 @@
 import { useEffect } from "react";
 import { Button, Container, Eyebrow } from "@/components/ds";
 
+/** признаки «вкладка открыта на старой версии сайта» после выкладки */
+const STALE_BUILD = /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Minified React error #306|Failed to find Server Action|reading 'call'/i;
+
 /** Ошибка на странице: спокойное сообщение без технических деталей */
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
+    // сайт обновился, а вкладка держит старую версию (ChunkLoadError, React #306 — модуль не найден):
+    // один раз перезагружаем страницу — она подхватит новую версию; повтор в течение минуты не зацикливает
+    if (STALE_BUILD.test(String(error.message ?? error))) {
+      try {
+        const last = Number(sessionStorage.getItem("f16-stale-reload") ?? 0);
+        if (Date.now() - last > 60_000) {
+          sessionStorage.setItem("f16-stale-reload", String(Date.now()));
+          location.reload();
+          return;
+        }
+      } catch {}
+    }
     console.error(error);
     // ошибки сервера (с digest) уже записаны в журнал на сервере — шлём только браузерные
     if (!error.digest) {
