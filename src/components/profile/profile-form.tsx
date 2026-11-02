@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useId, useState, useTransition } from "react";
+import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
 import type { ProfileActionResult } from "@/app/actions/player-profile";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
@@ -28,6 +28,32 @@ const fromProfile = (p: PlayerProfile | null, defaultCity: string): Values => ({
   course: p?.course ?? "",
   study_group: p?.study_group ?? "",
 });
+
+/** Поля в порядке формы — для перехода к первой ошибке */
+const FIELD_ORDER: { key: keyof ProfileErrors; label: string }[] = [
+  { key: "last_name", label: "Фамилия" },
+  { key: "first_name", label: "Имя" },
+  { key: "patronymic", label: "Отчество" },
+  { key: "birth_date", label: "Дата рождения" },
+  { key: "phone", label: "Телефон" },
+  { key: "city", label: "Город" },
+  { key: "occupation", label: "Работа или учёба" },
+  { key: "organization", label: "Место работы или учёбы" },
+  { key: "position", label: "Должность" },
+  { key: "course", label: "Курс / класс" },
+  { key: "study_group", label: "Группа" },
+  { key: "consent", label: "Согласие на обработку данных" },
+];
+
+/** Прокрутить к первому полю с ошибкой, поставить в него курсор и сказать, что не так */
+function showFirstError(form: HTMLFormElement, errs: Partial<Record<string, string | undefined>>, notify: (msg: string) => void) {
+  const first = FIELD_ORDER.find((f) => errs[f.key]);
+  if (!first) return;
+  const el = form.querySelector<HTMLElement>(`[name="${first.key}"]`);
+  el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  el?.focus({ preventScroll: true });
+  notify(`${first.label}: ${errs[first.key]}`);
+}
 
 /** Поле ввода организации с подсказками (стартовый список и уже введённые названия) */
 export function OrganizationInput({ suggestions, ...props }: React.ComponentProps<typeof Input> & { suggestions: string[] }) {
@@ -78,8 +104,12 @@ export function ProfileForm({
   const [consent, setConsent] = useState(false);
   const [local, setLocal] = useState<ProfileErrors | null>(null);
 
+  const formRef = useRef<HTMLFormElement>(null);
+
   useEffect(() => {
     if (state?.success) toast.success(state.success);
+    // ошибки с сервера — так же, как проверка в браузере: к первому полю и сообщение
+    if (state?.fields && formRef.current) showFirstError(formRef.current, state.fields, toast.error);
   }, [state, toast]);
 
   const errors: Record<string, string | undefined> = { ...(state?.fields ?? {}), ...(local ?? {}) };
@@ -97,6 +127,8 @@ export function ProfileForm({
     if (Object.values(all).some(Boolean)) {
       e.preventDefault();
       setLocal(all);
+      // ошибка может быть выше экрана (телефон) — иначе кажется, что кнопка не работает
+      showFirstError(e.currentTarget, all, toast.error);
     } else setLocal(null);
   };
 
@@ -120,7 +152,7 @@ export function ProfileForm({
   );
 
   return (
-    <form action={formAction} onSubmit={onSubmit} noValidate className="space-y-8" data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
+    <form ref={formRef} action={formAction} onSubmit={onSubmit} noValidate className="space-y-8" data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
       {next && <input type="hidden" name="next" value={next} />}
       {playerId && <input type="hidden" name="playerId" value={playerId} />}
       {locked && (
@@ -187,7 +219,7 @@ export function ProfileForm({
             {occupation === "studies" && (
               <>
                 {text("course", "Курс / класс", { required: true, placeholder: "2", max: 20 })}
-                {text("study_group", "Группа", { required: true, placeholder: "ИС-21", max: 30 })}
+                {text("study_group", "Группа", { required: true, placeholder: "ИС-21", hint: "Школьникам — буква класса, например «Б»", max: 30 })}
               </>
             )}
           </div>

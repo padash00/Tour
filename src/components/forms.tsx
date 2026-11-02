@@ -7,6 +7,21 @@ import { useToast } from "./toast";
 import { Spinner, buttonClass, cn } from "./ui";
 
 export type ActionResult = { error?: string; success?: string } | null;
+
+/**
+ * Форма не отправилась из-за ошибок: после отрисовки ошибок прокрутить к первому неверному полю
+ * и поставить в него курсор. На телефоне ошибка часто выше экрана — без этого кажется, что кнопка не работает.
+ */
+export function revealFirstError(form: HTMLFormElement) {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const el = form.querySelector<HTMLElement>('[aria-invalid="true"]');
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus({ preventScroll: true });
+    }),
+  );
+}
 export type FormAction = (prev: ActionResult, formData: FormData) => Promise<ActionResult>;
 
 export function SubmitButton({

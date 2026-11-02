@@ -4,7 +4,7 @@
 import { ImagePlus } from "lucide-react";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { checkTagAvailable } from "@/app/actions/team";
-import type { ActionResult, FormAction } from "@/components/forms";
+import { revealFirstError, type ActionResult, type FormAction } from "@/components/forms";
 import { Button, Callout, Field, Input, Panel, Textarea, TeamLogo, cn } from "@/components/ds";
 import { useToast } from "@/components/toast";
 import type { Team } from "@/lib/types";
@@ -84,7 +84,11 @@ export function TeamEditor({ action, team, mode }: { action: FormAction; team?: 
       action={formAction}
       onSubmit={(e) => {
         setSubmitted(true);
-        if (Object.keys(errors).length || (tagState === "taken" && !tagUnchanged)) e.preventDefault();
+        if (Object.keys(errors).length || (tagState === "taken" && !tagUnchanged)) {
+          e.preventDefault();
+          revealFirstError(e.currentTarget);
+          toast.error("Проверьте отмеченные поля");
+        }
       }}
       noValidate
       className="space-y-6"
