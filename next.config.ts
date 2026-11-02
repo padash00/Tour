@@ -27,6 +27,9 @@ const nextConfig: NextConfig = {
   // выгрузка Excel (только сервер, админка) — пакет загружается Node.js как есть, без сборки в бандл
   serverExternalPackages: ["exceljs"],
   experimental: {
+    // кэш страниц в браузере при переходах по ссылкам: по умолчанию 5 минут — новые команды и заявки
+    // было видно только после Ctrl+Shift+R. 30 с — как обновление страниц на сервере (revalidate = 30)
+    staleTimes: { static: 30 },
     serverActions: {
       // картинки до 3 МБ (обложка турнира, карты, логотип) + поля формы; у Vercel предел тела запроса 4,5 МБ
       bodySizeLimit: "4mb",
