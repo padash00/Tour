@@ -1291,6 +1291,8 @@ export type Database = {
           prompted_at: string | null
           study_group: string | null
           telegram: string | null
+          telegram_chat_id: number | null
+          telegram_verified_at: string | null
           updated_at: string
           updated_by: string | null
           whatsapp: boolean
@@ -1313,6 +1315,8 @@ export type Database = {
           prompted_at?: string | null
           study_group?: string | null
           telegram?: string | null
+          telegram_chat_id?: number | null
+          telegram_verified_at?: string | null
           updated_at?: string
           updated_by?: string | null
           whatsapp?: boolean
@@ -1335,6 +1339,8 @@ export type Database = {
           prompted_at?: string | null
           study_group?: string | null
           telegram?: string | null
+          telegram_chat_id?: number | null
+          telegram_verified_at?: string | null
           updated_at?: string
           updated_by?: string | null
           whatsapp?: boolean
@@ -1830,6 +1836,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telegram_link_tokens: {
+        Row: {
+          created_at: string
+          player_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          player_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          player_id?: string
+          token?: string
+        }
+        Relationships: []
       }
       tournament_applications: {
         Row: {

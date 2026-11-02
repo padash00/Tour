@@ -154,8 +154,8 @@ export function normalizeTelegram(raw: unknown): string | null {
 }
 
 /** Нет контакта для связи (ни Telegram, ни WhatsApp) — напоминание игроку, анкету это не блокирует */
-export function missingContact(p: Pick<ProfileInput, "telegram" | "whatsapp"> | null | undefined): boolean {
-  return !!p && !p.whatsapp && !p.telegram;
+export function missingContact(p: (Pick<ProfileInput, "telegram" | "whatsapp"> & { telegram_chat_id?: number | null }) | null | undefined): boolean {
+  return !!p && !p.whatsapp && !p.telegram && !p.telegram_chat_id;
 }
 
 export function isProfileComplete(p: ProfileLike | null | undefined): boolean {

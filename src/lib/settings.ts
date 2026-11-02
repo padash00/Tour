@@ -6,6 +6,8 @@ import { db } from "./supabase";
 export const SETTINGS = {
   STEAM_API_KEY: { label: "Steam Web API key", secret: true, hint: "steamcommunity.com/dev/apikey — ники и аватары игроков" },
   FACEIT_API_KEY: { label: "FACEIT API key", secret: true, hint: "developers.faceit.com — Server side key, уровень и ELO" },
+  TELEGRAM_BOT_TOKEN: { label: "Токен Telegram-бота", secret: true, hint: "@BotFather → бот → API Token. Бот подтверждает Telegram игроков и шлёт уведомления. После смены токена нажмите «Подключить бота» в разделе Telegram." },
+  TELEGRAM_BOT_USERNAME: { label: "Имя Telegram-бота", secret: false, hint: "Без @, например f16_tournament_bot — для ссылки «Подтвердить Telegram»." },
   PLAYER_IP: {
     label: "IP сервера для игроков",
     secret: false,

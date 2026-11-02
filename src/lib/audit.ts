@@ -22,4 +22,7 @@ export async function notify(playerIds: string[], title: string, body?: string, 
   await db()
     .from("notifications")
     .insert(playerIds.map((player_id) => ({ player_id, title, body: body ?? null, link: link ?? null })));
+  // то же — в Telegram тем, кто подтвердил его через бота (ошибки бота уведомление на сайте не ломают)
+  const { notifyTelegram } = await import("./telegram");
+  await notifyTelegram(playerIds, title, body, link);
 }

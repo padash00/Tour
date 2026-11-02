@@ -111,3 +111,17 @@ export async function adminDeleteProfile(_prev: ActionResult, formData: FormData
   revalidatePath("/admin", "layout");
   return { success: "Персональные данные игрока удалены" };
 }
+
+/** Ссылка на бота для подтверждения Telegram: t.me/<бот>?start=<одноразовый токен на 30 минут> */
+export async function startTelegramLink(): Promise<{ url?: string; error?: string }> {
+  const player = await requirePlayer("/me/profile");
+  const { telegramConfig } = await import("@/lib/telegram");
+  const cfg = await telegramConfig();
+  if (!cfg.username || !cfg.token) return { error: "Бот пока не подключён — напишите организатору" };
+  const { randomBytes } = await import("node:crypto");
+  const token = randomBytes(12).toString("base64url");
+  await db().from("telegram_link_tokens").delete().eq("player_id", player.id);
+  const { error } = await db().from("telegram_link_tokens").insert({ token, player_id: player.id });
+  if (error) return { error: "Не удалось создать ссылку — попробуйте ещё раз" };
+  return { url: `https://t.me/${cfg.username}?start=${token}` };
+}

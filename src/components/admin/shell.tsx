@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Activity, ArrowLeft, Radio, Gauge, LayoutGrid, MonitorPlay, ScrollText, Search, Server, Settings, Shield, Swords, Trophy, User, type LucideIcon } from "lucide-react";
+import { Activity, ArrowLeft, Radio, Gauge, LayoutGrid, MonitorPlay, ScrollText, Search, Send, Server, Settings, Shield, Swords, Trophy, User, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
 
 
@@ -15,6 +15,7 @@ import { cn } from "@/components/ui";
 const ICONS: Record<string, LucideIcon> = {
   overview: LayoutGrid,
   online: Radio,
+  telegram: Send,
   tournaments: Trophy,
   matches: Swords,
   board: MonitorPlay,
@@ -34,6 +35,7 @@ export const ADMIN_SECTIONS = [
   { href: "/admin/tournaments", label: "Турниры", short: "Турниры", icon: "tournaments", hint: "создать, заявки, сетка", group: "Подготовка" },
   { href: "/admin/teams", label: "Команды", short: "Команды", icon: "teams", hint: "составы и капитаны", group: "Подготовка" },
   { href: "/admin/players", label: "Игроки", short: "Игроки", icon: "players", hint: "поиск, права, баны", group: "Подготовка" },
+  { href: "/admin/telegram", label: "Telegram", short: "Telegram", icon: "telegram", hint: "бот и рассылка", group: "Подготовка" },
   { href: "/admin/logs", label: "Журнал", short: "Журнал", icon: "logs", hint: "кто что сделал, ошибки", group: "Система" },
   { href: "/admin/settings", label: "Настройки", short: "Настройки", icon: "settings", hint: "сайт, карты, правила", group: "Система" },
 ] as const;
@@ -151,6 +153,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   servers: "Серверы",
   teams: "Команды",
   players: "Игроки",
+  telegram: "Telegram",
   logs: "Журнал",
   settings: "Настройки",
   new: "Новый",

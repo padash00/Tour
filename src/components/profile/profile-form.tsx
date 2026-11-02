@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
-import type { ProfileActionResult } from "@/app/actions/player-profile";
+import { startTelegramLink, type ProfileActionResult } from "@/app/actions/player-profile";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
 import { Button, Callout, Checkbox, ConfirmDialog, Dialog, Field, Input, Radio, cn } from "@/components/ds";
@@ -249,6 +249,7 @@ export function ProfileForm({
             />
             {text("telegram", "Telegram", { placeholder: "@nickname", max: 40 })}
           </div>
+          {!admin && <TelegramVerify verifiedAt={profile?.telegram_verified_at ?? null} />}
         </div>
       </fieldset>
 
@@ -390,5 +391,38 @@ export function DeleteProfileButton({
       </Button>
       <ConfirmDialog open={open} onCancel={() => setOpen(false)} onConfirm={run} title={title} description={description} confirmLabel={label} danger loading={pending} />
     </>
+  );
+}
+
+/** Подтверждение Telegram через бота: одноразовая ссылка t.me/<бот>?start=<токен> */
+function TelegramVerify({ verifiedAt }: { verifiedAt: string | null }) {
+  const toast = useToast();
+  const [pending, start] = useTransition();
+  const [opened, setOpened] = useState(false);
+  if (verifiedAt) {
+    return <p className="mt-3 text-meta font-semibold text-ok">✓ Telegram подтверждён — уведомления приходят в бот @f16_tournament_bot</p>;
+  }
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        loading={pending}
+        onClick={() =>
+          start(async () => {
+            const r = await startTelegramLink();
+            if (r.error || !r.url) return toast.error(r.error ?? "Не удалось открыть бота");
+            window.open(r.url, "_blank", "noopener");
+            setOpened(true);
+          })
+        }
+      >
+        Подтвердить через Telegram-бота
+      </Button>
+      <span className="text-meta text-fg-3">
+        {opened ? "В боте нажмите «Старт», затем обновите эту страницу." : "Бот пришлёт уведомления о команде, заявках и матчах."}
+      </span>
+    </div>
   );
 }
