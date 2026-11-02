@@ -20,6 +20,7 @@ import type { MatchWithTeams } from "@/lib/matches";
 import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, manualBracketAction } from "@/app/actions/admin-match";
 import { bracketSize, seedOrder } from "@/lib/bracket";
+import { BracketDraft, type DraftTeam } from "@/components/admin/bracket-draft";
 import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ActionToggle } from "@/components/admin/action-toggle";
@@ -137,7 +138,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         <>
           <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />
           {(t.bracket_type === "single_elimination" || t.bracket_type === "double_elimination") && approved.length >= 2 && (
-            <ManualPairs t={t} regs={approved} fill={String(sp.fill ?? "")} seed={String(sp.s ?? "")} onlyCheckedIn={sp.ci === "1"} />
+            <ManualPairs t={t} regs={approved} thirdPlace={hasThirdPlaceMatch(t)} fill={String(sp.fill ?? "")} seed={String(sp.s ?? "")} onlyCheckedIn={sp.ci === "1"} />
           )}
         </>
       )}
@@ -589,7 +590,9 @@ async function ManualPairs({
   fill,
   seed,
   onlyCheckedIn,
+  thirdPlace,
 }: {
+  thirdPlace: boolean;
   t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official">;
   regs: RegistrationWithTeam[];
   fill: string;
@@ -605,35 +608,26 @@ async function ManualPairs({
   // предпросмотр: «случайно» (кнопка даёт новое зерно), «по рейтингу» — сильные разведены, иначе — как сейчас на сайте
   const mode = fill === "elo" ? "elo" : fill === "random" || !t.bracket_published_at ? "random" : "current";
   let pairs: [string | null, string | null][] = [];
-  if (mode === "random") pairs = fromList(shuffleBySeed(regs, seed || t.id));
+  if (mode === "random") pairs = fromList(shuffleBySeed(regs, `${t.id}:${seed}`));
   if (mode === "elo") pairs = fromList([...regs].sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999) || elo(b) - elo(a)));
   if (mode === "current") {
     const { data } = await db().from("matches").select("position, team1_id, team2_id").eq("tournament_id", t.id).eq("bracket", "upper").eq("round", 1).order("position");
     pairs = (data ?? []).map((m) => [m.team1_id, m.team2_id]);
   }
-  if (pairs.length !== size / 2) pairs = fromList(shuffleBySeed(regs, seed || t.id));
+  if (pairs.length !== size / 2) pairs = fromList(shuffleBySeed(regs, `${t.id}:${seed}`));
   const ci = onlyCheckedIn ? "&ci=1" : "";
   const base = `/admin/tournaments/${t.id}?tab=bracket${ci}`;
-  const nextSeed = `${Date.now().toString(36)}${regs.length}`;
+  // номер перемешивания: каждое нажатие — следующий вариант (без времени в рендере — страница детерминирована)
+  const nextSeed = String((Number(seed) || 0) + 1);
   const chip = (href: string, label: string, on: boolean) => (
     <Link href={href} scroll={false} className={buttonClass(on ? "primary" : "secondary", "sm", "sm:h-10")}>
       {label}
     </Link>
   );
   const keep = `${fill ? `&fill=${fill}` : ""}${seed ? `&s=${seed}` : ""}`;
-  const options = [...regs].sort((a, b) => (a.team?.name ?? "").localeCompare(b.team?.name ?? "", "ru"));
-  const select = (name: string, value: string | null) => (
-    <select name={name} defaultValue={value ?? ""} className="field h-11 min-w-0 flex-1 text-[15px]">
-      <option value="">— проход без игры —</option>
-      {options.map((r) => (
-        <option key={r.team_id} value={r.team_id}>
-          {r.team?.name} · {elo(r) || "—"} ELO
-        </option>
-      ))}
-    </select>
-  );
+  const draftTeams: DraftTeam[] = regs.map((r) => ({ id: r.team_id, name: r.team?.name ?? "—", tag: r.team?.tag ?? "", logo: r.team?.logo_url ?? null, elo: elo(r) || null }));
   return (
-    <ActionForm action={manualBracketAction} className="mt-5 max-w-3xl">
+    <ActionForm action={manualBracketAction} className="mt-5">
       <div className="rounded-surface border border-line-subtle bg-surface p-6 shadow-[var(--shadow-soft)] space-y-4">
         <input type="hidden" name="tournamentId" value={t.id} />
         <input type="hidden" name="onlyCheckedIn" value={onlyCheckedIn ? "1" : ""} />
@@ -660,16 +654,7 @@ async function ManualPairs({
             Официальный турнир: по регламенту (п. 4.3) пары определяет жеребьёвка на платформе. Ручную расстановку используйте, только если это согласовано с организаторами.
           </p>
         )}
-        <div className="space-y-2.5">
-          {pairs.map(([a, b], p) => (
-            <div key={p} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="w-20 shrink-0 text-[14px] font-semibold text-fg-3">Матч {p + 1}</span>
-              {select(`m${p}a`, a)}
-              <span className="text-center text-[13px] font-semibold text-fg-3">vs</span>
-              {select(`m${p}b`, b)}
-            </div>
-          ))}
-        </div>
+        <BracketDraft key={`${mode}:${seed}:${onlyCheckedIn}`} teams={draftTeams} initial={pairs} thirdPlace={thirdPlace} />
         <SubmitButton size="md" confirm={t.bracket_published_at ? "Заменить опубликованную сетку этими парами?" : "Опубликовать сетку с этими парами? Она сразу появится на сайте."}>
           {t.bracket_published_at ? "Опубликовать новые пары" : "Опубликовать сетку"}
         </SubmitButton>
