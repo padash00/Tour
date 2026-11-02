@@ -31,7 +31,7 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
     <div className="space-y-6">
       <AdminHeader
         title="Команды"
-        description={`Активных команд: ${all.length}. Найдите команду по названию или тегу.`}
+        description={`Активных команд: ${all.length}. Нажмите на команду, чтобы исключить игрока, сменить капитана или распустить её.`}
         actions={
           <form className="w-full sm:w-80" role="search">
             <input name="q" defaultValue={q} placeholder="Название или тег" aria-label="Поиск команды" className="field !h-11 text-[15px]" />
@@ -60,7 +60,7 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
               return (
                 <tr key={t.id}>
                   <td>
-                    <Link href={`/teams/${t.tag}`} className="flex items-center gap-2.5 text-fg hover:text-accent">
+                    <Link href={`/admin/teams/${t.id}`} className="flex items-center gap-2.5 text-fg hover:text-accent">
                       <TeamLogo src={t.logo_url} tag={t.tag} size={24} />
                       <span className="font-medium">{t.name}</span>
                       <span className="text-[13px] text-fg-3">{t.tag}</span>

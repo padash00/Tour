@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Button, Container, Eyebrow } from "@/components/ds";
 
 /** признаки «вкладка открыта на старой версии сайта» после выкладки */
-const STALE_BUILD = /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Minified React error #306|Failed to find Server Action|reading 'call'/i;
+const STALE_BUILD = /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Minified React error #306|Failed to find Server Action|Server Action "?\w*"? was not found|reading 'call'/i;
 
 /** Ошибка на странице: спокойное сообщение без технических деталей */
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
