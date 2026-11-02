@@ -110,7 +110,9 @@ export async function manualBracketAction(_prev: ActionResult, formData: FormDat
     const blocked = await bracketDeleteBlocker(t.id);
     if (blocked) return { error: `Переставить нельзя: ${blocked}` };
   }
-  const regs = (await getTournamentRegistrations(t.id)).filter((r) => r.status === "approved");
+  const onlyCheckedIn = formData.get("onlyCheckedIn") === "1";
+  const regs = (await getTournamentRegistrations(t.id)).filter((r) => r.status === "approved" && (!onlyCheckedIn || r.checked_in_at));
+  if (regs.length < 2) return { error: `Недостаточно участников: ${regs.length}` };
   const byTeam = new Map(regs.map((r) => [r.team_id, r]));
   const size = bracketSize(Math.max(regs.length, t.bracket_type === "double_elimination" ? 4 : 2));
   const pairs: [string | null, string | null][] = [];
@@ -150,6 +152,8 @@ export async function manualBracketAction(_prev: ActionResult, formData: FormDat
   } catch (e) {
     return { error: `Не удалось создать сетку: ${(e as Error).message}` };
   }
+  // generate с seeding = manual закрывает прежний протокол жеребьёвки на странице турнира
+  await audit(admin.id, "bracket.generate", { type: "tournament", id: t.id }, { teams: regs.length, seeding: "manual", onlyCheckedIn });
   await audit(admin.id, "bracket.manual", { type: "tournament", id: t.id }, {
     pairs: pairs.map(([a, b]) => `${a ? byTeam.get(a)!.team?.name : "—"} vs ${b ? byTeam.get(b)!.team?.name : "—"}`),
   });

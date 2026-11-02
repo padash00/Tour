@@ -18,7 +18,7 @@ import { FORMATS, type FormatKind } from "@/lib/formats";
 import { MODES, type ModeKey } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { TournamentStatus } from "@/lib/types";
-import { deleteBracketAction, generateBracketAction, manualBracketAction } from "@/app/actions/admin-match";
+import { deleteBracketAction, manualBracketAction } from "@/app/actions/admin-match";
 import { bracketSize, seedOrder } from "@/lib/bracket";
 import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -137,7 +137,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         <>
           <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />
           {(t.bracket_type === "single_elimination" || t.bracket_type === "double_elimination") && approved.length >= 2 && (
-            <ManualPairs t={t} regs={approved} />
+            <ManualPairs t={t} regs={approved} fill={String(sp.fill ?? "")} seed={String(sp.s ?? "")} onlyCheckedIn={sp.ci === "1"} />
           )}
         </>
       )}
@@ -303,16 +303,11 @@ function LifecyclePanel({
       if (!hasBracket) {
         now = `Идёт подтверждение участия (check-in): подтвердили ${checkedIn} из ${approved} одобренных команд.`;
         next = "Создайте сетку";
-        hint = `В сетку попадут только команды, подтвердившие участие (${checkedIn}). Порядок: сначала ваши номера, затем по рейтингу.`;
+        hint = `В сетку попадут только команды, подтвердившие участие (${checkedIn}). Пары — случайно или вручную, с предпросмотром до публикации.`;
         action = (
-          <ActionForm action={generateBracketAction}>
-            <input type="hidden" name="tournamentId" value={t.id} />
-            <input type="hidden" name="seeding" value="elo" />
-            <input type="hidden" name="onlyCheckedIn" value="on" />
-            <SubmitButton size="lg" className="!text-[16px]" confirm={`Создать и опубликовать сетку для ${checkedIn} участников? Посев зафиксируется.`}>
-              Создать сетку →
-            </SubmitButton>
-          </ActionForm>
+          <Link href={`/admin/tournaments/${t.id}?tab=bracket&ci=1`} className={buttonClass("primary", "lg", "!text-[16px]")}>
+            Создать сетку →
+          </Link>
         );
       } else {
         now = "Сетка опубликована: команды уже видят своих соперников.";
@@ -528,12 +523,6 @@ function BracketTab({
       {draw.redo && <span className="text-fg-3"> (повторная)</span>}, порядок: {drawOrderText(draw)}
     </div>
   ) : null;
-  const checkedInBox = (
-    <label className="flex items-center gap-2.5 text-[15px] text-fg-2">
-      <input type="checkbox" name="onlyCheckedIn" defaultChecked className="size-5 accent-[var(--color-accent)]" />
-      Только команды, подтвердившие участие ({checkedIn})
-    </label>
-  );
 
   return (
     <div className="max-w-3xl">
@@ -554,20 +543,6 @@ function BracketTab({
             </Link>
           </div>
           <div className="pt-5 border-t border-ink/[0.06] flex flex-wrap items-center gap-4">
-            <ActionForm action={generateBracketAction} className="flex flex-wrap items-center gap-3">
-              <input type="hidden" name="tournamentId" value={t.id} />
-              <input type="hidden" name="seeding" value="draw" />
-              <input type="hidden" name="redo" value="on" />
-              {checkedInBox}
-              <SubmitButton
-                size="sm"
-                variant="secondary"
-                className={BTN}
-                confirm="Провести жеребьёвку заново? Текущая сетка удалится. Можно только пока ни один матч не начат."
-              >
-                Провести жеребьёвку заново
-              </SubmitButton>
-            </ActionForm>
             <ActionForm action={deleteBracketAction}>
               <input type="hidden" name="tournamentId" value={t.id} />
               <SubmitButton size="sm" variant="danger" className={BTN} confirm="Удалить сетку? Можно только пока ни один матч не начат.">
@@ -583,33 +558,6 @@ function BracketTab({
             свободные места пропускаются — соперник проходит дальше автоматически.
           </div>
           {thirdPlaceNote}
-          <ActionForm action={generateBracketAction}>
-            <div className="rounded-surface border border-accent/30 bg-surface p-6 space-y-4">
-              <input type="hidden" name="tournamentId" value={t.id} />
-              <input type="hidden" name="seeding" value="draw" />
-              <div className="text-[18px] font-bold text-fg">Жеребьёвка (случайный порядок)</div>
-              <p className="text-[15px] text-fg-2 leading-relaxed">
-                Команды расставляются в сетке случайно, честно и без возможности подкрутить. Результат сохраняется в журнале,
-                виден здесь и на странице турнира. Пока ни один матч не начат, жеребьёвку можно провести заново.
-              </p>
-              {checkedInBox}
-              <SubmitButton size="md" confirm="Провести жеребьёвку и опубликовать сетку?">
-                Провести жеребьёвку
-              </SubmitButton>
-            </div>
-          </ActionForm>
-          <ActionForm action={generateBracketAction}>
-            <div className="rounded-surface border border-line-subtle bg-surface shadow-[var(--shadow-soft)] p-6 space-y-4">
-              <input type="hidden" name="tournamentId" value={t.id} />
-              <input type="hidden" name="seeding" value="elo" />
-              <div className="text-[18px] font-bold text-fg">По рейтингу</div>
-              <p className="text-[15px] text-fg-2 leading-relaxed">Сильные команды разводятся по сетке. Сначала берутся номера, которые вы задали во вкладке «Регистрация», потом средний рейтинг FACEIT основного состава.</p>
-              {checkedInBox}
-              <SubmitButton size="md" variant="secondary" confirm="Создать и опубликовать сетку? Посев зафиксируется.">
-                Создать сетку по рейтингу
-              </SubmitButton>
-            </div>
-          </ActionForm>
         </div>
       )}
     </div>
@@ -618,20 +566,61 @@ function BracketTab({
 
 // ───────────────────────── Ручная расстановка пар
 
-async function ManualPairs({ t, regs }: { t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official">; regs: RegistrationWithTeam[] }) {
+/** Детерминированное перемешивание по строке-зерну: предпросмотр не меняется при обновлении страницы */
+function shuffleBySeed<X>(list: X[], seed: string): X[] {
+  let h = 2166136261;
+  for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  const rnd = () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function ManualPairs({
+  t,
+  regs: allRegs,
+  fill,
+  seed,
+  onlyCheckedIn,
+}: {
+  t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official">;
+  regs: RegistrationWithTeam[];
+  fill: string;
+  seed: string;
+  onlyCheckedIn: boolean;
+}) {
+  const regs = onlyCheckedIn ? allRegs.filter((r) => r.checked_in_at) : allRegs;
   const size = bracketSize(Math.max(regs.length, t.bracket_type === "double_elimination" ? 4 : 2));
   const elo = (r: RegistrationWithTeam) => averageElo(r.roster.filter((p) => p.role === "main")) ?? 0;
-  // подстановка: текущие пары сетки, иначе — посев по рейтингу (сильные разведены)
+  const order = seedOrder(size);
+  const fromList = (list: RegistrationWithTeam[]): [string | null, string | null][] =>
+    Array.from({ length: size / 2 }, (_, p) => [list[order[2 * p] - 1]?.team_id ?? null, list[order[2 * p + 1] - 1]?.team_id ?? null]);
+  // предпросмотр: «случайно» (кнопка даёт новое зерно), «по рейтингу» — сильные разведены, иначе — как сейчас на сайте
+  const mode = fill === "elo" ? "elo" : fill === "random" || !t.bracket_published_at ? "random" : "current";
   let pairs: [string | null, string | null][] = [];
-  if (t.bracket_published_at) {
+  if (mode === "random") pairs = fromList(shuffleBySeed(regs, seed || t.id));
+  if (mode === "elo") pairs = fromList([...regs].sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999) || elo(b) - elo(a)));
+  if (mode === "current") {
     const { data } = await db().from("matches").select("position, team1_id, team2_id").eq("tournament_id", t.id).eq("bracket", "upper").eq("round", 1).order("position");
     pairs = (data ?? []).map((m) => [m.team1_id, m.team2_id]);
   }
-  if (pairs.length !== size / 2) {
-    const byElo = [...regs].sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999) || elo(b) - elo(a));
-    const order = seedOrder(size);
-    pairs = Array.from({ length: size / 2 }, (_, p) => [byElo[order[2 * p] - 1]?.team_id ?? null, byElo[order[2 * p + 1] - 1]?.team_id ?? null]);
-  }
+  if (pairs.length !== size / 2) pairs = fromList(shuffleBySeed(regs, seed || t.id));
+  const ci = onlyCheckedIn ? "&ci=1" : "";
+  const base = `/admin/tournaments/${t.id}?tab=bracket${ci}`;
+  const nextSeed = `${Date.now().toString(36)}${regs.length}`;
+  const chip = (href: string, label: string, on: boolean) => (
+    <Link href={href} scroll={false} className={buttonClass(on ? "primary" : "secondary", "sm", "sm:h-10")}>
+      {label}
+    </Link>
+  );
+  const keep = `${fill ? `&fill=${fill}` : ""}${seed ? `&s=${seed}` : ""}`;
   const options = [...regs].sort((a, b) => (a.team?.name ?? "").localeCompare(b.team?.name ?? "", "ru"));
   const select = (name: string, value: string | null) => (
     <select name={name} defaultValue={value ?? ""} className="field h-11 min-w-0 flex-1 text-[15px]">
@@ -647,11 +636,25 @@ async function ManualPairs({ t, regs }: { t: Pick<T, "id" | "bracket_type" | "br
     <ActionForm action={manualBracketAction} className="mt-5 max-w-3xl">
       <div className="rounded-surface border border-line-subtle bg-surface p-6 shadow-[var(--shadow-soft)] space-y-4">
         <input type="hidden" name="tournamentId" value={t.id} />
-        <div className="text-[18px] font-bold text-fg">Вручную — кто с кем играет</div>
+        <input type="hidden" name="onlyCheckedIn" value={onlyCheckedIn ? "1" : ""} />
+        <div className="text-[18px] font-bold text-fg">{t.bracket_published_at ? "Переставить пары" : "Пары первого раунда — предпросмотр"}</div>
         <p className="text-[15px] leading-relaxed text-fg-2">
-          Выберите пары первого раунда. Каждая одобренная команда — ровно один раз; «проход без игры» — команда сразу проходит дальше.
-          {t.bracket_published_at ? " Текущая сетка заменится — можно, пока ни один матч не начат." : ""}
+          Это черновик: на сайте ничего не появится, пока вы не нажмёте «Опубликовать сетку». Перемешивайте случайно сколько угодно раз или меняйте пары
+          вручную в списках. «Проход без игры» — команда сразу проходит дальше.
+          {t.bracket_published_at ? " Опубликованная сетка заменится — можно, пока ни один матч не начат." : ""}
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {chip(`${base}&fill=random&s=${nextSeed}`, mode === "random" ? "🎲 Перемешать ещё раз" : "🎲 Случайно", mode === "random")}
+          {chip(`${base}&fill=elo`, "По рейтингу (сильные разведены)", mode === "elo")}
+          {t.bracket_published_at ? chip(`/admin/tournaments/${t.id}?tab=bracket${ci}`, "Как сейчас на сайте", mode === "current") : null}
+          <Link
+            href={`/admin/tournaments/${t.id}?tab=bracket${onlyCheckedIn ? "" : "&ci=1"}${keep}`}
+            scroll={false}
+            className="ml-auto text-[14px] font-semibold text-accent hover:underline"
+          >
+            {onlyCheckedIn ? "✓ Только подтвердившие участие" : "Все одобренные"} · {regs.length}
+          </Link>
+        </div>
         {t.is_official && (
           <p className="rounded-control border border-warn/30 bg-warn-dim px-4 py-3 text-[14.5px] text-fg-2">
             Официальный турнир: по регламенту (п. 4.3) пары определяет жеребьёвка на платформе. Ручную расстановку используйте, только если это согласовано с организаторами.
@@ -667,8 +670,8 @@ async function ManualPairs({ t, regs }: { t: Pick<T, "id" | "bracket_type" | "br
             </div>
           ))}
         </div>
-        <SubmitButton size="md" confirm={t.bracket_published_at ? "Заменить сетку этими парами?" : "Создать и опубликовать сетку с этими парами?"}>
-          {t.bracket_published_at ? "Переставить пары" : "Создать сетку с этими парами"}
+        <SubmitButton size="md" confirm={t.bracket_published_at ? "Заменить опубликованную сетку этими парами?" : "Опубликовать сетку с этими парами? Она сразу появится на сайте."}>
+          {t.bracket_published_at ? "Опубликовать новые пары" : "Опубликовать сетку"}
         </SubmitButton>
       </div>
     </ActionForm>
