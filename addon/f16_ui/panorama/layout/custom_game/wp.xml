@@ -8,7 +8,7 @@
 			<Panel class="wp-top">
 				<Panel class="wp-heading">
 					<Panel class="wp-brand-row" hittest="false">
-						<Image class="wp-logo" src="s2r://panorama/images/custom_game/f16_logo_png.vtex" scaling="stretch-to-fit-preserve-aspect" hittest="false" />
+						<Image class="wp-logo" src="s2r://panorama/images/custom_game/f16_logo_png.vtex" hittest="false" />
 						<Label class="wp-brand stratum-medium-tf" text="F16 ARENA · СКИНЫ" />
 					</Panel>
 					<Label id="wp-title" class="wp-title stratum-bold-tf" text="{s:wp_title}" />
