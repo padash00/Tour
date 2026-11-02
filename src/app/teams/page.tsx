@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Users } from "lucide-react";
 import { listTeams } from "@/lib/data";
+import { parseTeamSort, sortHref, sortTeams, type TeamSortKey } from "@/lib/team-sort";
 import { ClientFilter } from "@/components/public/client-filter";
 import { TeamCta } from "@/components/public/team-cta";
 import { TeamsNav } from "@/components/team/teams-nav";
@@ -20,8 +21,16 @@ const plural = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "команда"
 
 const playersWord = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "игрока" : "игроков");
 
-export default async function TeamsPage() {
-  const teams = await listTeams();
+export default async function TeamsPage(props: PageProps<"/teams">) {
+  const sort = parseTeamSort(await props.searchParams);
+  const teams = sortTeams(await listTeams(), sort.key, sort.dir);
+  const arrow = (k: TeamSortKey) => (sort.key === k ? (sort.dir === "asc" ? " ↑" : " ↓") : "");
+  const head = (k: TeamSortKey, label: string, right = false) => (
+    <Link href={sortHref("/teams", {}, k, sort)} scroll={false} className={`hover:text-fg ${right ? "text-right" : ""} ${sort.key === k ? "text-fg" : ""}`}>
+      {label}
+      {arrow(k)}
+    </Link>
+  );
 
   return (
     <Container className="pt-8 sm:pt-10">
@@ -47,10 +56,10 @@ export default async function TeamsPage() {
                 Ничего не найдено — попробуйте другое название или тег.
               </p>
               <div className="hidden grid-cols-[minmax(0,1fr)_180px_90px_100px_20px] gap-4 border-b border-line-subtle px-5 py-3 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3 sm:grid">
-                <span>Команда</span>
-                <span>Регион</span>
-                <span className="text-right">Игроки</span>
-                <span className="text-right">ELO основы</span>
+                {head("name", "Команда")}
+                {head("region", "Регион")}
+                {head("players", "Игроки", true)}
+                {head("elo", "ELO основы", true)}
                 <span />
               </div>
               <div className="divide-y divide-line-subtle">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listTeams } from "@/lib/data";
+import { parseTeamSort, sortHref, sortTeams, type TeamSortKey } from "@/lib/team-sort";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { db } from "@/lib/supabase";
 import { EmptyState, TeamLogo } from "@/components/ui";
@@ -14,7 +15,8 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().toLowerCase() : "";
   const all = await listTeams();
-  const teams = q ? all.filter((t) => t.name.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q)) : all;
+  const sort = parseTeamSort(sp);
+  const found = q ? all.filter((t) => t.name.toLowerCase().includes(q) || t.tag.toLowerCase().includes(q)) : all;
 
   const [{ data: captains }, { data: regs }] = await Promise.all([
     db().from("players").select("id, nickname").in("id", [...new Set(all.map((t) => t.captain_id))]),
@@ -26,6 +28,16 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
   ]);
   const captainName = new Map((captains ?? []).map((p) => [p.id, p.nickname]));
   const regByTeam = new Map((regs ?? []).map((r) => [r.team_id, r]));
+  const teams = sortTeams(found, sort.key, sort.dir, (t) => captainName.get(t.captain_id) ?? "");
+  const arrow = (k: TeamSortKey) => (sort.key === k ? (sort.dir === "asc" ? " ↑" : " ↓") : "");
+  const th = (k: TeamSortKey, label: string, right = false) => (
+    <th className={right ? "text-right" : undefined}>
+      <Link href={sortHref("/admin/teams", q ? { q } : {}, k, sort)} scroll={false} className={`hover:text-accent ${sort.key === k ? "text-fg" : ""}`}>
+        {label}
+        {arrow(k)}
+      </Link>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -44,14 +56,14 @@ export default async function AdminTeamsPage(props: PageProps<"/admin/teams">) {
         <TableBox minWidth={900} maxHeight={720}>
           <thead>
             <tr>
-              <th>Команда</th>
-              <th>Капитан</th>
-              <th className="text-right">Игроков</th>
-              <th className="text-right">Средний ELO</th>
+              {th("name", "Команда")}
+              {th("captain", "Капитан")}
+              {th("players", "Игроков", true)}
+              {th("elo", "Средний ELO", true)}
               <th>Турнир</th>
               <th>Статус</th>
               <th>Код приглашения</th>
-              <th>Создана</th>
+              {th("created", "Создана")}
             </tr>
           </thead>
           <tbody>
