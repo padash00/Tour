@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
-import { cancelTeamApplications } from "@/lib/applications";
-import { getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration, syncOpenRosters } from "@/lib/data";
-import { cancelTeamInvites } from "@/lib/invites";
+import { cancelPlayerApplications, cancelTeamApplications } from "@/lib/applications";
+import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration, syncOpenRosters } from "@/lib/data";
+import { cancelPlayerInvites, cancelTeamInvites } from "@/lib/invites";
 import { registrationError } from "@/lib/registration-errors";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
@@ -44,6 +44,78 @@ export async function adminKickMember(_prev: ActionResult, formData: FormData): 
   await audit(admin.id, "admin.team.kick", { type: "team", id: team.id }, { player: target.player.steam_id });
   revalidateTeam(team.id, team.tag);
   return { success: `${target.player.nickname} исключён из команды` };
+}
+
+/** Игрок по нику, SteamID (17 цифр) или ссылке на профиль Steam */
+async function findPlayer(raw: string): Promise<{ id: string; nickname: string } | { error: string }> {
+  const q = raw.trim();
+  if (!q) return { error: "Введите ник или SteamID игрока" };
+  const steam = /(\d{17})/.exec(q)?.[1];
+  if (steam) {
+    const { data } = await db().from("players").select("id, nickname").eq("steam_id", steam).maybeSingle();
+    return data ?? { error: "Игрок с таким SteamID ещё не входил на сайт через Steam" };
+  }
+  const { data } = await db().from("players").select("id, nickname").ilike("nickname", q.replace(/[%_]/g, "\\$&")).limit(5);
+  if (!data?.length) return { error: `Игрок «${q}» не найден. Он должен хотя бы раз войти на сайт через Steam. Можно ввести SteamID.` };
+  if (data.length > 1) return { error: `Ников «${q}» несколько — введите SteamID игрока` };
+  return data[0];
+}
+
+export async function adminAddMember(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const team = await getTeamById(String(formData.get("teamId")));
+  if (!team || team.disbanded_at) return { error: "Команда не найдена" };
+  const found = await findPlayer(String(formData.get("player") ?? ""));
+  if ("error" in found) return { error: found.error };
+  const want = formData.get("role") === "substitute" ? "substitute" : "player";
+
+  const other = await getActiveMembership(found.id);
+  if (other) return { error: other.team.id === team.id ? `${found.nickname} уже в этой команде` : `${found.nickname} уже в команде ${other.team.name}. Сначала исключите его там.` };
+  if (team.coach_id === found.id) return { error: `${found.nickname} — тренер этой команды, игроком быть не может` };
+
+  // те же проверки, что при вступлении по ссылке: под блокировкой команды, с лимитом основы и запаса
+  const { data: role, error } = await db().rpc("join_team", { p_team: team.id, p_player: found.id, p_max_main: MAX_MAIN, p_max_subs: MAX_SUBS });
+  if (error?.message.includes("team_full")) return { error: `В команде нет мест: основа ${MAX_MAIN}, запас ${MAX_SUBS}` };
+  if (error?.message.includes("already_member")) return { error: `${found.nickname} уже в другой команде` };
+  if (error || !role) return { error: "Не удалось добавить игрока — обновите страницу" };
+
+  let finalRole = role as string;
+  if (finalRole !== want) {
+    const members = await getTeamMembers(team.id);
+    const m = members.find((x) => x.player_id === found.id);
+    const r = m
+      ? await db().rpc("set_team_member_role", { p_team: team.id, p_actor: team.captain_id, p_member: m.id, p_role: want, p_max_main: MAX_MAIN, p_max_subs: MAX_SUBS })
+      : null;
+    if (r && !r.error) finalRole = want;
+  }
+  await cancelPlayerApplications(found.id);
+  await cancelPlayerInvites(found.id);
+  const label = finalRole === "substitute" ? "в запас" : "в основу";
+  await notify([found.id], `Администратор добавил вас в команду ${team.name} (${label})`, undefined, "/team");
+  await notify([team.captain_id], `Администратор добавил ${found.nickname} в ${team.name} (${label})`, undefined, "/team");
+  await audit(admin.id, "admin.team.add", { type: "team", id: team.id }, { player: found.id, role: finalRole });
+  revalidateTeam(team.id, team.tag);
+  if (finalRole !== want) return { success: `${found.nickname} добавлен ${label}: в «${want === "substitute" ? "запасе" : "основе"}» нет места` };
+  return { success: `${found.nickname} добавлен ${label}` };
+}
+
+export async function adminSetRole(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const team = await getTeamById(String(formData.get("teamId")));
+  if (!team || team.disbanded_at) return { error: "Команда не найдена" };
+  const members = await getTeamMembers(team.id);
+  const target = members.find((m) => m.id === String(formData.get("memberId")));
+  if (!target) return { error: "Игрок уже не в команде — обновите страницу" };
+  if (target.player_id === team.captain_id) return { error: "Капитан всегда в основе" };
+  const role = formData.get("role") === "substitute" ? "substitute" : "player";
+  const { error } = await db().rpc("set_team_member_role", { p_team: team.id, p_actor: team.captain_id, p_member: target.id, p_role: role, p_max_main: MAX_MAIN, p_max_subs: MAX_SUBS });
+  if (error?.message.includes("main_full")) return { error: `В основе уже ${MAX_MAIN} игроков — сначала переведите кого-то в запас` };
+  if (error?.message.includes("subs_full")) return { error: `В запасе уже ${MAX_SUBS} игрока` };
+  if (error) return { error: "Не удалось изменить роль — обновите страницу" };
+  await syncOpenRosters(team.id);
+  await audit(admin.id, "admin.team.role", { type: "team", id: team.id }, { player: target.player.steam_id, role });
+  revalidateTeam(team.id, team.tag);
+  return { success: `${target.player.nickname} — ${role === "substitute" ? "в запасе" : "в основе"}` };
 }
 
 export async function adminMakeCaptain(_prev: ActionResult, formData: FormData): Promise<ActionResult> {

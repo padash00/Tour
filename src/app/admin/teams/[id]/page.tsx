@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { adminDisbandTeam, adminKickMember, adminMakeCaptain } from "@/app/actions/admin-team";
+import { adminAddMember, adminDisbandTeam, adminKickMember, adminMakeCaptain, adminSetRole } from "@/app/actions/admin-team";
+import { MAX_MAIN, MAX_SUBS } from "@/lib/data";
 import { requireAdmin } from "@/lib/auth";
 import { getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
@@ -71,6 +72,14 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
                     <td>
                       {!captain && !disbanded && (
                         <div className="flex flex-wrap justify-end gap-2">
+                          <ActionForm action={adminSetRole} inline>
+                            <input type="hidden" name="teamId" value={team.id} />
+                            <input type="hidden" name="memberId" value={m.id} />
+                            <input type="hidden" name="role" value={m.role === "substitute" ? "player" : "substitute"} />
+                            <SubmitButton variant="secondary" size="sm">
+                              {m.role === "substitute" ? "В основу" : "В запас"}
+                            </SubmitButton>
+                          </ActionForm>
                           <ActionForm action={adminMakeCaptain} inline>
                             <input type="hidden" name="teamId" value={team.id} />
                             <input type="hidden" name="memberId" value={m.id} />
@@ -95,6 +104,31 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
           </TableBox>
         )}
       </Panel>
+
+      {!disbanded && (
+        <Panel title="Добавить игрока" boxed>
+          <ActionForm action={adminAddMember} className="p-5">
+            <input type="hidden" name="teamId" value={team.id} />
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex min-w-[260px] flex-1 flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+                Ник или SteamID
+                <input name="player" required placeholder="dimon_kz или 7656119…" className="field" autoComplete="off" />
+              </label>
+              <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+                Роль
+                <select name="role" defaultValue="player" className="field w-44">
+                  <option value="player">Основа</option>
+                  <option value="substitute">Запас</option>
+                </select>
+              </label>
+              <SubmitButton>Добавить</SubmitButton>
+            </div>
+            <p className="mt-3 text-[13px] text-fg-3">
+              Игрок должен хотя бы раз войти на сайт через Steam и не состоять в другой команде. Мест: основа {MAX_MAIN} (с капитаном), запас {MAX_SUBS}.
+            </p>
+          </ActionForm>
+        </Panel>
+      )}
 
       <Panel title="Заявки на турниры">
         {regs.length === 0 ? (
