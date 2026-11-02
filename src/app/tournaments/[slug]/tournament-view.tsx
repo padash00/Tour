@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, ExternalLink, Gamepad2, Swords, Users } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Swords, Users } from "lucide-react";
 import { HelpHint } from "@/components/help-hint";
 import { LiveRefresh } from "@/components/live-refresh";
 import { getTournamentRegistrations } from "@/lib/data";
@@ -310,7 +310,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
           </TabPanel>
 
           <TabPanel tab="teams" defaultKey={defaultTab}>
-            <TeamsTab approved={approved} pendingCount={pending.length} solo={solo} />
+            <TeamsTab approved={approved} pendingCount={pending.length} solo={solo} maxTeams={t.max_teams} />
           </TabPanel>
           <TabPanel tab="bracket" defaultKey={defaultTab}>
             {matches.length > 0 && draw && (
@@ -465,7 +465,7 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
   );
 }
 
-function TeamsTab({ approved, pendingCount, solo }: { approved: Awaited<ReturnType<typeof getTournamentRegistrations>>; pendingCount: number; solo: boolean }) {
+function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaited<ReturnType<typeof getTournamentRegistrations>>; pendingCount: number; solo: boolean; maxTeams: number }) {
   if (approved.length === 0) {
     return (
       <EmptyState
@@ -475,43 +475,89 @@ function TeamsTab({ approved, pendingCount, solo }: { approved: Awaited<ReturnTy
       />
     );
   }
+  const filled = Math.min(approved.length, maxTeams);
+  const pct = maxTeams ? Math.round((filled / maxTeams) * 100) : 0;
+  const avgElo = (r: (typeof approved)[number]) => {
+    const elos = r.roster.filter((rp) => rp.role === "main").map((rp) => rp.player.faceit_elo).filter((e): e is number => typeof e === "number" && e > 0);
+    return elos.length ? Math.round(elos.reduce((a, b) => a + b, 0) / elos.length) : null;
+  };
   return (
-    <Section title={solo ? "Участники" : "Команды"} description={`${approved.length} ${solo ? "участников" : "команд"}${pendingCount > 0 ? ` · ещё на рассмотрении: ${pendingCount}` : ""}`}>
-      <RowList>
-        {approved.map((r) => (
-          <div key={r.id} className="px-4 py-3.5">
-            <div className="flex items-center gap-3">
-              {r.seed && <span className="num w-6 text-meta text-fg-3">{r.seed}</span>}
-              <TeamLogo src={r.team.logo_url} tag={r.team.tag} size="md" />
-              <div className="min-w-0 flex-1">
-                <Link href={`/teams/${encodeURIComponent(r.team.tag)}`} className="block truncate text-[15px] font-semibold text-fg hover:text-accent">
-                  {r.team.name}
-                </Link>
-                <div className="text-meta text-fg-3">
-                  {r.team.tag}
-                  {r.team.region ? ` · ${r.team.region}` : ""}
-                </div>
-              </div>
-              {r.checked_in_at && <Status info={{ label: "Check-in пройден", tone: "ok" }} size="sm" />}
+    <Stack>
+      {/* заполненность турнира */}
+      <div className="rounded-surface border border-line-subtle bg-surface p-5">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <div className="text-meta font-semibold uppercase tracking-wide text-fg-3">{solo ? "Участники" : "Команды"}</div>
+            <div className="mt-1 text-[28px] font-bold leading-none text-fg">
+              <span className="num">{filled}</span>
+              <span className="text-fg-3"> / {maxTeams}</span>
             </div>
-            {!solo && (
-              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 sm:pl-[60px]">
-                {[...r.roster]
-                  .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
-                  .map((rp) => (
-                    <Link key={rp.id} href={`/players/${rp.player.steam_id}`} className="flex items-center gap-2 text-meta text-fg-2 hover:text-fg">
-                      <Avatar src={rp.player.avatar_url} name={rp.player.nickname} size="xs" />
-                      <span className="max-w-[140px] truncate">{rp.player.nickname}</span>
-                      <FaceitLevel level={rp.player.faceit_level} className="!size-5 !text-[10px]" />
-                      {rp.role === "sub" && <span className="text-micro text-fg-3">запас</span>}
-                    </Link>
-                  ))}
-              </div>
-            )}
           </div>
-        ))}
-      </RowList>
-    </Section>
+          <div className="text-right text-meta text-fg-2">
+            {filled >= maxTeams ? "Мест больше нет" : `Свободно мест: ${maxTeams - filled}`}
+            {pendingCount > 0 && <div className="text-fg-3">ещё на рассмотрении: {pendingCount}</div>}
+          </div>
+        </div>
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-surface-3">
+          <div className="h-full rounded-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {approved.map((r, i) => {
+          const elo = avgElo(r);
+          const roster = [...r.roster].sort((a, b) => (a.role === b.role ? (a.player.id === r.team.captain_id ? -1 : b.player.id === r.team.captain_id ? 1 : 0) : a.role === "main" ? -1 : 1));
+          return (
+            <article key={r.id} className="flex flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface transition-shadow hover:shadow-[var(--shadow-pop)]">
+              <header className="flex items-center gap-4 border-b border-line-subtle bg-gradient-to-r from-accent-dim/40 to-transparent p-4">
+                <TeamLogo src={r.team.logo_url} tag={r.team.tag} size="lg" />
+                <div className="min-w-0 flex-1">
+                  <Link href={`/teams/${encodeURIComponent(r.team.tag)}`} className="block truncate text-[18px] font-bold text-fg hover:text-accent">
+                    {r.team.name}
+                  </Link>
+                  <div className="mt-0.5 truncate text-meta text-fg-3">
+                    <span className="font-semibold text-fg-2">{r.team.tag}</span>
+                    {r.team.region ? ` · ${r.team.region}` : ""}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  {elo != null && (
+                    <>
+                      <div className="num text-[17px] font-bold text-fg">{elo}</div>
+                      <div className="text-micro text-fg-3">средний ELO</div>
+                    </>
+                  )}
+                  {r.seed ? <div className="text-micro text-fg-3">посев {r.seed}</div> : <div className="num text-micro text-fg-4">#{i + 1}</div>}
+                </div>
+              </header>
+              {!solo && (
+                <ul className="flex-1 divide-y divide-line-subtle px-4 py-1">
+                  {roster.map((rp) => {
+                    const captain = rp.player.id === r.team.captain_id;
+                    return (
+                      <li key={rp.id}>
+                        <Link href={`/players/${rp.player.steam_id}`} className="flex items-center gap-3 py-2 text-[14px] text-fg-2 hover:text-fg">
+                          <Avatar src={rp.player.avatar_url} name={rp.player.nickname} size="sm" />
+                          <span className="min-w-0 flex-1 truncate font-medium text-fg">{rp.player.nickname}</span>
+                          {captain && <Crown className="size-4 shrink-0 text-warn" aria-label="Капитан" />}
+                          {rp.role === "sub" && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-micro text-fg-3">запас</span>}
+                          <FaceitLevel level={rp.player.faceit_level} className="!size-6 !text-[11px]" />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {r.checked_in_at && (
+                <footer className="border-t border-line-subtle px-4 py-2.5">
+                  <Status info={{ label: "Check-in пройден", tone: "ok" }} size="sm" />
+                </footer>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </Stack>
   );
 }
 
