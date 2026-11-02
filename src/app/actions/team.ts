@@ -127,7 +127,7 @@ async function requireCaptain() {
 async function lockedError(teamId: string) {
   const locked = await getLockingTournament(teamId);
   return locked
-    ? `Состав заблокирован турниром «${locked.name}». Изменения — только через администратора.`
+    ? `Команда подала заявку на «${locked.name}» — состав, название и тег теперь меняет только организатор. Напишите ему.`
     : null;
 }
 
@@ -143,6 +143,8 @@ export async function updateTeam(_prev: ActionResult, formData: FormData): Promi
   if (!ctx) return { error: NOT_CAPTAIN };
   const { player, team } = ctx;
   if (await isRateLimited(player.id, "team.update", 5)) return { error: "Слишком часто — попробуйте через несколько секунд" };
+  const lockedUpdate = await lockedError(team.id);
+  if (lockedUpdate) return { error: lockedUpdate };
   const parsed = teamSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { name, tag, region, description } = parsed.data;

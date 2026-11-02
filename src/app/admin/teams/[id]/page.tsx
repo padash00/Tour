@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { adminAddMember, adminDisbandTeam, adminKickMember, adminMakeCaptain, adminSetRole } from "@/app/actions/admin-team";
+import { adminAddMember, adminDisbandTeam, adminKickMember, adminMakeCaptain, adminRenameTeam, adminSetRole } from "@/app/actions/admin-team";
 import { MAX_MAIN, MAX_SUBS } from "@/lib/data";
 import { requireAdmin } from "@/lib/auth";
 import { getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
@@ -104,6 +104,26 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
           </TableBox>
         )}
       </Panel>
+
+      {!disbanded && (
+        <Panel title="Название и тег" boxed>
+          <ActionForm action={adminRenameTeam} className="p-5">
+            <input type="hidden" name="teamId" value={team.id} />
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex min-w-[240px] flex-1 flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+                Название
+                <input name="name" defaultValue={team.name} required maxLength={32} className="field" autoComplete="off" />
+              </label>
+              <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+                Тег
+                <input name="tag" defaultValue={team.tag} required maxLength={6} className="field w-36 uppercase" autoComplete="off" />
+              </label>
+              <SubmitButton variant="secondary">Сохранить</SubmitButton>
+            </div>
+            <p className="mt-3 text-[13px] text-fg-3">Пока у команды есть заявка на официальный турнир, капитан название, тег и состав менять не может — только вы здесь.</p>
+          </ActionForm>
+        </Panel>
+      )}
 
       {!disbanded && (
         <Panel title="Добавить игрока" boxed>

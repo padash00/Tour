@@ -48,6 +48,13 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const ctx = await captainContext(`/tournaments/${tournament.slug}/register`, tournament, true);
   if ("error" in ctx) return { error: ctx.error };
   const { player, team } = ctx;
+  // официальный турнир: после подачи заявку меняет только организатор (решение владельца 02.11.2026)
+  if (tournament.is_official) {
+    const existing = await getRegistration(tournament.id, team.id);
+    if (existing && (existing.status === "pending" || existing.status === "approved")) {
+      return { error: "Заявка уже подана — состав и данные теперь меняет только организатор. Напишите ему, что нужно изменить." };
+    }
+  }
   // анкета капитана (настройка PROFILE_REQUIRED); в официальном турнире ниже проверяются анкеты всех игроков
   const gate = await profileGateError(player);
   if (gate) return { error: gate };

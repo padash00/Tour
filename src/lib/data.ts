@@ -236,7 +236,13 @@ export function isActiveRegistration(r: { status: string }) {
 /** Турнир, который сейчас блокирует состав команды (регистрация закрыта / check-in / live) */
 export async function getLockingTournament(teamId: string): Promise<Tournament | null> {
   const regs = await getTeamRegistrations(teamId);
-  const locked = regs.find((r) => isActiveRegistration(r) && LOCKED_STATUSES.includes(r.tournament.status));
+  // официальный турнир — состав заморожен с момента подачи заявки (меняет только организатор в пульте);
+  // обычный — после закрытия регистрации
+  const locked = regs.find(
+    (r) =>
+      isActiveRegistration(r) &&
+      (LOCKED_STATUSES.includes(r.tournament.status) || (r.tournament.is_official && !["finished", "cancelled"].includes(r.tournament.status))),
+  );
   return locked?.tournament ?? null;
 }
 

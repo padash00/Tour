@@ -46,6 +46,24 @@ export async function adminKickMember(_prev: ActionResult, formData: FormData): 
   return { success: `${target.player.nickname} исключён из команды` };
 }
 
+/** Админ: название и тег команды (в любой момент, в том числе когда капитану изменения закрыты) */
+export async function adminRenameTeam(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const team = await getTeamById(String(formData.get("teamId")));
+  if (!team || team.disbanded_at) return { error: "Команда не найдена" };
+  const name = String(formData.get("name") ?? "").trim();
+  const tag = String(formData.get("tag") ?? "").trim().toUpperCase();
+  if (name.length < 2 || name.length > 32) return { error: "Название — от 2 до 32 символов" };
+  if (!/^[A-Z0-9]{2,6}$/.test(tag)) return { error: "Тег — 2–6 латинских букв или цифр" };
+  if (name === team.name && tag === team.tag) return { success: "Без изменений" };
+  const { error } = await db().from("teams").update({ name, tag }).eq("id", team.id);
+  if (error) return { error: error.code === "23505" ? "Такой тег или название уже заняты другой командой" : "Не удалось сохранить" };
+  await audit(admin.id, "admin.team.rename", { type: "team", id: team.id }, { from: `${team.name} [${team.tag}]`, to: `${name} [${tag}]` });
+  revalidateTeam(team.id, team.tag);
+  revalidatePath(`/teams/${encodeURIComponent(tag)}`);
+  return { success: `Сохранено: ${name} [${tag}]` };
+}
+
 /** Игрок по нику, SteamID (17 цифр) или ссылке на профиль Steam */
 async function findPlayer(raw: string): Promise<{ id: string; nickname: string } | { error: string }> {
   const q = raw.trim();
