@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Gamepad2, IdCard, RefreshCw, Trophy, User, Users } from "lucide-react";
+import { ArrowRight, FileText, Gamepad2, IdCard, RefreshCw, Trophy, User, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { refreshProfile } from "@/app/actions/profile";
@@ -97,6 +97,8 @@ export default async function MyGamePage() {
   const rejected = regs.find((r) => r.status === "rejected" && r.tournament.status === "registration");
   const isCaptain = membership?.team.captain_id === player.id;
   const myTeamIds = [membership?.team.id, solo?.id].filter(Boolean) as string[];
+  // капитан с поданной заявкой на официальный турнир скачивает Приложение №1 своей команды
+  const printable = isCaptain ? activeRegs.filter((r) => r.tournament.is_official && r.team_id === membership?.team.id) : [];
   const openTournament = tournaments.find((t) => t.status === "registration" && !regs.some((r) => r.tournament_id === t.id && isActiveRegistration(r)));
   const teamSize = openTournament ? modeOf(openTournament.format).size : 5;
 
@@ -227,6 +229,11 @@ export default async function MyGamePage() {
                 Обновить Steam и FACEIT
               </SubmitButton>
             </ActionForm>
+            {printable.map((r) => (
+              <Button key={r.id} href={`/tournaments/${r.tournament.slug}/application`} size="sm" icon={<FileText />}>
+                Скачать заявку{printable.length > 1 ? ` · ${r.tournament.name}` : ""}
+              </Button>
+            ))}
             <Button href="/me/profile" variant="secondary" size="sm" icon={<IdCard />}>
               Анкета игрока
             </Button>

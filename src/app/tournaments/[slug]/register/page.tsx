@@ -227,6 +227,19 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
         {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={fresh} canEdit />}
+        {active && (
+          <Callout
+            tone="warn"
+            title="Распечатайте и подпишите заявку"
+            action={
+              <Button href={`/tournaments/${t.slug}/application`} size="sm">
+                Скачать заявку
+              </Button>
+            }
+          >
+            Приложение №1 заполнено по данным с сайта. Распечатайте, подпишите и принесите организатору вместе со справками с места учёбы или работы.
+          </Callout>
+        )}
         {!active && hasRules(t.rules) && <RulesGate tournamentId={t.id} rules={t.rules!} />}
         <section aria-labelledby="application-title">
           <div className="mb-3">
