@@ -134,6 +134,7 @@ async function lockedError(teamId: string) {
 /** Моя команда и её публичная страница (под одним или несколькими тегами) */
 function revalidateTeamPages(...tags: string[]) {
   revalidatePath("/team");
+  revalidatePath("/teams");
   for (const tag of new Set(tags)) revalidatePath(`/teams/${encodeURIComponent(tag)}`);
 }
 
@@ -229,6 +230,7 @@ export async function leaveTeam(): Promise<ActionResult> {
   await syncOpenRosters(membership.team.id);
   await notify([membership.team.captain_id], `${player.nickname} покинул ${membership.team.name}`, undefined, "/team");
   await audit(player.id, "team.leave", { type: "team", id: membership.team.id });
+  revalidateTeamPages(membership.team.tag);
   redirect("/me");
 }
 
@@ -333,6 +335,7 @@ export async function disbandTeam(): Promise<ActionResult> {
     `Команда ${team.name} распущена`,
   );
   await audit(player.id, "team.disband", { type: "team", id: team.id });
+  revalidateTeamPages(team.tag);
   redirect("/me");
 }
 

@@ -21,6 +21,7 @@ const PLAYING = ["checkin", "live"];
 
 function revalidateTeam(teamId: string, tag: string) {
   revalidatePath("/admin/teams");
+  revalidatePath("/teams");
   revalidatePath(`/admin/teams/${teamId}`);
   revalidatePath(`/teams/${encodeURIComponent(tag)}`);
   revalidatePath("/team");
