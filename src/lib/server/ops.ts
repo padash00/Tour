@@ -86,6 +86,16 @@ export async function checkCs2UpToDate(patch: unknown) {
     next = { ...(prev ?? { patch, up_to_date: true, required: null }), patch, checked_at: new Date().toISOString(), error: String((e as Error).message ?? e) };
   }
   await db().from("app_settings").upsert({ key: CS2_KEY, value: JSON.stringify(next), updated_at: next.checked_at });
+  // серверы перешли на новую версию: Valve могла поменять правила вёрстки — окно скинов F16 и HUD надо проверить
+  // (31.10.2026 обновление молча сломало окно скинов: «[custom_hud] … did not pass CustomHud validation»)
+  if (prev && prev.patch !== patch) {
+    await notify(
+      await adminIds(),
+      `CS2 обновлён до ${patch} — проверьте окно скинов`,
+      `Серверы перешли с ${prev.patch} на ${patch}. Зайдите на свободный сервер, напишите !skins: окно F16 должно открыться. Если только курсор — откройте консоль (~) и найдите строки [custom_hud], пришлите их.`,
+      "/admin/servers",
+    );
+  }
   if (prev?.up_to_date !== false && next.up_to_date === false) {
     await notify(
       await adminIds(),
