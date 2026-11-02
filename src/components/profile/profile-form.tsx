@@ -17,7 +17,7 @@ import type { PlayerProfile } from "@/lib/types";
  * что на сервере; главная проверка всегда на сервере.
  */
 
-type Values = Record<"last_name" | "first_name" | "patronymic" | "birth_date" | "phone" | "city" | "organization" | "position" | "course" | "study_group", string>;
+type Values = Record<"last_name" | "first_name" | "patronymic" | "birth_date" | "phone" | "city" | "organization" | "position" | "course" | "study_group" | "telegram", string>;
 
 const fromProfile = (p: PlayerProfile | null, defaultCity: string): Values => ({
   last_name: p?.last_name ?? "",
@@ -30,6 +30,7 @@ const fromProfile = (p: PlayerProfile | null, defaultCity: string): Values => ({
   position: p?.position ?? "",
   course: p?.course ?? "",
   study_group: p?.study_group ?? "",
+  telegram: p?.telegram ? `@${p.telegram}` : "",
 });
 
 /** Поля в порядке формы — для перехода к первой ошибке */
@@ -39,6 +40,7 @@ const FIELD_ORDER: { key: keyof ProfileErrors; label: string }[] = [
   { key: "patronymic", label: "Отчество" },
   { key: "birth_date", label: "Дата рождения" },
   { key: "phone", label: "Телефон" },
+  { key: "telegram", label: "Связь (WhatsApp или Telegram)" },
   { key: "city", label: "Город" },
   { key: "occupation", label: "Работа или учёба" },
   { key: "organization", label: "Место работы или учёбы" },
@@ -104,6 +106,7 @@ export function ProfileForm({
   const [state, formAction, pending] = useActionState<ProfileActionResult, FormData>(action, null);
   const [v, setV] = useState<Values>(() => fromProfile(profile, defaultCity));
   const [occupation, setOccupation] = useState<Occupation | null>(profile?.occupation ?? null);
+  const [whatsapp, setWhatsapp] = useState(!!profile?.whatsapp);
   const [consent, setConsent] = useState(false);
   const [local, setLocal] = useState<ProfileErrors | null>(null);
 
@@ -152,7 +155,7 @@ export function ProfileForm({
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     const fd = new FormData(e.currentTarget);
-    const { errors: found } = parseProfileForm((k) => fd.get(k), almatyDay());
+    const { errors: found } = parseProfileForm((k) => fd.get(k), almatyDay(), !admin);
     const all: ProfileErrors = { ...found, ...(needConsent && !consent ? { consent: "Отметьте согласие" } : {}) };
     if (Object.values(all).some(Boolean)) {
       e.preventDefault();
@@ -228,6 +231,24 @@ export function ProfileForm({
           {text("birth_date", "Дата рождения", { required: true, type: "date", hint: "Возраст проверяется на дату турнира" })}
           {text("phone", "Телефон", { required: true, type: "tel", inputMode: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
           {text("city", "Город", { required: true, placeholder: "Усть-Каменогорск", hint: "Где живёте, учитесь или работаете" })}
+        </div>
+        <div className="rounded-control border border-line-subtle bg-surface-2/40 p-4">
+          <p className="text-[15px] font-semibold text-fg">
+            Связь с вами <span className="text-danger">*</span>
+          </p>
+          <p className="mt-0.5 text-meta text-fg-3">Организатор напишет о матчах и изменениях. Отметьте WhatsApp или укажите Telegram — можно и то, и другое.</p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 sm:items-end">
+            <Checkbox
+              name="whatsapp"
+              checked={whatsapp}
+              onChange={(e) => {
+                setWhatsapp(e.target.checked);
+                if (e.target.checked) setLocal((x) => (x ? { ...x, telegram: undefined } : x));
+              }}
+              label="На мой телефон можно писать в WhatsApp"
+            />
+            {text("telegram", "Telegram", { placeholder: "@nickname", max: 40 })}
+          </div>
         </div>
       </fieldset>
 

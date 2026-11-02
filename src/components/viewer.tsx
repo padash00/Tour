@@ -18,9 +18,9 @@ export type Viewer = {
 };
 export type { Activity };
 /** profileIncomplete — анкета игрока не заполнена (напоминание под шапкой) */
-type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; activity: Activity | null; moreActivity: number; profileIncomplete: boolean };
+type State = { status: "loading" | "ready"; player: Viewer | null; unread: number; activity: Activity | null; moreActivity: number; profileIncomplete: boolean; contactMissing: boolean };
 
-const EMPTY: State = { status: "loading", player: null, unread: 0, activity: null, moreActivity: 0, profileIncomplete: false };
+const EMPTY: State = { status: "loading", player: null, unread: 0, activity: null, moreActivity: 0, profileIncomplete: false, contactMissing: false };
 let state: State = EMPTY;
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
@@ -30,7 +30,7 @@ function emit(next: State) {
   listeners.forEach((l) => l());
 }
 
-type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number }; profileIncomplete?: boolean };
+type MeResponse = { player: Viewer | null; unread: number; activity?: { top: Activity | null; more: number }; profileIncomplete?: boolean; contactMissing?: boolean };
 
 /** Случайный id вкладки — чтобы пульт считал гостей «на сайте»; никаких личных данных */
 function visitorId() {
@@ -58,6 +58,7 @@ export function refreshViewer() {
         activity: d.activity?.top ?? null,
         moreActivity: d.activity?.more ?? 0,
         profileIncomplete: !!d.player && !!d.profileIncomplete,
+        contactMissing: !!d.player && !!d.contactMissing,
       }),
     )
     .catch(() => emit({ ...state, status: "ready" }))

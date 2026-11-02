@@ -19,10 +19,11 @@ export const OCCUPATIONS: Record<Occupation, string> = {
 /** Поля анкеты, которые заполняет игрок */
 export type ProfileInput = Pick<
   PlayerProfile,
-  "last_name" | "first_name" | "patronymic" | "birth_date" | "phone" | "city" | "occupation" | "organization" | "position" | "course" | "study_group"
+  "last_name" | "first_name" | "patronymic" | "birth_date" | "phone" | "city" | "occupation" | "organization" | "position" | "course" | "study_group" | "telegram" | "whatsapp"
 >;
 
-export type ProfileLike = ProfileInput & Pick<PlayerProfile, "consent_at">;
+/** Для проверки заполненности: контакт (telegram/whatsapp) не обязателен — он проверяется отдельно (missingContact) */
+export type ProfileLike = Omit<ProfileInput, "telegram" | "whatsapp"> & Partial<Pick<ProfileInput, "telegram" | "whatsapp">> & Pick<PlayerProfile, "consent_at">;
 
 const FIELD_LABELS = {
   last_name: "фамилия",
@@ -145,6 +146,18 @@ export function missingProfileFields(p: ProfileLike | null | undefined): string[
   return missing;
 }
 
+/** Telegram-ник: без @ и ссылки t.me, 5–32 латинских букв, цифр или «_»; null — не распознан */
+export function normalizeTelegram(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().replace(/^(https?:\/\/)?(t\.me|telegram\.me)\//i, "").replace(/^@/, "");
+  return /^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(s) ? s : null;
+}
+
+/** Нет контакта для связи (ни Telegram, ни WhatsApp) — напоминание игроку, анкету это не блокирует */
+export function missingContact(p: Pick<ProfileInput, "telegram" | "whatsapp"> | null | undefined): boolean {
+  return !!p && !p.whatsapp && !p.telegram;
+}
+
 export function isProfileComplete(p: ProfileLike | null | undefined): boolean {
   return missingProfileFields(p).length === 0;
 }
@@ -181,7 +194,7 @@ export type ProfileErrors = Partial<Record<keyof ProfileInput | "consent", strin
  * Разбор и проверка формы анкеты. Возвращает нормализованные значения или ошибки по полям.
  * today — для проверки даты рождения (не в будущем, не старше 100 лет).
  */
-export function parseProfileForm(get: (key: string) => unknown, today: string = almatyDay()): { value: ProfileInput; errors: ProfileErrors } {
+export function parseProfileForm(get: (key: string) => unknown, today: string = almatyDay(), requireContact = true): { value: ProfileInput; errors: ProfileErrors } {
   const errors: ProfileErrors = {};
   const occupationRaw = get("occupation");
   const occupation = occupationRaw === "works" || occupationRaw === "studies" || occupationRaw === "other" ? occupationRaw : null;
@@ -198,7 +211,12 @@ export function parseProfileForm(get: (key: string) => unknown, today: string = 
     position: occupation === "works" ? cleanText(get("position"), 80) : null,
     course: occupation === "studies" ? cleanText(get("course"), 20) : null,
     study_group: occupation === "studies" ? cleanText(get("study_group"), 30) : null,
+    telegram: normalizeTelegram(get("telegram")),
+    whatsapp: get("whatsapp") === "on",
   };
+  // связь с игроком: WhatsApp на номер из анкеты или Telegram — хотя бы одно
+  if (cleanText(get("telegram")) && !value.telegram) errors.telegram = "Ник Telegram: латиница, цифры и «_», от 5 символов (например @dimon_kz)";
+  else if (requireContact && !value.telegram && !value.whatsapp) errors.telegram = "Укажите Telegram или отметьте, что номер есть в WhatsApp — так организатор свяжется с вами";
   // в ФИО — буквы, пробел, дефис и апостроф
   const badName = (v: string | null) => !!v && !/^\p{L}[\p{L}' -]*$/u.test(v);
   if (!value.last_name) errors.last_name = "Укажите фамилию";

@@ -87,7 +87,7 @@ export async function adminSaveProfile(_prev: ProfileActionResult, formData: For
   const playerId = String(formData.get("playerId") ?? "");
   const { data: target } = await db().from("players").select("id").eq("id", playerId).maybeSingle();
   if (!target) return { error: "Игрок не найден" };
-  const { value, errors } = parseProfileForm((k) => formData.get(k));
+  const { value, errors } = parseProfileForm((k) => formData.get(k), undefined, false);
   if (Object.keys(errors).length) return { error: "Проверьте поля анкеты", fields: errors };
   const before = await getProfile(playerId);
   const now = new Date().toISOString();

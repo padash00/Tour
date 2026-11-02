@@ -1290,8 +1290,10 @@ export type Database = {
           position: string | null
           prompted_at: string | null
           study_group: string | null
+          telegram: string | null
           updated_at: string
           updated_by: string | null
+          whatsapp: boolean
         }
         Insert: {
           birth_date?: string | null
@@ -1310,8 +1312,10 @@ export type Database = {
           position?: string | null
           prompted_at?: string | null
           study_group?: string | null
+          telegram?: string | null
           updated_at?: string
           updated_by?: string | null
+          whatsapp?: boolean
         }
         Update: {
           birth_date?: string | null
@@ -1330,8 +1334,10 @@ export type Database = {
           position?: string | null
           prompted_at?: string | null
           study_group?: string | null
+          telegram?: string | null
           updated_at?: string
           updated_by?: string | null
+          whatsapp?: boolean
         }
         Relationships: [
           {
