@@ -563,6 +563,48 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          body: string
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          id: number
+          player_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: never
+          player_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: never
+          player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lobby_messages: {
         Row: {
           body: string
@@ -1311,6 +1353,7 @@ export type Database = {
       players: {
         Row: {
           avatar_url: string | null
+          chat_muted: boolean
           country: string | null
           created_at: string
           faceit_elo: number | null
@@ -1329,6 +1372,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          chat_muted?: boolean
           country?: string | null
           created_at?: string
           faceit_elo?: number | null
@@ -1347,6 +1391,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          chat_muted?: boolean
           country?: string | null
           created_at?: string
           faceit_elo?: number | null

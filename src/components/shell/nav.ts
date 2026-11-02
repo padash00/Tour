@@ -17,6 +17,7 @@ export const PRIMARY_NAV: NavItem[] = [
 export const SECONDARY_NAV: { href: string; label: string }[] = [
   { href: "/players", label: "Игроки" },
   { href: "/find", label: "Поиск команды" },
+  { href: "/chat", label: "Чат" },
   { href: "/about", label: "О платформе" },
   { href: "/help", label: "Как это работает" },
   { href: "/rules", label: "Правила" },
