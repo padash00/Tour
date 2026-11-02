@@ -49,6 +49,7 @@ import {
   cn,
 } from "@/components/ds";
 import { Check } from "lucide-react";
+import { groupSponsors } from "@/lib/sponsors";
 
 const real = (v: string | null | undefined) => !!v && !/^\s*0+\s*$/.test(v);
 
@@ -439,18 +440,25 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
       </Section>
 
       {t.sponsors?.length > 0 && (
-        <Section card title="Партнёры">
-          <div className="flex flex-wrap gap-x-10 gap-y-3 text-title text-fg-2">
-            {t.sponsors.map((sp) =>
-              sp.url ? (
-                <a key={sp.name} href={sp.url} target="_blank" rel="noreferrer" className="hover:text-fg">
-                  {sp.name}
-                </a>
-              ) : (
-                <span key={sp.name}>{sp.name}</span>
-              ),
-            )}
-          </div>
+        <Section card title="Организаторы и партнёры">
+          <dl className="grid gap-x-10 gap-y-5 sm:grid-cols-2">
+            {groupSponsors(t.sponsors).map((g) => (
+              <div key={g.role}>
+                <dt className="text-[13px] font-semibold uppercase tracking-wide text-fg-3">{g.label}</dt>
+                <dd className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-title text-fg">
+                  {g.items.map((sp) =>
+                    sp.url ? (
+                      <a key={sp.name} href={sp.url} target="_blank" rel="noreferrer" className="hover:text-accent">
+                        {sp.name}
+                      </a>
+                    ) : (
+                      <span key={sp.name}>{sp.name}</span>
+                    ),
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </Section>
       )}
     </Stack>

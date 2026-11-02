@@ -35,7 +35,7 @@ export type Tournament = Narrow<
     bracket_type: FormatKind;
     playoff_type: "single_elimination" | "double_elimination";
     prize_distribution: PrizeRow[];
-    sponsors: { name: string; url?: string }[];
+    sponsors: { name: string; url?: string; role?: import("./sponsors").SponsorRole }[];
   }
 >;
 

@@ -9,6 +9,7 @@ import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
 import { ConfirmModal } from "@/components/modal";
 import { requirementsTemplate, rulesTemplate } from "@/lib/rules-templates";
 import { buttonClass, cn } from "@/components/ui";
+import { SPONSOR_ROLES, type Sponsor, type SponsorRole } from "@/lib/sponsors";
 import { ADMIN_CARD } from "@/components/admin/control";
 
 const DEFAULT_RULES = `Вето проходит на странице матча до подключения к серверу.
@@ -200,7 +201,7 @@ export function TournamentForm({
   const [pendingTemplate, setPendingTemplate] = useState<null | "rules" | "requirements">(null);
   const [freeEntry, setFreeEntry] = useState(!t?.entry_fee || t.entry_fee === "Бесплатно");
   const [entryFee, setEntryFee] = useState(t?.entry_fee && t.entry_fee !== "Бесплатно" ? t.entry_fee : "");
-  const [sponsors, setSponsors] = useState<{ name: string; url?: string }[]>(t?.sponsors ?? []);
+  const [sponsors, setSponsors] = useState<Sponsor[]>(t?.sponsors ?? []);
   const [thirdPlace, setThirdPlace] = useState(t?.third_place_match ?? false);
   // официальный турнир (городской, с акиматом): анкеты, возраст, город, тренер, без запасных
   const [official, setOfficial] = useState(t?.is_official ?? false);
@@ -280,6 +281,8 @@ export function TournamentForm({
   return (
     <ActionForm action={action}>
       {t && <input type="hidden" name="id" value={t.id} />}
+      {/* когда форма была открыта: если турнир изменили в другом окне — сохранение откажет, а не затрёт */}
+      {t && <input type="hidden" name="loadedUpdatedAt" value={t.updated_at} />}
       <input type="hidden" name="slug" value={effectiveSlug} />
       <input type="hidden" name="format" value={format} />
       <input type="hidden" name="bracket_type" value={bracket} />
@@ -926,10 +929,22 @@ export function TournamentForm({
               </Field>
             </div>
             <div>
-              <Label>Спонсоры и партнёры (по желанию)</Label>
+              <Label>Спонсоры, организаторы и партнёры (по желанию)</Label>
               <div className="space-y-3">
                 {sponsors.map((sp, i) => (
-                  <div key={i} className="flex gap-2">
+                  <div key={i} className="flex flex-wrap gap-2 sm:flex-nowrap">
+                    <select
+                      value={sp.role ?? "partner"}
+                      onChange={(e) => setSponsors((l) => l.map((x, j) => (j === i ? { ...x, role: e.target.value as SponsorRole } : x)))}
+                      className="field w-full sm:w-52"
+                      aria-label="Роль"
+                    >
+                      {SPONSOR_ROLES.map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
                     <input
                       value={sp.name}
                       onChange={(e) => setSponsors((l) => l.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
@@ -952,8 +967,8 @@ export function TournamentForm({
                     </button>
                   </div>
                 ))}
-                <button type="button" onClick={() => setSponsors((l) => [...l, { name: "", url: "" }])} className="text-[15px] font-semibold text-accent hover:underline">
-                  + Добавить спонсора
+                <button type="button" onClick={() => setSponsors((l) => [...l, { name: "", url: "", role: "partner" }])} className="text-[15px] font-semibold text-accent hover:underline">
+                  + Добавить организацию
                 </button>
               </div>
             </div>

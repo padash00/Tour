@@ -8,6 +8,7 @@ import { audit, notify } from "@/lib/audit";
 import { AWARDS_TAG } from "@/lib/awards";
 import { getPlayerBySteamId, getTournamentById } from "@/lib/data";
 import { registrationError } from "@/lib/registration-errors";
+import { isSponsorRole } from "@/lib/sponsors";
 import { fromLocalInput } from "@/lib/format";
 import { closeMatchesOfEndedTournaments, enqueueCommand, enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
@@ -116,13 +117,17 @@ function parsePrizes(text: string): PrizeRow[] {
 
 function parseSponsors(raw: string) {
   try {
-    const list = JSON.parse(raw) as { name?: string; url?: string }[];
+    const list = JSON.parse(raw) as { name?: string; url?: string; role?: string }[];
     return list
       .filter((x) => x?.name?.trim())
       .slice(0, 12)
       .map((x) => {
         const url = x.url?.trim();
-        return { name: x.name!.trim().slice(0, 60), ...(url && /^https?:\/\//.test(url) ? { url } : {}) };
+        return {
+          name: x.name!.trim().slice(0, 80),
+          ...(url && /^https?:\/\//.test(url) ? { url } : {}),
+          ...(isSponsorRole(x.role) ? { role: x.role } : {}),
+        };
       });
   } catch {
     return [];
@@ -263,7 +268,12 @@ export async function updateTournament(_prev: ActionResult, formData: FormData):
   const datesError = checkDates(row) ?? checkOfficial(row);
   if (datesError) return { error: datesError };
   const before = await getTournamentById(id);
-  const { error } = await db().from("tournaments").update(row).eq("id", id);
+  // форма открыта давно, а турнир за это время меняли (другое окно, правка базы) — не затираем чужие изменения
+  const loaded = String(formData.get("loadedUpdatedAt") ?? "");
+  if (before && loaded && new Date(loaded).getTime() !== new Date(before.updated_at).getTime()) {
+    return { error: "Турнир уже изменили в другом окне. Обновите страницу (F5) и внесите правку ещё раз — иначе чужие изменения затрутся." };
+  }
+  const { error } = await db().from("tournaments").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id);
   if (error) return { error: error.code === "23505" ? "Турнир с таким адресом уже есть" : "Не удалось сохранить" };
   if (formData.get("removeCover") === "on") await db().from("tournaments").update({ cover_url: null }).eq("id", id);
   const cover = await uploadCover(id, formData);
