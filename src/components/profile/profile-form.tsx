@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
-import { startTelegramLink, type ProfileActionResult } from "@/app/actions/player-profile";
+import { saveContact, startTelegramLink, type ProfileActionResult } from "@/app/actions/player-profile";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
 import { Button, Callout, Checkbox, ConfirmDialog, Dialog, Field, Input, Radio, cn } from "@/components/ds";
@@ -211,6 +211,7 @@ export function ProfileForm({
         </div>
       }
     />
+    {disabled && !admin && <LockedContact profile={profile} />}
     <form ref={formRef} action={formAction} onSubmit={onSubmit} noValidate className="space-y-8" data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
       {next && <input type="hidden" name="next" value={next} />}
       {playerId && <input type="hidden" name="playerId" value={playerId} />}
@@ -232,6 +233,7 @@ export function ProfileForm({
           {text("phone", "Телефон", { required: true, type: "tel", inputMode: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
           {text("city", "Город", { required: true, placeholder: "Усть-Каменогорск", hint: "Где живёте, учитесь или работаете" })}
         </div>
+        {!disabled && (
         <div className="rounded-control border border-line-subtle bg-surface-2/40 p-4">
           <p className="text-[15px] font-semibold text-fg">
             Связь с вами <span className="text-danger">*</span>
@@ -251,6 +253,7 @@ export function ProfileForm({
           </div>
           {!admin && <TelegramVerify verifiedAt={profile?.telegram_verified_at ?? null} />}
         </div>
+        )}
       </fieldset>
 
       <fieldset className="space-y-5" disabled={disabled}>
@@ -424,5 +427,35 @@ function TelegramVerify({ verifiedAt }: { verifiedAt: string | null }) {
         {opened ? "В боте нажмите «Старт», затем обновите эту страницу." : "Бот пришлёт уведомления о команде, заявках и матчах."}
       </span>
     </div>
+  );
+}
+
+/** Связь при зафиксированной анкете: WhatsApp/Telegram и подтверждение бота — игрок меняет сам */
+function LockedContact({ profile }: { profile: PlayerProfile | null }) {
+  const toast = useToast();
+  const [state, action, pending] = useActionState<ProfileActionResult, FormData>(saveContact, null);
+  const [whatsapp, setWhatsapp] = useState(!!profile?.whatsapp);
+  const [tg, setTg] = useState(profile?.telegram ? `@${profile.telegram}` : "");
+  useEffect(() => {
+    if (state?.success) toast.success(state.success);
+    else if (state?.error) toast.error(state.error);
+  }, [state, toast]);
+  return (
+    <form action={action} className="mb-8 rounded-control border border-accent/40 bg-accent-dim/20 p-4">
+      <p className="text-[15px] font-semibold text-fg">Связь с вами</p>
+      <p className="mt-0.5 text-meta text-fg-3">Анкета зафиксирована турниром, но контакт для связи можно менять. Отметьте WhatsApp или укажите Telegram.</p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 sm:items-end">
+        <Checkbox name="whatsapp" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} label="На мой телефон можно писать в WhatsApp" />
+        <Field label="Telegram" error={state?.fields?.telegram}>
+          {(p) => <Input {...p} name="telegram" value={tg} onChange={(e) => setTg(e.target.value)} placeholder="@nickname" maxLength={40} />}
+        </Field>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button type="submit" size="sm" loading={pending}>
+          Сохранить контакт
+        </Button>
+      </div>
+      <TelegramVerify verifiedAt={profile?.telegram_verified_at ?? null} />
+    </form>
   );
 }

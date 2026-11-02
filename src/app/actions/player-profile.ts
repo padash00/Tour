@@ -125,3 +125,26 @@ export async function startTelegramLink(): Promise<{ url?: string; error?: strin
   if (error) return { error: "Не удалось создать ссылку — попробуйте ещё раз" };
   return { url: `https://t.me/${cfg.username}?start=${token}` };
 }
+
+/** Контакт для связи (WhatsApp / Telegram) — игрок меняет всегда, даже когда анкета зафиксирована официальным турниром */
+export async function saveContact(_prev: ProfileActionResult, formData: FormData): Promise<ProfileActionResult> {
+  const player = await requirePlayer("/me/profile");
+  if (await isRateLimited(player.id, "profile.contact", 3)) return { error: "Слишком часто — попробуйте через пару секунд" };
+  const { normalizeTelegram } = await import("@/lib/profile");
+  const rawTg = String(formData.get("telegram") ?? "").trim();
+  const telegram = normalizeTelegram(rawTg);
+  const whatsapp = formData.get("whatsapp") === "on";
+  if (rawTg && !telegram) return { error: "Ник Telegram: латиница, цифры и «_», от 5 символов", fields: { telegram: "Например @dimon_kz" } };
+  const before = await getProfile(player.id);
+  if (!telegram && !whatsapp && !before?.telegram_chat_id) {
+    return { error: "Укажите Telegram или отметьте WhatsApp", fields: { telegram: "Укажите Telegram или отметьте WhatsApp" } };
+  }
+  const now = new Date().toISOString();
+  const { error } = before
+    ? await db().from("player_profiles").update({ telegram, whatsapp, updated_at: now, updated_by: player.id }).eq("player_id", player.id)
+    : await db().from("player_profiles").insert({ player_id: player.id, telegram, whatsapp, updated_by: player.id });
+  if (error) return { error: "Не удалось сохранить — попробуйте ещё раз" };
+  await audit(player.id, "profile.contact", { type: "player", id: player.id });
+  revalidatePath("/me/profile");
+  return { success: "Контакт сохранён" };
+}
