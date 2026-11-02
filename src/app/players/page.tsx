@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "Игроки CS2 на F16 Arena: ники, уровни FACEIT, F16 Rating и статистика матчей турниров в Усть-Каменогорске.",
   alternates: { canonical: "/players" },
 };
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "игрока" : "игроков");
 

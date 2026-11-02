@@ -23,12 +23,7 @@ function describe(t: Tournament) {
 
 // страница одинакова для всех — из кэша CDN, обновляется раз в 30 с и сразу после изменений;
 // черновик здесь не виден — админ смотрит его через /tournaments/<slug>/preview
-export const revalidate = 30;
-
-// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;

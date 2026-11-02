@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 // одинакова для всех — из кэша CDN, обновляется раз в 30 с и сразу после матчей
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export default function StatsPage() {
   return (

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 // поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 const plural = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "команда" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "команды" : "команд");
 

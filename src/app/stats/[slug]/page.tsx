@@ -3,12 +3,7 @@ import { getTournamentBySlug } from "@/lib/data";
 import { StatsView } from "../stats-view";
 
 // статистика турнира — из кэша CDN, обновляется раз в 30 с и сразу после матчей
-export const revalidate = 30;
-
-// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/stats/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;

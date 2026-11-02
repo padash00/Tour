@@ -35,12 +35,7 @@ import {
 } from "@/components/ds";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
-export const revalidate = 30;
-
-// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;

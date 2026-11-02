@@ -5,7 +5,7 @@ import { TournamentList, type TournamentItem } from "@/components/competition/to
 import { Container, PageTitle } from "@/components/ds";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Турниры",

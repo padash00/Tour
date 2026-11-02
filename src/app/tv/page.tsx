@@ -5,7 +5,7 @@ import { TvEmpty } from "@/components/tv/panels";
 import { TvShell } from "@/components/tv/tv-shell";
 
 // редирект на текущий турнир — из кэша, раз в 10 с
-export const revalidate = 10;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Режим ТВ", robots: { index: false } };
 

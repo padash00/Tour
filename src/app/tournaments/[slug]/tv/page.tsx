@@ -11,12 +11,7 @@ import { db } from "@/lib/supabase";
 import { TvView, type TvData } from "@/components/tv/tv-view";
 
 // экран ТВ — из кэша CDN раз в 5 с; счёт подтягивает LiveRefresh
-export const revalidate = 5;
-
-// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]/tv">): Promise<Metadata> {
   const { slug } = await props.params;

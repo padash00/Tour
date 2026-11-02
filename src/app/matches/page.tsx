@@ -11,7 +11,7 @@ import { MatchListRow } from "@/components/match-row";
 import { Button, Container, EmptyState, PageTitle, RowList, Section, Stack } from "@/components/ds";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Матчи",

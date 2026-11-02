@@ -11,7 +11,7 @@ import { CLUB_SITE, ORGANIZER, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 

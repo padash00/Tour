@@ -11,12 +11,7 @@ import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { PlayerLobbyGames } from "@/components/lobby/player-lobby-games";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
-export const revalidate = 30;
-
-// страницы собираются при первом запросе и дальше отдаются из кэша (ISR)
-export async function generateStaticParams() {
-  return [];
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/players/[steamId]">): Promise<Metadata> {
   const { steamId } = await props.params;
