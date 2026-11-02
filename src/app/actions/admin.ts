@@ -41,6 +41,7 @@ const tournamentSchema = z.object({
   max_teams: z.coerce.number().int().min(2).max(64),
   default_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(1),
   final_best_of: z.coerce.number().refine((n) => [1, 3, 5].includes(n)).default(3),
+  final_bo_scope: z.enum(["semis", "final"]).default("semis"),
   overtime: z.string().optional(),
   knife_round: z.string().optional(),
   timeouts_per_team: z.coerce.number().int().min(0).max(10).default(4),
@@ -115,6 +116,40 @@ function parsePrizes(text: string): PrizeRow[] {
     });
 }
 
+/** «одна карта (BO1)», «до двух побед (BO3)», «до трёх побед (BO5)» */
+const boText = (n: number) => (n === 1 ? "одна карта (BO1)" : n === 3 ? "до двух побед (BO3)" : `до трёх побед (BO${n})`);
+type BoSettings = { default_best_of: number; final_best_of: number; final_bo_scope: "semis" | "final"; third_place_match?: string; bracket_type: string; playoff_type: string };
+
+/**
+ * Регламент следует за настройками формата: строки после «Формат:» (начинаются с «—») перестраиваются
+ * из BO обычных/финальных матчей и того, к каким матчам относится финальный формат. Нет такого блока — текст не трогаем.
+ */
+function syncFormatInRules(rules: string, s: BoSettings) {
+  if (!rules) return rules;
+  const se = s.bracket_type === "single_elimination" || (s.bracket_type !== "double_elimination" && s.playoff_type === "single_elimination");
+  if (!se) return rules;
+  const third = s.third_place_match === "on";
+  const nl = rules.includes("\r\n") ? "\r\n" : "\n";
+  const lines =
+    s.final_bo_scope === "final" || s.final_best_of === s.default_best_of
+      ? [
+          `— все матчи до финала${third ? ", включая полуфиналы и матч за III место," : ", включая полуфиналы,"} — ${boText(s.default_best_of)};`,
+          `— финал — ${boText(s.final_best_of)}.`,
+        ]
+      : [
+          `— матчи до полуфиналов — ${boText(s.default_best_of)};`,
+          `— полуфиналы${third ? ", матч за III место" : ""} и финал — ${boText(s.final_best_of)}.`,
+        ];
+  return rules.replace(/(Формат:\r?\n)((?:—[^\r\n]*(?:\r?\n|$))+)/, (_m, head: string, block: string) => head + lines.join(nl) + (/\r?\n$/.test(block) ? nl : ""));
+}
+
+/** Короткая строка формата на странице турнира: «BO1, финал — BO3» / «BO1, финальная стадия — BO3» */
+function syncMatchFormat(current: string, s: BoSettings) {
+  if (s.default_best_of === s.final_best_of) return `BO${s.default_best_of}`;
+  if (current && !/^BO\d/.test(current)) return current;
+  return `BO${s.default_best_of}, ${s.final_bo_scope === "final" ? "финал" : "финальная стадия"} — BO${s.final_best_of}`;
+}
+
 function parseSponsors(raw: string) {
   try {
     const list = JSON.parse(raw) as { name?: string; url?: string; role?: string }[];
@@ -147,6 +182,7 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     max_teams: data.max_teams,
     default_best_of: data.default_best_of,
     final_best_of: data.final_best_of,
+    final_bo_scope: data.final_bo_scope,
     overtime: data.overtime === "on",
     knife_round: data.knife_round === "on",
     timeouts_per_team: data.timeouts_per_team,
@@ -162,7 +198,7 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     is_lan: data.is_lan === "on",
     prize_pool: data.prize_pool || null,
     prize_distribution: parsePrizes(data.prizes),
-    match_format: data.match_format || null,
+    match_format: syncMatchFormat(data.match_format, data) || null,
     map_pool: data.map_pool
       .split(/[\s,]+/)
       .map((m) => (m.includes("@") ? m.trim() : m.trim().toLowerCase()))
@@ -172,7 +208,7 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
       .filter((m) => /^[a-z0-9_]{1,64}$/.test(m) || /^[\w.-]{1,40}@\d{1,20}$/.test(m)),
     description: data.description || null,
     requirements: data.requirements || null,
-    rules: data.rules || null,
+    rules: syncFormatInRules(data.rules, data) || null,
     starts_at: fromLocalInput(data.starts_at),
     registration_opens_at: fromLocalInput(data.registration_opens_at),
     registration_closes_at: fromLocalInput(data.registration_closes_at),

@@ -65,13 +65,15 @@ export type GenerateOptions = {
    * Проигравшие полуфиналов попадают в него через loser_to — так же, как в нижнюю сетку Double Elimination.
    */
   thirdPlace?: boolean;
+  /** финальный формат (finalBestOf) только у финала: полуфиналы и матч за 3-е место — как обычные (bestOf) */
+  finalOnly?: boolean;
 };
 
 /**
  * Генерирует структуру сетки. best_of по умолчанию: BO1, а финальная стадия (последние 4 команды) — BO3:
  * финал верхней сетки, два последних раунда нижней и гранд-финал (в SE — полуфиналы и финал).
  */
-export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3, thirdPlace = false }: GenerateOptions): BracketMatch[] {
+export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3, thirdPlace = false, finalOnly = false }: GenerateOptions): BracketMatch[] {
   const size = bracketSize(Math.max(seeded.length, double ? 4 : 2));
   const k = Math.log2(size);
   const matches: BracketMatch[] = [];
@@ -94,7 +96,7 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3, t
   // верхняя сетка
   for (let r = 1; r <= k; r++) {
     const count = size / 2 ** r;
-    const bo3 = double ? r === k : r >= k - 1;
+    const bo3 = double || finalOnly ? r === k : r >= k - 1;
     for (let p = 0; p < count; p++) matches.push(blank("upper", r, p, bo3 ? finalBestOf : bestOf));
   }
   const order = seedOrder(size);
@@ -108,14 +110,14 @@ export function generateBracket({ seeded, double, bestOf = 1, finalBestOf = 3, t
     const lbRounds = 2 * (k - 1);
     for (let r = 1; r <= lbRounds; r++) {
       const count = lowerRoundSize(size, r);
-      for (let p = 0; p < count; p++) matches.push(blank("lower", r, p, r >= lbRounds - 1 ? finalBestOf : bestOf));
+      for (let p = 0; p < count; p++) matches.push(blank("lower", r, p, !finalOnly && r >= lbRounds - 1 ? finalBestOf : bestOf));
     }
     // гранд-финал — BO5, команда из верхней сетки (слот 1) начинает со счётом 1:0 (GRAND_FINAL_ADVANTAGE)
     matches.push(blank("grand_final", 1, 0, GRAND_FINAL_BEST_OF));
   }
   // матч за 3-е место: раунд — как у финала (идёт в одно время с ним), формат — как у полуфиналов
   const withThird = !double && thirdPlace && seeded.length >= 4 && k >= 2;
-  if (withThird) matches.push(blank("third_place", k, 0, finalBestOf));
+  if (withThird) matches.push(blank("third_place", k, 0, finalOnly ? bestOf : finalBestOf));
 
   const get = (b: Side, r: number, p: number) => matches.find((x) => x.key === matchKey(b, r, p))!;
 

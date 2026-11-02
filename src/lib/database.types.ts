@@ -2149,6 +2149,7 @@ export type Database = {
           discord_url: string | null
           entry_fee: string | null
           final_best_of: number
+          final_bo_scope: string
           format: string
           game: string
           groups_count: number
@@ -2204,6 +2205,7 @@ export type Database = {
           discord_url?: string | null
           entry_fee?: string | null
           final_best_of?: number
+          final_bo_scope?: string
           format?: string
           game?: string
           groups_count?: number
@@ -2258,6 +2260,7 @@ export type Database = {
           description?: string | null
           discord_url?: string | null
           entry_fee?: string | null
+          final_bo_scope?: string
           final_best_of?: number
           format?: string
           game?: string

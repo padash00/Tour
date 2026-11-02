@@ -174,6 +174,8 @@ export function TournamentForm({
   const [maxTeams, setMaxTeams] = useState(t?.max_teams ?? 16);
   const [bo, setBo] = useState(t?.default_best_of ?? 1);
   const [finalBo, setFinalBo] = useState(t?.final_best_of ?? 3);
+  // к каким матчам относится финальный формат: полуфиналы + 3-е место + финал, или только финал
+  const [finalScope, setFinalScope] = useState<"semis" | "final">(t?.final_bo_scope === "final" ? "final" : "semis");
   const [isLan, setIsLan] = useState(t?.is_lan ?? true);
   const [location, setLocation] = useState(t?.location ?? "F16 Arena");
   const [maps, setMaps] = useState<string[]>(t?.map_pool ?? ACTIVE_POOL.filter((m) => !disabledMaps.includes(m)));
@@ -293,6 +295,7 @@ export function TournamentForm({
       <input type="hidden" name="playoff_type" value={playoffType} />
       <input type="hidden" name="default_best_of" value={bo} />
       <input type="hidden" name="final_best_of" value={finalBo} />
+      <input type="hidden" name="final_bo_scope" value={finalScope} />
       <input type="hidden" name="match_format" value={`BO${bo}, финальная стадия — BO${finalBo}`} />
       {isLan && <input type="hidden" name="is_lan" value="on" />}
       <input type="hidden" name="map_pool" value={maps.join(",")} />
@@ -508,6 +511,25 @@ export function TournamentForm({
                 </p>
               </div>
             </div>
+            {(singleElim || playoffType === "single_elimination") && bracket !== "double_elimination" && bracket !== "round_robin" && bracket !== "swiss" && (
+              <div>
+                <Label>Для каких матчей финальный формат (BO{finalBo})</Label>
+                <Segmented
+                  value={finalScope}
+                  onChange={(v) => setFinalScope(v as "semis" | "final")}
+                  options={[
+                    { value: "semis", label: "Полуфиналы, 3-е место и финал" },
+                    { value: "final", label: "Только финал" },
+                  ]}
+                />
+                <p className="mt-1.5 text-[13.5px] text-fg-3">
+                  {finalScope === "final"
+                    ? `Все матчи до финала, включая полуфиналы и матч за 3-е место, — BO${bo}; финал — BO${finalBo}.`
+                    : `Полуфиналы, матч за 3-е место и финал — BO${finalBo}, остальные — BO${bo}.`}
+                  {" "}При сохранении пункт «Формат:» в регламенте перепишется сам.
+                </p>
+              </div>
+            )}
             {singleElim && (
               <div>
                 <Label>Играть ли матч за 3-е место</Label>
