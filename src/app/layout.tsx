@@ -49,10 +49,23 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
+/** Обычный ES5 без зависимостей: должен выполниться даже там, где основной код сайта не запускается */
+const OLD_BROWSER_NOTICE = `(function(){try{
+var ok=window.CSS&&CSS.supports&&CSS.supports("color","color-mix(in srgb, red, blue)");
+if(ok)return;
+var d=document.createElement("div");
+d.setAttribute("role","alert");
+d.style.cssText="position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#5f9a00;color:#fff;font:600 16px/1.4 -apple-system,system-ui,sans-serif;padding:14px 16px;text-align:center";
+d.innerHTML="Ваш браузер устарел — сайт может работать неправильно.<br>Обновите iPhone: Настройки → Основные → Обновление ПО, или откройте сайт в Chrome.";
+(document.body||document.documentElement).appendChild(d);
+}catch(e){}})();`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ru" className={`${interTight.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
+        {/* Очень старый браузер (iOS < 16.2): стили сайта ему не по силам — сразу говорим, что делать */}
+        <script dangerouslySetInnerHTML={{ __html: OLD_BROWSER_NOTICE }} />
         <ToastProvider>
           <Suspense fallback={null}>
             <NavProgress />
