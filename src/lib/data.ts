@@ -86,7 +86,8 @@ export async function listTeams(): Promise<TeamListItem[]> {
     .eq("is_solo", false)
     .order("created_at", { ascending: false });
   type Row = Team & { team_members: { left_at: string | null; role: string; player: { faceit_elo: number | null } }[] };
-  return ((data ?? []) as Row[]).map(({ team_members, ...team }) => {
+  // сначала самые полные составы, при равенстве — выше средний ELO основы, потом новее
+  const list = ((data ?? []) as Row[]).map(({ team_members, ...team }) => {
     const active = team_members.filter((m) => !m.left_at);
     // средний ELO основы: капитан и игроки, без запасных
     const elos = active.filter((m) => m.role !== "substitute").map((m) => m.player.faceit_elo).filter((e): e is number => e != null);
@@ -96,6 +97,7 @@ export async function listTeams(): Promise<TeamListItem[]> {
       avg_elo: elos.length ? Math.round(elos.reduce((a, b) => a + b, 0) / elos.length) : null,
     };
   });
+  return list.sort((a, b) => b.member_count - a.member_count || (b.avg_elo ?? -1) - (a.avg_elo ?? -1));
 }
 
 export type PlayerListItem = Player & { team: Pick<Team, "name" | "tag"> | null };

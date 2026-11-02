@@ -21,8 +21,7 @@ const plural = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "команда"
 const playersWord = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "игрока" : "игроков");
 
 export default async function TeamsPage() {
-  // сначала самые полные составы, при равенстве — выше средний ELO основы, потом новее
-  const teams = (await listTeams()).sort((a, b) => b.member_count - a.member_count || (b.avg_elo ?? -1) - (a.avg_elo ?? -1));
+  const teams = await listTeams();
 
   return (
     <Container className="pt-8 sm:pt-10">
