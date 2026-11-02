@@ -47,9 +47,22 @@ export async function listFinderPosts(kind: "player" | "team", f: FinderFilter =
   if (f.faceitMin) list = list.filter((p) => (p.player.faceit_level ?? 0) >= f.faceitMin!);
   if (f.faceitMax) list = list.filter((p) => (p.player.faceit_level ?? 0) <= f.faceitMax!);
 
+  // «ищу команду»: кто уже вступил в команду — команду нашёл, объявление не показываем
+  if (kind === "player" && list.length) {
+    const { data: inTeam } = await db()
+      .from("team_members")
+      .select("player_id")
+      .in("player_id", [...new Set(list.map((p) => p.player_id))])
+      .is("left_at", null)
+      .eq("is_solo", false);
+    const busy = new Set((inTeam ?? []).map((m) => m.player_id));
+    list = list.filter((p) => !busy.has(p.player_id));
+  }
+
   if (kind === "team" && list.length) {
     const ids = list.map((p) => p.team_id!).filter(Boolean);
-    const { data: members } = await db().from("team_members").select("team_id").in("team_id", ids);
+    // только нынешний состав: вышедшие игроки в счёт не идут
+    const { data: members } = await db().from("team_members").select("team_id").in("team_id", ids).is("left_at", null);
     const count = new Map<string, number>();
     for (const m of members ?? []) count.set(m.team_id, (count.get(m.team_id) ?? 0) + 1);
     list = list.map((p) => (p.team ? { ...p, team: { ...p.team, member_count: count.get(p.team.id) ?? 0 } } : p));
