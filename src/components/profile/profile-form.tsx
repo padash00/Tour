@@ -5,7 +5,10 @@ import { useActionState, useEffect, useId, useRef, useState, useTransition } fro
 import type { ProfileActionResult } from "@/app/actions/player-profile";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
-import { Button, Callout, Checkbox, ConfirmDialog, Field, Input, Radio, cn } from "@/components/ds";
+import { Button, Callout, Checkbox, ConfirmDialog, Dialog, Field, Input, Radio, cn } from "@/components/ds";
+
+/** Флаг «анкета только что сохранена»: форма после сохранения пересоздаётся (key=updated_at), окно не должно пропасть */
+const SAVED_FLAG = "f16-profile-saved";
 import { OCCUPATIONS, almatyDay, formatPhone, parseProfileForm, type Occupation, type ProfileErrors } from "@/lib/profile";
 import type { PlayerProfile } from "@/lib/types";
 
@@ -106,11 +109,38 @@ export function ProfileForm({
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  // окно «Анкета сохранена» — заметнее тоста: игроки не видели подтверждения и жали «Сохранить» по нескольку раз
+  const [savedOpen, setSavedOpen] = useState(false);
   useEffect(() => {
-    if (state?.success) toast.success(state.success);
+    if (admin) return;
+    // после пересоздания формы: флаг из sessionStorage (внешнее состояние) → открыть окно
+    const t = setTimeout(() => {
+      try {
+        if (sessionStorage.getItem(SAVED_FLAG)) {
+          sessionStorage.removeItem(SAVED_FLAG);
+          setSavedOpen(true);
+        }
+      } catch {}
+    }, 0);
+    return () => clearTimeout(t);
+  }, [admin]);
+
+  useEffect(() => {
+    if (state?.success && !admin) {
+      try {
+        sessionStorage.setItem(SAVED_FLAG, "1");
+      } catch {}
+      const t = setTimeout(() => {
+        try {
+          sessionStorage.removeItem(SAVED_FLAG);
+        } catch {}
+        setSavedOpen(true);
+      }, 0);
+      return () => clearTimeout(t);
+    } else if (state?.success) toast.success(state.success);
     // ошибки с сервера — так же, как проверка в браузере: к первому полю и сообщение
     if (state?.fields && formRef.current) showFirstError(formRef.current, state.fields, toast.error);
-  }, [state, toast]);
+  }, [state, toast, admin]);
 
   const errors: Record<string, string | undefined> = { ...(state?.fields ?? {}), ...(local ?? {}) };
   const set = (k: keyof Values) => (e: { target: { value: string } }) => {
@@ -152,6 +182,32 @@ export function ProfileForm({
   );
 
   return (
+    <>
+    <Dialog
+      open={savedOpen}
+      onClose={() => setSavedOpen(false)}
+      size="sm"
+      title={
+        <span className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-[22px] font-bold text-accent-ink" aria-hidden>
+            ✓
+          </span>
+          Анкета сохранена
+        </span>
+      }
+      description="Данные записаны. Теперь можно собрать команду и подать заявку на турнир."
+      footer={
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={() => setSavedOpen(false)}>
+            Закрыть
+          </Button>
+          <Button href="/find" variant="secondary">
+            Поиск команды
+          </Button>
+          <Button href="/team">Моя команда</Button>
+        </div>
+      }
+    />
     <form ref={formRef} action={formAction} onSubmit={onSubmit} noValidate className="space-y-8" data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
       {next && <input type="hidden" name="next" value={next} />}
       {playerId && <input type="hidden" name="playerId" value={playerId} />}
@@ -276,6 +332,7 @@ export function ProfileForm({
         </div>
       )}
     </form>
+    </>
   );
 }
 
