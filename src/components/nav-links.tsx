@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, LayoutDashboard, LogOut, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, LogOut, Mail, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/components/ds";
@@ -54,12 +54,13 @@ export function PrimaryNav() {
   );
 }
 
-export type UserInfo = { nickname: string; avatar: string | null; steamId: string; unread: number; admin: boolean };
+export type UserInfo = { nickname: string; avatar: string | null; steamId: string; unread: number; dmUnread?: number; admin: boolean };
 
 function userLinks(u: UserInfo) {
   return [
     { href: "/me", label: "Моя игра", hint: "матчи, заявки, что делать дальше", icon: <LayoutDashboard /> },
     { href: "/team", label: "Моя команда", hint: "состав и приглашения", icon: <Users /> },
+    { href: "/messages", label: "Сообщения", hint: u.dmUnread ? "есть новые" : "личная переписка", icon: <Mail />, count: u.dmUnread ?? 0 },
     { href: "/notifications", label: "Уведомления", hint: u.unread ? "есть непрочитанные" : "всё прочитано", icon: <Bell />, count: u.unread },
     { href: `/players/${u.steamId}`, label: "Мой профиль", hint: "как вас видят другие", icon: <User /> },
   ];
@@ -250,6 +251,24 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
         document.body,
       )}
     </div>
+  );
+}
+
+/** Конверт: непрочитанные личные сообщения */
+export function MessagesIcon({ unread }: { unread: number }) {
+  return (
+    <Link
+      href="/messages"
+      className="relative grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg"
+      aria-label={unread > 0 ? `Сообщения: ${unread} новых` : "Сообщения"}
+    >
+      <Mail className="size-[18px]" />
+      {unread > 0 && (
+        <span className="num absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-ink ring-2 ring-shell">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </Link>
   );
 }
 

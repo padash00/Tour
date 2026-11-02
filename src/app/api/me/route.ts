@@ -5,6 +5,7 @@ import { getPlayerActivity } from "@/lib/activity";
 import { isProfileComplete, missingContact } from "@/lib/profile";
 import { getProfile } from "@/lib/profiles";
 import { touchPresence } from "@/lib/presence";
+import { dmUnreadCount } from "@/lib/dm";
 
 /**
  * Кто смотрит страницу. Публичные страницы отдаются из кэша CDN одинаковыми для всех,
@@ -24,6 +25,8 @@ export async function GET(req: Request) {
           isAdmin: isAdmin(player),
         },
         unread: await getUnreadCount(player.id),
+        // до применения миграции личных сообщений таблицы нет — считаем 0
+        dmUnread: await dmUnreadCount(player.id).catch(() => 0),
         activity: await getPlayerActivity(player.id).catch(() => ({ top: null, more: 0 })),
         // только флаг для напоминания об анкете — сами данные анкеты сюда не попадают
         ...(await getProfile(player.id).then(
@@ -31,6 +34,6 @@ export async function GET(req: Request) {
           () => ({ profileIncomplete: false, contactMissing: false }),
         )),
       }
-    : { player: null, unread: 0, activity: { top: null, more: 0 }, profileIncomplete: false, contactMissing: false };
+    : { player: null, unread: 0, dmUnread: 0, activity: { top: null, more: 0 }, profileIncomplete: false, contactMissing: false };
   return NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }

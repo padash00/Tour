@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, ChevronRight, CircleHelp, Copy, Crosshair, Home, MessagesSquare, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, ChevronRight, CircleHelp, Copy, Crosshair, Home, MessagesSquare, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
@@ -44,6 +44,7 @@ export const GROUPS: { title: string; items: SideItem[] }[] = [
 export const HELP = [
   { href: "/help", label: "Как это работает", Icon: CircleHelp },
   { href: "/rules", label: "Правила и FAQ", Icon: BookOpen },
+  { href: "/support", label: "Поддержка", Icon: LifeBuoy },
 ];
 
 const navActive = (pathname: string, item: NavItem) => (item.href === "/" ? pathname === "/" : isActive(pathname, item));

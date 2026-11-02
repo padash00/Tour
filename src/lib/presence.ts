@@ -1,4 +1,5 @@
 import "server-only";
+import { db } from "./supabase";
 
 /*
  * Кто сейчас на сайте. Каждая открытая вкладка опрашивает /api/me (viewer.tsx): вошедший игрок — раз в 15 с,
@@ -11,6 +12,10 @@ export const ONLINE_MS = 2 * 60_000;
 const MAX_ENTRIES = 5_000;
 
 export type PresenceEntry = { playerId: string | null; path: string; at: number; since: number };
+
+// «был на сайте» для профилей: players.last_seen_at пишется не чаще раза в минуту на игрока
+const SEEN_WRITE_MS = 60_000;
+const seenWritten: Map<string, number> = ((globalThis as { __f16Seen?: Map<string, number> }).__f16Seen ??= new Map());
 
 const store: Map<string, PresenceEntry> = ((globalThis as { __f16Presence?: Map<string, PresenceEntry> }).__f16Presence ??= new Map());
 
@@ -27,6 +32,11 @@ export function touchPresence({ playerId, visitor, path }: { playerId: string | 
   const prev = store.get(key);
   const fresh = prev && now - prev.at < ONLINE_MS;
   store.set(key, { playerId, path: cleanPath(path), at: now, since: fresh ? prev.since : now });
+  if (playerId && now - (seenWritten.get(playerId) ?? 0) >= SEEN_WRITE_MS) {
+    seenWritten.set(playerId, now);
+    if (seenWritten.size > MAX_ENTRIES) seenWritten.clear();
+    void db().from("players").update({ last_seen_at: new Date(now).toISOString() }).eq("id", playerId).then(() => {}, () => {});
+  }
   if (store.size > MAX_ENTRIES) prune(now);
 }
 
@@ -47,3 +57,6 @@ export function onlineNow() {
   players.sort((a, b) => b.at - a.at);
   return { players, guests, now };
 }
+
+/** Онлайн по сохранённому времени: был на сайте меньше 2 минут назад */
+export const isOnlineAt = (lastSeen: string | null | undefined, now = Date.now()) => !!lastSeen && now - new Date(lastSeen).getTime() < ONLINE_MS;

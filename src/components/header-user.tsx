@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { SteamMark } from "@/components/ds/icons";
 import { ActivityAnnouncer, GlobalActivity } from "./shell/activity";
 import { SearchTrigger } from "./shell/search";
-import { MobileMenu, NotificationsBell, UserMenu } from "./nav-links";
+import { MessagesIcon, MobileMenu, NotificationsBell, UserMenu } from "./nav-links";
 import { ViewerSync, useViewer } from "./viewer";
 
 /**
@@ -13,9 +13,9 @@ import { ViewerSync, useViewer } from "./viewer";
  * Зависит от того, кто смотрит, поэтому рисуется на клиенте (страница — из кэша CDN).
  */
 export function HeaderUser() {
-  const { status, player, unread } = useViewer();
+  const { status, player, unread, dmUnread } = useViewer();
   const pathname = usePathname();
-  const user = player ? { nickname: player.nickname, avatar: player.avatar_url, steamId: player.steam_id, unread, admin: player.isAdmin } : null;
+  const user = player ? { nickname: player.nickname, avatar: player.avatar_url, steamId: player.steam_id, unread, dmUnread, admin: player.isAdmin } : null;
 
   return (
     <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
@@ -28,6 +28,7 @@ export function HeaderUser() {
         <span aria-hidden className="hidden h-10 w-[150px] rounded-control bg-ink/[0.04] lg:block" />
       ) : user ? (
         <>
+          <MessagesIcon unread={dmUnread} />
           <NotificationsBell unread={unread} />
           <UserMenu user={user} />
         </>

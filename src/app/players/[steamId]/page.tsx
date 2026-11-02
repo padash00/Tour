@@ -9,6 +9,7 @@ import { getPlayerProgress } from "@/lib/progress";
 import { PlayerProfile } from "@/components/player-profile";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { PlayerLobbyGames } from "@/components/lobby/player-lobby-games";
+import { PlayerContact } from "@/components/public/player-contact";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
@@ -66,7 +67,12 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
         progress={progress}
         weapons={weapons}
         h2h={h2h}
-        actions={<ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />}
+        actions={
+          <>
+            <PlayerContact playerId={player.id} lastSeen={player.last_seen_at ?? null} />
+            <ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />
+          </>
+        }
       />
       <PlayerLobbyGames playerId={player.id} />
     </>

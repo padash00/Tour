@@ -1,0 +1,297 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ChevronLeft, Flag, Send, ShieldBan } from "lucide-react";
+import { reportDm, sendDirectMessage, setDmBlock } from "@/app/actions/dm";
+import { useToast } from "@/components/toast";
+import { Avatar } from "@/components/ui";
+import { cn } from "@/components/ds";
+import { refreshViewer } from "@/components/viewer";
+import { isOnline, seenLabel } from "@/lib/online";
+
+type Peer = { id: string; nickname: string; avatar_url: string | null; steam_id: string; last_seen_at: string | null };
+type Msg = { id: number; sender_id: string; recipient_id: string; body: string; created_at: string; read_at: string | null };
+type Conv = { peer: Peer; last: Msg; unread: number };
+
+const POLL_MS = 3000;
+function PeerAvatar({ peer, now, size = 40 }: { peer: Peer; now: number; size?: number }) {
+  return (
+    <span className="relative shrink-0">
+      <Avatar src={peer.avatar_url} name={peer.nickname} size={size} />
+      {isOnline(peer.last_seen_at, now) && <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-surface bg-ok" aria-label="в сети" />}
+    </span>
+  );
+}
+
+/** Личные сообщения: список диалогов слева, переписка справа (на телефоне — по очереди). Опрос раз в 3 с, пока вкладка видна. */
+export function MessagesApp({ withId }: { withId: string | null }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [convs, setConvs] = useState<Conv[] | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  const [support, setSupport] = useState<string | null>(null);
+  const [peer, setPeer] = useState<Peer | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [blocks, setBlocks] = useState({ iBlocked: false, blockedMe: false });
+  const [text, setText] = useState("");
+  const [pending, start] = useTransition();
+  const [now, setNow] = useState(() => Date.now());
+  const box = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const lastId = useRef(0);
+
+  const loadConvs = useCallback(async () => {
+    try {
+      const r = await fetch("/api/dm", { cache: "no-store" });
+      if (!r.ok) return;
+      const j = (await r.json()) as { me: string; support: string | null; conversations: Conv[] };
+      setMe(j.me);
+      setSupport(j.support);
+      setConvs(j.conversations);
+    } catch {}
+  }, []);
+
+  const loadThread = useCallback(
+    async (full = false) => {
+      if (!withId) return;
+      try {
+        const r = await fetch(`/api/dm?with=${withId}${!full && lastId.current ? `&after=${lastId.current}` : ""}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as { me: string; peer: Peer; messages: Msg[]; iBlocked: boolean; blockedMe: boolean };
+        setMe(j.me);
+        setPeer(j.peer);
+        setBlocks({ iBlocked: j.iBlocked, blockedMe: j.blockedMe });
+        setMsgs((prev) => {
+          const next = full ? j.messages : [...prev, ...j.messages.filter((m) => !prev.some((p) => p.id === m.id))];
+          if (next.length) lastId.current = next[next.length - 1].id;
+          return next;
+        });
+        if (j.messages.some((m) => m.recipient_id === j.me && !m.read_at)) refreshViewer();
+      } catch {}
+    },
+    [withId],
+  );
+
+  useEffect(() => {
+    lastId.current = 0;
+    const first = setTimeout(() => {
+      setMsgs([]);
+      setPeer(null);
+      loadConvs();
+      loadThread(true);
+    }, 0);
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      setNow(Date.now());
+      loadConvs();
+      loadThread();
+    }, POLL_MS);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [loadConvs, loadThread]);
+
+  const last = msgs[msgs.length - 1]?.id;
+  useEffect(() => {
+    const el = box.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [last]);
+
+  const send = () => {
+    const body = text.trim();
+    if (!body || !withId) return;
+    setText("");
+    stick.current = true;
+    start(async () => {
+      const r = await sendDirectMessage(withId, body);
+      if (r?.error) {
+        toast.error(r.error);
+        setText(body);
+      }
+      await loadThread();
+      await loadConvs();
+    });
+  };
+  const toggleBlock = () =>
+    start(async () => {
+      if (!withId || !peer) return;
+      const block = !blocks.iBlocked;
+      if (block && !window.confirm(`Заблокировать ${peer.nickname}? Он не сможет вам писать, а вы — ему.`)) return;
+      const r = await setDmBlock(withId, block);
+      if (r?.error) toast.error(r.error);
+      else toast.success(block ? "Игрок заблокирован" : "Блокировка снята");
+      await loadThread(true);
+    });
+  const report = (m: Msg) => {
+    const reason = window.prompt("Почему жалуетесь? (необязательно)") ?? null;
+    if (reason === null) return;
+    start(async () => {
+      const r = await reportDm(m.id, reason);
+      if (r?.error) toast.error(r.error);
+      else toast.success("Жалоба отправлена администратору");
+    });
+  };
+
+  const time = useMemo(() => new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), []);
+  const day = useMemo(() => new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" }), []);
+  const lastSeenOther = [...msgs].reverse().find((m) => m.sender_id === me && m.read_at);
+
+  const list = (
+    <div className={cn("min-h-0 overflow-y-auto border-line-subtle md:border-r", withId && "hidden md:block")}>
+      {convs === null && <p className="p-6 text-center text-[13px] text-fg-3">Загружаем…</p>}
+      {convs?.length === 0 && (
+        <p className="p-6 text-center text-[14px] leading-relaxed text-fg-3">
+          Диалогов пока нет. Откройте профиль игрока и нажмите «Написать» — например, в{" "}
+          <Link href="/players" className="font-semibold text-accent hover:underline">
+            списке игроков
+          </Link>
+          .
+        </p>
+      )}
+      {convs?.map((c) => (
+        <button
+          key={c.peer.id}
+          type="button"
+          onClick={() => router.replace(`/messages?with=${c.peer.id}`, { scroll: false })}
+          className={cn("flex w-full items-center gap-3 border-b border-line-subtle px-4 py-3 text-left transition-colors hover:bg-surface-2", c.peer.id === withId && "bg-accent-dim/50")}
+        >
+          <PeerAvatar peer={c.peer} now={now} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-[15px] font-semibold text-fg">
+                {c.peer.nickname}
+                {c.peer.id === support && <span className="ml-1.5 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold uppercase text-accent-ink">поддержка</span>}
+              </span>
+              <span className="num shrink-0 text-[11px] text-fg-4">{time.format(new Date(c.last.created_at))}</span>
+            </span>
+            <span className="flex items-center gap-2">
+              <span className={cn("truncate text-[13px]", c.unread ? "font-semibold text-fg" : "text-fg-3")}>
+                {c.last.sender_id === me ? "Вы: " : ""}
+                {c.last.body}
+              </span>
+              {c.unread > 0 && <span className="ml-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-accent-ink">{c.unread}</span>}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const thread = withId ? (
+    <div className="flex min-h-0 flex-col">
+      <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
+        <button type="button" onClick={() => router.replace("/messages", { scroll: false })} className="-ml-1 text-fg-3 hover:text-fg md:hidden" aria-label="К диалогам">
+          <ChevronLeft className="size-5" />
+        </button>
+        {peer ? (
+          <>
+            <Link href={`/players/${peer.steam_id}`} className="flex min-w-0 items-center gap-3">
+              <PeerAvatar peer={peer} now={now} size={36} />
+              <span className="min-w-0">
+                <span className="block truncate text-[15px] font-semibold text-fg hover:underline">
+                  {peer.nickname}
+                  {peer.id === support && <span className="ml-1.5 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold uppercase text-accent-ink">поддержка F16</span>}
+                </span>
+                <span className={cn("block text-[12px]", isOnline(peer.last_seen_at, now) ? "text-ok" : "text-fg-3")}>{seenLabel(peer.last_seen_at, now)}</span>
+              </span>
+            </Link>
+            <button type="button" onClick={toggleBlock} disabled={pending} className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-fg-3 hover:text-danger" title={blocks.iBlocked ? "Разблокировать" : "Заблокировать"}>
+              <ShieldBan className="size-4" />
+              <span className="hidden sm:inline">{blocks.iBlocked ? "Разблокировать" : "Заблокировать"}</span>
+            </button>
+          </>
+        ) : (
+          <span className="text-[13px] text-fg-3">Загружаем…</span>
+        )}
+      </div>
+      <div
+        ref={box}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4"
+        aria-live="polite"
+      >
+        {peer && msgs.length === 0 && (
+          <p className="pt-10 text-center text-[14px] text-fg-3">
+            {peer.id === support ? "Опишите вопрос — администратор ответит здесь, обычно в течение нескольких минут." : "Напишите первое сообщение"}
+          </p>
+        )}
+        {msgs.map((m, i) => {
+          const mine = m.sender_id === me;
+          const d = day.format(new Date(m.created_at));
+          const newDay = i === 0 || day.format(new Date(msgs[i - 1].created_at)) !== d;
+          return (
+            <div key={m.id}>
+              {newDay && <p className="my-2 text-center text-[12px] font-semibold text-fg-3">{d}</p>}
+              <div className={cn("group flex items-end gap-2", mine ? "justify-end" : "justify-start")}>
+                {!mine && (
+                  <button type="button" onClick={() => report(m)} className="order-2 text-fg-4 opacity-0 hover:text-danger group-hover:opacity-100" title="Пожаловаться">
+                    <Flag className="size-3.5" />
+                  </button>
+                )}
+                <div className={cn("max-w-[78%] rounded-[16px] px-3.5 py-2", mine ? "rounded-br-[4px] bg-accent text-accent-ink" : "rounded-bl-[4px] bg-surface-2 text-fg")}>
+                  <p className="whitespace-pre-wrap break-words text-[15px] leading-snug">{m.body}</p>
+                  <p className={cn("num mt-0.5 text-right text-[10.5px]", mine ? "text-accent-ink/70" : "text-fg-4")}>
+                    {time.format(new Date(m.created_at))}
+                    {mine && lastSeenOther?.id === m.id ? " · прочитано" : ""}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {blocks.iBlocked || blocks.blockedMe ? (
+        <p className="border-t border-line-subtle p-4 text-center text-[14px] text-fg-3">
+          {blocks.iBlocked ? "Вы заблокировали этого игрока." : "Игрок ограничил сообщения от вас."}
+        </p>
+      ) : (
+        <form
+          className="flex items-end gap-2 border-t border-line-subtle p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+        >
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            rows={1}
+            maxLength={1000}
+            placeholder="Сообщение…"
+            aria-label="Сообщение"
+            className="max-h-32 min-h-11 min-w-0 flex-1 resize-none rounded-control border border-line bg-shell px-3.5 py-2.5 text-[15px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
+          />
+          <button
+            type="submit"
+            disabled={pending || !text.trim()}
+            aria-label="Отправить"
+            className="grid size-11 shrink-0 place-items-center rounded-control bg-accent text-accent-ink transition-colors hover:bg-accent-strong disabled:opacity-50"
+          >
+            <Send className="size-4" />
+          </button>
+        </form>
+      )}
+    </div>
+  ) : (
+    <div className="hidden items-center justify-center p-6 text-center text-[14px] text-fg-3 md:flex">Выберите диалог слева</div>
+  );
+
+  return (
+    <div className="grid h-[72vh] min-h-[460px] overflow-hidden rounded-surface border border-line-subtle bg-surface md:grid-cols-[320px_minmax(0,1fr)]">
+      {list}
+      {thread}
+    </div>
+  );
+}

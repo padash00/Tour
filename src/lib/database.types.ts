@@ -605,6 +605,136 @@ export type Database = {
           },
         ]
       }
+      direct_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: number
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: never
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: never
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "direct_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_messages_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dm_reports: {
+        Row: {
+          created_at: string
+          id: number
+          message_id: number | null
+          reason: string | null
+          reported_id: string
+          reporter_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          message_id?: number | null
+          reason?: string | null
+          reported_id: string
+          reporter_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          message_id?: number | null
+          reason?: string | null
+          reported_id?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_reports_reported_id_fkey"
+            columns: ["reported_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dm_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lobby_messages: {
         Row: {
           body: string
@@ -1366,6 +1496,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           chat_muted: boolean
+          last_seen_at: string | null
           country: string | null
           created_at: string
           faceit_elo: number | null
@@ -1385,6 +1516,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           chat_muted?: boolean
+          last_seen_at?: string | null
           country?: string | null
           created_at?: string
           faceit_elo?: number | null
@@ -1404,6 +1536,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           chat_muted?: boolean
+          last_seen_at?: string | null
           country?: string | null
           created_at?: string
           faceit_elo?: number | null

@@ -7,6 +7,7 @@ import { ratingColor } from "@/components/stats-format";
 import { DATA_TABLE, NUM_CELL, tableBox } from "@/components/public/data-table";
 import { Avatar, Container, EmptyState, FaceitLevel, PageTitle, cn } from "@/components/ds";
 import { ClientFilter } from "@/components/public/client-filter";
+import { isOnline } from "@/lib/online";
 
 export const metadata: Metadata = {
   title: "Игроки",
@@ -17,21 +18,37 @@ export const dynamic = "force-dynamic";
 
 const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "игрока" : "игроков");
 
-export default async function PlayersPage() {
-  const [players, board] = await Promise.all([listPlayers(), getPlayerLeaderboard()]);
+export default async function PlayersPage(props: PageProps<"/players">) {
+  const sp = await props.searchParams;
+  const onlyOnline = sp.online === "1";
+  const [all, board] = await Promise.all([listPlayers(), getPlayerLeaderboard()]);
+  const now = serverNow();
+  // кто сейчас на сайте — сверху
+  const sorted = [...all].sort((a, b) => Number(isOnline(b.last_seen_at, now)) - Number(isOnline(a.last_seen_at, now)));
+  const onlineCount = sorted.filter((p) => isOnline(p.last_seen_at, now)).length;
+  const players = onlyOnline ? sorted.filter((p) => isOnline(p.last_seen_at, now)) : sorted;
   const statsById = new Map(board.filter((b) => b.player_id).map((b) => [b.player_id!, b]));
 
   return (
     <Container width="wide" className="pb-16 pt-8 sm:pt-10">
       <header>
         <PageTitle>Игроки</PageTitle>
-        <p className="mt-1 text-meta text-fg-3">{players.length ? `${players.length} ${word(players.length)} на платформе F16 Arena.` : "Игроки появятся после первого входа через Steam."}</p>
+        <p className="mt-1 text-meta text-fg-3">{all.length ? `${all.length} ${word(all.length)} на платформе F16 Arena.` : "Игроки появятся после первого входа через Steam."}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-[14px] font-semibold">
+          <Link href="/players" className={cn("rounded-full border px-3 py-1.5", !onlyOnline ? "border-accent bg-accent-dim text-fg" : "border-line text-fg-3 hover:text-fg")}>
+            Все
+          </Link>
+          <Link href="/players?online=1" className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5", onlyOnline ? "border-accent bg-accent-dim text-fg" : "border-line text-fg-3 hover:text-fg")}>
+            <span className="size-2 rounded-full bg-ok" aria-hidden />
+            Сейчас в сети · {onlineCount}
+          </Link>
+        </div>
       </header>
 
       {players.length > 0 && <ClientFilter scope="players" placeholder="Ник или SteamID" className="mt-8 mb-5 max-w-xl" />}
 
       {players.length === 0 ? (
-        <EmptyState className="mt-8" icon={<Users />} title="Игроков пока нет" text="После первого входа через Steam игрок появится в списке." />
+        <EmptyState className="mt-8" icon={<Users />} title={onlyOnline ? "Сейчас никого нет в сети" : "Игроков пока нет"} text={onlyOnline ? "Загляните позже или посмотрите всех игроков." : "После первого входа через Steam игрок появится в списке."} />
       ) : (
         <div className={tableBox(true, "mt-6")} data-filter-scope="players">
           <p data-filter-empty hidden className="px-6 py-10 text-[15px] text-fg-3">
@@ -55,7 +72,10 @@ export default async function PlayersPage() {
                   <tr key={player.id} data-filter={`${player.nickname} ${player.steam_id}`.toLowerCase()}>
                     <td>
                       <Link href={`/players/${player.steam_id}`} className="group flex min-h-11 items-center gap-3 text-fg">
-                        <Avatar src={player.avatar_url} name={player.nickname} size="md" />
+                        <span className="relative shrink-0">
+                          <Avatar src={player.avatar_url} name={player.nickname} size="md" />
+                          {isOnline(player.last_seen_at, now) && <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-ok" title="в сети" />}
+                        </span>
                         <span className="text-[15px] font-semibold transition-colors group-hover:text-accent">{player.nickname}</span>
                         {player.is_banned && <span className="text-micro font-semibold uppercase tracking-[0.12em] text-danger">бан</span>}
                       </Link>
@@ -88,4 +108,9 @@ export default async function PlayersPage() {
       )}
     </Container>
   );
+}
+
+/** Время запроса на сервере (страница рендерится на каждый запрос) */
+function serverNow() {
+  return Date.now();
 }
