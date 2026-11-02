@@ -97,8 +97,8 @@ export default async function MyGamePage() {
   const rejected = regs.find((r) => r.status === "rejected" && r.tournament.status === "registration");
   const isCaptain = membership?.team.captain_id === player.id;
   const myTeamIds = [membership?.team.id, solo?.id].filter(Boolean) as string[];
-  // капитан с поданной заявкой на официальный турнир скачивает Приложение №1 своей команды
-  const printable = isCaptain ? activeRegs.filter((r) => r.tournament.is_official && r.team_id === membership?.team.id) : [];
+  // капитан команды, допущенной (одобренной) на официальный турнир, скачивает Приложение №1 своей команды
+  const printable = isCaptain ? activeRegs.filter((r) => r.tournament.is_official && r.status === "approved" && r.team_id === membership?.team.id) : [];
   const openTournament = tournaments.find((t) => t.status === "registration" && !regs.some((r) => r.tournament_id === t.id && isActiveRegistration(r)));
   const teamSize = openTournament ? modeOf(openTournament.format).size : 5;
 

@@ -26,7 +26,8 @@ export default async function CaptainApplicationPage(props: PageProps<"/tourname
   const membership = await getActiveMembership(player.id);
   const isCaptain = !!membership && membership.team.captain_id === player.id;
   const data = isCaptain ? await loadOfficial(t) : null;
-  const index = data ? data.teams.findIndex((x) => x.registration.team.id === membership!.team.id) : -1;
+  // только капитан команды с одобренной заявкой
+  const index = data ? data.teams.findIndex((x) => x.registration.team.id === membership!.team.id && x.registration.status === "approved") : -1;
 
   const back = (
     <Link href={`/tournaments/${t.slug}`} className="-ml-1 inline-flex min-h-11 items-center gap-1 text-meta text-fg-3 hover:text-fg sm:min-h-0">
@@ -42,7 +43,7 @@ export default async function CaptainApplicationPage(props: PageProps<"/tourname
         <div className="mt-6">
           <EmptyState
             title="Заявки нет"
-            text={isCaptain ? "Ваша команда ещё не подала заявку на этот турнир." : "Скачать заявку может только капитан команды, подавшей заявку."}
+            text={isCaptain ? "Заявку можно скачать, когда организатор одобрит участие вашей команды." : "Скачать заявку может только капитан команды-участника."}
           />
         </div>
       </Container>

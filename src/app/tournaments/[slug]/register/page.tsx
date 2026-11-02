@@ -227,7 +227,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
         {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={fresh} canEdit />}
-        {active && (
+        {active?.status === "approved" && (
           <Callout
             tone="warn"
             title="Распечатайте и подпишите заявку"
