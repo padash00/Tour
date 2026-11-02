@@ -7,8 +7,13 @@ import type { Instrumentation } from "next";
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const tls = await import("node:tls");
-  tls.DEFAULT_ECDH_CURVE = "X25519:P-256:P-384";
+  try {
+    // default — сам объект модуля (изменяемый); именованный импорт ESM доступен только для чтения
+    const { default: tls } = await import("node:tls");
+    tls.DEFAULT_ECDH_CURVE = "X25519:P-256:P-384";
+  } catch (e) {
+    console.error("TLS curves not set", e);
+  }
 }
 
 /**
