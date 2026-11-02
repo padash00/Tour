@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 import { PRIMARY_NAV, SECONDARY_NAV, isActive, noChrome } from "./shell/nav";
+import { GROUPS, HELP } from "./shell/sidebar";
 
 /** Публичная обёртка не нужна в F16 Control и ТВ — там своя оболочка */
 export function PublicOnly({ children }: { children: ReactNode }) {
@@ -174,15 +175,39 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
           aria-label="Меню сайта"
           className="fixed inset-x-0 bottom-0 top-[var(--shell-h)] z-50 overflow-y-auto border-t border-line-subtle bg-bg animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
         >
-          <nav className="px-3 py-3" aria-label="Мобильное меню">
-            {PRIMARY_NAV.map((item) => {
-              const active = isActive(pathname, item);
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setOpen(false)} aria-current={active ? "page" : undefined} className={cn(row, "font-medium", active ? "bg-ink/[0.06] text-fg" : "text-fg-2 hover:text-fg")}>
-                  {item.label}
+          {/* те же разделы, что в боковом меню на компьютере: группы, иконки и пояснения */}
+          <nav className="px-3 py-2" aria-label="Мобильное меню">
+            {GROUPS.map((g) => (
+              <div key={g.title} className="py-2">
+                <div className="px-3 pb-1 text-[12px] font-semibold uppercase tracking-wide text-fg-3">{g.title}</div>
+                {g.items.map((item) => {
+                  const active = item.href === "/" ? pathname === "/" : isActive(pathname, item);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn("flex min-h-[52px] items-center gap-3 rounded-control px-3 py-1.5 transition-colors", active ? "bg-accent-dim/50 text-fg" : "text-fg-2 hover:bg-ink/[0.04] hover:text-fg")}
+                    >
+                      <item.Icon className={cn("size-5 shrink-0", active ? "text-accent" : "text-fg-3")} aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block text-[16px] font-medium leading-tight">{item.label}</span>
+                        <span className="block text-[12.5px] leading-tight text-fg-3">{item.hint}</span>
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+            <div className="border-t border-line-subtle py-2">
+              {HELP.map((h) => (
+                <Link key={h.href} href={h.href} onClick={() => setOpen(false)} className="flex h-11 items-center gap-3 rounded-control px-3 text-[15px] text-fg-2 hover:text-fg">
+                  <h.Icon className="size-5 shrink-0 text-fg-3" aria-hidden />
+                  {h.label}
                 </Link>
-              );
-            })}
+              ))}
+            </div>
           </nav>
           {user ? (
             <div className="mx-3 border-t border-line-subtle py-3">
@@ -214,7 +239,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
             </div>
           )}
           <div className="mx-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-line-subtle px-3 py-4 text-[14px] text-fg-3">
-            {SECONDARY_NAV.map((l) => (
+            {SECONDARY_NAV.filter((l) => !GROUPS.some((g) => g.items.some((i) => i.href === l.href)) && !HELP.some((h) => h.href === l.href) && l.href !== "/rules#faq").map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center hover:text-fg">
                 {l.label}
               </Link>

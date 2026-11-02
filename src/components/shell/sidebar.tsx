@@ -19,7 +19,7 @@ import { isActive, noChrome, type NavItem } from "./nav";
 type SideItem = NavItem & { hint: string; Icon: LucideIcon };
 
 /** Разделы бокового меню: группы и короткое пояснение под каждым пунктом — понятно, куда ведёт */
-const GROUPS: { title: string; items: SideItem[] }[] = [
+export const GROUPS: { title: string; items: SideItem[] }[] = [
   {
     title: "Играть",
     items: [
@@ -41,7 +41,7 @@ const GROUPS: { title: string; items: SideItem[] }[] = [
   },
 ];
 
-const HELP = [
+export const HELP = [
   { href: "/help", label: "Как это работает", Icon: CircleHelp },
   { href: "/rules", label: "Правила и FAQ", Icon: BookOpen },
 ];
