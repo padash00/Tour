@@ -8,6 +8,7 @@ import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, syncBracket } from "@/lib/matches";
 import { drawOrder, type DrawRecord } from "@/lib/draw";
+import { bracketSize, seedOrder } from "@/lib/bracket";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { SeriesResult } from "@/lib/types";
@@ -92,6 +93,69 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
   revalidatePath(`/admin/tournaments/${t.id}`);
   revalidatePath(`/tournaments/${t.slug}`);
   return { success: seeding === "draw" ? `Жеребьёвка проведена: ${ordered.length} команд` : `Сетка создана: ${ordered.length} команд` };
+}
+
+/**
+ * Ручная расстановка: админ сам задаёт пары первого раунда (Single / Double Elimination).
+ * Поля m{p}a / m{p}b — id команд матча p (пусто — проход без игры). Можно и поверх готовой сетки, пока матчи не начаты.
+ */
+export async function manualBracketAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const t = await getTournamentById(String(formData.get("tournamentId")));
+  if (!t) return { error: "Турнир не найден" };
+  if (t.bracket_type !== "single_elimination" && t.bracket_type !== "double_elimination") {
+    return { error: "Ручная расстановка — только для сетки на выбывание" };
+  }
+  if (t.bracket_published_at) {
+    const blocked = await bracketDeleteBlocker(t.id);
+    if (blocked) return { error: `Переставить нельзя: ${blocked}` };
+  }
+  const regs = (await getTournamentRegistrations(t.id)).filter((r) => r.status === "approved");
+  const byTeam = new Map(regs.map((r) => [r.team_id, r]));
+  const size = bracketSize(Math.max(regs.length, t.bracket_type === "double_elimination" ? 4 : 2));
+  const pairs: [string | null, string | null][] = [];
+  const used = new Set<string>();
+  for (let p = 0; p < size / 2; p++) {
+    const pick = (k: string) => {
+      const v = String(formData.get(`m${p}${k}`) ?? "");
+      return v ? v : null;
+    };
+    const a = pick("a"), b = pick("b");
+    for (const id of [a, b]) {
+      if (!id) continue;
+      if (!byTeam.has(id)) return { error: "В парах есть команда без одобренной заявки — обновите страницу" };
+      if (used.has(id)) return { error: `Команда ${byTeam.get(id)!.team?.name ?? ""} стоит в сетке дважды` };
+      used.add(id);
+    }
+    if (!a && !b) return { error: `Матч ${p + 1}: пустая пара — поставьте хотя бы одну команду` };
+    pairs.push([a, b]);
+  }
+  const missing = regs.filter((r) => !used.has(r.team_id));
+  if (missing.length) return { error: `Не расставлены: ${missing.map((r) => r.team?.name).join(", ")}` };
+
+  // пары → посев: матч p первого раунда = позиции order[2p], order[2p+1]
+  const order = seedOrder(size);
+  const seeded: (string | undefined)[] = Array.from({ length: size });
+  pairs.forEach(([a, b], p) => {
+    seeded[order[2 * p] - 1] = a ?? undefined;
+    seeded[order[2 * p + 1] - 1] = b ?? undefined;
+  });
+
+  if (t.bracket_published_at) await clearBracket(t.id);
+  for (const [i, id] of seeded.entries()) {
+    if (id) await db().from("tournament_registrations").update({ seed: i + 1 }).eq("id", byTeam.get(id)!.id);
+  }
+  try {
+    await createBracket(t, seeded as string[]);
+  } catch (e) {
+    return { error: `Не удалось создать сетку: ${(e as Error).message}` };
+  }
+  await audit(admin.id, "bracket.manual", { type: "tournament", id: t.id }, {
+    pairs: pairs.map(([a, b]) => `${a ? byTeam.get(a)!.team?.name : "—"} vs ${b ? byTeam.get(b)!.team?.name : "—"}`),
+  });
+  revalidatePath(`/admin/tournaments/${t.id}`);
+  revalidatePath(`/tournaments/${t.slug}`);
+  return { success: `Сетка расставлена вручную: ${regs.length} команд` };
 }
 
 /** Почему сетку нельзя удалить (есть начатые или сыгранные матчи); null — можно */

@@ -18,7 +18,8 @@ import { FORMATS, type FormatKind } from "@/lib/formats";
 import { MODES, type ModeKey } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { TournamentStatus } from "@/lib/types";
-import { deleteBracketAction, generateBracketAction } from "@/app/actions/admin-match";
+import { deleteBracketAction, generateBracketAction, manualBracketAction } from "@/app/actions/admin-match";
+import { bracketSize, seedOrder } from "@/lib/bracket";
 import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ActionToggle } from "@/components/admin/action-toggle";
@@ -132,7 +133,14 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
       {tab === "official" && <OfficialTab t={t} admin={admin} />}
-      {tab === "bracket" && <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />}
+      {tab === "bracket" && (
+        <>
+          <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />
+          {(t.bracket_type === "single_elimination" || t.bracket_type === "double_elimination") && approved.length >= 2 && (
+            <ManualPairs t={t} regs={approved} />
+          )}
+        </>
+      )}
       {tab === "matches" && <MatchesTab tournamentId={t.id} />}
       {tab === "awards" && <AwardsTab t={t} regs={approved} />}
       {tab === "settings" && (
@@ -605,6 +613,65 @@ function BracketTab({
         </div>
       )}
     </div>
+  );
+}
+
+// ───────────────────────── Ручная расстановка пар
+
+async function ManualPairs({ t, regs }: { t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official">; regs: RegistrationWithTeam[] }) {
+  const size = bracketSize(Math.max(regs.length, t.bracket_type === "double_elimination" ? 4 : 2));
+  const elo = (r: RegistrationWithTeam) => averageElo(r.roster.filter((p) => p.role === "main")) ?? 0;
+  // подстановка: текущие пары сетки, иначе — посев по рейтингу (сильные разведены)
+  let pairs: [string | null, string | null][] = [];
+  if (t.bracket_published_at) {
+    const { data } = await db().from("matches").select("position, team1_id, team2_id").eq("tournament_id", t.id).eq("bracket", "upper").eq("round", 1).order("position");
+    pairs = (data ?? []).map((m) => [m.team1_id, m.team2_id]);
+  }
+  if (pairs.length !== size / 2) {
+    const byElo = [...regs].sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999) || elo(b) - elo(a));
+    const order = seedOrder(size);
+    pairs = Array.from({ length: size / 2 }, (_, p) => [byElo[order[2 * p] - 1]?.team_id ?? null, byElo[order[2 * p + 1] - 1]?.team_id ?? null]);
+  }
+  const options = [...regs].sort((a, b) => (a.team?.name ?? "").localeCompare(b.team?.name ?? "", "ru"));
+  const select = (name: string, value: string | null) => (
+    <select name={name} defaultValue={value ?? ""} className="field h-11 min-w-0 flex-1 text-[15px]">
+      <option value="">— проход без игры —</option>
+      {options.map((r) => (
+        <option key={r.team_id} value={r.team_id}>
+          {r.team?.name} · {elo(r) || "—"} ELO
+        </option>
+      ))}
+    </select>
+  );
+  return (
+    <ActionForm action={manualBracketAction} className="mt-5 max-w-3xl">
+      <div className="rounded-surface border border-line-subtle bg-surface p-6 shadow-[var(--shadow-soft)] space-y-4">
+        <input type="hidden" name="tournamentId" value={t.id} />
+        <div className="text-[18px] font-bold text-fg">Вручную — кто с кем играет</div>
+        <p className="text-[15px] leading-relaxed text-fg-2">
+          Выберите пары первого раунда. Каждая одобренная команда — ровно один раз; «проход без игры» — команда сразу проходит дальше.
+          {t.bracket_published_at ? " Текущая сетка заменится — можно, пока ни один матч не начат." : ""}
+        </p>
+        {t.is_official && (
+          <p className="rounded-control border border-warn/30 bg-warn-dim px-4 py-3 text-[14.5px] text-fg-2">
+            Официальный турнир: по регламенту (п. 4.3) пары определяет жеребьёвка на платформе. Ручную расстановку используйте, только если это согласовано с организаторами.
+          </p>
+        )}
+        <div className="space-y-2.5">
+          {pairs.map(([a, b], p) => (
+            <div key={p} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="w-20 shrink-0 text-[14px] font-semibold text-fg-3">Матч {p + 1}</span>
+              {select(`m${p}a`, a)}
+              <span className="text-center text-[13px] font-semibold text-fg-3">vs</span>
+              {select(`m${p}b`, b)}
+            </div>
+          ))}
+        </div>
+        <SubmitButton size="md" confirm={t.bracket_published_at ? "Заменить сетку этими парами?" : "Создать и опубликовать сетку с этими парами?"}>
+          {t.bracket_published_at ? "Переставить пары" : "Создать сетку с этими парами"}
+        </SubmitButton>
+      </div>
+    </ActionForm>
   );
 }
 
