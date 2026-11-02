@@ -18,6 +18,8 @@ import { RegisterForm, RosterPicker, WithdrawApplication, type PickerMember } fr
 import { OfficialApplicationForm, type ApplicationValues } from "@/components/competition/official-application";
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { HelpHint } from "@/components/help-hint";
+import { RulesGate } from "@/components/rules-gate";
+import { hasRules } from "@/lib/rules-ack";
 
 export const metadata: Metadata = { title: "Регистрация на турнир", robots: { index: false } };
 
@@ -74,7 +76,14 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
                   <ProfileRequired next={`/tournaments/${t.slug}/register`} action="участвовать в турнире" />
                 </div>
               ) : (
-                <RegisterForm tournamentId={t.id} label={reg?.status === "rejected" ? "Подать заявку снова" : "Участвовать"} footer="Турнир 1×1 — команда не нужна." />
+                <>
+                  {hasRules(t.rules) && (
+                    <div className="p-4 sm:p-5">
+                      <RulesGate tournamentId={t.id} rules={t.rules!} />
+                    </div>
+                  )}
+                  <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label={reg?.status === "rejected" ? "Подать заявку снова" : "Участвовать"} footer="Турнир 1×1 — команда не нужна." />
+                </>
               )}
             </div>
           )}
@@ -218,6 +227,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
         {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={fresh} canEdit />}
+        {!active && hasRules(t.rules) && <RulesGate tournamentId={t.id} rules={t.rules!} />}
         <section aria-labelledby="application-title">
           <div className="mb-3">
             <h2 id="application-title" className="text-heading text-fg">
@@ -260,6 +270,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
     <Shell t={t} open={open} steps={steps}>
       {teamPanel}
       {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={fresh} canEdit />}
+      {!active && hasRules(t.rules) && <RulesGate tournamentId={t.id} rules={t.rules!} />}
 
       {previous && (
         <Panel padded={false} className="border-accent/25">
@@ -271,7 +282,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             </p>
           </div>
           <div className="border-t border-line-subtle">
-            <RegisterForm tournamentId={t.id} label="Подать тем же составом" variant="secondary" footer="Или выберите состав вручную ниже.">
+            <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label="Подать тем же составом" variant="secondary" footer="Или выберите состав вручную ниже.">
               {previous.main.map((id) => (
                 <input key={id} type="hidden" name="main" value={id} />
               ))}
@@ -298,6 +309,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             tournamentId={t.id}
             mains={mode.size}
             update={!!active}
+            rulesGate={!active && hasRules(t.rules)}
             label={active ? "Сохранить состав" : regShown?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
             pendingLabel={active ? "Сохраняем…" : "Отправляем…"}
             footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}
@@ -525,6 +537,7 @@ async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], capt
       values={values}
       suggestions={suggestions}
       update={!!active}
+      rulesGate={!active && hasRules(t.rules)}
       label={active ? "Сохранить заявку" : reg?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
       teamCoach={teamCoach}
       footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}

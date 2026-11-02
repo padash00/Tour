@@ -19,6 +19,7 @@ import { checkPlayer, officialRoster, parseApplication, type ApplicationInput } 
 import { fullName, isProfileComplete, positionOf, tournamentDay, workplaceOf } from "@/lib/profile";
 import { getProfile, getProfiles, profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
+import { ackRules, hasRules } from "@/lib/rules-ack";
 import type { SaveRegistrationResult, Tournament } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
 
@@ -53,6 +54,14 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     const existing = await getRegistration(tournament.id, team.id);
     if (existing && (existing.status === "pending" || existing.status === "approved")) {
       return { error: "Заявка уже подана — состав и данные теперь меняет только организатор. Напишите ему, что нужно изменить." };
+    }
+  }
+  // новая заявка — только после прочтения регламента (галочка на странице заявки); правка состава — без этого
+  const rulesRequired = hasRules(tournament.rules);
+  if (rulesRequired && formData.get("rules_ack") !== "1") {
+    const existing = await getRegistration(tournament.id, team.id);
+    if (!existing || (existing.status !== "pending" && existing.status !== "approved")) {
+      return { error: "Прочитайте регламент турнира до конца и поставьте галочку «Я прочитал регламент»" };
     }
   }
   // анкета капитана (настройка PROFILE_REQUIRED); в официальном турнире ниже проверяются анкеты всех игроков
@@ -131,6 +140,7 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
     `/tournaments/${tournament.slug}`,
   );
   await audit(player.id, auto ? "registration.auto_approved" : "registration.create", { type: "tournament", id: tournament.id }, { team: team.tag });
+  if (rulesRequired) await ackRules(player.id, tournament.id);
   revalidatePath(`/tournaments/${tournament.slug}`);
   revalidatePath("/team");
   return {

@@ -6,6 +6,7 @@ import { useActionState, useEffect, useRef, useState, useTransition, type FormEv
 import { checkIn, registerTeam, withdrawRegistration } from "@/app/actions/tournament";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
+import { useRulesOk } from "@/components/rules-gate";
 import { Avatar, Button, Callout, ConfirmDialog, FaceitLevel, Status, Timer, cn } from "@/components/ds";
 import { formatDateTime, formatTime } from "@/lib/format";
 import type { TournamentStatus } from "@/lib/types";
@@ -150,7 +151,10 @@ export function RegisterForm({
   variant = "primary",
   children,
   footer,
+  rulesGate,
 }: {
+  /** на странице стоит RulesGate: отправка только после прочтения регламента */
+  rulesGate?: boolean;
   tournamentId: string;
   mains?: number;
   update?: boolean;
@@ -162,6 +166,8 @@ export function RegisterForm({
 }) {
   const [state, action, pending] = useActionState<ActionResult, FormData>(registerTeam, null);
   const [local, setLocal] = useState<string | null>(null);
+  const rulesOk = useRulesOk(tournamentId);
+  const locked = !!rulesGate && !rulesOk;
   const toast = useToast();
   const router = useRouter();
   const path = usePathname();
@@ -185,10 +191,11 @@ export function RegisterForm({
   return (
     <form action={action} onSubmit={onSubmit} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
       <input type="hidden" name="tournamentId" value={tournamentId} />
+      {rulesGate && <input type="hidden" name="rules_ack" value={rulesOk ? "1" : ""} />}
       {children}
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="min-w-0 text-meta text-fg-3">{footer}</div>
-        <Button type="submit" variant={variant} size="lg" loading={pending} className="w-full sm:w-auto">
+        <div className={cn("min-w-0 text-meta", locked ? "font-medium text-warn" : "text-fg-3")}>{locked ? "Сначала прочитайте регламент турнира выше и поставьте галочку." : footer}</div>
+        <Button type="submit" variant={variant} size="lg" loading={pending} disabled={locked} className="w-full sm:w-auto">
           {pending ? pendingLabel : label}
         </Button>
       </div>

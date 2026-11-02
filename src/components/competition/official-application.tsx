@@ -6,6 +6,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { registerTeam } from "@/app/actions/tournament";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
+import { useRulesOk } from "@/components/rules-gate";
 import { Button, Callout, Field, Input, cn } from "@/components/ds";
 import { OrganizationInput } from "@/components/profile/profile-form";
 import { RosterPicker, type PickerMember, type Slot } from "@/components/competition/registration";
@@ -36,7 +37,10 @@ export function OfficialApplicationForm({
   label,
   footer,
   teamCoach,
+  rulesGate,
 }: {
+  /** на странице стоит RulesGate: отправка только после прочтения регламента */
+  rulesGate?: boolean;
   /** тренер команды на сайте: ready — анкета заполнена, данные подставит сервер (в браузер они не уходят) */
   teamCoach?: { nickname: string; ready: boolean } | null;
   tournamentId: string;
@@ -61,6 +65,8 @@ export function OfficialApplicationForm({
   const [slots, setSlots] = useState<Record<string, Slot>>(initial);
   const [v, setV] = useState<ApplicationValues>(values);
   const [touched, setTouched] = useState(false);
+  const rulesOk = useRulesOk(tournamentId);
+  const rulesLocked = !!rulesGate && !rulesOk;
 
   useEffect(() => {
     if (!state?.success) return;
@@ -97,13 +103,14 @@ export function OfficialApplicationForm({
       action={action}
       onSubmit={(e) => {
         setTouched(true);
-        if (blocked.length) e.preventDefault();
+        if (blocked.length || rulesLocked) e.preventDefault();
       }}
       noValidate
       data-f16-action-pending={pending ? "true" : undefined}
       aria-busy={pending}
     >
       <input type="hidden" name="tournamentId" value={tournamentId} />
+      {rulesGate && <input type="hidden" name="rules_ack" value={rulesOk ? "1" : ""} />}
 
       {/* состав */}
       <div className="border-b border-line-subtle px-4 pb-1 pt-4 sm:px-5">
@@ -187,8 +194,10 @@ export function OfficialApplicationForm({
       </div>
 
       <div className="flex flex-col gap-3 border-t border-line-subtle px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="min-w-0 text-meta text-fg-3">{blocked.length ? `Осталось исправить: ${blocked.length}` : footer}</div>
-        <Button type="submit" size="lg" loading={pending} disabled={blocked.length > 0} className="w-full sm:w-auto">
+        <div className={cn("min-w-0 text-meta", rulesLocked && !blocked.length ? "font-medium text-warn" : "text-fg-3")}>
+          {blocked.length ? `Осталось исправить: ${blocked.length}` : rulesLocked ? "Сначала прочитайте регламент турнира выше и поставьте галочку." : footer}
+        </div>
+        <Button type="submit" size="lg" loading={pending} disabled={blocked.length > 0 || rulesLocked} className="w-full sm:w-auto">
           {pending ? (update ? "Сохраняем…" : "Отправляем…") : label}
         </Button>
       </div>
