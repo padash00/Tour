@@ -165,8 +165,12 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
               </label>
               <SubmitButton>Добавить</SubmitButton>
             </div>
+            <label className="mt-3 flex items-center gap-2 text-[14px]">
+              <input type="checkbox" name="move" />
+              Забрать из его текущей команды (и из её заявки на турнир), если он где-то состоит
+            </label>
             <p className="mt-3 text-[13px] text-fg-3">
-              Игрок должен хотя бы раз войти на сайт через Steam и не состоять в другой команде. Мест: основа {MAX_MAIN} (с капитаном), запас {MAX_SUBS}.
+              Игрок должен хотя бы раз войти на сайт через Steam. Мест: основа {MAX_MAIN} (с капитаном), запас {MAX_SUBS}.
             </p>
           </ActionForm>
         </Panel>

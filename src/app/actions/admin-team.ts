@@ -112,7 +112,19 @@ export async function adminAddMember(_prev: ActionResult, formData: FormData): P
   const want = formData.get("role") === "substitute" ? "substitute" : "player";
 
   const other = await getActiveMembership(found.id);
-  if (other) return { error: other.team.id === team.id ? `${found.nickname} уже в этой команде` : `${found.nickname} уже в команде ${other.team.name}. Сначала исключите его там.` };
+  if (other && other.team.id === team.id) return { error: `${found.nickname} уже в этой команде` };
+  if (other) {
+    // «Забрать из текущей команды»: админ переводит игрока сам — уходит из старой команды и её заявок
+    if (formData.get("move") !== "on") return { error: `${found.nickname} уже в команде ${other.team.name}. Отметьте «Забрать из его текущей команды» или исключите его там.` };
+    if (other.team.captain_id === found.id) return { error: `${found.nickname} — капитан ${other.team.name}. Сначала назначьте там капитаном другого игрока.` };
+    const { error: leaveError } = await db().from("team_members").update({ left_at: new Date().toISOString() }).eq("id", other.member.id).is("left_at", null);
+    if (leaveError) return { error: `Не удалось забрать ${found.nickname} из ${other.team.name}` };
+    await syncOpenRosters(other.team.id);
+    await rebuildRostersFromTeam(other.team.id);
+    await notify([other.team.captain_id], `Администратор перевёл ${found.nickname} из ${other.team.name} в ${team.name}`, undefined, "/team");
+    await audit(admin.id, "admin.team.move", { type: "team", id: other.team.id }, { player: found.id, to: team.id });
+    revalidateTeam(other.team.id, other.team.tag);
+  }
   if (team.coach_id === found.id) return { error: `${found.nickname} — тренер этой команды, игроком быть не может` };
 
   // те же проверки, что при вступлении по ссылке: под блокировкой команды, с лимитом основы и запаса
