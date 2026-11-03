@@ -91,12 +91,11 @@ export async function listTeams(): Promise<TeamListItem[]> {
   // сначала самые полные составы, при равенстве — выше средний ELO основы, потом новее
   const list = ((data ?? []) as Row[]).map(({ team_members, ...team }) => {
     const active = team_members.filter((m) => !m.left_at);
-    // средний ELO основы: капитан и игроки, без запасных
-    const elos = active.filter((m) => m.role !== "substitute").map((m) => m.player.faceit_elo).filter((e): e is number => e != null);
+    // средний ELO основы: капитан и игроки, без запасных; игрок без FACEIT — 0
     return {
       ...team,
       member_count: active.length,
-      avg_elo: elos.length ? Math.round(elos.reduce((a, b) => a + b, 0) / elos.length) : null,
+      avg_elo: eloAverage(active.filter((m) => m.role !== "substitute").map((m) => m.player.faceit_elo)),
     };
   });
   return list.sort((a, b) => b.member_count - a.member_count || (b.avg_elo ?? -1) - (a.avg_elo ?? -1));
@@ -132,9 +131,17 @@ export async function getPlayerBySteamId(steamId: string): Promise<Player | null
   return data as Player | null;
 }
 
+/**
+ * Средний FACEIT ELO: сумма, делённая на ВСЕХ переданных игроков; у кого нет FACEIT — 0.
+ * Так нельзя поднять среднее, поставив в основу игроков без FACEIT. null — ни у кого нет ELO.
+ */
+export function eloAverage(elos: (number | null | undefined)[]) {
+  if (!elos.some((e) => typeof e === "number" && e > 0)) return null;
+  return Math.round(elos.reduce<number>((a, e) => a + (typeof e === "number" && e > 0 ? e : 0), 0) / elos.length);
+}
+
 export function averageElo(members: { player: Player }[]) {
-  const elos = members.map((m) => m.player.faceit_elo).filter((e): e is number => e != null);
-  return elos.length ? Math.round(elos.reduce((a, b) => a + b, 0) / elos.length) : null;
+  return eloAverage(members.map((m) => m.player.faceit_elo));
 }
 
 // ───────────────────────── tournaments

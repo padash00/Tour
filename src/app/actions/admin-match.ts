@@ -4,7 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { AWARDS_TAG } from "@/lib/awards";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
-import { getTournamentById, getTournamentRegistrations } from "@/lib/data";
+import { eloAverage, getTournamentById, getTournamentRegistrations } from "@/lib/data";
 import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, syncBracket } from "@/lib/matches";
 import { drawOrder, type DrawRecord } from "@/lib/draw";
@@ -54,8 +54,7 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
   if (regs.length > t.max_teams) return { error: `Команд больше лимита (${regs.length} > ${t.max_teams})` };
 
   const avgElo = (r: (typeof regs)[number]) => {
-    const elos = r.roster.filter((p) => p.role === "main").map((p) => p.player.faceit_elo ?? 0);
-    return elos.length ? elos.reduce((a, b) => a + b, 0) / elos.length : 0;
+    return eloAverage(r.roster.filter((p) => p.role === "main").map((p) => p.player.faceit_elo)) ?? 0;
   };
   // перемешивание до сортировки: при равном ELO без ручного seed порядок случайный
   const shuffled = drawOrder(regs);

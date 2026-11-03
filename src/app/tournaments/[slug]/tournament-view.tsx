@@ -3,7 +3,7 @@ import Image from "next/image";
 import { ArrowLeft, Crown, ExternalLink, Gamepad2, Swords, Users } from "lucide-react";
 import { HelpHint } from "@/components/help-hint";
 import { LiveRefresh } from "@/components/live-refresh";
-import { getTournamentRegistrations } from "@/lib/data";
+import { eloAverage, getTournamentRegistrations } from "@/lib/data";
 import { getMapImages } from "@/lib/settings";
 import { bracketLabel, formatDate, formatDateTime, mapName, formatMoney } from "@/lib/format";
 import type { Tournament } from "@/lib/types";
@@ -487,8 +487,7 @@ async function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: 
   const filled = Math.min(approved.length, maxTeams);
   const pct = maxTeams ? Math.round((filled / maxTeams) * 100) : 0;
   const avgElo = (r: (typeof approved)[number]) => {
-    const elos = r.roster.filter((rp) => rp.role === "main").map((rp) => rp.player.faceit_elo).filter((e): e is number => typeof e === "number" && e > 0);
-    return elos.length ? Math.round(elos.reduce((a, b) => a + b, 0) / elos.length) : null;
+    return eloAverage(r.roster.filter((rp) => rp.role === "main").map((rp) => rp.player.faceit_elo));
   };
   return (
     <Stack>
