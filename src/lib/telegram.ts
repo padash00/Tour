@@ -91,4 +91,4 @@ export async function setAppSettings(values: Record<string, string>) {
 }
 
 /** Какие обновления бот получает от Telegram (вебхук) */
-export const TG_ALLOWED_UPDATES = ["message", "my_chat_member", "chat_join_request"];
+export const TG_ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_join_request"];

@@ -4,12 +4,15 @@ import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
 import type { Player } from "@/lib/types";
+import { MODERATION_HELP, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
 
 export const dynamic = "force-dynamic";
 
 type TgUser = { id: number; username?: string; first_name?: string };
 type Update = {
-  message?: { text?: string; chat: { id: number; type: string }; from?: TgUser };
+  message?: TgMessage;
+  edited_message?: TgMessage;
+  callback_query?: TgCallback;
   /** бота добавили в группу / изменили права / удалили */
   my_chat_member?: { chat: { id: number; type: string; title?: string }; from: TgUser; new_chat_member: { status: string } };
   /** заявка на вступление в группу по ссылке «с одобрением» */
@@ -89,6 +92,14 @@ export async function POST(req: Request) {
     await onJoinRequest(cfg.token, update.chat_join_request).catch((e) => console.error("tg join request", e));
     return NextResponse.json({ ok: true });
   }
+  // общий чат игроков — модерация
+  const groupMsg = update.message ?? update.edited_message;
+  if (update.callback_query || (groupMsg && groupMsg.chat.type !== "private")) {
+    const group = await telegramGroup();
+    if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
+    else if (group.id && groupMsg && groupMsg.chat.id === group.id) await moderateGroupMessage(cfg.token, groupMsg, !update.message).catch((e) => console.error("tg moderation", e));
+    return NextResponse.json({ ok: true });
+  }
   const msg = update.message;
   if (!msg?.text || msg.chat.type !== "private") return NextResponse.json({ ok: true });
   const chat = msg.chat.id;
@@ -123,6 +134,13 @@ export async function POST(req: Request) {
       `✅ Telegram подтверждён для <b>${tgEscape(p?.nickname ?? "игрока")}</b>.\n\nСюда будут приходить уведомления F16 Arena: приглашения в команду, решения по заявкам, матчи и объявления турниров.${group.invite ? "\n\nВступайте в общий чат игроков — там новости, поиск тиммейтов и объявления турниров." : ""}\n\nОтключить — /stop`,
       group.invite ? { text: "💬 Вступить в чат игроков", url: group.invite } : { text: "Открыть сайт", url: SITE_URL },
     );
+    return NextResponse.json({ ok: true });
+  }
+
+  if (cmd === "/mod") {
+    const l = await linked();
+    const { data: me } = l ? await db().from("players").select("*").eq("id", l.player_id).maybeSingle() : { data: null };
+    await reply(isAdmin(me as Player | null) ? tgEscape(MODERATION_HELP) : "Команда для администраторов.");
     return NextResponse.json({ ok: true });
   }
 
