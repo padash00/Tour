@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
+import { modeOf } from "./modes";
 import type {
   Player,
   Registration,
@@ -262,6 +263,38 @@ export async function syncOpenRosters(teamId: string) {
     const gone = (data ?? []).filter((r) => !members.has(r.player_id)).map((r) => r.id);
     if (gone.length) await db().from("tournament_roster_players").delete().in("id", gone);
   }
+}
+
+/**
+ * Админ поменял состав команды в пульте → тот же состав в её заявках на турниры, которые ещё не начались
+ * (регистрация или закрытая регистрация): основа — капитан и игроки, запас — запасные. Лишние сверх лимита режима
+ * не переносятся. Возвращает игроков, которых добавить не удалось (уже заявлены за другую команду этого турнира).
+ */
+export async function rebuildRostersFromTeam(teamId: string): Promise<string[]> {
+  const regs = (await getTeamRegistrations(teamId)).filter((r) => isActiveRegistration(r) && ["registration", "registration_closed"].includes(r.tournament.status));
+  if (!regs.length) return [];
+  const members = await getTeamMembers(teamId);
+  const failed: string[] = [];
+  for (const reg of regs) {
+    const { size, subs } = modeOf(reg.tournament.format);
+    const main = members.filter((m) => m.role !== "substitute").slice(0, size);
+    const sub = members.filter((m) => m.role === "substitute").slice(0, subs);
+    const want = new Map<string, "main" | "sub">([...main.map((m) => [m.player_id, "main"] as const), ...sub.map((m) => [m.player_id, "sub"] as const)]);
+    const { data: cur } = await db().from("tournament_roster_players").select("id, player_id, role").eq("registration_id", reg.id);
+    const have = new Map((cur ?? []).map((r) => [r.player_id, r]));
+    const drop = (cur ?? []).filter((r) => !want.has(r.player_id)).map((r) => r.id);
+    if (drop.length) await db().from("tournament_roster_players").delete().in("id", drop);
+    for (const [playerId, role] of want) {
+      const row = have.get(playerId);
+      if (row) {
+        if (row.role !== role) await db().from("tournament_roster_players").update({ role }).eq("id", row.id);
+        continue;
+      }
+      const { error } = await db().from("tournament_roster_players").insert({ registration_id: reg.id, tournament_id: reg.tournament_id, player_id: playerId, role });
+      if (error) failed.push(members.find((m) => m.player_id === playerId)?.player.nickname ?? playerId);
+    }
+  }
+  return failed;
 }
 
 export async function getUnreadCount(playerId: string) {

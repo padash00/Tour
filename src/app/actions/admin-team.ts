@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { cancelPlayerApplications, cancelTeamApplications } from "@/lib/applications";
-import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration, syncOpenRosters } from "@/lib/data";
+import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration, rebuildRostersFromTeam, syncOpenRosters } from "@/lib/data";
 import { cancelPlayerInvites, cancelTeamInvites } from "@/lib/invites";
 import { registrationError } from "@/lib/registration-errors";
 import { db } from "@/lib/supabase";
@@ -39,6 +39,7 @@ export async function adminKickMember(_prev: ActionResult, formData: FormData): 
   const { error } = await db().from("team_members").update({ left_at: new Date().toISOString() }).eq("id", target.id).is("left_at", null);
   if (error) return { error: "Не удалось исключить игрока" };
   await syncOpenRosters(team.id);
+  await rebuildRostersFromTeam(team.id);
   await notify([target.player_id], `Администратор исключил вас из ${team.name}`);
   await notify([team.captain_id], `Администратор исключил ${target.player.nickname} из ${team.name}`, undefined, "/team");
   await audit(admin.id, "admin.team.kick", { type: "team", id: team.id }, { player: target.player.steam_id });
@@ -111,6 +112,8 @@ export async function adminAddMember(_prev: ActionResult, formData: FormData): P
   const label = finalRole === "substitute" ? "в запас" : "в основу";
   await notify([found.id], `Администратор добавил вас в команду ${team.name} (${label})`, undefined, "/team");
   await notify([team.captain_id], `Администратор добавил ${found.nickname} в ${team.name} (${label})`, undefined, "/team");
+  const notAdded = await rebuildRostersFromTeam(team.id);
+  if (notAdded.length) await notify([admin.id], `${notAdded.join(", ")}: не перенесён в заявку ${team.name} — уже заявлен за другую команду`, undefined, `/admin/teams/${team.id}`);
   await audit(admin.id, "admin.team.add", { type: "team", id: team.id }, { player: found.id, role: finalRole });
   revalidateTeam(team.id, team.tag);
   if (finalRole !== want) return { success: `${found.nickname} добавлен ${label}: в «${want === "substitute" ? "запасе" : "основе"}» нет места` };
@@ -131,6 +134,7 @@ export async function adminSetRole(_prev: ActionResult, formData: FormData): Pro
   if (error?.message.includes("subs_full")) return { error: `В запасе уже ${MAX_SUBS} игрока` };
   if (error) return { error: "Не удалось изменить роль — обновите страницу" };
   await syncOpenRosters(team.id);
+  await rebuildRostersFromTeam(team.id);
   await audit(admin.id, "admin.team.role", { type: "team", id: team.id }, { player: target.player.steam_id, role });
   revalidateTeam(team.id, team.tag);
   return { success: `${target.player.nickname} — ${role === "substitute" ? "в запасе" : "в основе"}` };
@@ -149,6 +153,7 @@ export async function adminMakeCaptain(_prev: ActionResult, formData: FormData):
   const { error } = await db().rpc("transfer_team_captain", { p_team: team.id, p_actor: team.captain_id, p_member: target.id });
   if (error) return { error: "Не удалось назначить капитана — обновите страницу" };
   await syncOpenRosters(team.id);
+  await rebuildRostersFromTeam(team.id);
   await notify([target.player_id], `Администратор назначил вас капитаном ${team.name}`, undefined, "/team");
   await notify([team.captain_id], `Капитан ${team.name} теперь ${target.player.nickname} (решение администратора)`, undefined, "/team");
   await audit(admin.id, "admin.team.captain", { type: "team", id: team.id }, { to: target.player.steam_id });
