@@ -19,6 +19,7 @@
     "demo": "node --conditions=react-server --import=tsx scripts/demo-tournament.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
     "@supabase/supabase-js": "^2.117.2",
     "exceljs": "^4.4.0",
     "jose": "^6.2.12",

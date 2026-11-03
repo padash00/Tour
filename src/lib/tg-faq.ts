@@ -1,0 +1,201 @@
+import "server-only";
+import Anthropic from "@anthropic-ai/sdk";
+import { audit } from "./audit";
+import { eloAverage } from "./data";
+import { getSetting } from "./settings";
+import { db } from "./supabase";
+import { SITE_URL, tgCall } from "./telegram";
+import { findViolation } from "./tg-moderation-core";
+import type { TgMessage } from "./tg-moderation";
+
+/**
+ * ИИ-помощник в общем Telegram-чате: отвечает на вопросы игроков о турнирах в темах, где админ написал /faq.
+ * Знает данные турниров с сайта, регламент и разъяснения организаторов; если игрок подтвердил Telegram —
+ * его команду и статус заявки. Не знает ответа — так и говорит. Ключ — ANTHROPIC_API_KEY в «Настройках».
+ */
+
+const MODEL = "claude-opus-5-5";
+const DAILY_LIMIT = 400;
+const USER_GAP_MS = 20_000;
+
+const TZ = "Asia/Almaty";
+const when = (iso: string | null | undefined) =>
+  iso ? new Intl.DateTimeFormat("ru-RU", { timeZone: TZ, day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "—";
+
+const STATUS: Record<string, string> = {
+  registration: "идёт приём заявок",
+  registration_closed: "приём заявок закрыт",
+  checkin: "идёт check-in",
+  live: "турнир идёт",
+  finished: "завершён",
+};
+const REG_STATUS: Record<string, string> = { pending: "на рассмотрении", approved: "одобрена", rejected: "отклонена", withdrawn: "отозвана" };
+
+const INSTRUCTIONS = `Ты — помощник организаторов турниров по CS2 компьютерного клуба F16 Arena (Усть-Каменогорск / Өскемен). Ты отвечаешь игрокам в Telegram-чате F16 Arena Community.
+
+Как отвечать:
+- Отвечай на языке вопроса: по-русски или по-казахски.
+- Коротко и по делу: 1–5 предложений, простым текстом без Markdown (без звёздочек и решёток). Можно эмодзи, ссылку на сайт.
+- Опирайся ТОЛЬКО на данные ниже (страница турнира, регламент, разъяснения организаторов, данные игрока). Ничего не выдумывай: дат, правил, призов, решений.
+- Если ответа в данных нет или вопрос требует решения организатора (одобрить заявку, сделать исключение, поменять правила, спор о результате) — скажи, что передал вопрос организаторам и они ответят здесь. Не обещай одобрения и исключений.
+- Про другие команды и игроков сообщай только публичное (название команды, статус заявки). Никаких личных данных (ФИО, телефоны, даты рождения).
+- Если сообщение — не вопрос к организаторам (болтовня, приветствие, поиск тиммейтов, объявление, шутка, спор игроков между собой), ответь ровно одним словом: SKIP
+
+Разъяснения организаторов (действуют вместе с регламентом):
+- Сайт турниров: ${SITE_URL}. Информация на странице турнира — официальная.
+- Как участвовать: войти на сайт через Steam → заполнить анкету (ФИО, дата рождения, телефон, место учёбы или работы) → капитан создаёт команду и приглашает игроков по ссылке → капитан подаёт заявку на турнир.
+- Заявок больше, чем мест. Команды отбираются по среднему FACEIT ELO основного состава: сумма ELO 5 игроков основы делится на 5, игрок без FACEIT или без калибровки считается как 0. Средний ELO видно на странице команды на сайте. Решение о допуске принимают организаторы, статус заявки виден на странице турнира.
+- Документы на каждого игрока (бумагой): учащимся — справка с места учёбы и студенческий билет; работающим — справка с места работы; тем, кто не учится и не работает, — удостоверение личности. Справку с места учёбы обычно выдаёт деканат/учебная часть, во многих вузах её можно заказать через eGov или личный кабинет студента.
+- Печатная заявка (Приложение №1): после одобрения команды капитан скачивает её на сайте (раздел «Моё» или страница турнира → «Заявка»), распечатывает, подписывает у руководителя организации, ставит печать (если есть) и приносит организатору вместе с документами игроков.
+- Команда может участвовать и без вуза/предприятия — как молодёжное объединение или инициативная группа (п. 2.2 регламента). Детали оформления в таком случае — уточнить у организаторов в теме «Помощь».
+- Срок подачи заявок и документов — указан на странице турнира ниже (если в тексте регламента другая дата, верна дата на странице турнира).
+- Состав команды правит капитан на сайте; когда команда подала заявку на официальный турнир, состав, название и тег меняют только организаторы — нужно написать им.
+- Чат: темы «Объявления» (только организаторы), «Турниры», «Поиск тиммейтов», «Лобби», «Общение», «Помощь», «Купля-продажа» (только объявления #продаю / #куплю / #обмен). Мат, оскорбления и реклама запрещены — бот выдаёт предупреждения.`;
+
+// ── данные турниров с сайта
+
+async function tournamentsContext() {
+  const { data } = await db()
+    .from("tournaments")
+    .select("id, name, slug, status, format, is_lan, is_official, starts_at, checkin_opens_at, checkin_closes_at, registration_closes_at, location, city, max_teams, entry_fee, prize_pool, description, requirements, rules")
+    .in("status", ["registration", "registration_closed", "checkin", "live"])
+    .order("starts_at", { ascending: true })
+    .limit(3);
+  const list = data ?? [];
+  if (!list.length) return { text: "Сейчас нет открытых турниров. Анонсы — в теме «Объявления» и на сайте.", ids: [] as string[] };
+  const parts: string[] = [];
+  for (const t of list) {
+    const { data: regs } = await db().from("tournament_registrations").select("status").eq("tournament_id", t.id);
+    const count = (s: string) => (regs ?? []).filter((r) => r.status === s).length;
+    parts.push(
+      [
+        `### Турнир «${t.name}» — ${STATUS[t.status] ?? t.status}`,
+        `Страница: ${SITE_URL}/tournaments/${t.slug}`,
+        `Формат: ${t.format}, ${t.is_lan ? "LAN в клубе F16 Arena" : "онлайн"}${t.is_official ? ", официальный турнир" : ""}${t.location || t.city ? `, место: ${[t.location, t.city].filter(Boolean).join(", ")}` : ""}`,
+        `Приём заявок до: ${when(t.registration_closes_at)}`,
+        `Регистрация у судей (check-in): ${when(t.checkin_opens_at)} — ${when(t.checkin_closes_at)}`,
+        `Начало матчей: ${when(t.starts_at)}`,
+        `Мест: ${t.max_teams}; заявок одобрено ${count("approved")}, на рассмотрении ${count("pending")}`,
+        t.entry_fee ? `Взнос: ${t.entry_fee}` : "",
+        t.prize_pool ? `Призовой фонд: ${t.prize_pool}` : "",
+        t.description ? `Описание:\n${t.description}` : "",
+        t.requirements ? `Требования:\n${t.requirements}` : "",
+        t.rules ? `Регламент:\n${String(t.rules).slice(0, 30_000)}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
+  return { text: parts.join("\n\n"), ids: list.map((t) => t.id) };
+}
+
+/** Кто спрашивает: если Telegram подтверждён на сайте — ник, команда, заявки */
+async function askerContext(tgUserId: number, tournamentIds: string[]) {
+  const { data: prof } = await db().from("player_profiles").select("player_id, player:players!player_profiles_player_id_fkey(nickname, faceit_elo)").eq("telegram_chat_id", tgUserId).maybeSingle();
+  const p = prof as { player_id: string; player: { nickname: string; faceit_elo: number | null } | null } | null;
+  if (!p) return "Спрашивающий не подтвердил Telegram на сайте — его команду и заявку не видно. Если нужен статус заявки, пусть посмотрит на странице турнира или подтвердит Telegram в анкете.";
+  const lines = [`Спрашивающий — игрок сайта «${p.player?.nickname ?? "?"}», FACEIT ELO: ${p.player?.faceit_elo ?? "нет / без калибровки"}.`];
+  const { data: m } = await db().from("team_members").select("role, team:teams(id, name, tag)").eq("player_id", p.player_id).is("left_at", null).eq("is_solo", false).maybeSingle();
+  const team = (m as { role: string; team: { id: string; name: string; tag: string } | null } | null)?.team;
+  if (!team) {
+    lines.push("В команде не состоит.");
+    return lines.join(" ");
+  }
+  lines.push(`Команда: ${team.name} [${team.tag}], роль: ${m!.role === "captain" ? "капитан" : m!.role === "substitute" ? "запасной" : "основа"}.`);
+  const { data: members } = await db().from("team_members").select("role, player:players(faceit_elo)").eq("team_id", team.id).is("left_at", null);
+  const mains = ((members ?? []) as unknown as { role: string; player: { faceit_elo: number | null } | null }[]).filter((x) => x.role !== "substitute");
+  lines.push(`Средний ELO основы: ${eloAverage(mains.map((x) => x.player?.faceit_elo)) ?? "нет данных"} (${mains.length} в основе).`);
+  if (tournamentIds.length) {
+    const { data: regs } = await db().from("tournament_registrations").select("status, note, tournament:tournaments(name)").eq("team_id", team.id).in("tournament_id", tournamentIds);
+    for (const r of (regs ?? []) as unknown as { status: string; note: string | null; tournament: { name: string } | null }[]) {
+      lines.push(`Заявка на «${r.tournament?.name}»: ${REG_STATUS[r.status] ?? r.status}${r.note ? ` (комментарий: ${r.note})` : ""}.`);
+    }
+    if (!(regs ?? []).length) lines.push("Заявок на текущие турниры у команды нет.");
+  }
+  return lines.join(" ");
+}
+
+// ── ограничения
+
+let day = "";
+let usedToday = 0;
+const lastAsk = new Map<number, number>();
+function allowed(userId: number) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== day) {
+    day = today;
+    usedToday = 0;
+  }
+  if (usedToday >= DAILY_LIMIT) return false;
+  const last = lastAsk.get(userId) ?? 0;
+  if (Date.now() - last < USER_GAP_MS) return false;
+  lastAsk.set(userId, Date.now());
+  usedToday++;
+  return true;
+}
+
+/** Похоже ли сообщение на вопрос — чтобы не звать модель на каждое «ок» */
+function looksLikeQuestion(text: string) {
+  const t = text.trim().toLowerCase();
+  if (t.length < 8 || t.startsWith("/")) return false;
+  return /\?/.test(t) || /^(как|когда|где|что|кто|сколько|можно|нужно|надо|почему|зачем|какой|какая|какие|куда|есть ли|подскажите|скажите|а если|қашан|қалай|қайда|не\b|неше|кім|бола ма|керек пе)/i.test(t);
+}
+
+/** Ответить на вопрос в теме с помощником (вызывать после модерации; сообщения админов не трогаем) */
+export async function answerQuestion(token: string, msg: TgMessage, faqThreads: number[], isAdmin: boolean) {
+  const text = (msg.text ?? msg.caption ?? "").trim();
+  if (!msg.from || msg.from.is_bot || isAdmin) return;
+  if (!msg.is_topic_message || !msg.message_thread_id || !faqThreads.includes(msg.message_thread_id)) return;
+  if (!looksLikeQuestion(text) || findViolation(text)) return;
+  const apiKey = await getSetting("ANTHROPIC_API_KEY");
+  if (!apiKey || !allowed(msg.from.id)) return;
+
+  const tours = await tournamentsContext();
+  const asker = await askerContext(msg.from.id, tours.ids);
+  // ответ, на который реагирует игрок, — для контекста «а это как?»
+  const replied = msg.reply_to_message && msg.reply_to_message.message_id !== msg.message_thread_id ? (msg.reply_to_message.text ?? msg.reply_to_message.caption ?? "") : "";
+
+  const client = new Anthropic({ apiKey });
+  let answer = "";
+  try {
+    const res = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 4000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "low" },
+      system: [
+        { type: "text", text: INSTRUCTIONS, cache_control: { type: "ephemeral" } },
+        { type: "text", text: `Данные с сайта на ${when(new Date().toISOString())}:\n\n${tours.text}` },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: `${asker}\n${replied ? `Игрок отвечает на сообщение: «${replied.slice(0, 1000)}»\n` : ""}\nВопрос игрока:\n${text.slice(0, 2000)}`,
+        },
+      ],
+    });
+    if (res.stop_reason === "refusal") return;
+    answer = res.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+  } catch (e) {
+    if (e instanceof Anthropic.AuthenticationError) console.error("tg faq: неверный ANTHROPIC_API_KEY");
+    else if (e instanceof Anthropic.RateLimitError) console.error("tg faq: лимит Claude API");
+    else if (e instanceof Anthropic.APIError) console.error("tg faq: Claude API", e.status, e.message);
+    else console.error("tg faq", e);
+    return;
+  }
+  if (!answer || /^SKIP\b/i.test(answer)) return;
+
+  await tgCall(token, "sendMessage", {
+    chat_id: msg.chat.id,
+    message_thread_id: msg.message_thread_id,
+    text: `🤖 ${answer.slice(0, 3500)}`,
+    disable_web_page_preview: true,
+    reply_parameters: { message_id: msg.message_id, allow_sending_without_reply: true },
+  });
+  await audit(null, "telegram.faq", undefined, { user: String(msg.from.id), username: msg.from.username ?? null, question: text.slice(0, 1000), answer: answer.slice(0, 2000) });
+}

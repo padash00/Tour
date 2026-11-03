@@ -47,7 +47,7 @@ const mention = (u: TgUser) => `<a href="tg://user?id=${u.id}">${tgEscape(nameOf
 // ── права участника
 
 const adminCache = new Map<string, { admin: boolean; at: number }>();
-async function isChatAdmin(token: string, chatId: number, userId: number) {
+export async function isChatAdmin(token: string, chatId: number, userId: number) {
   const key = `${chatId}:${userId}`;
   const hit = adminCache.get(key);
   if (hit && Date.now() - hit.at < 10 * 60_000) return hit.admin;
@@ -424,3 +424,28 @@ export async function pardonUser(token: string, groupId: number, uid: number, op
     if (op === "unmute") await audit(null, "tg.unmute", undefined, { user: String(uid), name: name ?? null, by });
   }
 }
+
+/** /faq в теме — включить ИИ-помощника здесь, /faq off — выключить. true — команда обработана */
+export async function handleFaqCommand(token: string, msg: TgMessage, threads: number[]) {
+  const text = (msg.text ?? "").trim();
+  if (!/^\/faq(?:@\w+)?(?:\s|$)/i.test(text)) return false;
+  const byAdmin = msg.sender_chat?.id === msg.chat.id || (!!msg.from && (await isChatAdmin(token, msg.chat.id, msg.from.id)));
+  if (!byAdmin) return false;
+  await del(token, msg.chat.id, msg.message_id);
+  const thread = msg.is_topic_message ? msg.message_thread_id : undefined;
+  if (!thread) {
+    await notice(token, msg, "Отправьте /faq внутри темы, где помощник должен отвечать (например, «Турниры» или «Помощь»).", 20_000);
+    return true;
+  }
+  const off = /\soff\b/i.test(text);
+  const next = off ? threads.filter((t) => t !== thread) : [...new Set([...threads, thread])];
+  await setAppSettings({ TELEGRAM_FAQ_THREADS: next.join(",") });
+  await notice(
+    token,
+    msg,
+    off ? "🤖 Помощник в этой теме выключен." : "🤖 В этой теме теперь отвечает помощник: задавайте вопросы о турнирах — регистрация, документы, сроки, статус заявки. Если ответа нет — передам организаторам.",
+    off ? 20_000 : 0,
+  );
+  return true;
+}
+

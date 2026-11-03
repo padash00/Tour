@@ -4,7 +4,9 @@ import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
 import type { Player } from "@/lib/types";
-import { MODERATION_HELP, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
+import { MODERATION_HELP, handleFaqCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
+import { answerQuestion } from "@/lib/tg-faq";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +99,21 @@ export async function POST(req: Request) {
   if (update.callback_query || (groupMsg && groupMsg.chat.type !== "private")) {
     const group = await telegramGroup();
     if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
-    else if (group.id && group.moderation && groupMsg && groupMsg.chat.id === group.id) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread).catch((e) => console.error("tg moderation", e));
+    else if (group.id && groupMsg && groupMsg.chat.id === group.id) {
+      const faqCmd = !!update.message && (await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false));
+      if (!faqCmd) {
+        if (group.moderation) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread).catch((e) => console.error("tg moderation", e));
+        // помощник отвечает после ответа Telegram — вызов модели занимает секунды
+        if (update.message && group.faqThreads.length && groupMsg.from) {
+          const m = groupMsg;
+          const from = groupMsg.from;
+          after(async () => {
+            const admin = await isChatAdmin(cfg.token, m.chat.id, from.id).catch(() => false);
+            await answerQuestion(cfg.token, m, group.faqThreads, admin).catch((e) => console.error("tg faq", e));
+          });
+        }
+      }
+    }
     return NextResponse.json({ ok: true });
   }
   const msg = update.message;
