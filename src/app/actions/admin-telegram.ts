@@ -103,6 +103,22 @@ export async function adminTelegramPardonUser(_prev: ActionResult, formData: For
   return { success: `${name || uid}: ${label}` };
 }
 
+/** Напомнить всем, кто не вступил в общий чат: уведомление на сайте (+ Telegram тем, у кого он подтверждён) */
+export async function adminRemindJoinChat(): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  const { joinStats } = await import("@/lib/tg-chat-join");
+  const { notify } = await import("@/lib/audit");
+  const s = await joinStats();
+  const members = new Set(s.memberIds);
+  const targets = [...new Set([...s.notClicked.filter((id) => !members.has(id)), ...s.linkedNotMembers.map((x) => x.player_id)])];
+  if (!targets.length) return { success: "Все уже вступили или нажали «Вступить» 🎉" };
+  for (let i = 0; i < targets.length; i += 300) {
+    await notify(targets.slice(i, i + 300), "Вступите в Telegram-чат игроков F16 Arena", "Объявления турниров, расписание, поиск тиммейтов и ответы на вопросы — всё в общем чате. Нажмите, чтобы вступить.", "/tg");
+  }
+  await audit(admin.id, "telegram.remind_join", undefined, { players: targets.length });
+  return { success: `Напоминание отправлено: ${targets.length} игрокам (на сайте; у кого подтверждён Telegram — ещё и от бота)` };
+}
+
 /** Telegram: не больше ~30 сообщений в секунду — шлём пачками по 20 с паузой. Возвращает, сколько дошло */
 async function sendBatched(token: string, chats: number[], html: string, button?: { text: string; url: string }) {
   let ok = 0;

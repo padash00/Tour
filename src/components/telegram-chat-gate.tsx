@@ -11,10 +11,11 @@ import { TG_GROUP_URL } from "@/lib/tg-group";
 
 /*
  * Обязательное окно для вошедших игроков: «Вступите в Telegram-чат игроков».
- * Закрывается только кнопкой «Вступить» (открывает группу в новой вкладке). Отметка — в браузере игрока;
- * проверить участие в группе сайт не может (бот в группе не состоит), поэтому полагаемся на нажатие.
+ * Показывать ли — решает сервер (/api/tg-chat): нажатие записывается на сайте, а у кого Telegram подтверждён,
+ * бот проверяет участие в группе. Ответ кэшируется в браузере на 10 минут, чтобы не спрашивать на каждой странице.
  */
-const KEY = (id: string) => `f16:tg-chat-joined:${id}`;
+const CACHE = (id: string) => `f16:tg-chat-ask:${id}`;
+const TTL = 10 * 60_000;
 
 export function TelegramChatGate() {
   const t = useT();
@@ -25,21 +26,34 @@ export function TelegramChatGate() {
 
   useEffect(() => {
     if (!playerId || noChrome(pathname) || pathname === "/tg") return;
-    let joined = false;
+    let alive = true;
     try {
-      joined = localStorage.getItem(KEY(playerId)) === "1";
-    } catch {
-      joined = true; // хранилище недоступно (приватный режим и т. п.) — не мучаем окном на каждой странице
-    }
-    // показываем после отрисовки страницы, чтобы не мешать первому экрану
-    const id = setTimeout(() => setShow(!joined), 0);
-    return () => clearTimeout(id);
+      const c = JSON.parse(sessionStorage.getItem(CACHE(playerId)) ?? "null") as { show: boolean; at: number } | null;
+      if (c && Date.now() - c.at < TTL) {
+        const id = setTimeout(() => setShow(c.show), 0);
+        return () => clearTimeout(id);
+      }
+    } catch {}
+    fetch("/api/tg-chat", { cache: "no-store", credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { show: false }))
+      .then((d: { show: boolean }) => {
+        if (!alive) return;
+        try {
+          sessionStorage.setItem(CACHE(playerId), JSON.stringify({ show: !!d.show, at: Date.now() }));
+        } catch {}
+        setShow(!!d.show);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, [playerId, pathname]);
 
   if (!show || !playerId) return null;
   const join = () => {
+    fetch("/api/tg-chat", { method: "POST", credentials: "same-origin", keepalive: true }).catch(() => {});
     try {
-      localStorage.setItem(KEY(playerId), "1");
+      sessionStorage.setItem(CACHE(playerId), JSON.stringify({ show: false, at: Date.now() }));
     } catch {}
     setShow(false);
   };

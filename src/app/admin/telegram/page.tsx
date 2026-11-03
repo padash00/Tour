@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration, adminTelegramPardonAll, adminTelegramPardonUser } from "@/app/actions/admin-telegram";
+import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration, adminTelegramPardonAll, adminTelegramPardonUser, adminRemindJoinChat } from "@/app/actions/admin-telegram";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
 import { formatShortDateTime } from "@/lib/format";
+import { joinStats } from "@/lib/tg-chat-join";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { AdminHeader, Panel } from "@/components/admin/control";
 
@@ -25,6 +26,7 @@ export default async function AdminTelegramPage() {
   ]);
   const hooked = !!info?.ok && !!info.result?.url;
   const punished = punishedUsers(modLog ?? []);
+  const join = await joinStats().catch(() => null);
   const violations = (modLog ?? []).filter((l) => l.action !== "tg.captcha").slice(0, 60);
   // новые события (кнопка «Я не бот», изменённые сообщения) приходят только после переподключения
   const needsReconnect = hooked && !TG_ALLOWED_UPDATES.every((u) => (info?.result?.allowed_updates ?? ["message"]).includes(u));
@@ -65,6 +67,38 @@ export default async function AdminTelegramPage() {
           </ActionForm>
         </div>
       </Panel>
+
+      {join && (
+        <Panel title="Вступление в Telegram-чат" boxed>
+          <div className="space-y-4 p-5 text-[15px]">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <div className="num text-[26px] font-bold text-fg">
+                  {join.clicked} <span className="text-[15px] font-normal text-fg-3">из {join.players}</span>
+                </div>
+                <div className="text-[13px] text-fg-3">нажали «Вступить в чат» на сайте</div>
+              </div>
+              <div>
+                <div className="num text-[26px] font-bold text-ok">
+                  {join.linkedMembers} <span className="text-[15px] font-normal text-fg-3">из {join.linked}</span>
+                </div>
+                <div className="text-[13px] text-fg-3">с подтверждённым Telegram — точно в группе (проверил бот)</div>
+              </div>
+              <div>
+                <div className="num text-[26px] font-bold text-warn">{join.notClicked.filter((id) => !join.memberIds.includes(id)).length + join.linkedNotMembers.length}</div>
+                <div className="text-[13px] text-fg-3">ещё не вступили</div>
+              </div>
+            </div>
+            <ActionForm action={adminRemindJoinChat}>
+              <SubmitButton confirm="Отправить напоминание всем, кто не вступил в Telegram-чат?">Напомнить невступившим</SubmitButton>
+            </ActionForm>
+            <p className="text-[13px] text-fg-3">
+              Окно «Вступите в Telegram-чат» на сайте показывается, пока игрок не нажмёт кнопку. Если Telegram подтверждён, а в группе его нет — окно появится снова через сутки.
+              Напоминание: уведомление в колокольчик, а у кого подтверждён Telegram — ещё и сообщение от бота.
+            </p>
+          </div>
+        </Panel>
+      )}
 
       <Panel title="Пригласить всех в Telegram-чат" boxed>
         <ActionForm action={adminChatInviteEveryone} className="space-y-4 p-5 text-[15px]">
