@@ -7,6 +7,7 @@ import { RouteTransition } from "@/components/route-transition";
 import { NavProgress } from "@/components/nav-progress";
 import { ProfileNudge } from "@/components/profile/profile-nudge";
 import { RulesAckModal } from "@/components/rules-gate";
+import { TelegramChatGate } from "@/components/telegram-chat-gate";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site";
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/seo";
@@ -93,6 +94,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <SiteHeader />
             <ProfileNudge />
             <RulesAckModal />
+            <TelegramChatGate />
             {/* anim-in — только при первой загрузке: main не пересоздаётся ни при переходах, ни при живом обновлении */}
             <main id="main-content" tabIndex={-1} className="flex-1 anim-in">
               <RouteTransition>{children}</RouteTransition>

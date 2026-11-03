@@ -69,7 +69,8 @@ export async function notifyTelegram(playerIds: string[], title: string, body?: 
  * Всё хранится в app_settings: TELEGRAM_GROUP_ID, TELEGRAM_GROUP_TITLE, TELEGRAM_GROUP_INVITE, TELEGRAM_GROUP_CLOSED.
  */
 /** Публичная группа F16 Arena Community — если бот ещё не создал свою ссылку, ведём сюда */
-export const PUBLIC_GROUP_URL = "https://t.me/f16arena_cs2";
+import { TG_GROUP_URL } from "./tg-group";
+export const PUBLIC_GROUP_URL = TG_GROUP_URL;
 
 export const GROUP_KEYS = ["TELEGRAM_GROUP_ID", "TELEGRAM_GROUP_TITLE", "TELEGRAM_GROUP_INVITE", "TELEGRAM_GROUP_CLOSED"] as const;
 
