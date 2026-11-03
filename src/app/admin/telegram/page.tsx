@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration, adminTelegramPardonAll, adminTelegramPardonUser, adminRemindJoinChat } from "@/app/actions/admin-telegram";
+import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration, adminTelegramPardonAll, adminTelegramPardonUser, adminRemindJoinChat, adminResetJoinRound } from "@/app/actions/admin-telegram";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
@@ -89,9 +89,14 @@ export default async function AdminTelegramPage() {
                 <div className="text-[13px] text-fg-3">ещё не вступили</div>
               </div>
             </div>
-            <ActionForm action={adminRemindJoinChat}>
-              <SubmitButton confirm="Отправить напоминание всем, кто не вступил в Telegram-чат?">Напомнить невступившим</SubmitButton>
-            </ActionForm>
+            <div className="flex flex-wrap gap-3">
+              <ActionForm action={adminRemindJoinChat}>
+                <SubmitButton confirm="Отправить напоминание всем, кто не вступил в Telegram-чат?">Напомнить невступившим</SubmitButton>
+              </ActionForm>
+              <ActionForm action={adminResetJoinRound}>
+                <SubmitButton variant="secondary" confirm="Показать окно «Вступите в Telegram-чат» всем игрокам ещё раз?">Показать окно всем ещё раз</SubmitButton>
+              </ActionForm>
+            </div>
             <p className="text-[13px] text-fg-3">
               Окно «Вступите в Telegram-чат» на сайте показывается, пока игрок не нажмёт кнопку. Если Telegram подтверждён, а в группе его нет — окно появится снова через сутки.
               Напоминание: уведомление в колокольчик, а у кого подтверждён Telegram — ещё и сообщение от бота.

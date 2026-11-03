@@ -28,9 +28,16 @@ export async function isGroupMember(tgUserId: number): Promise<boolean | null> {
 }
 
 /** Нужно ли показать игроку окно «Вступите в Telegram-чат» */
+/** С какого момента считаются нажатия: «Показать окно всем ещё раз» в пульте сдвигает этот момент */
+async function roundStart() {
+  const { data } = await db().from("app_settings").select("value").eq("key", "TELEGRAM_JOIN_ROUND").maybeSingle();
+  return data?.value || "1970-01-01T00:00:00Z";
+}
+
 export async function shouldAskToJoin(playerId: string): Promise<boolean> {
+  const since = await roundStart();
   const [{ data: click }, { data: prof }] = await Promise.all([
-    db().from("audit_logs").select("created_at").eq("action", "tg.chat_click").eq("actor_id", playerId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    db().from("audit_logs").select("created_at").eq("action", "tg.chat_click").eq("actor_id", playerId).gte("created_at", since).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     db().from("player_profiles").select("telegram_chat_id").eq("player_id", playerId).maybeSingle(),
   ]);
   const tg = prof?.telegram_chat_id ?? null;
@@ -61,7 +68,7 @@ export type JoinStats = {
 export async function joinStats(): Promise<JoinStats> {
   const [{ data: players }, { data: clicks }, { data: profs }] = await Promise.all([
     db().from("players").select("id").eq("is_banned", false),
-    db().from("audit_logs").select("actor_id").eq("action", "tg.chat_click"),
+    db().from("audit_logs").select("actor_id").eq("action", "tg.chat_click").gte("created_at", await roundStart()),
     db().from("player_profiles").select("player_id, telegram_chat_id").not("telegram_chat_id", "is", null),
   ]);
   const clicked = new Set((clicks ?? []).map((c) => c.actor_id).filter(Boolean) as string[]);

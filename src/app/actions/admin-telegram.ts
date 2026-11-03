@@ -103,6 +103,14 @@ export async function adminTelegramPardonUser(_prev: ActionResult, formData: For
   return { success: `${name || uid}: ${label}` };
 }
 
+/** Показать окно «Вступите в Telegram-чат» всем ещё раз (кроме тех, кого бот видит в группе) */
+export async function adminResetJoinRound(): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  await setAppSettings({ TELEGRAM_JOIN_ROUND: new Date().toISOString() });
+  await audit(admin.id, "telegram.join_round", undefined, {});
+  return { success: "Окно снова увидят все игроки, кроме тех, кто уже в группе (у кого подтверждён Telegram)" };
+}
+
 /** Напомнить всем, кто не вступил в общий чат: уведомление на сайте (+ Telegram тем, у кого он подтверждён) */
 export async function adminRemindJoinChat(): Promise<ActionResult> {
   const admin = await requireAdmin("/admin/telegram");
