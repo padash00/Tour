@@ -1,13 +1,15 @@
 import "server-only";
 import { cache } from "react";
-import { cookies, headers } from "next/headers";
-import { LANG_COOKIE, isLang, langFromAccept, makeT, type Lang } from "./core";
+import { cookies } from "next/headers";
+import { DEFAULT_LANG, LANG_COOKIE, isLang, makeT, type Lang } from "./core";
 
-/** Язык текущего запроса: cookie «lang» (переключатель в шапке), иначе язык браузера */
+/**
+ * Язык текущего запроса: cookie «lang» (переключатель ҚАЗ/РУС; при входе через Steam
+ * ставится из профиля игрока — так выбор переезжает на новое устройство), иначе казахский
+ */
 export const getLang = cache(async (): Promise<Lang> => {
   const c = (await cookies()).get(LANG_COOKIE)?.value;
-  if (isLang(c)) return c;
-  return langFromAccept((await headers()).get("accept-language"));
+  return isLang(c) ? c : DEFAULT_LANG;
 });
 
 /** Переводчик для серверных компонентов, server actions и API: const t = await getT() */

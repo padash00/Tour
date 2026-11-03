@@ -68,13 +68,8 @@ export function makeT(lang: Lang): T {
   return t;
 }
 
-/** Язык по заголовку Accept-Language: казахский — если он стоит раньше русского */
-export function langFromAccept(header: string | null | undefined): Lang {
-  const h = (header ?? "").toLowerCase();
-  const kk = h.search(/\bkk\b|\bkz\b/);
-  const ru = h.search(/\bru\b/);
-  return kk >= 0 && (ru < 0 || kk < ru) ? "kk" : "ru";
-}
+/** Язык, пока игрок сам ничего не выбрал — казахский; язык браузера не учитывается */
+export const DEFAULT_LANG: Lang = "kk";
 
 /** Метка «этот текст переводится» для констант (подписи статусов, пункты меню): возвращает как есть, переводится при показе через t(...) */
 export const tr = <S extends string>(s: S) => s;

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { saveLangChoice } from "@/app/actions/lang";
 import { cn } from "@/components/ds";
 import { LANG_COOKIE, type Lang } from "@/lib/i18n/core";
 import { useLang } from "@/lib/i18n/client";
@@ -15,7 +16,10 @@ function saveLang(l: Lang) {
   document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
 }
 
-/** Переключатель ҚАЗ / РУС: запоминается в cookie на год, страница перерисовывается на сервере */
+/**
+ * Переключатель ҚАЗ / РУС: запоминается в cookie на год, у вошедшего игрока — ещё и в профиле
+ * (на другом устройстве откроется его язык); страница перерисовывается на сервере
+ */
 export function LangSwitch({ className }: { className?: string }) {
   const lang = useLang();
   const router = useRouter();
@@ -23,7 +27,11 @@ export function LangSwitch({ className }: { className?: string }) {
   const pick = (l: Lang) => {
     if (l === lang) return;
     saveLang(l);
-    start(() => router.refresh());
+    start(async () => {
+      // профиль — не обязателен: cookie уже стоит, язык сменится и без него
+      await saveLangChoice(l).catch(() => {});
+      router.refresh();
+    });
   };
   return (
     <div role="group" aria-label="Тіл / Язык" className={cn("inline-flex h-9 shrink-0 items-center rounded-full bg-ink/[0.05] p-0.5", pending && "opacity-60", className)}>

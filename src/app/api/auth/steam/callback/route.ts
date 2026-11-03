@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { fetchSteamProfile, verifySteamCallback } from "@/lib/steam";
 import { fetchFaceitBySteamId } from "@/lib/faceit";
@@ -5,6 +6,7 @@ import { createSession } from "@/lib/session";
 import { safeNext } from "@/lib/redirect";
 import { db } from "@/lib/supabase";
 import { markLoginRefreshed } from "@/lib/profile-sync";
+import { LANG_COOKIE, isLang } from "@/lib/i18n/core";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -51,12 +53,32 @@ export async function GET(request: NextRequest) {
   }
 
   if (profile.ok) await markLoginRefreshed(player.id);
+  await syncLang(player.id, request.cookies.get(LANG_COOKIE)?.value);
   await createSession({ playerId: player.id, steamId: player.steam_id });
   const next = safeNext(url.searchParams.get("next"));
   if (await firstProfilePrompt(player.id)) {
     return NextResponse.redirect(new URL(`/me/profile?welcome=1&next=${encodeURIComponent(next)}`, url.origin));
   }
   return NextResponse.redirect(new URL(next, url.origin));
+}
+
+/**
+ * Язык ҚАЗ/РУС при входе: выбор, сделанный ещё гостем на этом устройстве, — в профиль (если там пусто);
+ * на устройстве без выбора — язык из профиля в cookie, чтобы он открылся и здесь. Ошибка базы вход не ломает.
+ */
+async function syncLang(playerId: string, deviceLang: string | undefined) {
+  try {
+    if (isLang(deviceLang)) {
+      await db().from("players").update({ lang: deviceLang }).eq("id", playerId).is("lang", null);
+      return;
+    }
+    const { data } = await db().from("players").select("lang").eq("id", playerId).maybeSingle();
+    if (isLang(data?.lang)) {
+      (await cookies()).set(LANG_COOKIE, data.lang, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    }
+  } catch {
+    // язык не критичен
+  }
 }
 
 /**

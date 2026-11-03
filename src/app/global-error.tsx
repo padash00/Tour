@@ -1,18 +1,18 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { LANG_COOKIE, isLang, langFromAccept, makeT, type Lang } from "@/lib/i18n/core";
+import { DEFAULT_LANG, LANG_COOKIE, isLang, makeT, type Lang } from "@/lib/i18n/core";
 
-/** Корневой layout недоступен — язык берём из cookie «lang», иначе из языка браузера (на сервере — русский) */
+/** Корневой layout недоступен — язык берём из cookie «lang», иначе язык по умолчанию */
 function readLang(): Lang {
   const c = document.cookie.match(new RegExp(`(?:^|; )${LANG_COOKIE}=([^;]*)`))?.[1];
-  return isLang(c) ? c : langFromAccept(navigator.languages?.join(",") ?? navigator.language);
+  return isLang(c) ? c : DEFAULT_LANG;
 }
 const subscribe = () => () => {};
 
 /** Ошибка в корневом layout: свои <html>/<body>, стили инлайн — globals.css тут может не загрузиться */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
-  const lang = useSyncExternalStore(subscribe, readLang, () => "ru" as Lang);
+  const lang = useSyncExternalStore(subscribe, readLang, () => DEFAULT_LANG);
   const t = makeT(lang);
   return (
     <html lang={lang}>
