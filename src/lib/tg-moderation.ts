@@ -217,6 +217,22 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
   const [rawCmd, arg] = text.trim().split(/\s+/, 2);
   const cmd = rawCmd.split("@")[0].toLowerCase();
   const known = ["/warn", "/unwarn", "/mute", "/unmute", "/ban", "/unban", "/warns"];
+  if (cmd === "/ideas") {
+    await del(token, msg.chat.id, msg.message_id);
+    if (arg === "off") {
+      await setAppSettings({ TELEGRAM_IDEAS_THREAD: "" });
+      await notice(token, msg, "Тема «Идеи» отключена — здесь снова обычный чат.", 20_000);
+      return true;
+    }
+    if (!msg.is_topic_message || !msg.message_thread_id) {
+      await notice(token, msg, "Отправьте /ideas внутри темы «Идеи и предложения».", 20_000);
+      return true;
+    }
+    await setAppSettings({ TELEGRAM_IDEAS_THREAD: String(msg.message_thread_id) });
+    const id = await notice(token, msg, IDEAS_RULES, 0);
+    if (id) await tgCall(token, "pinChatMessage", { chat_id: msg.chat.id, message_id: id, disable_notification: true });
+    return true;
+  }
   if (cmd === "/market") {
     await del(token, msg.chat.id, msg.message_id);
     if (arg === "off") {
@@ -289,7 +305,7 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
 // ── главное
 
 /** Сообщение (новое или изменённое) в общем чате. Ничего не бросает наружу. */
-export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null) {
+export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null, ideasThread: number | null = null) {
   // служебные «X теперь в группе» / «X покинул группу» — убираем, чтобы не засоряли чат
   if (msg.new_chat_members?.length || msg.left_chat_member) {
     await del(token, msg.chat.id, msg.message_id);
@@ -328,6 +344,27 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
     return;
   }
 
+  // «Идеи и предложения»: новое сообщение — только с #идея, обсуждение — ответом на идею
+  const inIdeas = !!ideasThread && msg.is_topic_message === true && msg.message_thread_id === ideasThread;
+  if (inIdeas && !edited) {
+    const isReply = !!msg.reply_to_message && msg.reply_to_message.message_id !== msg.message_thread_id;
+    const isIdea = IDEA_TAG.test(text);
+    if (!isIdea && !isReply) {
+      await del(token, msg.chat.id, msg.message_id);
+      await notice(token, msg, `${mention(from)}, новая идея должна начинаться с #идея. Обсуждать — ответом на идею.\n\n${IDEAS_TEMPLATE}`, 30_000);
+      return;
+    }
+    if (isIdea && !findViolation(text)) {
+      if (text.replace(IDEA_TAG, "").trim().length < 10) {
+        await del(token, msg.chat.id, msg.message_id);
+        await notice(token, msg, `${mention(from)}, опишите идею подробнее: что сделать и зачем.`, 30_000);
+        return;
+      }
+      await tgCall(token, "setMessageReaction", { chat_id: msg.chat.id, message_id: msg.message_id, reaction: [{ type: "emoji", emoji: "👍" }] });
+      await audit(null, "telegram.idea", undefined, { user: String(from.id), name: nameOf(from), username: from.username ?? null, text: text.slice(0, 1500), message: msg.message_id });
+    }
+  }
+
   // «Купля-продажа»: только объявления по шаблону, без обсуждений
   const inMarket = !!marketThread && msg.is_topic_message === true && msg.message_thread_id === marketThread;
   if (inMarket && !edited) {
@@ -353,6 +390,12 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
   await del(token, msg.chat.id, msg.message_id);
   await warn(token, msg, from, v.reason, text, "бот", v.match);
 }
+
+// ── «Идеи и предложения»
+
+const IDEA_TAG = /^\s*#(идея|ұсыныс|idea)(?![\p{L}\d_])/iu;
+const IDEAS_TEMPLATE = "<b>Как предложить:</b>\n#идея — что сделать и зачем (одно сообщение — одна идея)\nПонравилась идея — ставьте 👍, обсуждайте ответом на неё.";
+export const IDEAS_RULES = `💡 <b>Идеи и предложения</b>\nЧто добавить на сайт, в турниры или в чат? Предлагайте!\n\n${IDEAS_TEMPLATE}\n\nСообщения без #идея бот удаляет. Лучшие идеи берём в работу — о сделанном пишем в «Обновления платформы».`;
 
 // ── «Купля-продажа»
 
@@ -384,7 +427,7 @@ function tooManyAds(userId: number) {
 
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
-  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
+  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
 
 /** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */
 export async function pardonAll(token: string, groupId: number, by: string) {

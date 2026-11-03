@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     else if (group.id && groupMsg && groupMsg.chat.id === group.id) {
       const faqCmd = !!update.message && (await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false));
       if (!faqCmd) {
-        if (group.moderation) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread).catch((e) => console.error("tg moderation", e));
+        if (group.moderation) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread, group.ideasThread).catch((e) => console.error("tg moderation", e));
         // помощник отвечает после ответа Telegram — вызов модели занимает секунды
         if (update.message && group.faqThreads.length && groupMsg.from) {
           const m = groupMsg;
