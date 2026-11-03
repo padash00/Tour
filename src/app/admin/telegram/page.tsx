@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { adminTelegramBroadcast, adminTelegramConnect, adminTelegramGroupLink, adminTelegramInviteAll } from "@/app/actions/admin-telegram";
+import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramGroupLink, adminTelegramInviteAll } from "@/app/actions/admin-telegram";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
@@ -14,7 +14,8 @@ export default async function AdminTelegramPage() {
   await requireAdmin("/admin/telegram");
   const cfg = await telegramConfig();
   const group = await telegramGroup();
-  const [{ count: linked }, { count: profiles }, info, { data: tournaments }, members] = await Promise.all([
+  const [{ count: everyone }, { count: linked }, { count: profiles }, info, { data: tournaments }, members] = await Promise.all([
+    db().from("players").select("id", { count: "exact", head: true }).eq("is_banned", false),
     db().from("player_profiles").select("player_id", { count: "exact", head: true }).not("telegram_chat_id", "is", null),
     db().from("player_profiles").select("player_id", { count: "exact", head: true }),
     cfg.token ? tgCall<{ url: string; pending_update_count: number; last_error_message?: string; allowed_updates?: string[] }>(cfg.token, "getWebhookInfo", {}) : Promise.resolve(null),
@@ -47,6 +48,22 @@ export default async function AdminTelegramPage() {
             <SubmitButton variant={hooked ? "secondary" : "primary"}>{hooked ? "Переподключить бота" : "Подключить бота"}</SubmitButton>
           </ActionForm>
         </div>
+      </Panel>
+
+      <Panel title="Пригласить всех в Telegram-чат" boxed>
+        <ActionForm action={adminChatInviteEveryone} className="space-y-4 p-5 text-[15px]">
+          <p>
+            Чат: <a href={group.invite} target="_blank" rel="noreferrer" className="font-semibold text-accent underline">{group.invite}</a>
+          </p>
+          <label className="flex flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+            Текст (необязательно)
+            <textarea name="text" rows={3} maxLength={1000} className="field min-h-[90px] py-3" placeholder="Турниры, лобби, поиск тиммейтов и новости клуба — всё в одном чате. Заходите!" />
+          </label>
+          <SubmitButton confirm={`Отправить приглашение в чат всем игрокам сайта (${everyone ?? 0})? Повторное нажатие пришлёт его ещё раз.`}>Пригласить всех ({everyone ?? 0})</SubmitButton>
+          <p className="text-[13px] text-fg-3">
+            Каждому игроку — уведомление на сайте (колокольчик, ведёт в чат). Кто подтвердил Telegram ({linked ?? 0}) — ещё и сообщение от бота с кнопкой «Вступить в чат».
+          </p>
+        </ActionForm>
       </Panel>
 
       <Panel title="Общий чат игроков" boxed>

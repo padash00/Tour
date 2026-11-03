@@ -112,3 +112,34 @@ ${note ? tgEscape(note) : "Объявления турниров, поиск т�
   await audit(admin.id, "telegram.group_invite_all", undefined, { sent: ok, total: chats.length });
   return { success: `Приглашение отправлено: ${ok} из ${chats.length}` };
 }
+
+/** Пригласить в Telegram-чат ВСЕХ игроков сайта: уведомление на сайте (колокольчик) + личка от бота тем, кто подтвердил Telegram */
+export async function adminChatInviteEveryone(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  const note = String(formData.get("text") ?? "").trim().slice(0, 1000);
+  const group = await telegramGroup();
+  const title = "Общий чат игроков F16 Arena в Telegram";
+  const body = note || "Турниры, лобби, поиск тиммейтов и новости клуба — всё в одном чате. Заходите!";
+
+  const { data: players } = await db().from("players").select("id").eq("is_banned", false);
+  const ids = (players ?? []).map((p) => p.id);
+  if (!ids.length) return { error: "Игроков нет" };
+  for (let i = 0; i < ids.length; i += 500) {
+    const { error } = await db().from("notifications").insert(ids.slice(i, i + 500).map((player_id) => ({ player_id, title, body, link: "/tg" })));
+    if (error) return { error: `Уведомления на сайте: ${error.message}` };
+  }
+
+  let tg = 0;
+  let tgTotal = 0;
+  const cfg = await telegramConfig();
+  if (cfg.token) {
+    const { data } = await db().from("player_profiles").select("telegram_chat_id").not("telegram_chat_id", "is", null);
+    const chats = (data ?? []).map((r) => r.telegram_chat_id).filter((c): c is number => typeof c === "number");
+    tgTotal = chats.length;
+    tg = await sendBatched(cfg.token, chats, `💬 <b>${tgEscape(title)}</b>
+
+${tgEscape(body)}`, { text: "Вступить в чат", url: group.invite });
+  }
+  await audit(admin.id, "telegram.chat_invite_everyone", undefined, { site: ids.length, tg, tgTotal });
+  return { success: `Уведомление на сайте: ${ids.length} игрокам · в Telegram: ${tg} из ${tgTotal}` };
+}

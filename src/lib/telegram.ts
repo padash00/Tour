@@ -68,6 +68,9 @@ export async function notifyTelegram(playerIds: string[], title: string, body?: 
  * «Только для игроков сайта» — ссылка с заявкой: бот принимает тех, кто подтвердил Telegram на сайте.
  * Всё хранится в app_settings: TELEGRAM_GROUP_ID, TELEGRAM_GROUP_TITLE, TELEGRAM_GROUP_INVITE, TELEGRAM_GROUP_CLOSED.
  */
+/** Публичная группа F16 Arena Community — если бот ещё не создал свою ссылку, ведём сюда */
+export const PUBLIC_GROUP_URL = "https://t.me/f16arena_cs2";
+
 export const GROUP_KEYS = ["TELEGRAM_GROUP_ID", "TELEGRAM_GROUP_TITLE", "TELEGRAM_GROUP_INVITE", "TELEGRAM_GROUP_CLOSED"] as const;
 
 export async function telegramGroup() {
@@ -77,7 +80,7 @@ export async function telegramGroup() {
   return {
     id: Number.isFinite(id) && id !== 0 ? id : null,
     title: m.get("TELEGRAM_GROUP_TITLE") || "",
-    invite: m.get("TELEGRAM_GROUP_INVITE") || "",
+    invite: m.get("TELEGRAM_GROUP_INVITE") || PUBLIC_GROUP_URL,
     closed: m.get("TELEGRAM_GROUP_CLOSED") === "1",
   };
 }
