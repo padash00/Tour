@@ -25,8 +25,11 @@ export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfi
     // Без калибровки FACEIT отдаёт стартовые 1000 ELO (4 уровень) — это не рейтинг игрока.
     // Проверяем число сыгранных матчей CS2: 0 — ELO и уровень не показываем.
     if (elo != null && p.player_id) {
-      const matches = await faceitMatchCount(p.player_id, key);
-      if (matches === 0 || (matches == null && elo === UNCALIBRATED_ELO)) {
+      const [matches, last] = await Promise.all([faceitMatchCount(p.player_id, key), faceitLastMatchAt(p.player_id, key)]);
+      const uncalibrated = matches === 0 || (matches == null && elo === UNCALIBRATED_ELO);
+      // давно не играл: FACEIT продолжает отдавать ELO прошлого сезона, хотя в текущем у игрока «нет ранга»
+      const stale = last === 0 || (last != null && Date.now() - last > ACTIVE_DAYS * 86_400_000);
+      if (uncalibrated || stale) {
         elo = null;
         level = null;
       }
@@ -36,6 +39,9 @@ export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfi
     return null;
   }
 }
+
+/** ELO считается, только если игрок сыграл на FACEIT хотя бы один матч CS2 за этот срок */
+export const ACTIVE_DAYS = 90;
 
 /** Стартовый ELO FACEIT CS2 до калибровки */
 export const UNCALIBRATED_ELO = 1000;
@@ -57,3 +63,24 @@ async function faceitMatchCount(playerId: string, key: string): Promise<number |
     return null;
   }
 }
+
+/** Когда закончился последний матч CS2 на FACEIT (мс); 0 — матчей нет; null — не удалось узнать */
+async function faceitLastMatchAt(playerId: string, key: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://open.faceit.com/data/v4/players/${playerId}/history?game=cs2&offset=0&limit=1`, {
+      headers: { Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return null;
+    const h = await res.json();
+    const item = h?.items?.[0];
+    if (!item) return 0;
+    const t = Number(item.finished_at ?? item.started_at);
+    if (!Number.isFinite(t) || t <= 0) return null;
+    return t < 1e12 ? t * 1000 : t;
+  } catch {
+    return null;
+  }
+}
+
