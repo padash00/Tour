@@ -10,6 +10,7 @@ export async function TeamsNav() {
       <ContextNav
         items={[
           { key: "teams", label: t("Все команды"), href: "/teams" },
+          { key: "ranking", label: t("Рейтинг команд"), href: "/ranking" },
           { key: "find", label: t("Поиск команды и игроков"), href: "/find" },
         ]}
       />

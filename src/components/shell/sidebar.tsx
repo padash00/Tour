@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, ChevronRight, CircleHelp, Copy, Crosshair, Home, MessagesSquare, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
+import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, Home, MessagesSquare, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
@@ -36,6 +36,7 @@ export const GROUPS: { title: string; items: SideItem[] }[] = [
     title: tr("Сообщество"),
     items: [
       { href: "/stats", label: tr("Рейтинг"), hint: tr("лучшие игроки и статистика"), match: ["/stats"], Icon: BarChart3 },
+      { href: "/ranking", label: tr("Рейтинг команд"), hint: tr("лучшие команды по турнирам"), match: ["/ranking"], Icon: Medal },
       { href: "/teams", label: tr("Команды"), hint: tr("составы и капитаны"), match: ["/teams", "/team", "/join"], Icon: Shield },
       { href: "/find", label: tr("Поиск команды"), hint: tr("найти тиммейтов"), match: ["/find"], Icon: Search },
       { href: "/chat", label: tr("Чат"), hint: tr("общение игроков"), match: ["/chat"], Icon: MessagesSquare },

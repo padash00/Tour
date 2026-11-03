@@ -12,6 +12,7 @@ import { JsonLd } from "@/components/json-ld";
 import { getHeadToHead, getPlayerLeaderboard } from "@/lib/stats";
 import { HeadToHeadList } from "@/components/head-to-head";
 import { getTeamAwards } from "@/lib/awards";
+import { getTeamRank } from "@/lib/team-ranking";
 import { AwardsRow } from "@/components/public/awards";
 import { FormStrip } from "@/components/public/form-strip";
 import { ratingColor } from "@/components/stats-format";
@@ -67,7 +68,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
     notFound();
   }
 
-  const [members, regs, matches, board, awards, h2h, recruiting, coach] = await Promise.all([
+  const [members, regs, matches, board, awards, h2h, recruiting, coach, rank] = await Promise.all([
     getTeamMembers(team.id),
     getTeamRegistrations(team.id),
     getTeamMatches(team.id),
@@ -76,6 +77,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
     getHeadToHead({ teamIds: [team.id] }),
     team.is_solo ? Promise.resolve(null) : getOwnPost("team", team.id),
     getCoach(team),
+    getTeamRank(team.id).catch(() => null),
   ]);
   const canApply = !team.is_solo && team.accepts_applications && members.length < MAX_MAIN + MAX_SUBS;
   const finished = matches.filter((m) => m.status === "finished").reverse();
@@ -179,6 +181,12 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
             <div className="min-w-0">
               <Eyebrow>{t("Команда · {tag}", { tag: team.tag })}</Eyebrow>
               <h1 className="mt-1 break-words text-page text-fg">{team.name}</h1>
+              {rank && (
+                <Link href="/ranking" className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent-dim px-3 py-1 text-[13px] font-semibold text-accent hover:opacity-90">
+                  {t("#{rank} в рейтинге F16", { rank: rank.rank })}
+                  <span className="num font-normal opacity-80">· {t("{n} очк.", { n: rank.points })}</span>
+                </Link>
+              )}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-3">
                 {[team.region, captain ? t("Капитан — {name}", { name: captain.player.nickname }) : null, coach ? t("Тренер — {name}", { name: coach.nickname }) : null, t("С {date}", { date: formatDate(team.created_at, t.lang) })]
                   .filter(Boolean)
