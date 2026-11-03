@@ -95,8 +95,8 @@ async function warnCount(userId: number) {
 }
 
 /** Предупреждение + наказание по лестнице; сообщение в чат */
-async function warn(token: string, msg: TgMessage, target: TgUser, reason: string, text: string, by: string) {
-  await audit(null, "tg.warn", undefined, { user: String(target.id), name: nameOf(target), username: target.username ?? null, reason, text: text.slice(0, 300), by });
+async function warn(token: string, msg: TgMessage, target: TgUser, reason: string, text: string, by: string, match?: string) {
+  await audit(null, "tg.warn", undefined, { user: String(target.id), name: nameOf(target), username: target.username ?? null, reason, match: match ?? null, text: text.slice(0, 1500), by });
   const n = await warnCount(target.id);
   const p = punishmentFor(n);
   if (p.action === "mute") await mute(token, msg.chat.id, target.id, p.seconds!);
@@ -259,7 +259,7 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
   const v: Violation | null = findViolation(text) ?? (fromChannel ? { kind: "link", reason: "реклама и пересылки из каналов запрещены", match: "канал" } : null);
   if (!v) return;
   await del(token, msg.chat.id, msg.message_id);
-  await warn(token, msg, from, v.reason, text, "бот");
+  await warn(token, msg, from, v.reason, text, "бот", v.match);
 }
 
 /** Подсказка в личке боту для админа: как модерировать */

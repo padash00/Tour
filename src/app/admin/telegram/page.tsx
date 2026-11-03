@@ -96,7 +96,7 @@ export default async function AdminTelegramPage() {
         ) : (
           <div className="divide-y divide-line-subtle">
             {(modLog ?? []).map((l) => {
-              const p = (l.payload ?? {}) as { name?: string; username?: string | null; reason?: string; text?: string; seconds?: number | null; by?: string };
+              const p = (l.payload ?? {}) as { name?: string; username?: string | null; reason?: string; match?: string | null; text?: string; seconds?: number | null; by?: string };
               return (
                 <div key={l.id} className="grid gap-1 px-5 py-3 text-[14px] sm:grid-cols-[110px_200px_minmax(0,1fr)] sm:gap-4">
                   <span className="num text-fg-3">{formatShortDateTime(l.created_at)}</span>
@@ -108,6 +108,7 @@ export default async function AdminTelegramPage() {
                     <b className={l.action === "tg.ban" ? "text-danger" : l.action === "tg.mute" || l.action === "tg.warn" ? "text-warn" : "text-ok"}>{MOD_LABEL[l.action] ?? l.action}</b>
                     {p.seconds ? ` ${Math.round(p.seconds / 60)} мин` : ""}
                     {p.reason ? ` — ${p.reason}` : ""}
+                    {p.match ? <span className="text-fg-3"> (слово: «{p.match}»)</span> : null}
                     {p.by ? <span className="text-fg-3"> · {p.by}</span> : null}
                     {p.text ? <span className="mt-0.5 block truncate text-[13px] text-fg-3">«{p.text}»</span> : null}
                   </span>
