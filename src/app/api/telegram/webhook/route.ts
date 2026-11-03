@@ -18,7 +18,7 @@ type Update = {
 
 /** Игрок сайта, к которому привязан этот Telegram (id пользователя = id личного чата с ботом) */
 async function playerByTelegram(userId: number) {
-  const { data } = await db().from("player_profiles").select("player:players(*)").eq("telegram_chat_id", userId).maybeSingle();
+  const { data } = await db().from("player_profiles").select("player:players!player_profiles_player_id_fkey(*)").eq("telegram_chat_id", userId).maybeSingle();
   return ((data as { player: Player | null } | null)?.player ?? null) as Player | null;
 }
 
@@ -38,9 +38,8 @@ async function onMyChatMember(token: string, u: NonNullable<Update["my_chat_memb
   }
   const admin = await playerByTelegram(from.id);
   if (!isAdmin(admin)) {
-    // чужая группа: бот не участвует
-    await tgSend(token, chat.id, "Этот бот работает только в общем чате игроков F16 Arena. Ухожу.");
-    await tgCall(token, "leaveChat", { chat_id: chat.id });
+    // добавил не админ сайта — группу не запоминаем и молчим (из группы не выходим: могли ошибиться с аккаунтом)
+    console.warn("tg: group add by non-admin", chat.id, from.id);
     return;
   }
   await setAppSettings({ TELEGRAM_GROUP_ID: String(chat.id), TELEGRAM_GROUP_TITLE: chat.title ?? "", TELEGRAM_GROUP_INVITE: "" });
@@ -96,7 +95,7 @@ export async function POST(req: Request) {
   const [cmd, arg] = msg.text.trim().split(/\s+/, 2);
   const reply = (html: string, button?: { text: string; url: string }) => tgSend(cfg.token, chat, html, button);
   const linked = async () => {
-    const { data } = await db().from("player_profiles").select("player_id, player:players(nickname)").eq("telegram_chat_id", chat).maybeSingle();
+    const { data } = await db().from("player_profiles").select("player_id, player:players!player_profiles_player_id_fkey(nickname)").eq("telegram_chat_id", chat).maybeSingle();
     return data as { player_id: string; player: { nickname: string } | null } | null;
   };
 
