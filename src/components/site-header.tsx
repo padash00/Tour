@@ -4,11 +4,13 @@ import { HeaderUser } from "./header-user";
 import { HeaderShell, PublicOnly } from "./nav-links";
 import { SECONDARY_NAV } from "./shell/nav";
 import { MobileActivityBar } from "./shell/activity";
+import { getT } from "@/lib/i18n/server";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
-export function Logo({ height = 30 }: { height?: number }) {
+export async function Logo({ height = 30 }: { height?: number }) {
+  const t = await getT();
   return (
-    <Link href="/" className="flex shrink-0 items-center rounded-control" aria-label="F16 Arena — главная">
+    <Link href="/" className="flex shrink-0 items-center rounded-control" aria-label={t("F16 Arena — главная")}>
       <BrandLogo height={height} priority />
     </Link>
   );
@@ -35,19 +37,20 @@ export function SiteHeader() {
 }
 
 /** Подвал: одна строка — логотип, кто мы, год и второстепенные ссылки (разделы — в боковом меню и нижней панели) */
-export function SiteFooter() {
+export async function SiteFooter() {
+  const t = await getT();
   return (
     <PublicOnly>
       <footer className="mt-12 border-t border-line-subtle bg-shell">
         <div className="flex flex-col gap-4 px-4 py-6 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Logo height={22} />
-            <span className="text-meta text-fg-3">Турниры и лобби по CS2 на серверах клуба F16 Arena · © {new Date().getFullYear()}</span>
+            <span className="text-meta text-fg-3">{t("Турниры и лобби по CS2 на серверах клуба F16 Arena")} · © {new Date().getFullYear()}</span>
           </div>
-          <nav aria-label="Помощь" className="flex flex-wrap gap-x-5 gap-y-1">
+          <nav aria-label={t("Помощь")} className="flex flex-wrap gap-x-5 gap-y-1">
             {SECONDARY_NAV.map((i) => (
               <Link key={i.href} href={i.href} className="inline-flex min-h-9 items-center text-[14px] text-fg-3 transition-colors hover:text-fg">
-                {i.label}
+                {t(i.label)}
               </Link>
             ))}
           </nav>

@@ -10,6 +10,9 @@ import { SteamMark } from "@/components/ds/icons";
 import { useToast } from "../toast";
 import { useViewer, type Activity } from "../viewer";
 import { isActive, noChrome, type NavItem } from "./nav";
+import { tr } from "@/lib/i18n/core";
+import { useT } from "@/lib/i18n/client";
+import { LangSwitch } from "../lang-switch";
 
 /*
  * Каркас сайта: боковое меню слева (от 1024px) и нижняя панель на телефоне.
@@ -21,30 +24,30 @@ type SideItem = NavItem & { hint: string; Icon: LucideIcon };
 /** Разделы бокового меню: группы и короткое пояснение под каждым пунктом — понятно, куда ведёт */
 export const GROUPS: { title: string; items: SideItem[] }[] = [
   {
-    title: "Играть",
+    title: tr("Играть"),
     items: [
-      { href: "/", label: "Главная", hint: "что идёт сейчас", match: ["/"], Icon: Home },
-      { href: "/tournaments", label: "Турниры", hint: "заявки, сетка, итоги", match: ["/tournaments"], Icon: Trophy },
-      { href: "/matches", label: "Матчи", hint: "счёт и расписание", match: ["/matches"], Icon: Crosshair },
-      { href: "/lobbies", label: "Лобби", hint: "сыграть без турнира", match: ["/lobbies", "/lobby"], Icon: Users },
+      { href: "/", label: tr("Главная"), hint: tr("что идёт сейчас"), match: ["/"], Icon: Home },
+      { href: "/tournaments", label: tr("Турниры"), hint: tr("заявки, сетка, итоги"), match: ["/tournaments"], Icon: Trophy },
+      { href: "/matches", label: tr("Матчи"), hint: tr("счёт и расписание"), match: ["/matches"], Icon: Crosshair },
+      { href: "/lobbies", label: tr("Лобби"), hint: tr("сыграть без турнира"), match: ["/lobbies", "/lobby"], Icon: Users },
     ],
   },
   {
-    title: "Сообщество",
+    title: tr("Сообщество"),
     items: [
-      { href: "/stats", label: "Рейтинг", hint: "лучшие игроки и статистика", match: ["/stats"], Icon: BarChart3 },
-      { href: "/teams", label: "Команды", hint: "составы и капитаны", match: ["/teams", "/team", "/join"], Icon: Shield },
-      { href: "/find", label: "Поиск команды", hint: "найти тиммейтов", match: ["/find"], Icon: Search },
-      { href: "/chat", label: "Чат", hint: "общение игроков", match: ["/chat"], Icon: MessagesSquare },
-      { href: "/players", label: "Игроки", hint: "все игроки сайта", match: ["/players"], Icon: UserRound },
+      { href: "/stats", label: tr("Рейтинг"), hint: tr("лучшие игроки и статистика"), match: ["/stats"], Icon: BarChart3 },
+      { href: "/teams", label: tr("Команды"), hint: tr("составы и капитаны"), match: ["/teams", "/team", "/join"], Icon: Shield },
+      { href: "/find", label: tr("Поиск команды"), hint: tr("найти тиммейтов"), match: ["/find"], Icon: Search },
+      { href: "/chat", label: tr("Чат"), hint: tr("общение игроков"), match: ["/chat"], Icon: MessagesSquare },
+      { href: "/players", label: tr("Игроки"), hint: tr("все игроки сайта"), match: ["/players"], Icon: UserRound },
     ],
   },
 ];
 
 export const HELP = [
-  { href: "/help", label: "Как это работает", Icon: CircleHelp },
-  { href: "/rules", label: "Правила и FAQ", Icon: BookOpen },
-  { href: "/support", label: "Поддержка", Icon: LifeBuoy },
+  { href: "/help", label: tr("Как это работает"), Icon: CircleHelp },
+  { href: "/rules", label: tr("Правила и FAQ"), Icon: BookOpen },
+  { href: "/support", label: tr("Поддержка"), Icon: LifeBuoy },
 ];
 
 const navActive = (pathname: string, item: NavItem) => (item.href === "/" ? pathname === "/" : isActive(pathname, item));
@@ -66,6 +69,7 @@ const TONE: Record<Activity["tone"], { box: string; dot: string }> = {
 /** «Мой матч»: срочное действие крупно — что случилось, до когда, кнопки «Открыть» и «Скопировать адрес» */
 export function MyMatchCard({ activity, more }: { activity: Activity; more: number }) {
   const toast = useToast();
+  const t = useT();
   const tone = TONE[activity.tone];
   return (
     <div className={cn("flex flex-col gap-2 rounded-surface p-3.5", tone.box)}>
@@ -77,25 +81,25 @@ export function MyMatchCard({ activity, more }: { activity: Activity; more: numb
       <span className="text-[15px] font-semibold leading-snug text-fg">{activity.detail}</span>
       {activity.deadline && (
         <span className="text-meta text-fg-2">
-          Осталось <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="font-bold text-fg" />
+          {t("Осталось")} <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="font-bold text-fg" />
         </span>
       )}
       <Link href={activity.href} className="mt-1 inline-flex h-11 items-center justify-center rounded-control bg-fg text-[15px] font-bold text-white transition-opacity hover:opacity-90">
-        Открыть
+        {t("Открыть")}
       </Link>
       {activity.connect && (
         <button
           type="button"
           onClick={() =>
             navigator.clipboard.writeText(`connect ${activity.connect}`).then(
-              () => toast.success(`Скопировано: connect ${activity.connect} — вставьте в консоль CS2 (~)`),
-              () => toast.error(`Адрес сервера: ${activity.connect}`),
+              () => toast.success(t("Скопировано: connect {addr} — вставьте в консоль CS2 (~)", { addr: activity.connect })),
+              () => toast.error(t("Адрес сервера: {addr}", { addr: activity.connect })),
             )
           }
           className="inline-flex h-10 items-center justify-center gap-2 rounded-control bg-surface text-[14px] font-semibold text-fg shadow-[inset_0_0_0_1px_var(--color-line)]"
         >
           <Copy className="size-4" />
-          Скопировать адрес сервера
+          {t("Скопировать адрес сервера")}
         </button>
       )}
     </div>
@@ -106,18 +110,20 @@ export function MyMatchCard({ activity, more }: { activity: Activity; more: numb
 export function SiteSidebar() {
   const pathname = usePathname();
   const { status, player, activity, moreActivity } = useViewer();
+  const t = useT();
   if (noChrome(pathname)) return null;
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-w)] flex-col gap-4 overflow-y-auto border-r border-line-subtle bg-shell px-3.5 py-4 lg:flex" aria-label="Меню сайта">
-      <Link href="/" className="mx-2 mb-1 mt-1 block w-fit rounded-control" aria-label="F16 Arena — главная">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-w)] flex-col gap-4 overflow-y-auto border-r border-line-subtle bg-shell px-3.5 py-4 lg:flex" aria-label={t("Меню сайта")}>
+      <Link href="/" className="mx-2 mb-1 mt-1 block w-fit rounded-control" aria-label={t("F16 Arena — главная")}>
         <BrandLogo height={30} />
       </Link>
+      <LangSwitch className="mx-2 self-start" />
 
       {activity && <MyMatchCard activity={activity} more={moreActivity} />}
 
       {GROUPS.map((g) => (
-        <nav key={g.title} className="flex flex-col gap-0.5" aria-label={g.title}>
-          <div className="px-3 pb-1.5 text-[12px] font-bold uppercase tracking-[0.06em] text-fg-4">{g.title}</div>
+        <nav key={g.title} className="flex flex-col gap-0.5" aria-label={t(g.title)}>
+          <div className="px-3 pb-1.5 text-[12px] font-bold uppercase tracking-[0.06em] text-fg-4">{t(g.title)}</div>
           {g.items.map((item) => {
             const active = navActive(pathname, item);
             return (
@@ -132,8 +138,8 @@ export function SiteSidebar() {
               >
                 <item.Icon className={cn("size-[22px] shrink-0", active ? "text-accent" : "text-fg-3")} />
                 <span className="min-w-0">
-                  <span className="block text-[15.5px] font-semibold leading-tight">{item.label}</span>
-                  <span className="block truncate text-[12.5px] leading-snug text-fg-3">{item.hint}</span>
+                  <span className="block text-[15.5px] font-semibold leading-tight">{t(item.label)}</span>
+                  <span className="block truncate text-[12.5px] leading-snug text-fg-3">{t(item.hint)}</span>
                 </span>
               </Link>
             );
@@ -147,16 +153,16 @@ export function SiteSidebar() {
         {HELP.map(({ href, label, Icon }) => (
           <Link key={href} href={href} className="flex items-center gap-2.5 rounded-control px-2.5 py-2 text-[14px] font-semibold text-fg-2 transition-colors hover:bg-surface hover:text-fg">
             <Icon className="size-[18px] text-fg-3" />
-            {label}
+            {t(label)}
             <ChevronRight className="ml-auto size-4 text-fg-4" />
           </Link>
         ))}
         <div className="flex flex-wrap gap-x-3 px-2.5 pb-1 pt-1.5 text-[12.5px] text-fg-3">
           <Link href="/about" className="hover:text-fg">
-            О платформе
+            {t("О платформе")}
           </Link>
           <Link href="/privacy" className="hover:text-fg">
-            Персональные данные
+            {t("Персональные данные")}
           </Link>
         </div>
       </div>
@@ -172,7 +178,7 @@ export function SiteSidebar() {
           <Avatar src={player.avatar_url} name={player.nickname} size="md" className="!rounded-full" />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{player.nickname}</span>
-            <span className="block text-[12.5px] text-fg-3">Моя игра</span>
+            <span className="block text-[12.5px] text-fg-3">{t("Моя игра")}</span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-fg-4" />
         </Link>
@@ -182,7 +188,7 @@ export function SiteSidebar() {
           className="inline-flex h-12 items-center justify-center gap-2 rounded-control bg-fg text-[15px] font-bold text-white transition-opacity hover:opacity-90"
         >
           <SteamMark className="size-5" />
-          Войти через Steam
+          {t("Войти через Steam")}
         </Link>
       )}
     </aside>
@@ -193,20 +199,21 @@ export function SiteSidebar() {
 export function MobileTabBar() {
   const pathname = usePathname();
   const { player } = useViewer();
+  const t = useT();
   if (noChrome(pathname)) return null;
   const items = [
-    { href: "/", label: "Главная", Icon: Home, active: pathname === "/" },
-    { href: "/tournaments", label: "Турниры", Icon: Trophy, active: pathname.startsWith("/tournaments") },
-    { href: "/matches", label: "Матчи", Icon: Crosshair, active: pathname.startsWith("/matches") },
-    { href: "/lobbies", label: "Лобби", Icon: Users, active: pathname.startsWith("/lobb") },
+    { href: "/", label: tr("Главная"), Icon: Home, active: pathname === "/" },
+    { href: "/tournaments", label: tr("Турниры"), Icon: Trophy, active: pathname.startsWith("/tournaments") },
+    { href: "/matches", label: tr("Матчи"), Icon: Crosshair, active: pathname.startsWith("/matches") },
+    { href: "/lobbies", label: tr("Лобби"), Icon: Users, active: pathname.startsWith("/lobb") },
     player
-      ? { href: "/me", label: "Профиль", Icon: User, active: pathname === "/me" || pathname.startsWith("/team") }
-      : { href: `/login?next=${encodeURIComponent(pathname)}`, label: "Войти", Icon: User, active: pathname === "/login" },
+      ? { href: "/me", label: tr("Профиль"), Icon: User, active: pathname === "/me" || pathname.startsWith("/team") }
+      : { href: `/login?next=${encodeURIComponent(pathname)}`, label: tr("Войти"), Icon: User, active: pathname === "/login" },
   ];
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line-subtle bg-shell/95 px-1 pb-[env(safe-area-inset-bottom,0px)] pt-1.5 backdrop-blur-xl lg:hidden"
-      aria-label="Разделы"
+      aria-label={t("Разделы")}
     >
       {items.map(({ href, label, Icon, active }) => (
         <Link
@@ -216,7 +223,7 @@ export function MobileTabBar() {
           className={cn("flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-control text-[12px] font-bold", active ? "text-accent" : "text-fg-3")}
         >
           <Icon className="size-6" />
-          {label}
+          {t(label)}
         </Link>
       ))}
     </nav>

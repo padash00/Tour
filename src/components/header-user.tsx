@@ -7,6 +7,8 @@ import { ActivityAnnouncer, GlobalActivity } from "./shell/activity";
 import { SearchTrigger } from "./shell/search";
 import { MessagesIcon, MobileMenu, NotificationsBell, UserMenu } from "./nav-links";
 import { ViewerSync, useViewer } from "./viewer";
+import { LangSwitch } from "./lang-switch";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Правая часть шапки: поиск · глобальная активность · уведомления · профиль (на телефоне — меню).
@@ -15,6 +17,7 @@ import { ViewerSync, useViewer } from "./viewer";
 export function HeaderUser() {
   const { status, player, unread, dmUnread } = useViewer();
   const pathname = usePathname();
+  const t = useT();
   const user = player ? { nickname: player.nickname, avatar: player.avatar_url, steamId: player.steam_id, unread, dmUnread, admin: player.isAdmin } : null;
 
   return (
@@ -23,6 +26,7 @@ export function HeaderUser() {
       <ActivityAnnouncer />
       <GlobalActivity />
       <SearchTrigger />
+      <LangSwitch className="lg:hidden" />
       {status === "loading" ? (
         // место под профиль того же размера — без прыжка вёрстки
         <span aria-hidden className="hidden h-10 w-[150px] rounded-control bg-ink/[0.04] lg:block" />
@@ -38,7 +42,7 @@ export function HeaderUser() {
           className="hidden h-10 items-center gap-2 rounded-control border border-line bg-ink/[0.03] px-3.5 text-[14px] font-semibold text-fg transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-ink/[0.06] sm:inline-flex lg:hidden"
         >
           <SteamMark className="size-4" />
-          Войти через Steam
+          {t("Войти через Steam")}
         </Link>
       )}
       <MobileMenu user={user} />

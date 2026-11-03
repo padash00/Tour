@@ -1,16 +1,17 @@
 import { mapLabel } from "./maps";
 import type { RegistrationStatus, TournamentStatus } from "./types";
+import { intlLocale, type Lang } from "./i18n/core";
 
 const TZ = "Asia/Almaty";
 
-export function formatDate(iso: string | null | undefined) {
+export function formatDate(iso: string | null | undefined, lang: Lang = "ru") {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", timeZone: TZ }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(lang), { day: "numeric", month: "long", timeZone: TZ }).format(new Date(iso));
 }
 
-export function formatDateTime(iso: string | null | undefined) {
+export function formatDateTime(iso: string | null | undefined, lang: Lang = "ru") {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("ru-RU", {
+  return new Intl.DateTimeFormat(intlLocale(lang), {
     day: "numeric",
     month: "long",
     hour: "2-digit",
@@ -19,14 +20,14 @@ export function formatDateTime(iso: string | null | undefined) {
   }).format(new Date(iso));
 }
 
-export function formatTime(iso: string | null | undefined) {
+export function formatTime(iso: string | null | undefined, lang: Lang = "ru") {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
+  return new Intl.DateTimeFormat(intlLocale(lang), { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(iso));
 }
 
-export function formatShortDateTime(iso: string | null | undefined) {
+export function formatShortDateTime(iso: string | null | undefined, lang: Lang = "ru") {
   if (!iso) return "—";
-  return new Intl.DateTimeFormat("ru-RU", {
+  return new Intl.DateTimeFormat(intlLocale(lang), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

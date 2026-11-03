@@ -10,6 +10,9 @@ import { RulesAckModal } from "@/components/rules-gate";
 import { Suspense } from "react";
 import { SITE_URL } from "@/lib/site";
 import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/seo";
+import { LangProvider } from "@/lib/i18n/client";
+import { getLang } from "@/lib/i18n/server";
+import { makeT } from "@/lib/i18n/core";
 import "./globals.css";
 
 // Inter Tight — чёткий гротеск с кириллицей: весь интерфейс
@@ -61,12 +64,15 @@ d.innerHTML="Ваш браузер устарел — сайт может раб
 (document.body||document.documentElement).appendChild(d);
 }catch(e){}})();`;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const lang = await getLang();
+  const t = makeT(lang);
   return (
-    <html lang="ru" className={`${interTight.variable} ${jetbrains.variable} h-full`}>
+    <html lang={lang} className={`${interTight.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         {/* Очень старый браузер (iOS < 16.2): стили сайта ему не по силам — сразу говорим, что делать */}
         <script dangerouslySetInnerHTML={{ __html: OLD_BROWSER_NOTICE }} />
+        <LangProvider lang={lang}>
         <ToastProvider>
           <Suspense fallback={null}>
             <NavProgress />
@@ -75,7 +81,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             href="#main-content"
             className="fixed left-3 top-3 z-[200] -translate-y-20 rounded-control bg-accent px-4 py-2 text-[14px] font-semibold text-accent-ink shadow-[var(--shadow-pop)] transition-transform focus:translate-y-0"
           >
-            Перейти к содержимому
+            {t("Перейти к содержимому")}
           </a>
           <SiteSidebar />
           <ShellFrame>
@@ -90,6 +96,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </ShellFrame>
           <MobileTabBar />
         </ToastProvider>
+        </LangProvider>
       </body>
     </html>
   );

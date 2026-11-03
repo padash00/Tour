@@ -9,6 +9,8 @@ import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/component
 import { SteamMark } from "@/components/ds/icons";
 import { PRIMARY_NAV, SECONDARY_NAV, isActive, noChrome } from "./shell/nav";
 import { GROUPS, HELP } from "./shell/sidebar";
+import { tr } from "@/lib/i18n/core";
+import { useT } from "@/lib/i18n/client";
 
 /** Публичная обёртка не нужна в F16 Control и ТВ — там своя оболочка */
 export function PublicOnly({ children }: { children: ReactNode }) {
@@ -31,8 +33,9 @@ export function HeaderShell({ children }: { children: ReactNode }) {
 /** Основное меню (десктоп, от 1024px): разделы продукта */
 export function PrimaryNav() {
   const pathname = usePathname();
+  const t = useT();
   return (
-    <nav className="ml-8 hidden h-full items-center gap-1 lg:flex xl:ml-10" aria-label="Основное меню">
+    <nav className="ml-8 hidden h-full items-center gap-1 lg:flex xl:ml-10" aria-label={t("Основное меню")}>
       {PRIMARY_NAV.map((item) => {
         const active = isActive(pathname, item);
         return (
@@ -45,7 +48,7 @@ export function PrimaryNav() {
               active ? "text-fg" : "text-fg-2 hover:text-fg",
             )}
           >
-            {item.label}
+            {t(item.label)}
             <span className={cn("absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent transition-opacity duration-[var(--dur-hover)]", active ? "opacity-100" : "opacity-0")} />
           </Link>
         );
@@ -58,11 +61,11 @@ export type UserInfo = { nickname: string; avatar: string | null; steamId: strin
 
 function userLinks(u: UserInfo) {
   return [
-    { href: "/me", label: "Моя игра", hint: "матчи, заявки, что делать дальше", icon: <LayoutDashboard /> },
-    { href: "/team", label: "Моя команда", hint: "состав и приглашения", icon: <Users /> },
-    { href: "/messages", label: "Сообщения", hint: u.dmUnread ? "есть новые" : "личная переписка", icon: <Mail />, count: u.dmUnread ?? 0 },
-    { href: "/notifications", label: "Уведомления", hint: u.unread ? "есть непрочитанные" : "всё прочитано", icon: <Bell />, count: u.unread },
-    { href: `/players/${u.steamId}`, label: "Мой профиль", hint: "как вас видят другие", icon: <User /> },
+    { href: "/me", label: tr("Моя игра"), hint: tr("матчи, заявки, что делать дальше"), icon: <LayoutDashboard /> },
+    { href: "/team", label: tr("Моя команда"), hint: tr("состав и приглашения"), icon: <Users /> },
+    { href: "/messages", label: tr("Сообщения"), hint: u.dmUnread ? tr("есть новые") : tr("личная переписка"), icon: <Mail />, count: u.dmUnread ?? 0 },
+    { href: "/notifications", label: tr("Уведомления"), hint: u.unread ? tr("есть непрочитанные") : tr("всё прочитано"), icon: <Bell />, count: u.unread },
+    { href: `/players/${u.steamId}`, label: tr("Мой профиль"), hint: tr("как вас видят другие"), icon: <User /> },
   ];
 }
 
@@ -78,12 +81,13 @@ function useLogout() {
 /** Аватар в шапке → меню: моя игра, профиль, команда, уведомления, F16 Control, выход (десктоп) */
 export function UserMenu({ user }: { user: UserInfo }) {
   const router = useRouter();
+  const t = useT();
   const { node, logout } = useLogout();
   return (
     <div className="hidden lg:block">
       {node}
       <Menu
-        label="Меню игрока"
+        label={t("Меню игрока")}
         trigger={
           <button
             type="button"
@@ -101,7 +105,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
             <div className="min-w-0">
               <div className="truncate text-[16px] font-bold text-fg">{user.nickname}</div>
               <span className={cn("mt-1 inline-flex rounded-full px-2 py-0.5 text-[12px] font-bold", user.admin ? "bg-accent-dim text-accent" : "bg-ink/[0.06] text-fg-2")}>
-                {user.admin ? "Администратор" : "Игрок F16 Arena"}
+                {user.admin ? t("Администратор") : t("Игрок F16 Arena")}
               </span>
             </div>
           </div>
@@ -109,11 +113,11 @@ export function UserMenu({ user }: { user: UserInfo }) {
             <MenuItem
               key={l.href}
               icon={l.icon}
-              hint={l.hint}
+              hint={t(l.hint)}
               badge={l.count ? <span className="rounded-full bg-live px-2 py-0.5 text-[12px] font-bold text-white">{countLabel(l.count)}</span> : undefined}
               onSelect={() => router.push(l.href)}
             >
-              {l.label}
+              {t(l.label)}
             </MenuItem>
           ))}
           {user.admin && (
@@ -129,15 +133,15 @@ export function UserMenu({ user }: { user: UserInfo }) {
                   <Shield />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-bold leading-tight">Пульт организатора</span>
-                  <span className="mt-0.5 block text-[12.5px] leading-snug text-white/70">F16 Control: турниры, матчи, серверы</span>
+                  <span className="block text-[15px] font-bold leading-tight">{t("Пульт организатора")}</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-snug text-white/70">{t("F16 Control: турниры, матчи, серверы")}</span>
                 </span>
               </button>
             </>
           )}
           <MenuSeparator />
           <MenuItem icon={<LogOut />} danger onSelect={logout}>
-            Выйти из аккаунта
+            {t("Выйти из аккаунта")}
           </MenuItem>
         </div>
       </Menu>
@@ -149,6 +153,7 @@ export function UserMenu({ user }: { user: UserInfo }) {
 export function MobileMenu({ user }: { user?: UserInfo | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const t = useT();
   const { node, logout } = useLogout();
 
   const panel = useModal(open, () => setOpen(false));
@@ -161,7 +166,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative grid size-10 place-items-center rounded-control text-fg-2 hover:bg-ink/[0.06] hover:text-fg"
-        aria-label={open ? "Закрыть меню" : "Меню"}
+        aria-label={open ? t("Закрыть меню") : t("Меню")}
         aria-expanded={open}
         aria-controls="mobile-menu"
       >
@@ -173,14 +178,14 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
           id="mobile-menu"
           role="dialog"
           aria-modal="true"
-          aria-label="Меню сайта"
+          aria-label={t("Меню сайта")}
           className="fixed inset-x-0 bottom-0 top-[var(--shell-h)] z-50 overflow-y-auto border-t border-line-subtle bg-bg animate-[sheet-in-y_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)]"
         >
           {/* те же разделы, что в боковом меню на компьютере: группы, иконки и пояснения */}
-          <nav className="px-3 py-2" aria-label="Мобильное меню">
+          <nav className="px-3 py-2" aria-label={t("Мобильное меню")}>
             {GROUPS.map((g) => (
               <div key={g.title} className="py-2">
-                <div className="px-3 pb-1 text-[12px] font-semibold uppercase tracking-wide text-fg-3">{g.title}</div>
+                <div className="px-3 pb-1 text-[12px] font-semibold uppercase tracking-wide text-fg-3">{t(g.title)}</div>
                 {g.items.map((item) => {
                   const active = item.href === "/" ? pathname === "/" : isActive(pathname, item);
                   return (
@@ -193,8 +198,8 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
                     >
                       <item.Icon className={cn("size-5 shrink-0", active ? "text-accent" : "text-fg-3")} aria-hidden />
                       <span className="min-w-0">
-                        <span className="block text-[16px] font-medium leading-tight">{item.label}</span>
-                        <span className="block text-[12.5px] leading-tight text-fg-3">{item.hint}</span>
+                        <span className="block text-[16px] font-medium leading-tight">{t(item.label)}</span>
+                        <span className="block text-[12.5px] leading-tight text-fg-3">{t(item.hint)}</span>
                       </span>
                     </Link>
                   );
@@ -205,7 +210,7 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
               {HELP.map((h) => (
                 <Link key={h.href} href={h.href} onClick={() => setOpen(false)} className="flex h-11 items-center gap-3 rounded-control px-3 text-[15px] text-fg-2 hover:text-fg">
                   <h.Icon className="size-5 shrink-0 text-fg-3" aria-hidden />
-                  {h.label}
+                  {t(h.label)}
                 </Link>
               ))}
             </div>
@@ -216,33 +221,33 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
                 <Avatar src={user.avatar} name={user.nickname} size="md" />
                 <div className="min-w-0">
                   <div className="truncate text-[16px] font-semibold">{user.nickname}</div>
-                  <div className="text-meta text-fg-3">{user.admin ? "Администратор" : "Игрок F16 Arena"}</div>
+                  <div className="text-meta text-fg-3">{user.admin ? t("Администратор") : t("Игрок F16 Arena")}</div>
                 </div>
               </div>
-              {[...userLinks(user), ...(user.admin ? [{ href: "/admin", label: "Пульт организатора", hint: "F16 Control", icon: <Shield />, count: 0 }] : [])].map((l) => (
+              {[...userLinks(user), ...(user.admin ? [{ href: "/admin", label: tr("Пульт организатора"), hint: "F16 Control", icon: <Shield />, count: 0 }] : [])].map((l) => (
                 <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className={cn(row, "text-fg-2 hover:text-fg [&>svg]:size-5 [&>svg]:text-fg-3")}>
                   {l.icon}
-                  {l.label}
+                  {t(l.label)}
                   {l.count ? <span className="ml-auto rounded-full bg-live px-2 py-0.5 text-[12px] font-bold text-white">{countLabel(l.count)}</span> : null}
                 </Link>
               ))}
               <button type="button" onClick={logout} className={cn(row, "w-full text-left text-danger [&>svg]:size-5")}>
                 <LogOut />
-                Выйти
+                {t("Выйти")}
               </button>
             </div>
           ) : (
             <div className="mx-6 border-t border-line-subtle py-4">
               <Link href={`/login?next=${encodeURIComponent(pathname)}`} onClick={() => setOpen(false)} className="flex h-12 items-center justify-center gap-2 rounded-control bg-accent text-[16px] font-semibold text-accent-ink">
                 <SteamMark className="size-5" />
-                Войти через Steam
+                {t("Войти через Steam")}
               </Link>
             </div>
           )}
           <div className="mx-3 flex flex-wrap gap-x-5 gap-y-1 border-t border-line-subtle px-3 py-4 text-[14px] text-fg-3">
             {SECONDARY_NAV.filter((l) => !GROUPS.some((g) => g.items.some((i) => i.href === l.href)) && !HELP.some((h) => h.href === l.href) && l.href !== "/rules#faq").map((l) => (
               <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center hover:text-fg">
-                {l.label}
+                {t(l.label)}
               </Link>
             ))}
           </div>
@@ -256,11 +261,12 @@ export function MobileMenu({ user }: { user?: UserInfo | null }) {
 
 /** Конверт: непрочитанные личные сообщения */
 export function MessagesIcon({ unread }: { unread: number }) {
+  const t = useT();
   return (
     <Link
       href="/messages"
       className="relative grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg"
-      aria-label={unread > 0 ? `Сообщения: ${unread} новых` : "Сообщения"}
+      aria-label={unread > 0 ? t("Сообщения: {n} новых", { n: unread }) : t("Сообщения")}
     >
       <Mail className="size-[18px]" />
       {unread > 0 && (
@@ -274,11 +280,12 @@ export function MessagesIcon({ unread }: { unread: number }) {
 
 /** Колокольчик: непрочитанные уведомления */
 export function NotificationsBell({ unread }: { unread: number }) {
+  const t = useT();
   return (
     <Link
       href="/notifications"
       className="relative grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg"
-      aria-label={unread > 0 ? `Уведомления: ${unread} новых` : "Уведомления"}
+      aria-label={unread > 0 ? t("Уведомления: {n} новых", { n: unread }) : t("Уведомления")}
     >
       <Bell className="size-[18px]" />
       {unread > 0 && (
