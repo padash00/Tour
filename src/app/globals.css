@@ -685,10 +685,16 @@ html[data-navigating] main > * {
 /* внутри раздела-карточки (Section, .ds-card) вложенные белые карточки — светло-серые: не «белое на белом».
    Вне слоёв — сильнее утилит Tailwind. */
 .ds-card :where(.bg-surface) {
-  background-color: var(--color-surface-2);
+  background-color: var(--color-surface-4);
+  border-color: var(--color-line);
+}
+.ds-card a:where(.bg-surface) {
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .ds-card a:where(.bg-surface):hover {
-  background-color: var(--color-surface-4);
+  background-color: var(--color-surface);
+  border-color: var(--color-line-hover);
+  box-shadow: 0 6px 18px -8px #12141733;
 }
 
 /* иконки F16 DS (lucide-react и свои через createLucideIcon): одна толщина линии на весь сайт,

@@ -118,7 +118,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
         </span>
         <span className="mt-3 w-full truncate text-[15px] font-semibold text-fg group-hover:text-accent">{m.player.nickname}</span>
         <span className="text-meta text-fg-3">{m.player.is_banned ? <span className="text-danger">{t("Заблокирован")}</span> : ROLE[m.role] ? t(ROLE[m.role]) : m.role}</span>
-        <span className="mt-3 flex items-center gap-3 border-t border-line-subtle pt-3 text-meta">
+        <span className="mt-3 flex w-full items-center justify-center gap-3 border-t border-line pt-3 text-meta">
           <span className={cn("num font-semibold", r?.rating != null ? ratingColor(r.rating) : "text-fg-3")} title="F16 Rating">
             {r?.rating != null ? r.rating.toFixed(2) : "—"}
           </span>
@@ -226,13 +226,13 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                 { label: "F16 Rating", value: teamRating ? teamRating.toFixed(2) : "—", cls: teamRating ? ratingColor(teamRating) : "text-fg-3" },
                 { label: t("Турниров"), value: participations.length, cls: "text-fg" },
               ].map((f) => (
-                <div key={f.label} className="rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
+                <div key={f.label} className="rounded-control border border-line bg-surface-4 px-4 py-3">
                   <dt className="text-micro text-fg-3">{f.label}</dt>
                   <dd className={cn("num mt-1 text-[20px] font-semibold leading-none", f.cls)}>{f.value}</dd>
                 </div>
               ))}
             </dl>
-            <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-line bg-surface-4 px-4 py-3">
               <span className="text-micro text-fg-3">{t("Форма")}</span>
               {form.length ? (
                 <span className="flex items-center gap-3">
@@ -250,7 +250,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
       </header>
 
       {/* ── состав: основа в ряд, ниже запас и тренер */}
-      <Section title={t("Состав")} className="pt-12" action={<span className="num text-meta text-fg-3">{t("Основа")} {mains.length}/{MAX_MAIN}</span>}>
+      <Section title={t("Состав")} className="mt-6" action={<span className="num text-meta text-fg-3">{t("Основа")} {mains.length}/{MAX_MAIN}</span>}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {mains.map((m) => playerCard(m))}
           {Array.from({ length: Math.max(0, MAX_MAIN - mains.length) }, (_, i) => emptyCard(`m${i}`, t("Свободно"), <UserPlus />, canApply && i === 0))}
