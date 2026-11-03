@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { disbandTeam, leaveTeam } from "@/app/actions/team";
 import { Button, ConfirmDialog } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/client";
 
 export type DangerBlock = { title: string; text: string; link?: { href: string; label: string } };
 
@@ -15,6 +16,7 @@ export type DangerBlock = { title: string; text: string; link?: { href: string; 
  * кнопки нет. Проверка на сервере остаётся главной.
  */
 export function DangerZone({ isCaptain, teamName, blocked }: { isCaptain: boolean; teamName: string; blocked?: DangerBlock | null }) {
+  const t = useT();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -29,7 +31,7 @@ export function DangerZone({ isCaptain, teamName, blocked }: { isCaptain: boolea
     });
   return (
     <section className="rounded-surface border border-danger/25 bg-danger-dim/40 p-5 sm:p-6">
-      <h2 className="text-title text-fg">Опасная зона</h2>
+      <h2 className="text-title text-fg">{t("Опасная зона")}</h2>
       {blocked ? (
         <div className="mt-3 flex gap-3 rounded-control border border-line bg-black/20 px-4 py-3">
           <Lock className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
@@ -47,20 +49,20 @@ export function DangerZone({ isCaptain, teamName, blocked }: { isCaptain: boolea
         <>
           <p className="mt-1.5 max-w-read text-[14px] leading-relaxed text-fg-2">
             {isCaptain
-              ? "Роспуск исключит всех игроков, команда исчезнет из списков. Отменить нельзя. Чтобы уйти самому, сначала передайте капитанство в разделе «Состав»."
-              : "Вы покинете команду и не сможете играть за неё в турнирах. Вернуться можно будет только по новому приглашению."}
+              ? t("Роспуск исключит всех игроков, команда исчезнет из списков. Отменить нельзя. Чтобы уйти самому, сначала передайте капитанство в разделе «Состав».")
+              : t("Вы покинете команду и не сможете играть за неё в турнирах. Вернуться можно будет только по новому приглашению.")}
           </p>
           <Button variant="danger" className="mt-4" onClick={() => setOpen(true)}>
-            {isCaptain ? "Распустить команду" : "Покинуть команду"}
+            {isCaptain ? t("Распустить команду") : t("Покинуть команду")}
           </Button>
         </>
       )}
       <ConfirmDialog
         open={open}
         onCancel={() => setOpen(false)}
-        title={isCaptain ? `Распустить ${teamName}?` : `Покинуть ${teamName}?`}
-        description={isCaptain ? "Все игроки будут исключены. Это действие нельзя отменить." : "Капитан получит уведомление."}
-        confirmLabel={isCaptain ? "Распустить команду" : "Покинуть команду"}
+        title={isCaptain ? t("Распустить {name}?", { name: teamName }) : t("Покинуть {name}?", { name: teamName })}
+        description={isCaptain ? t("Все игроки будут исключены. Это действие нельзя отменить.") : t("Капитан получит уведомление.")}
+        confirmLabel={isCaptain ? t("Распустить команду") : t("Покинуть команду")}
         danger
         loading={pending}
         onConfirm={act}

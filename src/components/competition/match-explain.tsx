@@ -3,12 +3,13 @@ import type { ReactNode } from "react";
 import { formatDateTime, mapName } from "@/lib/format";
 import type { MatchFull } from "@/lib/matches";
 import { Timer, cn } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * «Что происходит» — одна плашка под табло: состояние матча обычными словами по данным матча.
  * Тон: идёт / ваш ход — красный, готов / окончен — зелёный, остальное — нейтральный.
  */
-export function MatchExplain({
+export async function MatchExplain({
   m,
   turnTeam,
   myTurn,
@@ -29,15 +30,16 @@ export function MatchExplain({
   winsToMap: number;
   serverNow: number;
 }) {
-  const t1 = m.team1?.name ?? "Команда 1";
-  const t2 = m.team2?.name ?? "Команда 2";
+  const t = await getT();
+  const t1 = m.team1?.name ?? t("Команда 1");
+  const t2 = m.team2?.name ?? t("Команда 2");
   const seriesWins = Math.ceil(m.best_of / 2);
   const advance = next
-    ? `Победитель пройдёт дальше — ${next}.`
+    ? t("Победитель пройдёт дальше — {next}.", { next })
     : m.bracket === "third_place"
-      ? "Победитель займёт третье место."
+      ? t("Победитель займёт третье место.")
       : isFinal(m)
-        ? "Победитель станет победителем турнира."
+        ? t("Победитель станет победителем турнира.")
         : "";
   let tone: "live" | "ok" | "neutral" = "neutral";
   let title: ReactNode;
@@ -45,22 +47,25 @@ export function MatchExplain({
 
   switch (m.status) {
     case "pending":
-      title = "Ждём соперников";
-      text = "Команды определятся по итогам предыдущих матчей. Страница обновится сама.";
+      title = t("Ждём соперников");
+      text = t("Команды определятся по итогам предыдущих матчей. Страница обновится сама.");
       break;
     case "upcoming":
-      title = m.scheduled_at ? `Матч назначен на ${formatDateTime(m.scheduled_at)}` : "Матч назначен";
-      text = m.tournament.map_pool.length <= 1 ? "Карта уже известна. Когда сервер будет готов, здесь появится кнопка подключения." : "Сначала капитаны выберут карту. Им придёт уведомление.";
+      title = m.scheduled_at ? t("Матч назначен на {when}", { when: formatDateTime(m.scheduled_at, t.lang) }) : t("Матч назначен");
+      text = m.tournament.map_pool.length <= 1 ? t("Карта уже известна. Когда сервер будет готов, здесь появится кнопка подключения.") : t("Сначала капитаны выберут карту. Им придёт уведомление.");
       break;
     case "veto":
       tone = myTurn ? "live" : "neutral";
-      title = myTurn ? "Ваш ход — выберите карту ниже" : turnTeam ? `Идёт выбор карт. Сейчас ход: ${turnTeam}` : "Идёт выбор карт";
+      title = myTurn ? t("Ваш ход — выберите карту ниже") : turnTeam ? t("Идёт выбор карт. Сейчас ход: {team}", { team: turnTeam }) : t("Идёт выбор карт");
       text = (
         <>
-          Капитаны по очереди убирают карты, оставшаяся будет сыграна.
+          {t("Капитаны по очереди убирают карты, оставшаяся будет сыграна.")}
           {m.veto_deadline && (
             <>
-              {" "}На ход осталось <Timer deadline={m.veto_deadline} serverNow={serverNow} urgentAt={10} className="font-bold text-fg" />. Если время выйдет, карту выберут случайно.
+              {" "}
+              {t.rich("На ход осталось <timer></timer>. Если время выйдет, карту выберут случайно.", {
+                timer: () => <Timer deadline={m.veto_deadline!} serverNow={serverNow} urgentAt={10} className="font-bold text-fg" />,
+              })}
             </>
           )}
         </>
@@ -68,12 +73,12 @@ export function MatchExplain({
       break;
     case "ready":
       tone = m.server_address ? "ok" : "neutral";
-      title = m.server_address ? (participant ? "Сервер готов — нажмите «Подключиться»" : "Сервер готов, игроки подключаются") : "Готовим сервер";
+      title = m.server_address ? (participant ? t("Сервер готов — нажмите «Подключиться»") : t("Сервер готов, игроки подключаются")) : t("Готовим сервер");
       text = m.server_address
         ? participant
-          ? "Скопируйте адрес справа и вставьте в консоль CS2 (клавиша ~). В разминке напишите .ready."
-          : "Адрес сервера видят только игроки этих двух команд."
-        : "Загружаем карту. Адрес появится здесь автоматически — страницу обновлять не нужно.";
+          ? t("Скопируйте адрес справа и вставьте в консоль CS2 (клавиша ~). В разминке напишите .ready.")
+          : t("Адрес сервера видят только игроки этих двух команд.")
+        : t("Загружаем карту. Адрес появится здесь автоматически — страницу обновлять не нужно.");
       break;
     case "live": {
       tone = "live";
@@ -81,20 +86,20 @@ export function MatchExplain({
       if (map) {
         const lead = map.team1_score === map.team2_score ? null : map.team1_score > map.team2_score ? t1 : t2;
         title = lead
-          ? `Идёт игра на ${mapName(map.map_name)}. Ведёт ${lead} — ${Math.max(map.team1_score, map.team2_score)} : ${Math.min(map.team1_score, map.team2_score)}`
-          : `Идёт игра на ${mapName(map.map_name)}. Счёт равный — ${map.team1_score} : ${map.team2_score}`;
+          ? t("Идёт игра на {map}. Ведёт {lead} — {a} : {b}", { map: mapName(map.map_name), lead, a: Math.max(map.team1_score, map.team2_score), b: Math.min(map.team1_score, map.team2_score) })
+          : t("Идёт игра на {map}. Счёт равный — {a} : {b}", { map: mapName(map.map_name), a: map.team1_score, b: map.team2_score });
       } else {
-        title = "Идёт игра";
+        title = t("Идёт игра");
       }
       // овертайм: оба набрали на раунд меньше нужного — играется MR3 (6 раундов), побеждает взявший 4
       const overtime = !!map && m.tournament.overtime && Math.min(map.team1_score, map.team2_score) >= winsToMap - 1;
       text = [
         overtime
-          ? "Идёт овертайм: по 6 раундов, побеждает команда, которая первой выиграет 4. При равенстве — ещё один овертайм."
-          : `Карту выигрывает тот, кто первым возьмёт ${winsToMap} раундов.`,
-        m.best_of > 1 ? `Серия до ${seriesWins} побед, по картам ${m.team1_score} : ${m.team2_score}.` : "",
+          ? t("Идёт овертайм: по 6 раундов, побеждает команда, которая первой выиграет 4. При равенстве — ещё один овертайм.")
+          : t("Карту выигрывает тот, кто первым возьмёт {n} раундов.", { n: winsToMap }),
+        m.best_of > 1 ? t("Серия до {n} побед, по картам {a} : {b}.", { n: seriesWins, a: m.team1_score, b: m.team2_score }) : "",
         advance,
-        participant ? "Если игра вылетела — подключитесь заново, раунд сохранится." : "",
+        participant ? t("Если игра вылетела — подключитесь заново, раунд сохранится.") : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -107,22 +112,22 @@ export function MatchExplain({
       const ls = Math.min(m.team1_score, m.team2_score);
       const oneMap = m.maps.filter((x) => x.status === "finished");
       const mapScore = m.best_of === 1 && oneMap.length === 1 ? ` (${mapName(oneMap[0].map_name)} ${Math.max(oneMap[0].team1_score, oneMap[0].team2_score)} : ${Math.min(oneMap[0].team1_score, oneMap[0].team2_score)})` : "";
-      title = winner ? `Матч окончен: победили ${winner} — ${ws} : ${ls}${mapScore}` : "Матч окончен";
+      title = winner ? `${t("Матч окончен: победили {winner} — {a} : {b}", { winner, a: ws, b: ls })}${mapScore}` : t("Матч окончен");
       text = m.under_review
-        ? "Результат проверяет администратор."
+        ? t("Результат проверяет администратор.")
         : winner && next
-          ? `${winner} проходят дальше — ${next}.`
+          ? t("{winner} проходят дальше — {next}.", { winner, next })
           : winner && m.bracket === "third_place"
-            ? `${winner} занимают третье место.`
+            ? t("{winner} занимают третье место.", { winner })
             : winner && isFinal(m)
-              ? `${winner} — победитель турнира.`
-              : "Результат учтён в турнире.";
+              ? t("{winner} — победитель турнира.", { winner })
+              : t("Результат учтён в турнире.");
       break;
     }
     default:
       tone = "neutral";
-      title = "Матч отменён";
-      text = "Этот матч не будет сыгран.";
+      title = t("Матч отменён");
+      text = t("Этот матч не будет сыгран.");
   }
 
   return (

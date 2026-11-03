@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/components/ds";
+import { TSpan } from "@/components/ds/tt";
+import { tr } from "@/lib/i18n/core";
 
 /*
  * Таблицы данных публичной части — уровень профессиональной статистики:
@@ -41,15 +43,16 @@ export function SortedHead({ children, title }: { children: ReactNode; title?: s
 export function RankBadge({ n }: { n: number }) {
   if (n > 3) return <span className="num inline-grid size-8 place-items-center text-[14px] font-semibold text-fg-3">{n}</span>;
   return (
-    <span
+    <TSpan
       className={cn(
         "num inline-grid size-8 place-items-center rounded-full text-[14px] font-extrabold",
         n === 1 ? "bg-gold/20 text-gold" : n === 2 ? "bg-silver/20 text-silver" : "bg-bronze/20 text-bronze",
       )}
-      aria-label={`${n} место`}
+      text={tr("{n} место")}
+      vars={{ n }}
     >
       {n}
-    </span>
+    </TSpan>
   );
 }
 

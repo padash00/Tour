@@ -6,30 +6,32 @@ import { useState, useTransition, type ReactNode } from "react";
 import { createLobby } from "@/app/actions/lobby";
 import { useToast } from "../toast";
 import { Button, Dialog, Field, Input, cn } from "@/components/ds";
+import { useT } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/core";
 
 type Visibility = "public" | "closed" | "private";
 
 const TYPES: { key: Visibility; title: string; text: string; icon: ReactNode; meta: string }[] = [
   {
     key: "public",
-    title: "Публичное",
-    text: "Видно в общем списке. Игроки могут зайти без пароля.",
+    title: tr("Публичное"),
+    text: tr("Видно в общем списке. Игроки могут зайти без пароля."),
     icon: <Globe2 />,
-    meta: "Для открытого набора",
+    meta: tr("Для открытого набора"),
   },
   {
     key: "closed",
-    title: "По паролю",
-    text: "Видно в списке, но вход только по паролю.",
+    title: tr("По паролю"),
+    text: tr("Видно в списке, но вход только по паролю."),
     icon: <LockKeyhole />,
-    meta: "Для своей компании",
+    meta: tr("Для своей компании"),
   },
   {
     key: "private",
-    title: "Приватное",
-    text: "Не показывается в общем списке. Вход по ссылке и паролю.",
+    title: tr("Приватное"),
+    text: tr("Не показывается в общем списке. Вход по ссылке и паролю."),
     icon: <EyeOff />,
-    meta: "Только по приглашению",
+    meta: tr("Только по приглашению"),
   },
 ];
 
@@ -40,12 +42,13 @@ const TYPES: { key: Visibility; title: string; text: string; icon: ReactNode; me
 export function CreateLobbyButton({
   loggedIn,
   className,
-  label = "Создать лобби",
+  label = tr("Создать лобби"),
 }: {
   loggedIn: boolean;
   className?: string;
   label?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -78,22 +81,22 @@ export function CreateLobbyButton({
   return (
     <>
       <Button onClick={trigger} icon={<Plus />} className={className}>
-        {label}
+        {t(label)}
       </Button>
 
       <Dialog
         open={open}
         onClose={() => !pending && setOpen(false)}
-        title="Создать лобби"
-        description="Сначала выберите доступ. Режим, карты, команды и сервер настраиваются уже внутри комнаты."
+        title={t("Создать лобби")}
+        description={t("Сначала выберите доступ. Режим, карты, команды и сервер настраиваются уже внутри комнаты.")}
         size="lg"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-              Отмена
+              {t("Отмена")}
             </Button>
             <Button onClick={submit} loading={pending} disabled={type !== "public" && password.trim().length < 4} data-autofocus>
-              Создать лобби
+              {t("Создать лобби")}
             </Button>
           </>
         }
@@ -117,10 +120,10 @@ export function CreateLobbyButton({
                 </span>
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <span className="text-[14px] font-semibold text-fg">{item.title}</span>
-                    <span className="text-micro text-fg-3">{item.meta}</span>
+                    <span className="text-[14px] font-semibold text-fg">{t(item.title)}</span>
+                    <span className="text-micro text-fg-3">{t(item.meta)}</span>
                   </span>
-                  <span className="mt-1 block text-meta leading-relaxed text-fg-2">{item.text}</span>
+                  <span className="mt-1 block text-meta leading-relaxed text-fg-2">{t(item.text)}</span>
                 </span>
               </button>
             );
@@ -130,9 +133,9 @@ export function CreateLobbyButton({
         {type !== "public" && (
           <Field
             className="mt-5"
-            label="Пароль"
+            label={t("Пароль")}
             required
-            hint="От 4 до 32 символов. Игроки смогут войти по нему или по действующей ссылке-приглашению."
+            hint={t("От 4 до 32 символов. Игроки смогут войти по нему или по действующей ссылке-приглашению.")}
           >
             {(field) => (
               <Input
@@ -143,14 +146,14 @@ export function CreateLobbyButton({
                 minLength={4}
                 maxLength={32}
                 autoComplete="off"
-                placeholder="Введите пароль"
+                placeholder={t("Введите пароль")}
               />
             )}
           </Field>
         )}
 
         <div className="mt-5 rounded-control border border-line-subtle bg-shell px-4 py-3 text-meta text-fg-3">
-          Если вы уже создавали лобби, новые комнаты наследуют ваши последние игровые настройки. Их можно изменить до запуска матча.
+          {t("Если вы уже создавали лобби, новые комнаты наследуют ваши последние игровые настройки. Их можно изменить до запуска матча.")}
         </div>
       </Dialog>
     </>

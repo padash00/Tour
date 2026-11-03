@@ -9,6 +9,7 @@ import { Avatar, FaceitLevel } from "../ui";
 import { Menu, MenuItem as DsMenuItem, MenuSeparator, cn } from "@/components/ds";
 import { Icon } from "./ui";
 import type { Run } from "./use-lobby-view";
+import { useT } from "@/lib/i18n/client";
 
 type Slot = ViewMember["slot"];
 
@@ -39,6 +40,7 @@ export function TeamCard({
   code: string;
   onEmpty: () => void;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const rated = members.filter((m) => m.faceit_elo);
@@ -66,13 +68,13 @@ export function TeamCard({
             <div className="flex items-center gap-2">
               <span className="truncate text-[16px] font-semibold text-fg">{name}</span>
               {isHost && (
-                <button type="button" onClick={() => (setDraftName(name), setEditing(true))} className="text-fg-3 hover:text-fg" aria-label="Переименовать">
+                <button type="button" onClick={() => (setDraftName(name), setEditing(true))} className="text-fg-3 hover:text-fg" aria-label={t("Переименовать")}>
                   {Icon.edit("size-4")}
                 </button>
               )}
             </div>
           )}
-          <div className="num text-[12px] text-fg-3">AVG ELO: {avg ?? "—"}</div>
+          <div className="num text-[12px] text-fg-3">{t("AVG ELO: {n}", { n: avg ?? "—" })}</div>
         </div>
         <span className="num rounded-[6px] bg-ink/[0.05] px-2 py-1 text-[13px] text-fg-2">
           {members.length + bots.length}/{size}
@@ -87,10 +89,10 @@ export function TeamCard({
             <span className="grid size-10 shrink-0 place-items-center rounded-full bg-surface-3 text-fg-3">{Icon.bot("size-5")}</span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[14px] font-medium text-fg">Bot {b}</div>
-              <div className="text-[12px] text-fg-3">{BOT_DIFFICULTY[view.lobby.settings.bot_difficulty]}</div>
+              <div className="text-[12px] text-fg-3">{t(BOT_DIFFICULTY[view.lobby.settings.bot_difficulty])}</div>
             </div>
             {canAddBot && (
-              <button type="button" disabled={busy} onClick={() => run(() => A.removeBot(code, team, b))} className="grid size-8 place-items-center rounded-[7px] text-fg-3 hover:bg-ink/[0.06] hover:text-danger" aria-label="Убрать бота">
+              <button type="button" disabled={busy} onClick={() => run(() => A.removeBot(code, team, b))} className="grid size-8 place-items-center rounded-[7px] text-fg-3 hover:bg-ink/[0.06] hover:text-danger" aria-label={t("Убрать бота")}>
                 {Icon.x("size-4")}
               </button>
             )}
@@ -98,11 +100,11 @@ export function TeamCard({
         ))}
         {Array.from({ length: empty }, (_, i) => (
           <div key={i} className="flex h-[64px] items-stretch">
-            <button type="button" onClick={onEmpty} className="grid flex-1 place-items-center text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-fg-2" aria-label="Занять место">
+            <button type="button" onClick={onEmpty} className="grid flex-1 place-items-center text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-fg-2" aria-label={t("Занять место")}>
               {Icon.plus("size-5")}
             </button>
             {canAddBot && (
-              <button type="button" disabled={busy} onClick={() => run(() => A.addBot(code, team))} title="Добавить бота" className="grid w-16 place-items-center border-l border-ink/[0.04] text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-accent">
+              <button type="button" disabled={busy} onClick={() => run(() => A.addBot(code, team))} title={t("Добавить бота")} className="grid w-16 place-items-center border-l border-ink/[0.04] text-fg-4 transition-colors hover:bg-ink/[0.03] hover:text-accent">
                 {Icon.bot("size-5")}
               </button>
             )}
@@ -132,15 +134,16 @@ export function PlayerLine({
   captain?: boolean;
   children?: ReactNode;
 }) {
+  const t = useT();
   const host = view.lobby.host_id === m.id;
   const self = view.me?.id === m.id;
   const inTeam = m.slot === "team1" || m.slot === "team2";
   const moves: { slot: Slot; label: string }[] = (
     [
-      { slot: "team1", label: `В ${view.lobby.team1_name}` },
-      { slot: "team2", label: `В ${view.lobby.team2_name}` },
-      { slot: "wait", label: "В ожидание" },
-      { slot: "spec", label: "В наблюдатели" },
+      { slot: "team1", label: t("В {name}", { name: view.lobby.team1_name }) },
+      { slot: "team2", label: t("В {name}", { name: view.lobby.team2_name }) },
+      { slot: "wait", label: t("В ожидание") },
+      { slot: "spec", label: t("В наблюдатели") },
     ] as { slot: Slot; label: string }[]
   ).filter((x) => x.slot !== m.slot);
   // готовность видна, пока идёт проверка или в режиме «когда все готовы»
@@ -157,35 +160,35 @@ export function PlayerLine({
     >
       <div className="relative shrink-0">
         <Avatar src={m.avatar_url} name={m.nickname} size={big ? 40 : 32} />
-        <span className={cn("absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface", m.online ? "bg-ok" : "bg-fg-4")} title={m.online ? "в лобби" : "не на странице"} />
+        <span className={cn("absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface", m.online ? "bg-ok" : "bg-fg-4")} title={m.online ? t("в лобби") : t("не на странице")} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          {host && <span className="text-warn" title="Хост">{Icon.crown("size-3.5")}</span>}
-          {captain && !host && <span className="text-accent" title="Капитан">★</span>}
+          {host && <span className="text-warn" title={t("Хост")}>{Icon.crown("size-3.5")}</span>}
+          {captain && !host && <span className="text-accent" title={t("Капитан")}>★</span>}
           <Link href={`/players/${m.steam_id}`} className="truncate text-[14px] font-medium text-fg hover:text-accent">
             {m.nickname}
           </Link>
         </div>
         <div className="flex items-center gap-2 text-[12px] text-fg-3">
-          {m.faceit_elo ? <span className="num">{m.faceit_elo} ELO</span> : <span>без FACEIT</span>}
+          {m.faceit_elo ? <span className="num">{m.faceit_elo} ELO</span> : <span>{t("без FACEIT")}</span>}
         </div>
       </div>
       {m.faceit_level ? <FaceitLevel level={m.faceit_level} /> : null}
       {showReady &&
         (m.ready ? (
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ok text-[#06130c] shadow-[0_0_16px_-2px_var(--color-ok)] animate-[pop_.25s_cubic-bezier(.2,.8,.2,1)]" title="Готов">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ok text-[#06130c] shadow-[0_0_16px_-2px_var(--color-ok)] animate-[pop_.25s_cubic-bezier(.2,.8,.2,1)]" title={t("Готов")}>
             {Icon.check("size-5")}
           </span>
         ) : (
-          <span className="size-7 shrink-0 animate-spin rounded-full border-[3px] border-warn/25 border-t-warn" title="Ждём подтверждения" />
+          <span className="size-7 shrink-0 animate-spin rounded-full border-[3px] border-warn/25 border-t-warn" title={t("Ждём подтверждения")} />
         ))}
       {children}
       {isHost && !self && (
         <Menu
-          label={`Действия с игроком ${m.nickname}`}
+          label={t("Действия с игроком {name}", { name: m.nickname })}
           trigger={
-            <button type="button" className="grid size-9 place-items-center rounded-control text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label={`Действия с игроком ${m.nickname}`}>
+            <button type="button" className="grid size-9 place-items-center rounded-control text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label={t("Действия с игроком {name}", { name: m.nickname })}>
               {Icon.more("size-5")}
             </button>
           }
@@ -196,15 +199,15 @@ export function PlayerLine({
                 {move.label}
               </DsMenuItem>
             ))}
-          <DsMenuItem onSelect={() => run(() => A.transferHost(code, m.id), `${m.nickname} теперь хост`)}>
-            Сделать хостом
+          <DsMenuItem onSelect={() => run(() => A.transferHost(code, m.id), t("{name} теперь хост", { name: m.nickname }))}>
+            {t("Сделать хостом")}
           </DsMenuItem>
           <MenuSeparator />
           <DsMenuItem danger onSelect={() => run(() => A.kickPlayer(code, m.id, false))}>
-            Выгнать
+            {t("Выгнать")}
           </DsMenuItem>
           <DsMenuItem danger onSelect={() => run(() => A.kickPlayer(code, m.id, true))}>
-            Забанить в лобби
+            {t("Забанить в лобби")}
           </DsMenuItem>
         </Menu>
       )}
@@ -212,11 +215,14 @@ export function PlayerLine({
   );
 }
 
-export const EmptySlot = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-ink/[0.03] hover:text-fg-2" aria-label="Занять место">
+export function EmptySlot({ onClick }: { onClick: () => void }) {
+  const t = useT();
+  return (
+  <button type="button" onClick={onClick} className="grid h-[52px] place-items-center rounded-control border border-dashed border-line text-fg-4 transition-colors hover:border-line-strong hover:bg-ink/[0.03] hover:text-fg-2" aria-label={t("Занять место")}>
     {Icon.plus("size-5")}
   </button>
-);
+  );
+}
 
 export function Panel({ title, count, right, children }: { title: string; count?: ReactNode; right?: ReactNode; children: ReactNode }) {
   return (

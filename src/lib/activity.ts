@@ -3,6 +3,8 @@ import { db } from "./supabase";
 import type { VetoActionRow } from "./types";
 import { checkinWindowError } from "./data";
 import { vetoState } from "./veto";
+import { getT } from "./i18n/server";
+import type { T } from "./i18n/core";
 import { getGame, getLobby, getMembers, lobbyVetoState, playerLobby } from "./lobby";
 
 /**
@@ -39,15 +41,17 @@ export type Activity = {
 
 export type ActivityState = { top: Activity | null; more: number };
 
-export async function getPlayerActivity(playerId: string): Promise<ActivityState> {
-  const [tournament, lobby] = await Promise.all([tournamentActivity(playerId).catch(() => []), lobbyActivity(playerId).catch(() => [])]);
+/** Тексты карточки — на языке текущего запроса (cookie/браузер), если переводчик не передан */
+export async function getPlayerActivity(playerId: string, tr?: T): Promise<ActivityState> {
+  const tx = tr ?? (await getT());
+  const [tournament, lobby] = await Promise.all([tournamentActivity(playerId, tx).catch(() => []), lobbyActivity(playerId, tx).catch(() => [])]);
   const all = [...tournament, ...lobby].sort(
     (a, b) => a.priority - b.priority || (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"),
   );
   return { top: all[0] ?? null, more: Math.max(0, all.length - 1) };
 }
 
-async function tournamentActivity(playerId: string): Promise<Activity[]> {
+async function tournamentActivity(playerId: string, tx: T): Promise<Activity[]> {
   // команды игрока в одобренных составах турниров
   const { data: rows } = await db()
     .from("tournament_roster_players")
@@ -88,7 +92,7 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
   for (const m of matches) {
     const mine = regs.find((r) => r.tournament_id === m.tournament_id && (r.registration.team_id === m.team1_id || r.registration.team_id === m.team2_id))!;
     const myTeam = mine.registration.team_id;
-    const opponent = (myTeam === m.team1_id ? m.team2?.name : m.team1?.name) ?? "соперник";
+    const opponent = (myTeam === m.team1_id ? m.team2?.name : m.team1?.name) ?? tx("соперник");
     const href = `/matches/${m.id}`;
     if (m.status === "veto") {
       const t = tour.get(m.tournament_id);
@@ -98,8 +102,8 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
         out.push({
           kind: "veto_turn",
           priority: 1,
-          label: st.current?.action === "pick" ? "Ваш ход · пик карты" : "Ваш ход · бан карты",
-          detail: `Вето матча #${m.number} против ${opponent}`,
+          label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"),
+          detail: tx("Вето матча #{n} против {opp}", { n: m.number, opp: opponent }),
           href,
           deadline: m.veto_deadline,
           tone: "accent",
@@ -111,8 +115,8 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
       out.push({
         kind: "server_ready",
         priority: 3,
-        label: "Сервер готов",
-        detail: `Матч #${m.number} против ${opponent}`,
+        label: tx("Сервер готов"),
+        detail: tx("Матч #{n} против {opp}", { n: m.number, opp: opponent }),
         href,
         deadline: null,
         tone: "ok",
@@ -120,7 +124,7 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
         key: `ready:${m.id}`,
       });
     } else if (m.status === "live") {
-      out.push({ kind: "live", priority: 5, label: "Ваш матч идёт", detail: `Матч #${m.number} против ${opponent}`, href, deadline: null, tone: "live", connect: null, key: `live:${m.id}` });
+      out.push({ kind: "live", priority: 5, label: tx("Ваш матч идёт"), detail: tx("Матч #{n} против {opp}", { n: m.number, opp: opponent }), href, deadline: null, tone: "live", connect: null, key: `live:${m.id}` });
     }
   }
 
@@ -134,8 +138,8 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
     out.push({
       kind: "checkin",
       priority: 4,
-      label: "Check-in открыт",
-      detail: `${t.name} — подтвердите участие команды`,
+      label: tx("Check-in открыт"),
+      detail: tx("{name} — подтвердите участие команды", { name: t.name }),
       href: `/tournaments/${t.slug}/checkin`,
       deadline: t.checkin_closes_at,
       tone: "warn",
@@ -146,7 +150,7 @@ async function tournamentActivity(playerId: string): Promise<Activity[]> {
   return out;
 }
 
-async function lobbyActivity(playerId: string): Promise<Activity[]> {
+async function lobbyActivity(playerId: string, tx: T): Promise<Activity[]> {
   const ref = await playerLobby(playerId);
   if (!ref) return [];
   const lobby = await getLobby(ref.id);
@@ -157,10 +161,10 @@ async function lobbyActivity(playerId: string): Promise<Activity[]> {
   const me = members.find((m) => m.player_id === playerId);
 
   if (lobby.draft && lobby.draft.captains[lobby.draft.turn - 1] === playerId) {
-    out.push({ kind: "lobby_draft_turn", priority: 1, label: "Ваш ход · драфт", detail: `Лобби #${lobby.code} — выберите игрока`, href, deadline: lobby.draft.deadline, tone: "accent", connect: null, key: `draft:${lobby.id}:${lobby.draft.deadline}` });
+    out.push({ kind: "lobby_draft_turn", priority: 1, label: tx("Ваш ход · драфт"), detail: tx("Лобби #{code} — выберите игрока", { code: lobby.code }), href, deadline: lobby.draft.deadline, tone: "accent", connect: null, key: `draft:${lobby.id}:${lobby.draft.deadline}` });
   }
   if (lobby.ready_check_until && me && (me.slot === "team1" || me.slot === "team2") && !me.ready) {
-    out.push({ kind: "lobby_ready_check", priority: 2, label: "Проверка готовности", detail: `Лобби #${lobby.code} — подтвердите, что вы на месте`, href, deadline: lobby.ready_check_until, tone: "warn", connect: null, key: `ready-check:${lobby.id}:${lobby.ready_check_until}` });
+    out.push({ kind: "lobby_ready_check", priority: 2, label: tx("Проверка готовности"), detail: tx("Лобби #{code} — подтвердите, что вы на месте", { code: lobby.code }), href, deadline: lobby.ready_check_until, tone: "warn", connect: null, key: `ready-check:${lobby.id}:${lobby.ready_check_until}` });
   }
 
   const game = lobby.current_game_id ? await getGame(lobby.current_game_id) : null;
@@ -171,12 +175,12 @@ async function lobbyActivity(playerId: string): Promise<Activity[]> {
       const team = st.current?.team === 1 ? game.team1 : st.current?.team === 2 ? game.team2 : null;
       const captain = team ? (team.players[0]?.id ?? lobby.host_id) : null;
       if (captain === playerId && st.current?.action !== "decider") {
-        out.push({ kind: "lobby_veto_turn", priority: 1, label: st.current?.action === "pick" ? "Ваш ход · пик карты" : "Ваш ход · бан карты", detail: `Вето в лобби #${lobby.code}`, href, deadline: game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
+        out.push({ kind: "lobby_veto_turn", priority: 1, label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"), detail: tx("Вето в лобби #{code}", { code: lobby.code }), href, deadline: game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
       }
     } else if (inGame && game.status === "waiting" && game.server_state === "ready" && game.server_address) {
-      out.push({ kind: "lobby_server_ready", priority: 3, label: "Сервер готов", detail: `Лобби #${lobby.code}`, href, deadline: null, tone: "ok", connect: game.server_address, key: `lobby-ready:${game.id}` });
+      out.push({ kind: "lobby_server_ready", priority: 3, label: tx("Сервер готов"), detail: tx("Лобби #{code}", { code: lobby.code }), href, deadline: null, tone: "ok", connect: game.server_address, key: `lobby-ready:${game.id}` });
     } else if (inGame && game.status === "live") {
-      out.push({ kind: "lobby_live", priority: 5, label: "Ваш матч идёт", detail: `Лобби #${lobby.code}`, href, deadline: null, tone: "live", connect: null, key: `lobby-live:${game.id}` });
+      out.push({ kind: "lobby_live", priority: 5, label: tx("Ваш матч идёт"), detail: tx("Лобби #{code}", { code: lobby.code }), href, deadline: null, tone: "live", connect: null, key: `lobby-live:${game.id}` });
     }
   }
   return out;

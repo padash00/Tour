@@ -8,12 +8,14 @@ import { fetchFaceitBySteamId } from "@/lib/faceit";
 import { fetchSteamProfile } from "@/lib/steam";
 import { db } from "@/lib/supabase";
 import { markLoginRefreshed } from "@/lib/profile-sync";
+import { getT } from "@/lib/i18n/server";
 import type { ActionResult } from "@/components/forms";
 
 export async function refreshProfile(): Promise<ActionResult> {
+  const t = await getT();
   const player = await requirePlayer();
   // каждый вызов ходит во внешние Steam/FACEIT API — не чаще раза в 15 секунд
-  if (await isRateLimited(player.id, "profile.refresh", 15)) return { error: "Профиль только что обновлялся — подождите немного" };
+  if (await isRateLimited(player.id, "profile.refresh", 15)) return { error: t("Профиль только что обновлялся — подождите немного") };
   await audit(player.id, "profile.refresh");
   const [profile, faceit] = await Promise.all([
     fetchSteamProfile(player.steam_id),
@@ -36,8 +38,8 @@ export async function refreshProfile(): Promise<ActionResult> {
   if (profile.ok || faceit) await markLoginRefreshed(player.id);
   revalidatePath("/me");
   revalidatePath(`/players/${player.steam_id}`);
-  if (!profile.ok) return { error: "Steam не ответил — попробуйте позже" };
-  return faceit ? { success: "Профиль и FACEIT обновлены" } : { success: "Профиль Steam обновлён. FACEIT-профиль не найден." };
+  if (!profile.ok) return { error: t("Steam не ответил — попробуйте позже") };
+  return faceit ? { success: t("Профиль и FACEIT обновлены") } : { success: t("Профиль Steam обновлён. FACEIT-профиль не найден.") };
 }
 
 export async function markNotificationsRead(): Promise<ActionResult> {
@@ -50,8 +52,9 @@ export async function markNotificationsRead(): Promise<ActionResult> {
 
 /** Отметить прочитанным одно уведомление — только своё (по player_id текущего игрока) */
 export async function markNotificationRead(id: string): Promise<ActionResult> {
+  const t = await getT();
   const player = await requirePlayer();
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Уведомление не найдено" };
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: t("Уведомление не найдено") };
   await db().from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("player_id", player.id).is("read_at", null);
   return null;
 }

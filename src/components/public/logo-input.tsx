@@ -3,9 +3,11 @@
 /* eslint-disable @next/next/no-img-element -- превью локального файла */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../ui";
+import { useT } from "@/lib/i18n/client";
 
 /** Загрузка логотипа: превью, имя файла, понятная кнопка вместо системного поля */
 export function LogoInput({ name = "logo", current, tag }: { name?: string; current?: string | null; tag?: string }) {
+  const t = useT();
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function LogoInput({ name = "logo", current, tag }: { name?: string; curr
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
           src ? "border-line bg-shell" : "border-ink/[0.2] bg-shell hover:border-accent/60",
         )}
-        aria-label="Выбрать логотип"
+        aria-label={t("Выбрать логотип")}
       >
         {src ? (
           <img src={src} alt="" className="size-full object-contain" />
@@ -37,21 +39,21 @@ export function LogoInput({ name = "logo", current, tag }: { name?: string; curr
           onClick={() => input.current?.click()}
           className="rounded-[6px] text-[15px] font-semibold text-accent transition-colors hover:text-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {src ? "Заменить логотип" : "Загрузить логотип"}
+          {src ? t("Заменить логотип") : t("Загрузить логотип")}
         </button>
-        <div className="mt-1 truncate text-[12px] text-fg-3">{file ?? "PNG, JPG или WEBP до 1 МБ, лучше квадратный"}</div>
+        <div className="mt-1 truncate text-[12px] text-fg-3">{file ?? t("PNG, JPG или WEBP до 1 МБ, лучше квадратный")}</div>
       </div>
       <input
         ref={input}
         name={name}
         type="file"
-        aria-label="Логотип команды"
+        aria-label={t("Логотип команды")}
         accept="image/png,image/jpeg,image/webp"
         className="sr-only"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           if (!f) return;
-          setFile(`${f.name} · ${Math.max(1, Math.round(f.size / 1024))} КБ`);
+          setFile(`${f.name} · ${Math.max(1, Math.round(f.size / 1024))} ${t("КБ")}`);
           setPreview(URL.createObjectURL(f));
         }}
       />

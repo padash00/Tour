@@ -7,6 +7,7 @@ import { getTournamentRecap } from "@/lib/recap";
 import { RecapView } from "@/components/competition/recap-view";
 import { ShareButton } from "@/components/stream";
 import { Button, Container, PageTitle } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 // одинакова для всех — из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
@@ -25,17 +26,18 @@ export async function generateMetadata(props: PageProps<"/tournaments/[slug]/rec
 
 export default async function RecapPage(props: PageProps<"/tournaments/[slug]/recap">) {
   const { slug } = await props.params;
+  const tx = await getT();
   const tournament = await getTournamentBySlug(slug);
   if (!tournament) notFound();
-  const recap = await getTournamentRecap(tournament);
+  const recap = await getTournamentRecap(tournament, tx);
   const mode = modeOf(tournament.format);
 
   const meta = [
-    tournament.starts_at ? formatDate(tournament.starts_at) : null,
+    tournament.starts_at ? formatDate(tournament.starts_at, tx.lang) : null,
     tournament.game,
     mode.size === 5 ? "5v5" : mode.size === 2 ? "2v2" : "1v1",
-    bracketLabel[tournament.bracket_type] ?? tournament.bracket_type,
-    tournament.is_lan ? "LAN" : "Онлайн",
+    tx(bracketLabel[tournament.bracket_type] ?? tournament.bracket_type),
+    tournament.is_lan ? "LAN" : tx("Онлайн"),
   ].filter(Boolean);
 
   return (
@@ -47,7 +49,7 @@ export default async function RecapPage(props: PageProps<"/tournaments/[slug]/re
               <Button href={`/tournaments/${tournament.slug}`} variant="quiet" size="sm">
                 ← {tournament.name}
               </Button>
-              <div className="mt-5 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">Итоги турнира</div>
+              <div className="mt-5 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">{tx("Итоги турнира")}</div>
               <PageTitle className="mt-1">{tournament.name}</PageTitle>
               <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-meta text-fg-3">
                 {meta.map((item, i) => (
@@ -58,7 +60,7 @@ export default async function RecapPage(props: PageProps<"/tournaments/[slug]/re
                 ))}
               </div>
             </div>
-            <ShareButton title={`Итоги — ${tournament.name}`} />
+            <ShareButton title={tx("Итоги — {name}", { name: tournament.name })} />
           </div>
         </Container>
       </div>

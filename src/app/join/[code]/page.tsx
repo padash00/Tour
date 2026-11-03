@@ -10,29 +10,31 @@ import { Button, Callout, Container, EmptyState } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 import { HelpHint } from "@/components/help-hint";
 import { TeamOfferCard } from "@/components/team/team-offer";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Приглашение в команду", robots: { index: false } };
 
 export default async function JoinPage(props: PageProps<"/join/[code]">) {
+  const t = await getT();
   const { code } = await props.params;
   const team = await getTeamByInvite(code);
 
   if (!team) {
     return (
       <Container width="read" className="flex min-h-[calc(100dvh-var(--shell-h))] items-center py-12">
-        <h1 className="sr-only">Приглашение в команду</h1>
+        <h1 className="sr-only">{t("Приглашение в команду")}</h1>
         <EmptyState
           className="w-full"
           icon={<Link2Off />}
-          title="Ссылка больше не действует"
-          text="Возможно, капитан команды создал новую ссылку или команда распущена. Попросите у капитана актуальное приглашение."
+          title={t("Ссылка больше не действует")}
+          text={t("Возможно, капитан команды создал новую ссылку или команда распущена. Попросите у капитана актуальное приглашение.")}
           action={
             <>
               <Button href="/find" variant="secondary" size="sm">
-                Найти команду
+                {t("Найти команду")}
               </Button>
               <Button href="/teams" variant="ghost" size="sm">
-                Все команды
+                {t("Все команды")}
               </Button>
             </>
           }
@@ -52,47 +54,47 @@ export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const blocker: { title: string; text: string } | null = !player
     ? null
     : player.is_banned
-      ? { title: "Ваш аккаунт заблокирован", text: "Вступить в команду нельзя. Если это ошибка — напишите администратору." }
+      ? { title: t("Ваш аккаунт заблокирован"), text: t("Вступить в команду нельзя. Если это ошибка — напишите администратору.") }
       : membership && membership.team.id !== team.id
-        ? { title: `Вы уже в команде ${membership.team.name}`, text: "Чтобы вступить сюда, сначала покиньте текущую команду в её настройках." }
+        ? { title: t("Вы уже в команде {name}", { name: membership.team.name }), text: t("Чтобы вступить сюда, сначала покиньте текущую команду в её настройках.") }
         : locked
-          ? { title: "Состав заблокирован турниром", text: `Команда играет в «${locked.name}» — до конца турнира новых игроков принимает только администратор.` }
+          ? { title: t("Состав заблокирован турниром"), text: t("Команда играет в «{name}» — до конца турнира новых игроков принимает только администратор.", { name: locked.name }) }
           : full
-            ? { title: "В команде нет свободных мест", text: `Основа и запас заполнены (${MAX_MAIN} + ${MAX_SUBS}). Попросите капитана освободить место.` }
+            ? { title: t("В команде нет свободных мест"), text: t("Основа и запас заполнены ({a} + {b}). Попросите капитана освободить место.", { a: MAX_MAIN, b: MAX_SUBS }) }
             : null;
 
   return (
     <Container width="read" className="flex min-h-[calc(100dvh-var(--shell-h))] items-center py-12">
-      <TeamOfferCard team={team} members={members} eyebrow="Вас приглашают в команду" maxMain={MAX_MAIN} maxSubs={MAX_SUBS}>
+      <TeamOfferCard team={team} members={members} eyebrow={t("Вас приглашают в команду")} maxMain={MAX_MAIN} maxSubs={MAX_SUBS}>
         {!player ? (
           <>
             <a href={`/api/auth/steam?next=${encodeURIComponent(next)}`} className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-control bg-accent px-6 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong">
               <SteamMark className="size-5" />
-              Продолжить через Steam
+              {t("Продолжить через Steam")}
             </a>
-            <p className="mt-3 text-center text-meta text-fg-3">После входа вернём вас на это приглашение.</p>
+            <p className="mt-3 text-center text-meta text-fg-3">{t("После входа вернём вас на это приглашение.")}</p>
           </>
         ) : membership?.team.id === team.id ? (
           <Button href="/team" block size="lg">
-            Вы уже в этой команде — открыть штаб
+            {t("Вы уже в этой команде — открыть штаб")}
           </Button>
         ) : blocker ? (
           <Callout tone="warn" title={blocker.title}>
             {blocker.text}
           </Callout>
         ) : gated ? (
-          <ProfileRequired next={next} action="вступить в команду" />
+          <ProfileRequired next={next} action={t("вступить в команду")} />
         ) : (
           <ActionForm action={joinTeam}>
             <input type="hidden" name="code" value={code} />
-            <SubmitButton size="lg" pendingText="Вступаем…" className="w-full">
-              Вступить в {team.name}
+            <SubmitButton size="lg" pendingText={t("Вступаем…")} className="w-full">
+              {t("Вступить в {name}", { name: team.name })}
             </SubmitButton>
-            <p className="mt-3 text-center text-meta text-fg-3">{mains < MAX_MAIN ? "Вы попадёте в основной состав." : "Основа заполнена — вы попадёте в запас."}</p>
+            <p className="mt-3 text-center text-meta text-fg-3">{mains < MAX_MAIN ? t("Вы попадёте в основной состав.") : t("Основа заполнена — вы попадёте в запас.")}</p>
           </ActionForm>
         )}
         <Button href="/" variant="ghost" block className="mt-2">
-          Отказаться
+          {t("Отказаться")}
         </Button>
         <HelpHint topics={["join-team"]} className="mt-6" />
       </TeamOfferCard>

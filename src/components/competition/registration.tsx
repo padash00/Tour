@@ -10,6 +10,8 @@ import { useRulesOk } from "@/components/rules-gate";
 import { Avatar, Button, Callout, ConfirmDialog, FaceitLevel, Status, Timer, cn } from "@/components/ds";
 import { formatDateTime, formatTime } from "@/lib/format";
 import type { TournamentStatus } from "@/lib/types";
+import { useT } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/core";
 
 /*
  * Клиентская часть регистрации и check-in (F16 DS).
@@ -30,7 +32,7 @@ export type PickerMember = {
   captain: boolean;
 };
 
-const SLOT_LABEL: Record<Slot, string> = { main: "Основа", sub: "Запас", out: "Не играет" };
+const SLOT_LABEL: Record<Slot, string> = { main: tr("Основа"), sub: tr("Запас"), out: tr("Не играет") };
 
 /** Капитан распределяет игроков: основа ровно под режим, запас — до лимита, остальные не играют */
 export function RosterPicker({
@@ -47,6 +49,7 @@ export function RosterPicker({
   /** выбор изменился — для проверок заявки до отправки (официальный турнир) */
   onChange?: (slots: Record<string, Slot>) => void;
 }) {
+  const tx = useT();
   const [slots, setSlotsState] = useState<Record<string, Slot>>(initial);
   const setSlots = (update: (cur: Record<string, Slot>) => Record<string, Slot>) => {
     const next = update(slots);
@@ -63,7 +66,7 @@ export function RosterPicker({
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line-subtle px-4 py-3 sm:px-5">
         <div className="num flex items-center gap-2 text-[14px] font-medium text-fg">
           <span className={mains === size ? "text-ok" : "text-fg"}>
-            Основа {mains}/{size}
+            {tx("Основа")} {mains}/{size}
           </span>
           {subs > 0 && (
             <>
@@ -71,7 +74,7 @@ export function RosterPicker({
                 ·
               </span>
               <span className="text-fg-2">
-                Запас {benched}/{subs}
+                {tx("Запас")} {benched}/{subs}
               </span>
             </>
           )}
@@ -79,10 +82,10 @@ export function RosterPicker({
         <p aria-live="polite" className={cn("flex items-center gap-1.5 text-meta", need === 0 ? "text-ok" : "text-warn")}>
           {need === 0 ? (
             <>
-              <Check className="size-3.5" aria-hidden /> Основа собрана
+              <Check className="size-3.5" aria-hidden /> {tx("Основа собрана")}
             </>
           ) : (
-            `Выберите в основу ещё ${need}`
+            tx("Выберите в основу ещё {n}", { n: need })
           )}
         </p>
       </div>
@@ -98,15 +101,15 @@ export function RosterPicker({
                 <div className="min-w-0">
                   <div className={cn("truncate text-[15px] font-medium", m.banned || s === "out" ? "text-fg-3" : "text-fg")}>{m.nickname}</div>
                   <div className="mt-0.5 flex items-center gap-2 text-meta text-fg-3">
-                    {m.banned ? <span className="text-danger">Заблокирован</span> : m.captain ? "Капитан" : SLOT_LABEL[s]}
+                    {m.banned ? <span className="text-danger">{tx("Заблокирован")}</span> : m.captain ? tx("Капитан") : tx(SLOT_LABEL[s])}
                     <FaceitLevel level={m.faceit_level} />
                   </div>
                 </div>
               </div>
               {m.banned ? (
-                <Status info={{ label: "Недоступен", tone: "danger" }} size="sm" />
+                <Status info={{ label: tx("Недоступен"), tone: "danger" }} size="sm" />
               ) : (
-                <div role="radiogroup" aria-label={`Роль в заявке: ${m.nickname}`} className="flex w-full rounded-control border border-line bg-surface-2 p-0.5 sm:w-auto">
+                <div role="radiogroup" aria-label={tx("Роль в заявке: {name}", { name: m.nickname })} className="flex w-full rounded-control border border-line bg-surface-2 p-0.5 sm:w-auto">
                   {options.map((o) => (
                     <button
                       key={o}
@@ -114,14 +117,14 @@ export function RosterPicker({
                       role="radio"
                       aria-checked={s === o}
                       disabled={full(o)}
-                      title={full(o) ? (o === "main" ? "Основа уже собрана" : "Запас заполнен") : undefined}
+                      title={full(o) ? (o === "main" ? tx("Основа уже собрана") : tx("Запас заполнен")) : undefined}
                       onClick={() => setSlots((cur) => ({ ...cur, [m.player_id]: o }))}
                       className={cn(
                         "h-9 flex-1 whitespace-nowrap rounded-[6px] px-3 text-[13px] font-medium transition-colors duration-[var(--dur-hover)] disabled:cursor-not-allowed disabled:opacity-35 sm:flex-none",
                         s === o ? (o === "main" ? "bg-accent text-accent-ink" : "bg-ink/[0.1] text-fg") : "text-fg-3 hover:text-fg",
                       )}
                     >
-                      {SLOT_LABEL[o]}
+                      {tx(SLOT_LABEL[o])}
                     </button>
                   ))}
                 </div>
@@ -147,7 +150,7 @@ export function RegisterForm({
   mains,
   update,
   label,
-  pendingLabel = "Отправляем…",
+  pendingLabel,
   variant = "primary",
   children,
   footer,
@@ -164,6 +167,7 @@ export function RegisterForm({
   children?: ReactNode;
   footer?: ReactNode;
 }) {
+  const tx = useT();
   const [state, action, pending] = useActionState<ActionResult, FormData>(registerTeam, null);
   const [local, setLocal] = useState<string | null>(null);
   const rulesOk = useRulesOk(tournamentId);
@@ -183,7 +187,7 @@ export function RegisterForm({
     const chosen = new FormData(e.currentTarget).getAll("main").length;
     if (chosen !== mains) {
       e.preventDefault();
-      setLocal(chosen < mains ? `В основе должно быть ${mains}: выберите ещё ${mains - chosen}.` : `В основе должно быть ${mains}, выбрано ${chosen}.`);
+      setLocal(chosen < mains ? tx("В основе должно быть {n}: выберите ещё {m}.", { n: mains, m: mains - chosen }) : tx("В основе должно быть {n}, выбрано {m}.", { n: mains, m: chosen }));
     } else setLocal(null);
   };
   const error = local ?? state?.error ?? null;
@@ -194,9 +198,9 @@ export function RegisterForm({
       {rulesGate && <input type="hidden" name="rules_ack" value={rulesOk ? "1" : ""} />}
       {children}
       <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className={cn("min-w-0 text-meta", locked ? "font-medium text-warn" : "text-fg-3")}>{locked ? "Сначала прочитайте регламент турнира выше и поставьте галочку." : footer}</div>
+        <div className={cn("min-w-0 text-meta", locked ? "font-medium text-warn" : "text-fg-3")}>{locked ? tx("Сначала прочитайте регламент турнира выше и поставьте галочку.") : footer}</div>
         <Button type="submit" variant={variant} size="lg" loading={pending} disabled={locked} className="w-full sm:w-auto">
-          {pending ? pendingLabel : label}
+          {pending ? (pendingLabel ?? tx("Отправляем…")) : label}
         </Button>
       </div>
       {error && (
@@ -210,6 +214,7 @@ export function RegisterForm({
 
 /** Отозвать заявку (капитан, пока открыта регистрация) — только с подтверждением */
 export function WithdrawApplication({ tournamentId, solo }: { tournamentId: string; solo?: boolean }) {
+  const tx = useT();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const toast = useToast();
@@ -225,14 +230,14 @@ export function WithdrawApplication({ tournamentId, solo }: { tournamentId: stri
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        {solo ? "Отменить участие" : "Отозвать заявку"}
+        {solo ? tx("Отменить участие") : tx("Отозвать заявку")}
       </Button>
       <ConfirmDialog
         open={open}
         onCancel={() => setOpen(false)}
-        title={solo ? "Отменить участие?" : "Отозвать заявку команды?"}
-        description="Место в турнире освободится. Подать заявку снова можно, пока открыта регистрация."
-        confirmLabel={solo ? "Отменить участие" : "Отозвать заявку"}
+        title={solo ? tx("Отменить участие?") : tx("Отозвать заявку команды?")}
+        description={tx("Место в турнире освободится. Подать заявку снова можно, пока открыта регистрация.")}
+        confirmLabel={solo ? tx("Отменить участие") : tx("Отозвать заявку")}
         danger
         loading={pending}
         onConfirm={act}
@@ -258,10 +263,10 @@ function phaseOf(p: { status: TournamentStatus; opensAt: string | null; closesAt
 const ANNOUNCE: Record<Phase, string> = {
   upcoming: "",
   waiting: "",
-  open: "Check-in открыт",
-  closed: "Check-in закрыт",
-  done: "Check-in пройден",
-  missed: "Check-in завершён",
+  open: tr("Check-in открыт"),
+  closed: tr("Check-in закрыт"),
+  done: tr("Check-in пройден"),
+  missed: tr("Check-in завершён"),
 };
 
 /**
@@ -294,6 +299,7 @@ export function CheckinTask({
   checks: CheckItem[];
   solo?: boolean;
 }) {
+  const tx = useT();
   // Держим phase/checks синхронизированными с временем сервера.
   // setState вызывается только из таймера, поэтому строгий React lint не ловит cascading render.
   const [now, setNow] = useState(serverNow);
@@ -319,9 +325,9 @@ export function CheckinTask({
   useEffect(() => {
     if (prev.current === phase) return;
     prev.current = phase;
-    const id = setTimeout(() => setAnnounce(ANNOUNCE[phase]), 0);
+    const id = setTimeout(() => setAnnounce(ANNOUNCE[phase] ? tx(ANNOUNCE[phase]) : ""), 0);
     return () => clearTimeout(id);
-  }, [phase]);
+  }, [phase, tx]);
 
   const blocked = checks.filter((c) => !c.ok);
   const left = closesAt ? new Date(closesAt).getTime() - now : null;
@@ -329,20 +335,20 @@ export function CheckinTask({
 
   const doneNext =
     status === "live"
-      ? "Турнир уже идёт. Следите за сеткой и своими матчами."
+      ? tx("Турнир уже идёт. Следите за сеткой и своими матчами.")
       : status === "finished"
-        ? "Турнир завершён. Результаты, сетка и статистика доступны на странице турнира."
+        ? tx("Турнир завершён. Результаты, сетка и статистика доступны на странице турнира.")
         : status === "cancelled"
-          ? "Турнир отменён."
-          : "Что дальше: ждите публикации сетки и первого матча.";
+          ? tx("Турнир отменён.")
+          : tx("Что дальше: ждите публикации сетки и первого матча.");
 
   const windowItem = {
-    upcoming: { state: "wait" as const, text: opensAt ? `Откроется ${formatDateTime(opensAt)}` : "Время объявит администратор" },
-    waiting: { state: "wait" as const, text: opensAt ? `Откроется в ${formatTime(opensAt)}` : "Скоро откроется" },
-    open: { state: "ok" as const, text: closesAt ? `Открыто до ${formatTime(closesAt)}` : "Открыто" },
-    closed: { state: "fail" as const, text: "Окно закрыто" },
-    done: { state: "ok" as const, text: "Пройден" },
-    missed: { state: "fail" as const, text: "Окно закрыто" },
+    upcoming: { state: "wait" as const, text: opensAt ? tx("Откроется {date}", { date: formatDateTime(opensAt, tx.lang) }) : tx("Время объявит администратор") },
+    waiting: { state: "wait" as const, text: opensAt ? tx("Откроется в {time}", { time: formatTime(opensAt, tx.lang) }) : tx("Скоро откроется") },
+    open: { state: "ok" as const, text: closesAt ? tx("Открыто до {time}", { time: formatTime(closesAt, tx.lang) }) : tx("Открыто") },
+    closed: { state: "fail" as const, text: tx("Окно закрыто") },
+    done: { state: "ok" as const, text: tx("Пройден") },
+    missed: { state: "fail" as const, text: tx("Окно закрыто") },
   }[phase];
 
   return (
@@ -359,11 +365,11 @@ export function CheckinTask({
               <Check className="size-6" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-heading text-fg">{solo ? "Вы прошли check-in" : "Команда прошла check-in"}</h2>
-              <p className="mt-1 text-meta text-fg-3">Подтверждено {formatDateTime(checkedInAt)}</p>
+              <h2 className="text-heading text-fg">{solo ? tx("Вы прошли check-in") : tx("Команда прошла check-in")}</h2>
+              <p className="mt-1 text-meta text-fg-3">{tx("Подтверждено {date}", { date: formatDateTime(checkedInAt, tx.lang) })}</p>
               <p className="mt-3 text-[15px] text-fg-2">{doneNext}</p>
               <Button href={tournamentHref} variant="secondary" size="sm" className="mt-4">
-                К турниру
+                {tx("К турниру")}
               </Button>
             </div>
           </div>
@@ -371,30 +377,30 @@ export function CheckinTask({
           <>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="text-meta text-fg-3">{closesAt ? "До конца check-in" : "Check-in открыт"}</div>
+                <div className="text-meta text-fg-3">{closesAt ? tx("До конца check-in") : tx("Check-in открыт")}</div>
                 {closesAt ? (
                   <Timer deadline={closesAt} urgentAt={60} serverNow={serverNow} className={cn("mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] sm:text-[48px]", hurry && "text-warn")} />
                 ) : (
-                  <div className="mt-1 text-title text-fg">Окно закроет администратор</div>
+                  <div className="mt-1 text-title text-fg">{tx("Окно закроет администратор")}</div>
                 )}
               </div>
-              <Status info={{ label: "Check-in открыт", tone: "accent" }} />
+              <Status info={{ label: tx("Check-in открыт"), tone: "accent" }} />
             </div>
             {hurry && (
               <Callout tone="warn" className="mt-5">
-                {isCaptain ? "Осталось меньше 5 минут — подтвердите участие сейчас." : "Осталось меньше 5 минут. Напомните капитану подтвердить участие."}
+                {isCaptain ? tx("Осталось меньше 5 минут — подтвердите участие сейчас.") : tx("Осталось меньше 5 минут. Напомните капитану подтвердить участие.")}
               </Callout>
             )}
             <div className="mt-6">
               {blocked.length ? (
-                <Callout tone="danger" title="Подтвердить участие нельзя">
-                  Исправить заявку после закрытия регистрации может только администратор турнира — напишите ему.
+                <Callout tone="danger" title={tx("Подтвердить участие нельзя")}>
+                  {tx("Исправить заявку после закрытия регистрации может только администратор турнира — напишите ему.")}
                 </Callout>
               ) : isCaptain ? (
                 <form action={action} data-f16-action-pending={pending ? "true" : undefined} aria-busy={pending}>
                   <input type="hidden" name="tournamentId" value={tournamentId} />
                   <Button type="submit" size="lg" loading={pending} className="w-full sm:w-auto sm:min-w-64">
-                    {pending ? "Подтверждаем…" : "Подтвердить участие"}
+                    {pending ? tx("Подтверждаем…") : tx("Подтвердить участие")}
                   </Button>
                   {state?.error && (
                     <Callout tone="danger" className="mt-4">
@@ -406,8 +412,8 @@ export function CheckinTask({
                 <div className="flex items-start gap-3 rounded-control border border-line bg-ink/[0.03] px-4 py-3">
                   <Clock className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden />
                   <div className="text-[14px] leading-relaxed">
-                    <div className="font-medium text-fg">Check-in проходит капитан команды</div>
-                    <div className="text-fg-2">Ждём подтверждения{captainName ? ` от ${captainName}` : ""}. Вам ничего делать не нужно.</div>
+                    <div className="font-medium text-fg">{tx("Check-in проходит капитан команды")}</div>
+                    <div className="text-fg-2">{captainName ? tx("Ждём подтверждения от {name}. Вам ничего делать не нужно.", { name: captainName }) : tx("Ждём подтверждения. Вам ничего делать не нужно.")}</div>
                   </div>
                 </div>
               )}
@@ -416,27 +422,29 @@ export function CheckinTask({
         ) : phase === "waiting" ? (
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="text-meta text-fg-3">Check-in откроется через</div>
+              <div className="text-meta text-fg-3">{tx("Check-in откроется через")}</div>
               <Timer deadline={opensAt!} urgentAt={0} serverNow={serverNow} className="mt-1 block text-[40px] font-semibold leading-none tracking-[-0.02em] text-fg-2 sm:text-[48px]" />
               <p className="mt-3 text-[14px] text-fg-2">
-                {isCaptain ? "Кнопка подтверждения появится здесь, когда окно откроется." : "Check-in пройдёт капитан команды, когда окно откроется."}
+                {isCaptain ? tx("Кнопка подтверждения появится здесь, когда окно откроется.") : tx("Check-in пройдёт капитан команды, когда окно откроется.")}
               </p>
             </div>
-            <Status info={{ label: "Скоро", tone: "neutral" }} />
+            <Status info={{ label: tx("Скоро"), tone: "neutral" }} />
           </div>
         ) : phase === "upcoming" ? (
           <div>
-            <h2 className="text-heading text-fg">Check-in ещё не начался</h2>
+            <h2 className="text-heading text-fg">{tx("Check-in ещё не начался")}</h2>
             <p className="mt-2 text-[15px] text-fg-2">
-              {opensAt ? `Окно откроется ${formatDateTime(opensAt)}.` : "Время check-in объявит администратор."} Мы пришлём уведомление, когда он начнётся.
+              {opensAt ? tx("Окно откроется {date}.", { date: formatDateTime(opensAt, tx.lang) }) : tx("Время check-in объявит администратор.")} {tx("Мы пришлём уведомление, когда он начнётся.")}
             </p>
           </div>
         ) : (
           <div>
-            <h2 className="text-heading text-fg">Check-in закрыт</h2>
-            <p className="mt-2 text-[15px] text-fg-2">{solo ? "Участие не подтверждено" : "Команда не подтвердила участие"} вовремя. Если это ошибка — напишите администратору турнира.</p>
+            <h2 className="text-heading text-fg">{tx("Check-in закрыт")}</h2>
+            <p className="mt-2 text-[15px] text-fg-2">
+              {solo ? tx("Участие не подтверждено вовремя. Если это ошибка — напишите администратору турнира.") : tx("Команда не подтвердила участие вовремя. Если это ошибка — напишите администратору турнира.")}
+            </p>
             <Button href={tournamentHref} variant="secondary" size="sm" className="mt-4">
-              К турниру
+              {tx("К турниру")}
             </Button>
           </div>
         )}
@@ -444,12 +452,12 @@ export function CheckinTask({
 
       {/* проверки — только реальные условия, которые проверяются при check-in */}
       <div className="border-t border-line-subtle p-5 sm:p-7">
-        <h3 className="text-title text-fg">Проверка готовности</h3>
+        <h3 className="text-title text-fg">{tx("Проверка готовности")}</h3>
         <ul className="mt-3 divide-y divide-line-subtle">
           {checks.map((c) => (
             <CheckRow key={c.label} state={c.ok ? "ok" : "fail"} label={c.label} detail={c.detail} />
           ))}
-          <CheckRow state={windowItem.state} label="Окно check-in" detail={windowItem.text} />
+          <CheckRow state={windowItem.state} label={tx("Окно check-in")} detail={windowItem.text} />
         </ul>
       </div>
     </div>
@@ -457,6 +465,7 @@ export function CheckinTask({
 }
 
 function CheckRow({ state, label, detail }: { state: "ok" | "fail" | "wait"; label: string; detail?: string }) {
+  const tx = useT();
   const icon = state === "ok" ? <Check className="size-3.5" /> : state === "fail" ? <X className="size-3.5" /> : <Clock className="size-3.5" />;
   return (
     <li className="flex items-center gap-3 py-2.5">
@@ -469,7 +478,7 @@ function CheckRow({ state, label, detail }: { state: "ok" | "fail" | "wait"; lab
         )}
       >
         {icon}
-        <span className="sr-only">{state === "ok" ? "выполнено" : state === "fail" ? "не выполнено" : "ожидание"}</span>
+        <span className="sr-only">{state === "ok" ? tx("выполнено") : state === "fail" ? tx("не выполнено") : tx("ожидание")}</span>
       </span>
       <span className="flex-1 text-[14px] text-fg">{label}</span>
       {detail && <span className={cn("text-right text-meta", state === "fail" ? "text-danger" : "text-fg-3")}>{detail}</span>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useT } from "@/lib/i18n/client";
 import { cn } from "./ui";
 
 /*
@@ -25,6 +26,7 @@ export function useToast() {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const tx = useT();
   const [items, setItems] = useState<Toast[]>([]);
   const seq = useRef(0);
 
@@ -51,7 +53,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         className="pointer-events-none fixed inset-x-4 top-4 z-[120] flex flex-col items-end gap-2.5 sm:inset-x-auto sm:right-6 sm:top-6 sm:w-[380px]"
-        aria-label="Уведомления"
+        aria-label={tx("Уведомления")}
       >
         {items.map((t) => (
           <ToastItem key={t.id} toast={t} onClose={() => dismiss(t.id)} />
@@ -91,6 +93,7 @@ const TONE: Record<ToastTone, { bar: string; icon: ReactNode }> = {
 };
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+  const tx = useT();
   // длинный текст держим дольше
   useEffect(() => {
     const ms = Math.min(9000, 3500 + toast.text.length * 40);
@@ -115,7 +118,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <button
         type="button"
         onClick={onClose}
-        aria-label="Закрыть"
+        aria-label={tx("Закрыть")}
         className="absolute right-2 top-2 grid size-7 place-items-center rounded-md text-fg-3 transition-colors hover:bg-ink/[0.06] hover:text-fg"
       >
         <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>

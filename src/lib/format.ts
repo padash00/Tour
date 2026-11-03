@@ -1,6 +1,6 @@
 import { mapLabel } from "./maps";
 import type { RegistrationStatus, TournamentStatus } from "./types";
-import { intlLocale, type Lang } from "./i18n/core";
+import { intlLocale, tr, type Lang } from "./i18n/core";
 
 const TZ = "Asia/Almaty";
 
@@ -52,29 +52,29 @@ export function toLocalInput(iso: string | null | undefined): string {
 }
 
 export const tournamentStatusLabel: Record<TournamentStatus, string> = {
-  draft: "Черновик",
-  registration: "Регистрация открыта",
-  registration_closed: "Регистрация закрыта",
-  checkin: "Идёт check-in",
-  live: "Идёт турнир",
-  finished: "Завершён",
-  cancelled: "Отменён",
+  draft: tr("Черновик"),
+  registration: tr("Регистрация открыта"),
+  registration_closed: tr("Регистрация закрыта"),
+  checkin: tr("Идёт check-in"),
+  live: tr("Идёт турнир"),
+  finished: tr("Завершён"),
+  cancelled: tr("Отменён"),
 };
 
 export const registrationStatusLabel: Record<RegistrationStatus, string> = {
-  pending: "На рассмотрении",
-  approved: "Одобрена",
-  rejected: "Отклонена",
-  withdrawn: "Отозвана",
+  pending: tr("На рассмотрении"),
+  approved: tr("Одобрена"),
+  rejected: tr("Отклонена"),
+  withdrawn: tr("Отозвана"),
 };
 
 export const bracketLabel: Record<string, string> = {
   double_elimination: "Double Elimination",
   single_elimination: "Single Elimination",
-  round_robin: "Круговая система",
-  groups_playoff: "Группы + плей-офф",
-  swiss: "Швейцарская система",
-  swiss_playoff: "Швейцарка + плей-офф",
+  round_robin: tr("Круговая система"),
+  groups_playoff: tr("Группы + плей-офф"),
+  swiss: tr("Швейцарская система"),
+  swiss_playoff: tr("Швейцарка + плей-офф"),
 };
 
 export function mapName(map: string) {

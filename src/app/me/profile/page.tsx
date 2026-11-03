@@ -8,11 +8,13 @@ import { getOrganizationSuggestions, getProfile, isProfileRequired, profileLock 
 import { safeNext } from "@/lib/redirect";
 import { Callout, Container, Eyebrow, PageTitle, Panel } from "@/components/ds";
 import { DeleteProfileButton, ProfileForm } from "@/components/profile/profile-form";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Анкета игрока", robots: { index: false } };
 
 /** Анкета игрока: видит и меняет только сам игрок (и администраторы в F16 Control) */
 export default async function ProfilePage(props: PageProps<"/me/profile">) {
+  const t = await getT();
   const player = await requirePlayer("/me/profile");
   const sp = await props.searchParams;
   const next = typeof sp.next === "string" ? safeNext(sp.next, "") : "";
@@ -26,30 +28,30 @@ export default async function ProfilePage(props: PageProps<"/me/profile">) {
     <Container width="read" className="pb-16 pt-6 sm:pt-8">
       <Link href="/me" className="-ml-1 inline-flex min-h-11 items-center gap-1 text-meta text-fg-3 hover:text-fg sm:min-h-0">
         <ArrowLeft className="size-4" aria-hidden />
-        Моя игра
+        {t("Моя игра")}
       </Link>
       <header className="mt-3">
-        <Eyebrow tone={complete ? "ok" : "accent"}>{complete ? "Анкета заполнена" : "Анкета игрока"}</Eyebrow>
-        <PageTitle className="mt-1">{welcome ? `${player.nickname}, добро пожаловать!` : "Анкета игрока"}</PageTitle>
+        <Eyebrow tone={complete ? "ok" : "accent"}>{complete ? t("Анкета заполнена") : t("Анкета игрока")}</Eyebrow>
+        <PageTitle className="mt-1">{welcome ? t("{name}, добро пожаловать!", { name: player.nickname }) : t("Анкета игрока")}</PageTitle>
         <p className="mt-2 text-[15px] leading-relaxed text-fg-2">
           {welcome
-            ? "Заполните анкету — она нужна для участия в турнирах: организаторы проверяют возраст, место учёбы или работы участников."
-            : "Данные для заявок на турниры. Их видите только вы и администраторы F16 — в публичном профиле их нет."}
-          {required ? " Без анкеты нельзя создать команду, вступить в неё и подать заявку на турнир." : ""}
+            ? t("Заполните анкету — она нужна для участия в турнирах: организаторы проверяют возраст, место учёбы или работы участников.")
+            : t("Данные для заявок на турниры. Их видите только вы и администраторы F16 — в публичном профиле их нет.")}
+          {required ? ` ${t("Без анкеты нельзя создать команду, вступить в неё и подать заявку на турнир.")}` : ""}
         </p>
       </header>
 
       <div className="mt-6 space-y-5">
         {!complete && hasData && missing.length > 0 && !lock && (
-          <Callout tone="warn" title="Анкета заполнена не полностью">
-            Не хватает: {missing.join(", ")}.
+          <Callout tone="warn" title={t("Анкета заполнена не полностью")}>
+            {t("Не хватает: {list}.", { list: missing.map((m) => t(m)).join(", ") })}
           </Callout>
         )}
         {welcome && (
-          <Callout title="Можно заполнить позже">
-            Смотреть турниры, матчи и играть в лобби можно и без анкеты.{" "}
+          <Callout title={t("Можно заполнить позже")}>
+            {t("Смотреть турниры, матчи и играть в лобби можно и без анкеты.")}{" "}
             <Link href={next || "/me"} className="text-accent hover:underline">
-              Пропустить
+              {t("Пропустить")}
             </Link>
           </Callout>
         )}
@@ -60,14 +62,14 @@ export default async function ProfilePage(props: PageProps<"/me/profile">) {
             profile={profile}
             suggestions={suggestions}
             next={next || undefined}
-            locked={lock ? `Вы заявлены на официальный турнир «${lock.name}» — анкета зафиксирована до его окончания. Если в данных ошибка, напишите администратору: исправить может только он.` : null}
+            locked={lock ? t("Вы заявлены на официальный турнир «{name}» — анкета зафиксирована до его окончания. Если в данных ошибка, напишите администратору: исправить может только он.", { name: lock.name }) : null}
             consentCurrent={!!profile?.consent_at && profile.consent_version === PRIVACY_VERSION}
           />
         </Panel>
         {hasData && !lock && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-surface border border-line-subtle px-4 py-3 sm:px-5">
             <span className="text-meta text-fg-3">
-              Хотите, чтобы мы удалили ваши данные? <Link href="/privacy" className="text-accent hover:underline">Политика обработки данных</Link>
+              {t("Хотите, чтобы мы удалили ваши данные?")} <Link href="/privacy" className="text-accent hover:underline">{t("Политика обработки данных")}</Link>
             </span>
             <DeleteProfileButton action={deleteOwnProfile} />
           </div>

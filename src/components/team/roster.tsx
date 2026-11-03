@@ -7,6 +7,8 @@ import { kickMember, setMemberRole, transferCaptain } from "@/app/actions/team";
 import type { ActionResult, FormAction } from "@/components/forms";
 import { ConfirmDialog, FaceitLevel, IconButton, Menu, MenuItem, MenuSeparator, PlayerIdentity, RowList, SubsectionTitle, cn } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { tr } from "@/lib/i18n/core";
+import { useT } from "@/lib/i18n/client";
 
 export type RosterMember = {
   id: string;
@@ -14,13 +16,14 @@ export type RosterMember = {
   player: { steam_id: string; nickname: string; avatar_url: string | null; faceit_level: number | null; faceit_elo: number | null; is_banned: boolean };
 };
 
-const ROLE = { captain: "Капитан", player: "Основа", substitute: "Запас" } as const;
+const ROLE = { captain: tr("Капитан"), player: tr("Основа"), substitute: tr("Запас") } as const;
 
 /**
  * Состав: основа и запас отдельно, пустые места видны. Капитану — меню «⋯» у игрока:
  * перевести в запас / основу, сделать капитаном; «Исключить» — отдельно, с подтверждением.
  */
 export function Roster({ members, isCaptain, locked, maxMain, maxSubs }: { members: RosterMember[]; isCaptain: boolean; locked: string | null; maxMain: number; maxSubs: number }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [pending, start] = useTransition();
@@ -52,7 +55,7 @@ export function Roster({ members, isCaptain, locked, maxMain, maxSubs }: { membe
           size="md"
           meta={
             <>
-              {m.player.is_banned ? <span className="text-danger">Заблокирован</span> : ROLE[m.role]}
+              {m.player.is_banned ? <span className="text-danger">{t("Заблокирован")}</span> : t(ROLE[m.role])}
               {m.player.faceit_elo ? <span className="num"> · {m.player.faceit_elo} ELO</span> : null}
             </>
           }
@@ -61,28 +64,28 @@ export function Roster({ members, isCaptain, locked, maxMain, maxSubs }: { membe
       <FaceitLevel level={m.player.faceit_level} />
       {canManage && m.role !== "captain" ? (
         <Menu
-          label={`Действия: ${m.player.nickname}`}
+          label={t("Действия: {name}", { name: m.player.nickname })}
           trigger={
-            <IconButton label={`Действия: ${m.player.nickname}`} size="sm" disabled={pending}>
+            <IconButton label={t("Действия: {name}", { name: m.player.nickname })} size="sm" disabled={pending}>
               <Ellipsis />
             </IconButton>
           }
         >
           {m.role === "substitute" ? (
             <MenuItem icon={<ArrowUpToLine />} onSelect={() => run(setMemberRole, { memberId: m.id, role: "player" })}>
-              Перевести в основу
+              {t("Перевести в основу")}
             </MenuItem>
           ) : (
             <MenuItem icon={<ArrowDownToLine />} onSelect={() => run(setMemberRole, { memberId: m.id, role: "substitute" })}>
-              Перевести в запас
+              {t("Перевести в запас")}
             </MenuItem>
           )}
           <MenuItem icon={<Crown />} onSelect={() => setConfirm({ kind: "captain", m })}>
-            Сделать капитаном
+            {t("Сделать капитаном")}
           </MenuItem>
           <MenuSeparator />
           <MenuItem icon={<UserMinus />} danger onSelect={() => setConfirm({ kind: "kick", m })}>
-            Исключить из команды
+            {t("Исключить из команды")}
           </MenuItem>
         </Menu>
       ) : (
@@ -104,35 +107,35 @@ export function Roster({ members, isCaptain, locked, maxMain, maxSubs }: { membe
   return (
     <div className="space-y-8">
       <div>
-        <SubsectionTitle action={<span className={cn("num text-meta", mains.length >= maxMain ? "text-ok" : "text-warn")}>{mains.length}/{maxMain}</span>}>Основной состав</SubsectionTitle>
+        <SubsectionTitle action={<span className={cn("num text-meta", mains.length >= maxMain ? "text-ok" : "text-warn")}>{mains.length}/{maxMain}</span>}>{t("Основной состав")}</SubsectionTitle>
         <RowList>
           {mains.map(row)}
-          {empty(maxMain - mains.length, "Свободное место в основе")}
+          {empty(maxMain - mains.length, t("Свободное место в основе"))}
         </RowList>
       </div>
       <div>
-        <SubsectionTitle action={<span className="num text-meta text-fg-3">{subs.length}/{maxSubs}</span>}>Запасные</SubsectionTitle>
+        <SubsectionTitle action={<span className="num text-meta text-fg-3">{subs.length}/{maxSubs}</span>}>{t("Запасные")}</SubsectionTitle>
         <RowList>
           {subs.map(row)}
-          {empty(maxSubs - subs.length, "Свободное место в запасе")}
+          {empty(maxSubs - subs.length, t("Свободное место в запасе"))}
         </RowList>
       </div>
 
       <ConfirmDialog
         open={confirm?.kind === "captain"}
         onCancel={() => setConfirm(null)}
-        title={`Передать капитанство игроку ${confirm?.m.player.nickname ?? ""}?`}
-        description="Вы станете обычным игроком: управлять составом и подавать заявки будет новый капитан."
-        confirmLabel="Передать капитанство"
+        title={t("Передать капитанство игроку {name}?", { name: confirm?.m.player.nickname ?? "" })}
+        description={t("Вы станете обычным игроком: управлять составом и подавать заявки будет новый капитан.")}
+        confirmLabel={t("Передать капитанство")}
         loading={pending}
         onConfirm={() => confirm && run(transferCaptain, { memberId: confirm.m.id }, () => setConfirm(null))}
       />
       <ConfirmDialog
         open={confirm?.kind === "kick"}
         onCancel={() => setConfirm(null)}
-        title={`Исключить ${confirm?.m.player.nickname ?? ""} из команды?`}
-        description="Игрок получит уведомление. Вернуться он сможет только по ссылке-приглашению."
-        confirmLabel="Исключить"
+        title={t("Исключить {name} из команды?", { name: confirm?.m.player.nickname ?? "" })}
+        description={t("Игрок получит уведомление. Вернуться он сможет только по ссылке-приглашению.")}
+        confirmLabel={t("Исключить")}
         danger
         loading={pending}
         onConfirm={() => confirm && run(kickMember, { memberId: confirm.m.id }, () => setConfirm(null))}

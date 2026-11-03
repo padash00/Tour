@@ -1,3 +1,4 @@
+import { tr } from "./i18n/core";
 /**
  * Форматы турнира кроме чистой сетки на выбывание:
  * круговая система (Round Robin), группы + плей-офф, швейцарская система (+ плей-офф).
@@ -13,12 +14,12 @@ export type FormatKind =
   | "swiss_playoff";
 
 export const FORMATS: Record<FormatKind, { title: string; text: string; stage: "elimination" | "group" | "swiss"; playoff: boolean }> = {
-  single_elimination: { title: "Single Elimination", text: "Проиграл — выбыл. Быстро и жёстко.", stage: "elimination", playoff: false },
-  double_elimination: { title: "Double Elimination", text: "Выбывание после двух поражений: верхняя и нижняя сетка, гранд-финал.", stage: "elimination", playoff: false },
-  round_robin: { title: "Круговая система", text: "Каждый играет с каждым. Победитель — первый в таблице.", stage: "group", playoff: false },
-  groups_playoff: { title: "Группы + плей-офф", text: "Круговые группы, лучшие из каждой группы выходят в плей-офф.", stage: "group", playoff: true },
-  swiss: { title: "Швейцарская система", text: "Пары по одинаковому счёту. N побед — выход, N поражений — вылет.", stage: "swiss", playoff: false },
-  swiss_playoff: { title: "Швейцарка + плей-офф", text: "Как на мейджорах: швейцарская стадия, вышедшие играют плей-офф.", stage: "swiss", playoff: true },
+  single_elimination: { title: "Single Elimination", text: tr("Проиграл — выбыл. Быстро и жёстко."), stage: "elimination", playoff: false },
+  double_elimination: { title: "Double Elimination", text: tr("Выбывание после двух поражений: верхняя и нижняя сетка, гранд-финал."), stage: "elimination", playoff: false },
+  round_robin: { title: tr("Круговая система"), text: tr("Каждый играет с каждым. Победитель — первый в таблице."), stage: "group", playoff: false },
+  groups_playoff: { title: tr("Группы + плей-офф"), text: tr("Круговые группы, лучшие из каждой группы выходят в плей-офф."), stage: "group", playoff: true },
+  swiss: { title: tr("Швейцарская система"), text: tr("Пары по одинаковому счёту. N побед — выход, N поражений — вылет."), stage: "swiss", playoff: false },
+  swiss_playoff: { title: tr("Швейцарка + плей-офф"), text: tr("Как на мейджорах: швейцарская стадия, вышедшие играют плей-офф."), stage: "swiss", playoff: true },
 };
 
 export const isFormat = (s: string): s is FormatKind => s in FORMATS;

@@ -1,9 +1,11 @@
 import { cn } from "../ui";
+import { getT } from "@/lib/i18n/server";
 
 /** Форма: последние результаты квадратами W/L, слева — самый свежий */
-export function FormStrip({ results, className, size = "md" }: { results: ("W" | "L")[]; className?: string; size?: "sm" | "md" }) {
+export async function FormStrip({ results, className, size = "md" }: { results: ("W" | "L")[]; className?: string; size?: "sm" | "md" }) {
+  const t = await getT();
   return (
-    <div className={cn("flex gap-1.5", className)} aria-label={`Последние результаты: ${results.join(" ")}`}>
+    <div className={cn("flex gap-1.5", className)} aria-label={t("Последние результаты: {list}", { list: results.join(" ") })}>
       {results.map((r, i) => (
         <span
           key={i}

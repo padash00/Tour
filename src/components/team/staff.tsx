@@ -7,6 +7,7 @@ import { cancelInvite, removeCoach } from "@/app/actions/invites";
 import type { ActionResult } from "@/components/forms";
 import { Button, ConfirmDialog, FaceitLevel, PlayerIdentity, RowList, SubsectionTitle } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/client";
 import { InviteByNick } from "./invite-by-nick";
 
 type Who = { steam_id: string; nickname: string; avatar_url: string | null; faceit_level: number | null };
@@ -28,6 +29,7 @@ function useRun() {
 
 /** Слот тренера: один на команду, необязательный. Капитан приглашает по нику или убирает тренера */
 export function CoachSlot({ coach, invited, isCaptain }: { coach: Who | null; invited: PendingInvite | null; isCaptain: boolean }) {
+  const t = useT();
   const { pending, run } = useRun();
   const [confirm, setConfirm] = useState(false);
   const fd = (k: string, v: string) => {
@@ -37,28 +39,28 @@ export function CoachSlot({ coach, invited, isCaptain }: { coach: Who | null; in
   };
   return (
     <div>
-      <SubsectionTitle action={<span className="num text-meta text-fg-3">{coach ? 1 : 0}/1</span>}>Тренер</SubsectionTitle>
+      <SubsectionTitle action={<span className="num text-meta text-fg-3">{coach ? 1 : 0}/1</span>}>{t("Тренер")}</SubsectionTitle>
       <RowList>
         <div className="flex min-h-16 flex-wrap items-center gap-3 px-4 py-2.5">
           {coach ? (
             <>
               <div className="min-w-0 flex-1">
-                <PlayerIdentity name={coach.nickname} avatar={coach.avatar_url} href={`/players/${coach.steam_id}`} size="md" meta="Тренер · не играет" trailing={<FaceitLevel level={coach.faceit_level} />} />
+                <PlayerIdentity name={coach.nickname} avatar={coach.avatar_url} href={`/players/${coach.steam_id}`} size="md" meta={t("Тренер · не играет")} trailing={<FaceitLevel level={coach.faceit_level} />} />
               </div>
               {isCaptain && (
                 <Button size="sm" variant="ghost" disabled={pending} onClick={() => setConfirm(true)}>
-                  Убрать
+                  {t("Убрать")}
                 </Button>
               )}
             </>
           ) : invited ? (
             <>
               <div className="min-w-0 flex-1">
-                <PlayerIdentity name={invited.player.nickname} avatar={invited.player.avatar_url} size="md" meta={`Приглашён тренером ${invited.date} · ждём ответа`} />
+                <PlayerIdentity name={invited.player.nickname} avatar={invited.player.avatar_url} size="md" meta={t("Приглашён тренером {date} · ждём ответа", { date: invited.date })} />
               </div>
               {isCaptain && (
                 <Button size="sm" variant="ghost" icon={<X />} disabled={pending} onClick={() => run(() => cancelInvite(null, fd("inviteId", invited.id)))}>
-                  Отменить
+                  {t("Отменить")}
                 </Button>
               )}
             </>
@@ -67,7 +69,7 @@ export function CoachSlot({ coach, invited, isCaptain }: { coach: Who | null; in
               <span className="grid size-10 place-items-center rounded-full border border-dashed border-line-strong text-fg-3 [&>svg]:size-4">
                 <GraduationCap aria-hidden />
               </span>
-              <div className="min-w-0 flex-1 text-meta text-fg-3">Тренер не назначен — необязательно. В официальных турнирах может требоваться.</div>
+              <div className="min-w-0 flex-1 text-meta text-fg-3">{t("Тренер не назначен — необязательно. В официальных турнирах может требоваться.")}</div>
               {isCaptain && <InviteByNick role="coach" size="sm" />}
             </>
           )}
@@ -76,9 +78,9 @@ export function CoachSlot({ coach, invited, isCaptain }: { coach: Who | null; in
       <ConfirmDialog
         open={confirm}
         onCancel={() => setConfirm(false)}
-        title="Убрать тренера?"
-        description="Тренер получит уведомление. Пригласить его снова можно в любой момент."
-        confirmLabel="Убрать"
+        title={t("Убрать тренера?")}
+        description={t("Тренер получит уведомление. Пригласить его снова можно в любой момент.")}
+        confirmLabel={t("Убрать")}
         danger
         loading={pending}
         onConfirm={() => {
@@ -92,16 +94,17 @@ export function CoachSlot({ coach, invited, isCaptain }: { coach: Who | null; in
 
 /** Отправленные приглашения игрокам: ждут ответа, капитан может отменить */
 export function PendingInvites({ items, isCaptain }: { items: PendingInvite[]; isCaptain: boolean }) {
+  const t = useT();
   const { pending, run } = useRun();
   if (!items.length) return null;
   return (
     <div>
-      <SubsectionTitle action={<span className="num text-meta text-fg-3">{items.length}</span>}>Приглашены — ждём ответа</SubsectionTitle>
+      <SubsectionTitle action={<span className="num text-meta text-fg-3">{items.length}</span>}>{t("Приглашены — ждём ответа")}</SubsectionTitle>
       <RowList>
         {items.map((i) => (
           <div key={i.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
             <div className="min-w-0 flex-1">
-              <PlayerIdentity name={i.player.nickname} avatar={i.player.avatar_url} href={`/players/${i.player.steam_id}`} size="sm" meta={`Приглашён ${i.date}`} />
+              <PlayerIdentity name={i.player.nickname} avatar={i.player.avatar_url} href={`/players/${i.player.steam_id}`} size="sm" meta={t("Приглашён {date}", { date: i.date })} />
             </div>
             {isCaptain && (
               <Button
@@ -117,7 +120,7 @@ export function PendingInvites({ items, isCaptain }: { items: PendingInvite[]; i
                   })
                 }
               >
-                Отменить
+                {t("Отменить")}
               </Button>
             )}
           </div>

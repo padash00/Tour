@@ -20,6 +20,7 @@ import { ProfileRequired } from "@/components/profile/profile-required";
 import { HelpHint } from "@/components/help-hint";
 import { RulesGate } from "@/components/rules-gate";
 import { hasRules } from "@/lib/rules-ack";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Регистрация на турнир", robots: { index: false } };
 
@@ -29,6 +30,7 @@ const activeOf = (r: Reg | null) => (r && (r.status === "pending" || r.status ==
 export default async function RegisterPage(props: PageProps<"/tournaments/[slug]/register">) {
   const { slug } = await props.params;
   const sp = await props.searchParams;
+  const tx = await getT();
   const t = await getTournamentBySlug(slug);
   if (!t) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/register`);
@@ -51,7 +53,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
               size="lg"
               meta={
                 <span className="flex items-center gap-2">
-                  Steam подключён <FaceitLevel level={player.faceit_level} />
+                  {tx("Steam подключён")} <FaceitLevel level={player.faceit_level} />
                   {player.faceit_elo != null && <span className="num">{player.faceit_elo} ELO</span>}
                 </span>
               }
@@ -60,8 +62,8 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
           </div>
           {player.is_banned ? (
             <div className="border-t border-line-subtle p-4 sm:p-5">
-              <Callout tone="danger" title="Аккаунт заблокирован">
-                Участвовать в турнирах нельзя.
+              <Callout tone="danger" title={tx("Аккаунт заблокирован")}>
+                {tx("Участвовать в турнирах нельзя.")}
               </Callout>
             </div>
           ) : (reg && reg.status !== "withdrawn") ? (
@@ -73,7 +75,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             <div className="border-t border-line-subtle">
               {gated ? (
                 <div className="p-4 sm:p-5">
-                  <ProfileRequired next={`/tournaments/${t.slug}/register`} action="участвовать в турнире" />
+                  <ProfileRequired next={`/tournaments/${t.slug}/register`} action={tx("участвовать в турнире")} />
                 </div>
               ) : (
                 <>
@@ -82,14 +84,14 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
                       <RulesGate tournamentId={t.id} rules={t.rules!} />
                     </div>
                   )}
-                  <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label={reg?.status === "rejected" ? "Подать заявку снова" : "Участвовать"} footer="Турнир 1×1 — команда не нужна." />
+                  <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label={reg?.status === "rejected" ? tx("Подать заявку снова") : tx("Участвовать")} footer={tx("Турнир 1×1 — команда не нужна.")} />
                 </>
               )}
             </div>
           )}
           {!open && !activeOf(reg) && reg?.status !== "rejected" && (
             <div className="border-t border-line-subtle p-4 sm:p-5">
-              <Callout>Регистрация закрыта.</Callout>
+              <Callout>{tx("Регистрация закрыта.")}</Callout>
             </div>
           )}
         </Panel>
@@ -105,14 +107,18 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <Shell t={t} open={open} steps={["current", "todo", "todo"]}>
         <EmptyState
           icon={<Users />}
-          title="Для участия нужна команда"
-          text={`Соберите команду: в основе ${mainPlayersLabel(mode.size)}${mode.subs ? `, до ${mode.subs} запасных` : ""}. Заявку подаёт капитан.`}
+          title={tx("Для участия нужна команда")}
+          text={
+            (mode.subs as number)
+              ? tx("Соберите команду: в основе {players}, до {n} запасных. Заявку подаёт капитан.", { players: mainPlayersLabel(mode.size, tx), n: mode.subs as number })
+              : tx("Соберите команду: в основе {players}. Заявку подаёт капитан.", { players: mainPlayersLabel(mode.size, tx) })
+          }
           action={
             open ? (
               <>
-                <Button href="/team/create">Создать команду</Button>
+                <Button href="/team/create">{tx("Создать команду")}</Button>
                 <Button href="/find" variant="secondary">
-                  Найти команду
+                  {tx("Найти команду")}
                 </Button>
               </>
             ) : undefined
@@ -146,7 +152,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         logo={team.logo_url}
         href="/team"
         size="lg"
-        meta={`${team.tag}${captain ? ` · капитан ${captain.nickname}` : ""}`}
+        meta={`${team.tag}${captain ? ` · ${tx("капитан {name}", { name: captain.nickname })}` : ""}`}
       />
       {regShown && <Status info={registrationStatus[regShown.status]} size="sm" />}
     </Panel>
@@ -161,10 +167,10 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         {regShown ? (
           <ApplicationStatus t={t} reg={regShown} open={open} fresh={false} captainName={captain?.nickname} />
         ) : (
-          <Callout title={open ? "Заявку подаёт капитан команды" : "Команда не подавала заявку"}>
+          <Callout title={open ? tx("Заявку подаёт капитан команды") : tx("Команда не подавала заявку")}>
             {open
-              ? `${captain?.nickname ?? "Капитан"} выбирает состав и отправляет заявку. Вам ничего делать не нужно — придёт уведомление, если вы в составе.`
-              : "Регистрация на турнир закрыта."}
+              ? tx("{name} выбирает состав и отправляет заявку. Вам ничего делать не нужно — придёт уведомление, если вы в составе.", { name: captain?.nickname ?? tx("Капитан") })
+              : tx("Регистрация на турнир закрыта.")}
           </Callout>
         )}
         {regShown && regShown.roster.length > 0 && <ApplicationRoster roster={regShown.roster} captainId={team.captain_id} meId={player.id} />}
@@ -180,7 +186,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         {regShown ? (
           <ApplicationStatus t={t} reg={regShown} open={false} fresh={false} />
         ) : (
-          <Callout>Регистрация закрыта — заявка не подавалась.</Callout>
+          <Callout>{tx("Регистрация закрыта — заявка не подавалась.")}</Callout>
         )}
         {regShown && regShown.roster.length > 0 && <ApplicationRoster roster={regShown.roster} captainId={team.captain_id} meId={player.id} />}
       </Shell>
@@ -195,15 +201,16 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={false} canEdit />}
         <Callout
           tone="warn"
-          title={`Нужно минимум ${mainPlayersLabel(mode.size)}`}
+          title={tx("Нужно минимум {players}", { players: mainPlayersLabel(mode.size, tx) })}
           action={
             <Button href="/team?tab=roster" variant="secondary" size="sm">
-              Пригласить игроков
+              {tx("Пригласить игроков")}
             </Button>
           }
         >
-          Сейчас в команде доступно {available} из {mode.size}
-          {available < members.length ? " (заблокированные игроки не учитываются)" : ""}. Пригласите игроков по ссылке со страницы команды.
+          {available < members.length
+            ? tx("Сейчас в команде доступно {available} из {size} (заблокированные игроки не учитываются). Пригласите игроков по ссылке со страницы команды.", { available, size: mode.size })
+            : tx("Сейчас в команде доступно {available} из {size}. Пригласите игроков по ссылке со страницы команды.", { available, size: mode.size })}
         </Callout>
       </Shell>
     );
@@ -215,7 +222,7 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <Shell t={t} open={open} steps={steps}>
         {teamPanel}
         {regShown && <ApplicationStatus t={t} reg={regShown} open fresh={false} canEdit />}
-        <ProfileRequired next={`/tournaments/${t.slug}/register`} action="подать заявку на турнир" />
+        <ProfileRequired next={`/tournaments/${t.slug}/register`} action={tx("подать заявку на турнир")} />
       </Shell>
     );
   }
@@ -230,23 +237,23 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
         {active?.status === "approved" && (
           <Callout
             tone="warn"
-            title="Распечатайте и подпишите заявку"
+            title={tx("Распечатайте и подпишите заявку")}
             action={
               <Button href={`/tournaments/${t.slug}/application`} size="sm">
-                Скачать заявку
+                {tx("Скачать заявку")}
               </Button>
             }
           >
-            Приложение №1 заполнено по данным с сайта. Распечатайте, подпишите и принесите организатору вместе со справками с места учёбы или работы.
+            {tx("Приложение №1 заполнено по данным с сайта. Распечатайте, подпишите и принесите организатору вместе со справками с места учёбы или работы.")}
           </Callout>
         )}
         {!active && hasRules(t.rules) && <RulesGate tournamentId={t.id} rules={t.rules!} />}
         <section aria-labelledby="application-title">
           <div className="mb-3">
             <h2 id="application-title" className="text-heading text-fg">
-              Заявка — Приложение №1
+              {tx("Заявка — Приложение №1")}
             </h2>
-            <p className="mt-1 text-meta text-fg-3">Заявку можно менять, пока открыта регистрация. После закрытия состав меняет только администратор.</p>
+            <p className="mt-1 text-meta text-fg-3">{tx("Заявку можно менять, пока открыта регистрация. После закрытия состав меняет только администратор.")}</p>
           </div>
           <Panel padded={false}>{form}</Panel>
         </section>
@@ -288,14 +295,14 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       {previous && (
         <Panel padded={false} className="border-accent/25">
           <div className="p-4 sm:p-5">
-            <div className="text-title text-fg">Тем же составом, что на «{previous.tournamentName}»</div>
+            <div className="text-title text-fg">{tx("Тем же составом, что на «{name}»", { name: previous.tournamentName })}</div>
             <p className="mt-1 text-[14px] text-fg-2">
-              Основа: {previous.names.slice(0, previous.main.length).join(", ")}
-              {previous.sub.length ? ` · запас: ${previous.names.slice(previous.main.length).join(", ")}` : ""}
+              {tx("Основа: {names}", { names: previous.names.slice(0, previous.main.length).join(", ") })}
+              {previous.sub.length ? ` · ${tx("запас: {names}", { names: previous.names.slice(previous.main.length).join(", ") })}` : ""}
             </p>
           </div>
           <div className="border-t border-line-subtle">
-            <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label="Подать тем же составом" variant="secondary" footer="Или выберите состав вручную ниже.">
+            <RegisterForm rulesGate={hasRules(t.rules)} tournamentId={t.id} label={tx("Подать тем же составом")} variant="secondary" footer={tx("Или выберите состав вручную ниже.")}>
               {previous.main.map((id) => (
                 <input key={id} type="hidden" name="main" value={id} />
               ))}
@@ -310,11 +317,12 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
       <section aria-labelledby="roster-title">
         <div className="mb-3">
           <h2 id="roster-title" className="text-heading text-fg">
-            Состав на турнир
+            {tx("Состав на турнир")}
           </h2>
           <p className="mt-1 text-meta text-fg-3">
-            {mode.title}: в основе {mainPlayersLabel(mode.size)}
-            {mode.subs ? `, запасных — до ${mode.subs}` : ""}. Состав можно менять, пока открыта регистрация.
+            {(mode.subs as number)
+              ? tx("{mode}: в основе {players}, запасных — до {n}. Состав можно менять, пока открыта регистрация.", { mode: tx(mode.title), players: mainPlayersLabel(mode.size, tx), n: mode.subs as number })
+              : tx("{mode}: в основе {players}. Состав можно менять, пока открыта регистрация.", { mode: tx(mode.title), players: mainPlayersLabel(mode.size, tx) })}
           </p>
         </div>
         <Panel padded={false}>
@@ -323,9 +331,9 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
             mains={mode.size}
             update={!!active}
             rulesGate={!active && hasRules(t.rules)}
-            label={active ? "Сохранить состав" : regShown?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
-            pendingLabel={active ? "Сохраняем…" : "Отправляем…"}
-            footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}
+            label={active ? tx("Сохранить состав") : regShown?.status === "rejected" ? tx("Подать заявку снова") : tx("Подать заявку")}
+            pendingLabel={active ? tx("Сохраняем…") : tx("Отправляем…")}
+            footer={active ? tx("Изменения сразу попадут в заявку.") : t.auto_approve ? tx("Заявка одобряется автоматически, пока есть места.") : tx("Заявку рассмотрит администратор.")}
           >
             <RosterPicker members={pickerMembers} size={mode.size} subs={mode.subs} initial={initial} />
           </RegisterForm>
@@ -339,9 +347,18 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
 
 // ───────────────────────── части страницы
 
-function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; steps?: StepState[]; children: ReactNode }) {
+async function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; steps?: StepState[]; children: ReactNode }) {
+  const tx = await getT();
   const mode = modeOf(t.format);
-  const titles = ["Команда", "Состав", "Подтверждение"];
+  const titles = [tx("Команда"), tx("Состав"), tx("Подтверждение")];
+  const official = officialRoster(t);
+  const rosterText = t.require_coach
+    ? official.subs
+      ? tx("{players} и тренер, до {n} запасных", { players: mainPlayersLabel(official.size, tx), n: official.subs })
+      : tx("{players} и тренер, без запасных — состав в заявке окончательный", { players: mainPlayersLabel(official.size, tx) })
+    : official.subs
+      ? tx("{players}, до {n} запасных", { players: mainPlayersLabel(official.size, tx), n: official.subs })
+      : tx("{players}, без запасных — состав в заявке окончательный", { players: mainPlayersLabel(official.size, tx) });
   return (
     <Container width="read" className="pb-16 pt-6 sm:pt-8">
       <Link href={`/tournaments/${t.slug}`} className="-ml-1 inline-flex min-h-11 items-center gap-1 text-meta text-fg-3 hover:text-fg sm:min-h-0">
@@ -349,22 +366,21 @@ function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; ste
         {t.name}
       </Link>
       <header className="mt-3">
-        <Eyebrow tone={open ? "accent" : "muted"}>{open ? "Регистрация открыта" : "Регистрация закрыта"}</Eyebrow>
-        <PageTitle className="mt-1">Заявка на {t.name}</PageTitle>
+        <Eyebrow tone={open ? "accent" : "muted"}>{open ? tx("Регистрация открыта") : tx("Регистрация закрыта")}</Eyebrow>
+        <PageTitle className="mt-1">{tx("Заявка на {name}", { name: t.name })}</PageTitle>
         <p className="mt-2 text-meta text-fg-3">
-          {mode.title}
-          {open && t.registration_closes_at ? ` · заявки до ${formatDateTime(t.registration_closes_at)}` : ""}
-          {open ? " · после закрытия состав меняет только администратор" : ""}
+          {tx(mode.title)}
+          {open && t.registration_closes_at ? ` · ${tx("заявки до {date}", { date: formatDateTime(t.registration_closes_at, tx.lang) })}` : ""}
+          {open ? ` · ${tx("после закрытия состав меняет только администратор")}` : ""}
         </p>
       </header>
       {steps && <Steps direction="horizontal" className="mt-6" steps={titles.map((title, i) => ({ title, state: steps[i] }))} />}
       {t.is_official && (
-        <Callout title="Официальный турнир — условия участия" className="mt-6">
-          Команда представляет организацию (предприятие, учреждение, вуз, колледж): {mainPlayersLabel(officialRoster(t).size)}
-          {t.require_coach ? " и тренер" : ""}
-          {officialRoster(t).subs ? `, до ${officialRoster(t).subs} запасных` : ", без запасных — состав в заявке окончательный"}. Возраст участников —{" "}
-          {ageRangeLabel(t)} на день турнира, живут, учатся или работают в городе {t.city}. Каждый игрок — только в одной команде. Справки с места
-          работы или учёбы сдаются организатору на бумаге.
+        <Callout title={tx("Официальный турнир — условия участия")} className="mt-6">
+          {tx(
+            "Команда представляет организацию (предприятие, учреждение, вуз, колледж): {roster}. Возраст участников — {age} на день турнира, живут, учатся или работают в городе {city}. Каждый игрок — только в одной команде. Справки с места работы или учёбы сдаются организатору на бумаге.",
+            { roster: rosterText, age: ageRangeLabel(t, tx), city: t.city },
+          )}
         </Callout>
       )}
       <div className="mt-6 space-y-5">{children}</div>
@@ -374,7 +390,7 @@ function Shell({ t, open, steps, children }: { t: Tournament; open: boolean; ste
 }
 
 /** Статус заявки: что с ней сейчас и что дальше */
-function ApplicationStatus({
+async function ApplicationStatus({
   t,
   reg,
   open,
@@ -391,30 +407,32 @@ function ApplicationStatus({
   canEdit?: boolean;
   captainName?: string;
 }) {
+  const tx = await getT();
   const base = `/tournaments/${t.slug}`;
   const window_ = t.checkin_opens_at
-    ? `Check-in: ${formatDateTime(t.checkin_opens_at)}${t.checkin_closes_at ? ` – ${formatTime(t.checkin_closes_at)}` : ""}.`
-    : "Время check-in объявит администратор — придёт уведомление.";
+    ? tx("Check-in: {range}.", { range: `${formatDateTime(t.checkin_opens_at, tx.lang)}${t.checkin_closes_at ? ` – ${formatTime(t.checkin_closes_at, tx.lang)}` : ""}` })
+    : tx("Время check-in объявит администратор — придёт уведомление.");
 
   if (reg.status === "rejected") {
     return (
-      <Callout tone="danger" title="Заявка отклонена">
-        {reg.note ? <>Причина: {reg.note}. </> : null}
+      <Callout tone="danger" title={tx("Заявка отклонена")}>
+        {reg.note ? <>{tx("Причина: {note}.", { note: reg.note })} </> : null}
         {open
           ? canEdit
-            ? "Исправьте состав ниже и подайте заявку снова."
-            : `${captainName ?? "Капитан"} может исправить заявку и подать её снова, пока открыта регистрация.`
-          : "Регистрация закрыта — подать заявку снова уже нельзя."}
+            ? tx("Исправьте состав ниже и подайте заявку снова.")
+            : tx("{name} может исправить заявку и подать её снова, пока открыта регистрация.", { name: captainName ?? tx("Капитан") })
+          : tx("Регистрация закрыта — подать заявку снова уже нельзя.")}
       </Callout>
     );
   }
 
   if (reg.status === "pending") {
     return (
-      <Callout tone={fresh ? "ok" : "warn"} title={fresh ? "Заявка отправлена" : "Заявка на рассмотрении"}>
-        Заявка на рассмотрении. Администратор проверит {solo ? "заявку" : "состав"} — о решении придёт уведомление
-        {solo ? "" : " всем игрокам из заявки"}.
-        {open && canEdit && !solo ? " До закрытия регистрации состав можно менять." : ""}
+      <Callout tone={fresh ? "ok" : "warn"} title={fresh ? tx("Заявка отправлена") : tx("Заявка на рассмотрении")}>
+        {solo
+          ? tx("Заявка на рассмотрении. Администратор проверит заявку — о решении придёт уведомление.")
+          : tx("Заявка на рассмотрении. Администратор проверит состав — о решении придёт уведомление всем игрокам из заявки.")}
+        {open && canEdit && !solo ? ` ${tx("До закрытия регистрации состав можно менять.")}` : ""}
       </Callout>
     );
   }
@@ -422,30 +440,31 @@ function ApplicationStatus({
   // одобрена
   if (reg.checked_in_at) {
     return (
-      <Callout tone="ok" title={solo ? "Вы прошли check-in" : "Команда прошла check-in"}>
-        Что дальше: ждите публикации сетки и первого матча.
+      <Callout tone="ok" title={solo ? tx("Вы прошли check-in") : tx("Команда прошла check-in")}>
+        {tx("Что дальше: ждите публикации сетки и первого матча.")}
       </Callout>
     );
   }
   return (
     <Callout
       tone="ok"
-      title={fresh ? (solo ? "Заявка одобрена — вы в турнире" : "Заявка одобрена — команда в турнире") : "Заявка одобрена"}
+      title={fresh ? (solo ? tx("Заявка одобрена — вы в турнире") : tx("Заявка одобрена — команда в турнире")) : tx("Заявка одобрена")}
       action={
         t.status === "checkin" ? (
           <Button href={`${base}/checkin`} size="sm">
-            Перейти к check-in
+            {tx("Перейти к check-in")}
           </Button>
         ) : undefined
       }
     >
-      Следующий шаг — check-in{solo ? "" : " (проходит капитан)"}. {t.status === "checkin" ? "Check-in уже открыт." : window_}
+      {solo ? tx("Следующий шаг — check-in.") : tx("Следующий шаг — check-in (проходит капитан).")} {t.status === "checkin" ? tx("Check-in уже открыт.") : window_}
     </Callout>
   );
 }
 
 /** Состав заявки — только чтение */
-function ApplicationRoster({ roster, captainId, meId }: { roster: RosterEntry[]; captainId: string; meId: string }) {
+async function ApplicationRoster({ roster, captainId, meId }: { roster: RosterEntry[]; captainId: string; meId: string }) {
+  const tx = await getT();
   const sorted = [...roster].sort((a, b) => (a.player_id === captainId ? -1 : b.player_id === captainId ? 1 : a.role === b.role ? 0 : a.role === "main" ? -1 : 1));
   const mains = roster.filter((r) => r.role === "main").length;
   const subs = roster.length - mains;
@@ -453,11 +472,11 @@ function ApplicationRoster({ roster, captainId, meId }: { roster: RosterEntry[];
     <section aria-labelledby="app-roster">
       <div className="mb-3 flex items-baseline justify-between gap-4">
         <h2 id="app-roster" className="text-heading text-fg">
-          Состав заявки
+          {tx("Состав заявки")}
         </h2>
         <span className="num text-meta text-fg-3">
-          Основа {mains}
-          {subs ? ` · запас ${subs}` : ""}
+          {tx("Основа")} {mains}
+          {subs ? ` · ${tx("запас {n}", { n: subs })}` : ""}
         </span>
       </div>
       <Panel padded={false}>
@@ -470,7 +489,7 @@ function ApplicationRoster({ roster, captainId, meId }: { roster: RosterEntry[];
                 href={`/players/${r.player.steam_id}`}
                 size="md"
                 captain={r.player_id === captainId}
-                meta={r.player.is_banned ? <span className="text-danger">Заблокирован</span> : `${r.role === "sub" ? "Запас" : "Основа"}${r.player_id === meId ? " · это вы" : ""}`}
+                meta={r.player.is_banned ? <span className="text-danger">{tx("Заблокирован")}</span> : `${r.role === "sub" ? tx("Запас") : tx("Основа")}${r.player_id === meId ? ` · ${tx("это вы")}` : ""}`}
                 trailing={<FaceitLevel level={r.player.faceit_level} />}
               />
             </li>
@@ -481,10 +500,13 @@ function ApplicationRoster({ roster, captainId, meId }: { roster: RosterEntry[];
   );
 }
 
-function WithdrawRow({ tournamentId, solo }: { tournamentId: string; solo?: boolean }) {
+async function WithdrawRow({ tournamentId, solo }: { tournamentId: string; solo?: boolean }) {
+  const tx = await getT();
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-surface border border-line-subtle px-4 py-3 sm:px-5">
-      <span className="text-meta text-fg-3">{solo ? "Не сможете сыграть?" : "Передумали участвовать?"} Это можно сделать до закрытия регистрации.</span>
+      <span className="text-meta text-fg-3">
+        {solo ? tx("Не сможете сыграть? Это можно сделать до закрытия регистрации.") : tx("Передумали участвовать? Это можно сделать до закрытия регистрации.")}
+      </span>
       <WithdrawApplication tournamentId={tournamentId} solo={solo} />
     </div>
   );
@@ -498,6 +520,7 @@ function WithdrawRow({ tournamentId, solo }: { tournamentId: string; solo?: bool
  * только итог проверки (ник, что не заполнено, возраст при несоответствии) — не сами данные товарищей.
  */
 async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], captainId: string, meId: string, reg: Reg | null, active: Reg | null, coachId: string | null) {
+  const tx = await getT();
   const day = tournamentDay(t);
   const { size, subs } = officialRoster(t);
   const [profiles, suggestions, app, coach] = await Promise.all([
@@ -508,7 +531,7 @@ async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], capt
   ]);
   // в браузер — только ник тренера и готова ли анкета, сами данные подставит сервер
   const teamCoach = coach ? { nickname: coach.nickname, ready: isProfileComplete(profiles.get(coachId!) ?? null) } : null;
-  const checks = members.map((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, t, day));
+  const checks = members.map((m) => checkPlayer({ id: m.player_id, nickname: m.player.nickname }, profiles.get(m.player_id) ?? null, t, day, tx));
 
   const initial: Record<string, "main" | "sub" | "out"> = {};
   if (active && active.roster.length) {
@@ -551,41 +574,45 @@ async function officialForm(t: Tournament, members: TeamMemberWithPlayer[], capt
       suggestions={suggestions}
       update={!!active}
       rulesGate={!active && hasRules(t.rules)}
-      label={active ? "Сохранить заявку" : reg?.status === "rejected" ? "Подать заявку снова" : "Подать заявку"}
+      label={active ? tx("Сохранить заявку") : reg?.status === "rejected" ? tx("Подать заявку снова") : tx("Подать заявку")}
       teamCoach={teamCoach}
-      footer={active ? "Изменения сразу попадут в заявку." : t.auto_approve ? "Заявка одобряется автоматически, пока есть места." : "Заявку рассмотрит администратор."}
+      footer={active ? tx("Изменения сразу попадут в заявку.") : t.auto_approve ? tx("Заявка одобряется автоматически, пока есть места.") : tx("Заявку рассмотрит администратор.")}
     />
   );
 }
 
 /** Игрок официального турнира видит, всё ли в порядке с его анкетой (свои данные — только ему) */
 async function OwnOfficialStatus({ t, playerId, nickname }: { t: Tournament; playerId: string; nickname: string }) {
+  const tx = await getT();
   const [profile, lock] = await Promise.all([getProfile(playerId), profileLock(playerId)]);
-  const check = checkPlayer({ id: playerId, nickname }, profile, t, tournamentDay(t));
+  const check = checkPlayer({ id: playerId, nickname }, profile, t, tournamentDay(t), tx);
   if (!check.issues.length) {
     return (
-      <Callout tone="ok" title="Ваша анкета в порядке">
-        Анкета заполнена, возраст подходит.{check.warnings.length ? ` ${check.warnings[0].replace(`${nickname}: `, "").replace(/^в/, "В")}.` : ""}
+      <Callout tone="ok" title={tx("Ваша анкета в порядке")}>
+        {tx("Анкета заполнена, возраст подходит.")}
+        {check.warnings.length ? ` ${capitalize(check.warnings[0].replace(`${nickname}: `, ""))}.` : ""}
       </Callout>
     );
   }
   return (
     <Callout
       tone="warn"
-      title="Анкета не проходит условия турнира"
+      title={tx("Анкета не проходит условия турнира")}
       action={
         lock ? undefined : (
           <Button href={`/me/profile?next=${encodeURIComponent(`/tournaments/${t.slug}/register`)}`} size="sm">
-            Открыть анкету
+            {tx("Открыть анкету")}
           </Button>
         )
       }
     >
-      {check.issues.map((x) => x.replace(`${nickname}: `, "")).join("; ")}. Без этого капитан не сможет подать заявку с вами в составе.
-      {lock ? " Анкета зафиксирована — для исправления напишите администратору." : ""}
+      {tx("{issues}. Без этого капитан не сможет подать заявку с вами в составе.", { issues: check.issues.map((x) => x.replace(`${nickname}: `, "")).join("; ") })}
+      {lock ? ` ${tx("Анкета зафиксирована — для исправления напишите администратору.")}` : ""}
     </Callout>
   );
 }
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Время сервера на момент отрисовки (динамическая страница) */
 function serverNow() {

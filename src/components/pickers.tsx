@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { cn } from "./ui";
 
 /** Число с кнопками − / + (счёт карты, seed) */
@@ -53,6 +54,7 @@ export function ChipInput({
   placeholder?: string;
   className?: string;
 }) {
+  const t = useT();
   const [v, setV] = useState("");
   return (
     <div className={className}>
@@ -71,7 +73,7 @@ export function ChipInput({
           </button>
         ))}
       </div>
-      <input name={name} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} aria-label={placeholder ?? "Причина"} className="field mt-2" />
+      <input name={name} value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} aria-label={placeholder ?? t("Причина")} className="field mt-2" />
     </div>
   );
 }
@@ -82,7 +84,7 @@ export type PickPlayer = { steam_id: string; nickname: string; hint?: string };
 export function PlayerPicker({
   name,
   players,
-  placeholder = "Начните вводить ник или SteamID",
+  placeholder: placeholderProp,
   suggested,
 }: {
   name: string;
@@ -91,6 +93,8 @@ export function PlayerPicker({
   /** быстрые варианты кнопками, например запасные команды */
   suggested?: PickPlayer[];
 }) {
+  const t = useT();
+  const placeholder = placeholderProp ?? t("Начните вводить ник или SteamID");
   const listId = useId();
   const [text, setText] = useState("");
   const match = players.find((p) => p.steam_id === text.trim() || p.nickname.toLowerCase() === text.trim().toLowerCase());
@@ -125,7 +129,7 @@ export function PlayerPicker({
       </datalist>
       <input type="hidden" name={name} value={steamId} />
       <div className="mt-1 text-xs text-fg-3 num">
-        {steamId ? `SteamID ${steamId}` : text ? "Игрок не найден — нужен ник с платформы или SteamID64" : ""}
+        {steamId ? `SteamID ${steamId}` : text ? t("Игрок не найден — нужен ник с платформы или SteamID64") : ""}
       </div>
     </div>
   );

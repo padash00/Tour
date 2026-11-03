@@ -6,6 +6,8 @@ import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
 import { SectionTitle, TeamLogo, cn } from "./ds";
 import { BracketHover } from "./competition/bracket-hover";
+import { tr, type T } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 
 // размеры сетки: карточки матчей покрупнее (читаемо любому), линии между колонками
 const W = 244;
@@ -17,16 +19,16 @@ const HEAD = 52;
 /** Подписи пустых мест: «победитель матча 3», «проигравший матча 13» — кто сюда придёт */
 type SlotHints = Map<string, string>;
 
-function slotHints(all: MatchWithTeams[]): SlotHints {
+function slotHints(all: MatchWithTeams[], t: T): SlotHints {
   const hints: SlotHints = new Map();
   for (const f of all) {
-    if (f.winner_to_match && f.winner_to_slot) hints.set(`${f.winner_to_match}:${f.winner_to_slot}`, `победитель матча ${f.number}`);
-    if (f.loser_to_match && f.loser_to_slot) hints.set(`${f.loser_to_match}:${f.loser_to_slot}`, `проигравший матча ${f.number}`);
+    if (f.winner_to_match && f.winner_to_slot) hints.set(`${f.winner_to_match}:${f.winner_to_slot}`, t("победитель матча {n}", { n: f.number }));
+    if (f.loser_to_match && f.loser_to_slot) hints.set(`${f.loser_to_match}:${f.loser_to_slot}`, t("проигравший матча {n}", { n: f.number }));
   }
   return hints;
 }
 
-function Slot({ team, hint, score, winner, loser, showScore }: { team: Team | null; hint?: string; score: number; winner: boolean; loser: boolean; showScore: boolean }) {
+function Slot({ team, hint, score, winner, loser, showScore, t }: { team: Team | null; hint?: string; score: number; winner: boolean; loser: boolean; showScore: boolean; t: T }) {
   return (
     <div
       data-team={team?.id}
@@ -36,28 +38,28 @@ function Slot({ team, hint, score, winner, loser, showScore }: { team: Team | nu
       )}
     >
       {team ? <TeamLogo src={team.logo_url} tag={team.tag} size="xs" /> : <span className="size-6 shrink-0 rounded-[6px] border border-dashed border-line-strong" />}
-      <span className={cn("flex-1 truncate", team ? "text-[15px]" : "text-[13.5px]", winner ? "font-extrabold" : team ? "font-semibold" : "font-medium")}>{team?.name ?? hint ?? "ждёт соперника"}</span>
+      <span className={cn("flex-1 truncate", team ? "text-[15px]" : "text-[13.5px]", winner ? "font-extrabold" : team ? "font-semibold" : "font-medium")}>{team?.name ?? hint ?? t("ждёт соперника")}</span>
       {showScore && <span className={cn("num min-w-6 text-right text-[16px]", winner ? "font-extrabold" : "font-semibold")}>{score}</span>}
     </div>
   );
 }
 
 const STATUS_TEXT: Record<string, string> = {
-  pending: "ждёт соперников",
-  upcoming: "скоро",
-  veto: "выбор карт",
-  ready: "готовим сервер",
-  live: "идёт",
-  finished: "окончен",
+  pending: tr("ждёт соперников"),
+  upcoming: tr("скоро"),
+  veto: tr("выбор карт"),
+  ready: tr("готовим сервер"),
+  live: tr("идёт"),
+  finished: tr("окончен"),
 };
 
-function Node({ m, hints }: { m: MatchWithTeams; hints: SlotHints }) {
+function Node({ m, hints, t }: { m: MatchWithTeams; hints: SlotHints; t: T }) {
   const finished = m.status === "finished";
   const bye = m.is_walkover && (!m.team1_id || !m.team2_id);
   if (m.status === "cancelled" || bye) {
     return (
       <div className="flex h-full items-center rounded-surface border border-dashed border-line bg-surface/70 px-4 text-meta text-fg-3">
-        Матч {m.number} · {bye ? `${(m.team1 ?? m.team2)?.name ?? "—"} проходит дальше без игры` : "пустой матч"}
+        {t("Матч {n}", { n: m.number })} · {bye ? t("{name} проходит дальше без игры", { name: (m.team1 ?? m.team2)?.name ?? "—" }) : t("пустой матч")}
       </div>
     );
   }
@@ -85,17 +87,17 @@ function Node({ m, hints }: { m: MatchWithTeams; hints: SlotHints }) {
       <div className={cn("flex h-[26px] items-center justify-between gap-2 px-3 pt-1 text-[12.5px] font-semibold", live ? "text-live" : active ? "text-warn" : "text-fg-3")}>
         <span className="truncate">
           {live && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" aria-hidden />}
-          {STATUS_TEXT[m.status] ?? ""}
+          {STATUS_TEXT[m.status] ? t(STATUS_TEXT[m.status]) : ""}
           {map && ` · ${map}`}
           {lm && !rounds && ` ${lm.team1_score}:${lm.team2_score}`}
         </span>
         <span className="num shrink-0 font-medium text-fg-3">
-          №{m.number} · {m.best_of === 1 ? "до 1 победы" : `до ${Math.ceil(m.best_of / 2)} побед`}
+          №{m.number} · {m.best_of === 1 ? t("до 1 победы") : t("до {n} побед", { n: Math.ceil(m.best_of / 2) })}
         </span>
       </div>
-      <Slot team={m.team1} hint={hints.get(`${m.id}:1`)} score={s1} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} />
+      <Slot team={m.team1} hint={hints.get(`${m.id}:1`)} score={s1} winner={finished && m.winner_id === m.team1_id} loser={finished && !!m.winner_id && m.winner_id !== m.team1_id} showScore={showScore} t={t} />
       <div className="mx-3 h-px bg-line-subtle" />
-      <Slot team={m.team2} hint={hints.get(`${m.id}:2`)} score={s2} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} />
+      <Slot team={m.team2} hint={hints.get(`${m.id}:2`)} score={s2} winner={finished && m.winner_id === m.team2_id} loser={finished && !!m.winner_id && m.winner_id !== m.team2_id} showScore={showScore} t={t} />
     </Link>
   );
 }
@@ -139,12 +141,14 @@ function BracketSection({
   totalUpper,
   totalLower,
   hints,
+  t,
 }: {
   title: string;
   matches: MatchWithTeams[];
   totalUpper: number;
   totalLower: number;
   hints: SlotHints;
+  t: T;
 }) {
   const { placed, rounds } = layout(matches);
   const all = [...placed.values()];
@@ -195,10 +199,10 @@ function BracketSection({
                 )}
                 style={{ left: col * (W + GAP_X), top: 0, width: W }}
               >
-                <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower)}</span>
+                <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower, t)}</span>
                 <span className="num text-meta font-medium text-fg-3">
                   {active && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" aria-hidden />}
-                  {inRound.length} {inRound.length === 1 ? "матч" : inRound.length < 5 ? "матча" : "матчей"}
+                  {inRound.length} {t.plural(inRound.length, "матч", "матча", "матчей")}
                 </span>
               </div>
             );
@@ -206,7 +210,7 @@ function BracketSection({
 
           {all.map((p) => (
             <div key={p.m.id} className="absolute" style={{ left: p.x, top: p.y, width: W, height: H }}>
-              <Node m={p.m} hints={hints} />
+              <Node m={p.m} hints={hints} t={t} />
             </div>
           ))}
         </div>
@@ -216,7 +220,8 @@ function BracketSection({
 }
 
 /** Сетка на выбывание: верхняя, нижняя, гранд-финал и матч за 3-е место — отдельные понятные области. */
-export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
+export async function BracketView({ matches }: { matches: MatchWithTeams[] }) {
+  const t = await getT();
   const playoff = matches.filter((m) => (m.stage ?? "playoff") === "playoff");
   const upper = playoff.filter((m) => m.bracket === "upper");
   const lower = playoff.filter((m) => m.bracket === "lower");
@@ -226,7 +231,7 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const totalLower = Math.max(0, ...lower.map((m) => m.round));
 
   if (playoff.length === 0) return null;
-  const hints = slotHints(playoff);
+  const hints = slotHints(playoff, t);
   const bo = [...new Set(playoff.map((m) => m.best_of))].sort((a, b) => a - b);
 
   return (
@@ -236,49 +241,54 @@ export function BracketView({ matches }: { matches: MatchWithTeams[] }) {
           <div className="flex gap-3 rounded-surface bg-accent-dim px-4 py-3.5 text-[15px] text-fg-2 sm:px-5">
             <Info className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
             <p>
-              <b className="block text-fg">Как читать сетку</b>
-              {bo.length > 1 ? `Ранние матчи — до ${Math.ceil(bo[0] / 2)} победы, решающие — до ${Math.ceil(bo[bo.length - 1] / 2)} побед.` : bo[0] === 1 ? "Каждый матч — одна карта." : `Каждый матч — до ${Math.ceil(bo[0] / 2)} побед.`}{" "}
-              Победитель идёт в следующий столбец, проигравший выбывает.{" "}
-              <span className="hidden md:inline">Наведите на команду — подсветится её путь.</span>
+              <b className="block text-fg">{t("Как читать сетку")}</b>
+              {bo.length > 1
+                ? t("Ранние матчи — до {a} победы, решающие — до {b} побед.", { a: Math.ceil(bo[0] / 2), b: Math.ceil(bo[bo.length - 1] / 2) })
+                : bo[0] === 1
+                  ? t("Каждый матч — одна карта.")
+                  : t("Каждый матч — до {n} побед.", { n: Math.ceil(bo[0] / 2) })}{" "}
+              {t("Победитель идёт в следующий столбец, проигравший выбывает.")}{" "}
+              <span className="hidden md:inline">{t("Наведите на команду — подсветится её путь.")}</span>
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-meta text-fg-2">
             <span className="inline-flex items-center gap-2">
-              <span className="size-3 rounded-[4px] bg-accent" aria-hidden /> победитель
+              <span className="size-3 rounded-[4px] bg-accent" aria-hidden /> {t("победитель")}
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="size-3 rounded-[4px] border-2 border-live" aria-hidden /> идёт сейчас
+              <span className="size-3 rounded-[4px] border-2 border-live" aria-hidden /> {t("идёт сейчас")}
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="size-3 rounded-[4px] border border-dashed border-line-strong" aria-hidden /> ещё не определён
+              <span className="size-3 rounded-[4px] border border-dashed border-line-strong" aria-hidden /> {t("ещё не определён")}
             </span>
             <span className="inline-flex items-center gap-2 md:hidden">
-              <MoveHorizontal className="size-4" aria-hidden /> листайте сетку в сторону
+              <MoveHorizontal className="size-4" aria-hidden /> {t("листайте сетку в сторону")}
             </span>
           </div>
         </div>
 
         {upper.length > 0 && (
           <BracketSection
-            title={lower.length ? "Верхняя сетка" : "Плей-офф"}
+            title={lower.length ? t("Верхняя сетка") : t("Плей-офф")}
             matches={upper}
             totalUpper={totalUpper}
             totalLower={totalLower}
             hints={hints}
+            t={t}
           />
         )}
 
         {lower.length > 0 && (
-          <BracketSection title="Нижняя сетка" matches={lower} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
+          <BracketSection title={t("Нижняя сетка")} matches={lower} totalUpper={totalUpper} totalLower={totalLower} hints={hints} t={t} />
         )}
 
         {grandFinal.length > 0 && (
-          <BracketSection title="Гранд-финал" matches={grandFinal} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
+          <BracketSection title={t("Гранд-финал")} matches={grandFinal} totalUpper={totalUpper} totalLower={totalLower} hints={hints} t={t} />
         )}
 
         {/* проигравшие полуфиналов играют за 3-е место */}
         {thirdPlace.length > 0 && (
-          <BracketSection title={THIRD_PLACE_TITLE} matches={thirdPlace} totalUpper={totalUpper} totalLower={totalLower} hints={hints} />
+          <BracketSection title={t(THIRD_PLACE_TITLE)} matches={thirdPlace} totalUpper={totalUpper} totalLower={totalLower} hints={hints} t={t} />
         )}
       </div>
     </BracketHover>

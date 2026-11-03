@@ -7,6 +7,7 @@ import { acceptApplication, declineApplication } from "@/app/actions/application
 import type { ActionResult, FormAction } from "@/components/forms";
 import { Button, FaceitLevel, PlayerIdentity, RowList } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/client";
 
 export type InboxItem = {
   id: string;
@@ -18,6 +19,7 @@ export type InboxItem = {
 
 /** Заявки на вступление — капитану: принять или отклонить. Проверки (места, блокировка турниром) — на сервере */
 export function ApplicationsInbox({ items, locked }: { items: InboxItem[]; locked: string | null }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [pending, start] = useTransition();
@@ -54,10 +56,10 @@ export function ApplicationsInbox({ items, locked }: { items: InboxItem[]; locke
           </div>
           <div className="flex gap-2">
             <Button size="sm" icon={<Check />} disabled={pending || !!locked} onClick={() => run(acceptApplication, a.id)}>
-              Принять
+              {t("Принять")}
             </Button>
             <Button size="sm" variant="secondary" icon={<X />} disabled={pending} onClick={() => run(declineApplication, a.id)}>
-              Отклонить
+              {t("Отклонить")}
             </Button>
           </div>
         </div>

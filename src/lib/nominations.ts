@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { bestClutch, bestEntry, bestMultikill, bestRifler, bestSniper, bestStable, bestSupport, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
+import { makeT, type T } from "./i18n/core";
 import { displayFullNames } from "./person-name";
 import { getPlayerLeaderboard, getTournamentWeaponKills, mvpOf } from "./stats";
 import { db } from "./supabase";
@@ -62,7 +63,8 @@ async function nominationLines(tournamentId: string) {
   return { board, lines };
 }
 
-export const getTournamentNominations = cache(async (tournamentId: string): Promise<Nomination[]> => {
+/** tx — язык подписей значений (на публичной странице турнира); без него — по-русски (пульт, дипломы) */
+export const getTournamentNominations = cache(async (tournamentId: string, tx: T = makeT("ru")): Promise<Nomination[]> => {
   const [{ board, lines }, { data: rows }] = await Promise.all([
     nominationLines(tournamentId),
     db().from("tournament_nominations").select("*").eq("tournament_id", tournamentId),
@@ -78,13 +80,13 @@ export const getTournamentNominations = cache(async (tournamentId: string): Prom
     });
   }
   for (const [key, pick] of [
-    ["sniper", bestSniper(lines)],
+    ["sniper", bestSniper(lines, tx)],
     ["rifler", bestRifler(lines)],
-    ["support", bestSupport(lines)],
-    ["entry", bestEntry(lines)],
-    ["clutch", bestClutch(lines)],
+    ["support", bestSupport(lines, tx)],
+    ["entry", bestEntry(lines, tx)],
+    ["clutch", bestClutch(lines, tx)],
     ["stable", bestStable(lines)],
-    ["multikill", bestMultikill(lines)],
+    ["multikill", bestMultikill(lines, tx)],
   ] as const) {
     if (pick) computed.set(key, { playerId: pick.line.key, teamId: pick.line.teamId, value: pick.value });
   }

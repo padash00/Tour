@@ -11,10 +11,12 @@ import { TeamEditor } from "@/components/team/team-editor";
 import { TeamHeader } from "@/components/team/team-header";
 import { HelpHint } from "@/components/help-hint";
 import { Container, Panel, Section, Stack } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Настройки команды", robots: { index: false } };
 
 export default async function TeamSettingsPage() {
+  const t = await getT();
   const player = await requirePlayer("/team/settings");
   const membership = await getActiveMembership(player.id);
   if (!membership) redirect("/team");
@@ -29,14 +31,14 @@ export default async function TeamSettingsPage() {
   if (isCaptain && activeReg) {
     const open = activeReg.tournament.status === "registration";
     blocked = {
-      title: `Команда участвует в «${activeReg.tournament.name}»`,
+      title: t("Команда участвует в «{name}»", { name: activeReg.tournament.name }),
       text: open
-        ? "Чтобы распустить команду, сначала отзовите заявку на турнир."
-        : "Регистрация уже закрыта — отозвать заявку можно только через администратора. Распустить команду можно после турнира.",
-      link: open ? { href: `/tournaments/${activeReg.tournament.slug}`, label: "Открыть турнир и отозвать заявку" } : undefined,
+        ? t("Чтобы распустить команду, сначала отзовите заявку на турнир.")
+        : t("Регистрация уже закрыта — отозвать заявку можно только через администратора. Распустить команду можно после турнира."),
+      link: open ? { href: `/tournaments/${activeReg.tournament.slug}`, label: t("Открыть турнир и отозвать заявку") } : undefined,
     };
   } else if (!isCaptain && locked) {
-    blocked = { title: `Состав заблокирован турниром «${locked.name}»`, text: "Покинуть команду можно после окончания блокировки." };
+    blocked = { title: t("Состав заблокирован турниром «{name}»", { name: locked.name }), text: t("Покинуть команду можно после окончания блокировки.") };
   }
 
   return (
@@ -45,34 +47,34 @@ export default async function TeamSettingsPage() {
       <Stack className="max-w-[760px] pt-10">
         {isCaptain ? (
           <>
-            <Section title="Основное и логотип" description="Название, тег, регион, логотип и описание — так команду видят в сетке и на её странице.">
+            <Section title={t("Основное и логотип")} description={t("Название, тег, регион, логотип и описание — так команду видят в сетке и на её странице.")}>
               <Panel className="p-5 sm:p-7">
                 <TeamEditor action={updateTeam} team={team} mode="edit" />
               </Panel>
             </Section>
-            <Section title="Приглашения" description="Одна активная ссылка. Новая ссылка отключает предыдущую.">
+            <Section title={t("Приглашения")} description={t("Одна активная ссылка. Новая ссылка отключает предыдущую.")}>
               <Panel className="flex flex-wrap items-center justify-between gap-4 p-5">
                 <div className="min-w-0">
-                  <div className="text-[14px] font-medium text-fg">Ссылка-приглашение</div>
+                  <div className="text-[14px] font-medium text-fg">{t("Ссылка-приглашение")}</div>
                   <div className="num mt-0.5 truncate text-meta text-fg-3">
                     {origin}/join/{team.invite_code}
                   </div>
                 </div>
-                <InviteButton url={`${origin}/join/${team.invite_code}`} freeSlots={MAX_MAIN + MAX_SUBS - members.length} variant="secondary" label="Открыть приглашение" />
+                <InviteButton url={`${origin}/join/${team.invite_code}`} freeSlots={MAX_MAIN + MAX_SUBS - members.length} variant="secondary" label={t("Открыть приглашение")} />
               </Panel>
             </Section>
-            <Section title="Заявки на вступление" description="Игроки подают заявки со страницы команды и из «Поиска команды», вы принимаете или отклоняете их во вкладке «Заявки».">
+            <Section title={t("Заявки на вступление")} description={t("Игроки подают заявки со страницы команды и из «Поиска команды», вы принимаете или отклоняете их во вкладке «Заявки».")}>
               <Panel className="flex items-center justify-between gap-4 p-5">
                 <div className="min-w-0">
-                  <div className="text-[14px] font-medium text-fg">Принимать заявки</div>
-                  <div className="mt-0.5 text-meta text-fg-3">{team.accepts_applications ? "Кнопка «Подать заявку» видна на странице команды." : "Приём закрыт — вступить можно только по ссылке-приглашению."}</div>
+                  <div className="text-[14px] font-medium text-fg">{t("Принимать заявки")}</div>
+                  <div className="mt-0.5 text-meta text-fg-3">{team.accepts_applications ? t("Кнопка «Подать заявку» видна на странице команды.") : t("Приём закрыт — вступить можно только по ссылке-приглашению.")}</div>
                 </div>
                 <ApplicationsToggle accepts={team.accepts_applications} />
               </Panel>
             </Section>
           </>
         ) : (
-          <p className="text-[14px] text-fg-2">Название, логотип и приглашения меняет капитан команды.</p>
+          <p className="text-[14px] text-fg-2">{t("Название, логотип и приглашения меняет капитан команды.")}</p>
         )}
         <DangerZone isCaptain={isCaptain} teamName={team.name} blocked={blocked} />
         <HelpHint topics={isCaptain ? ["leave-team", "team-applications", "manage-roster"] : ["leave-team"]} />

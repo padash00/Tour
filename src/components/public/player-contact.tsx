@@ -5,9 +5,11 @@ import { Mail } from "lucide-react";
 import { useViewer } from "@/components/viewer";
 import { isOnline, seenLabel } from "@/lib/online";
 import { cn } from "@/components/ds";
+import { useT } from "@/lib/i18n/client";
 
 /** В профиле игрока: «в сети / был(а) …» и «Написать» (себе — не показываем; гостю — вход через Steam) */
 export function PlayerContact({ playerId, lastSeen }: { playerId: string; lastSeen: string | null }) {
+  const t = useT();
   const { player, status } = useViewer();
   const online = isOnline(lastSeen);
   const self = player?.id === playerId;
@@ -16,7 +18,7 @@ export function PlayerContact({ playerId, lastSeen }: { playerId: string; lastSe
     <span className="inline-flex flex-wrap items-center gap-3">
       <span suppressHydrationWarning className={cn("inline-flex items-center gap-1.5 text-[13px] font-medium", online ? "text-ok" : "text-fg-3")}>
         <span className={cn("size-2 rounded-full", online ? "bg-ok" : "bg-fg-4")} aria-hidden />
-        {seenLabel(lastSeen)}
+        {seenLabel(t, lastSeen)}
       </span>
       {status === "ready" && !self && (
         <Link
@@ -24,7 +26,7 @@ export function PlayerContact({ playerId, lastSeen }: { playerId: string; lastSe
           className="inline-flex h-9 items-center gap-1.5 rounded-control bg-accent px-3.5 text-[14px] font-semibold text-accent-ink transition-colors hover:bg-accent-strong"
         >
           <Mail className="size-4" aria-hidden />
-          Написать
+          {t("Написать")}
         </Link>
       )}
     </span>

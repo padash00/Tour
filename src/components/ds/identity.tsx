@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Bot, Crown } from "lucide-react";
 import type { ReactNode } from "react";
+import { tr } from "@/lib/i18n/core";
 import { cn } from "./cn";
+import { TSpan } from "./tt";
 
 /*
  * Сущности F16 DS — одинаковые в турнире, матче, команде и лобби.
@@ -45,14 +47,14 @@ export function FaceitLevel({ level, className }: { level: number | null | undef
   if (!level) return null;
   const color = level >= 10 ? "#ff5a1f" : level >= 8 ? "#ff8a3d" : level >= 4 ? "#e3b465" : level >= 2 ? "#58c99b" : "#aeb8c7";
   return (
-    <span
+    <TSpan
       className={cn("num inline-grid size-6 shrink-0 place-items-center rounded-full border-2 text-[11px] font-bold", className)}
       style={{ borderColor: color, color }}
-      title={`FACEIT, уровень ${level}`}
-      aria-label={`FACEIT, уровень ${level}`}
+      text={tr("FACEIT, уровень {level}")}
+      vars={{ level }}
     >
       {level}
-    </span>
+    </TSpan>
   );
 }
 
@@ -94,7 +96,7 @@ export function PlayerIdentity({
       )}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5 text-[14px]">
-          {captain && <Crown className="size-3.5 text-warn" aria-label="Капитан" />}
+          {captain && <TSpan text={tr("Капитан")} title={undefined} className="inline-flex"><Crown className="size-3.5 text-warn" /></TSpan>}
           {nick}
         </div>
         {meta && <div className="truncate text-meta text-fg-3">{meta}</div>}

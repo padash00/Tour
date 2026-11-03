@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "./supabase";
 import type { Tables } from "./database.types";
 import type { Narrow, Player, Team } from "./types";
+import { tr } from "./i18n/core";
 
 /** Поиск команды и игроков: объявления «ищу команду» (игрок) и «ищем игрока» (капитан команды) */
 
@@ -11,7 +12,7 @@ export const FINDER_ROLES = [
   { key: "support", label: "Support" },
   { key: "lurk", label: "Lurker" },
   { key: "igl", label: "IGL" },
-  { key: "any", label: "Любая" },
+  { key: "any", label: tr("Любая") },
 ] as const;
 export type FinderRole = (typeof FINDER_ROLES)[number]["key"];
 export const FINDER_MODES = ["5v5", "2v2"] as const;

@@ -5,6 +5,7 @@ import type { vetoState } from "@/lib/veto";
 import { ActionForm } from "../forms";
 import { Callout, CriticalSurface, Panel, SubsectionTitle, Timer, cn } from "@/components/ds";
 import { MapTile, type MapTileState } from "./map-tile";
+import { getT } from "@/lib/i18n/server";
 
 type VetoState = ReturnType<typeof vetoState>;
 
@@ -12,7 +13,7 @@ type VetoState = ReturnType<typeof vetoState>;
  * Veto — один stateful блок для tournament Match Room.
  * serverNow нужен для честного countdown: решение server action и таймер UI используют одни часы.
  */
-export function VetoBoard({
+export async function VetoBoard({
   m,
   state,
   myTurn,
@@ -27,6 +28,7 @@ export function VetoBoard({
   images?: Record<string, string>;
   serverNow: number;
 }) {
+  const t = await getT();
   const active = m.status === "veto";
   const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
   const tag = (id: string | null) => (id === m.team1_id ? m.team1?.tag : id === m.team2_id ? m.team2?.tag : null);
@@ -36,20 +38,20 @@ export function VetoBoard({
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="min-w-0">
           <div className={cn("text-micro font-semibold uppercase tracking-[0.14em]", myTurn ? "text-accent" : "text-fg-3")}>
-            {myTurn ? "Ваш ход" : "Ход соперника"} · BO{m.best_of}
+            {myTurn ? t("Ваш ход") : t("Ход соперника")} · BO{m.best_of}
           </div>
           <div className="mt-2 text-heading text-fg">
-            {turnTeam?.name ?? "—"} · <span className={state.current.action === "ban" ? "text-danger" : "text-accent"}>{state.current.action === "ban" ? "бан карты" : "пик карты"}</span>
+            {turnTeam?.name ?? "—"} · <span className={state.current.action === "ban" ? "text-danger" : "text-accent"}>{state.current.action === "ban" ? t("бан карты") : t("пик карты")}</span>
           </div>
           <p className="mt-2 max-w-read text-[14px] text-fg-2">
             {myTurn
-              ? "Выберите карту ниже. Если время закончится, система выберет допустимую карту автоматически."
-              : "Дождитесь выбора соперника. Страница обновится автоматически."}
+              ? t("Выберите карту ниже. Если время закончится, система выберет допустимую карту автоматически.")
+              : t("Дождитесь выбора соперника. Страница обновится автоматически.")}
           </p>
         </div>
         {m.veto_deadline && (
           <div className="shrink-0 text-right">
-            <div className="text-micro text-fg-3">Осталось</div>
+            <div className="text-micro text-fg-3">{t("Осталось")}</div>
             <Timer deadline={m.veto_deadline} serverNow={serverNow} urgentAt={10} className="mt-1 block text-[36px] font-semibold leading-none sm:text-[44px]" />
           </div>
         )}
@@ -75,7 +77,7 @@ export function VetoBoard({
               const caption = act
                 ? act.action === "decider"
                   ? "Decider"
-                  : `${act.action === "ban" ? "Бан" : "Пик"} · ${tag(act.team_id) ?? "авто"}${act.auto ? " · таймер" : ""}`
+                  : `${act.action === "ban" ? t("Бан") : t("Пик")} · ${tag(act.team_id) ?? t("авто")}${act.auto ? ` · ${t("таймер")}` : ""}`
                 : undefined;
               const clickable = !act && active && myTurn;
 
@@ -85,13 +87,13 @@ export function VetoBoard({
                   <input type="hidden" name="map" value={map} />
                   <button
                     type="submit"
-                    aria-label={`${state.current?.action === "pick" ? "Пик" : "Бан"}: ${map}`}
+                    aria-label={`${state.current?.action === "pick" ? t("Пик") : t("Бан")}: ${map}`}
                     className="group/map block w-full rounded-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   >
                     <MapTile
                       map={map}
                       state={state_}
-                      caption={state.current?.action === "pick" ? "Нажмите — пик" : "Нажмите — бан"}
+                      caption={state.current?.action === "pick" ? t("Нажмите — пик") : t("Нажмите — бан")}
                       interactive
                       image={images[map]}
                     />
@@ -106,13 +108,13 @@ export function VetoBoard({
       )}
 
       <div className={cn(!compact && "mt-7")}>
-        {!compact && <SubsectionTitle>Ход вето</SubsectionTitle>}
+        {!compact && <SubsectionTitle>{t("Ход вето")}</SubsectionTitle>}
         <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
           {state.plan.map((step) => {
             const done = m.veto.find((a) => a.step === step.step);
             const teamTag = step.team === 1 ? m.team1?.tag : step.team === 2 ? m.team2?.tag : null;
             const current = state.current?.step === step.step && active;
-            const action = step.action === "ban" ? "Бан" : step.action === "pick" ? "Пик" : "Decider";
+            const action = step.action === "ban" ? t("Бан") : step.action === "pick" ? t("Пик") : "Decider";
             return (
               <li
                 key={step.step}
@@ -128,9 +130,9 @@ export function VetoBoard({
                   </span>
                 </div>
                 <div className={cn("mt-1.5 truncate text-[14px] font-medium", done ? "text-fg" : current ? "text-accent" : "text-fg-3")}>
-                  {done ? mapName(done.map_name) : current ? "выбирает…" : "—"}
+                  {done ? mapName(done.map_name) : current ? t("выбирает…") : "—"}
                 </div>
-                <div className="mt-0.5 truncate text-meta text-fg-3">{teamTag ?? "по остатку"}</div>
+                <div className="mt-0.5 truncate text-meta text-fg-3">{teamTag ?? t("по остатку")}</div>
               </li>
             );
           })}
@@ -138,7 +140,7 @@ export function VetoBoard({
       </div>
 
       {active && !state.current && !state.complete && (
-        <Callout className="mt-4">Состояние вето обновляется. Страница синхронизируется автоматически.</Callout>
+        <Callout className="mt-4">{t("Состояние вето обновляется. Страница синхронизируется автоматически.")}</Callout>
       )}
     </section>
   );

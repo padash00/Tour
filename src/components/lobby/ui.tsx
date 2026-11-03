@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../ui";
+import { useT } from "@/lib/i18n/client";
 
 /** Большое окно лобби (создание, расширенные настройки, карты): заголовок, прокрутка, подвал */
 export function Sheet({
@@ -22,6 +23,7 @@ export function Sheet({
   footer?: ReactNode;
   width?: number;
 }) {
+  const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -49,7 +51,7 @@ export function Sheet({
             <h2 className="text-[22px] font-semibold tracking-[-0.015em] text-fg">{title}</h2>
             {subtitle && <p className="mt-1.5 text-[14px] text-fg-2">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-[8px] text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label="Закрыть">
+          <button type="button" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-[8px] text-fg-3 hover:bg-ink/[0.06] hover:text-fg" aria-label={t("Закрыть")}>
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
             </svg>
@@ -157,6 +159,7 @@ export function Choice<T extends string | number>({
   onChange?: (v: T) => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const a11y = useContext(RowA11yContext);
   return (
     <select
@@ -172,7 +175,7 @@ export function Choice<T extends string | number>({
     >
       {options.map((o) => (
         <option key={String(o.value)} value={String(o.value)}>
-          {o.label}
+          {t(o.label)}
         </option>
       ))}
     </select>

@@ -3,6 +3,8 @@ import { mapName } from "@/lib/format";
 import { HOW_LABEL, type KillLine, type MapRounds, type RoundHow } from "@/lib/rounds";
 import { weaponName } from "../stats-format";
 import { cn } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
+import type { T } from "@/lib/i18n/core";
 
 /*
  * Лента раундов: фишка на каждый раунд — цвет команды-победителя, значок — как закончился.
@@ -43,7 +45,7 @@ export function HowIcon({ how, className }: { how: RoundHow; className?: string 
   );
 }
 
-function Legend() {
+function Legend({ t }: { t: T }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-fg-3">
       <span className="inline-flex items-center gap-1.5">
@@ -54,7 +56,7 @@ function Legend() {
       </span>
       {(Object.keys(HOW_LABEL) as RoundHow[]).map((h) => (
         <span key={h} className="inline-flex items-center gap-1.5">
-          <HowIcon how={h} className="size-3" /> {HOW_LABEL[h]}
+          <HowIcon how={h} className="size-3" /> {t(HOW_LABEL[h])}
         </span>
       ))}
     </div>
@@ -62,15 +64,16 @@ function Legend() {
 }
 
 /** Ряд фишек раундов одной карты (используется и на странице матча, и в режиме ТВ) */
-export function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds; team1: string; team2: string; size?: "md" | "tv" }) {
+export async function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds; team1: string; team2: string; size?: "md" | "tv" }) {
+  const t = await getT();
   const tv = size === "tv";
   return (
     <div className={cn("flex flex-wrap items-center", tv ? "gap-[0.35vw]" : "gap-1")}>
       {map.rounds.map((r) => (
         <Fragment key={r.n}>
-          {r.switched && <span aria-hidden className={cn("self-stretch bg-line-strong", tv ? "mx-[0.4vw] w-[0.15vw]" : "mx-1 w-px")} title="Смена сторон" />}
+          {r.switched && <span aria-hidden className={cn("self-stretch bg-line-strong", tv ? "mx-[0.4vw] w-[0.15vw]" : "mx-1 w-px")} title={t("Смена сторон")} />}
           <span
-            title={`Раунд ${r.n}${r.winner ? ` · ${r.winner === 1 ? team1 : team2}` : ""} · ${HOW_LABEL[r.how]}`}
+            title={`${t("Раунд {n}", { n: r.n })}${r.winner ? ` · ${r.winner === 1 ? team1 : team2}` : ""} · ${t(HOW_LABEL[r.how])}`}
             className={cn(
               "grid place-items-center rounded-[4px] num font-semibold transition-colors",
               tv ? "h-[3.2vh] w-[1.9vw] text-[0.85vw]" : "h-7 w-[26px] text-[10px]",
@@ -88,7 +91,7 @@ export function RoundChips({ map, team1, team2, size = "md" }: { map: MapRounds;
 type Segment = { title: string; rounds: MapRounds["rounds"]; s1: number; s2: number };
 
 /** Деление на половины по номерам раундов: основное время и половины овертаймов */
-function segments(rounds: MapRounds["rounds"]): Segment[] {
+function segments(rounds: MapRounds["rounds"], t: T): Segment[] {
   // половина — 12 раундов (MR12), у 2×2 — 8 (видно по смене сторон на 9-м раунде); овертайм — по 3 раунда на сторону
   const half = rounds.some((r) => r.switched && r.n === 9) ? 8 : 12;
   const ot = half === 8 ? 4 : 3;
@@ -106,7 +109,14 @@ function segments(rounds: MapRounds["rounds"]): Segment[] {
   if (cur.length) out.push({ title: "", rounds: cur, s1: 0, s2: 0 });
   return out.map((seg, i) => ({
     ...seg,
-    title: i === 0 ? "1-я половина" : i === 1 ? "2-я половина" : `Овертайм ${Math.floor((i - 2) / 2) + 1} · ${(i - 2) % 2 === 0 ? "1-я" : "2-я"} пол.`,
+    title:
+      i === 0
+        ? t("1-я половина")
+        : i === 1
+          ? t("2-я половина")
+          : (i - 2) % 2 === 0
+            ? t("Овертайм {n} · 1-я пол.", { n: Math.floor((i - 2) / 2) + 1 })
+            : t("Овертайм {n} · 2-я пол.", { n: Math.floor((i - 2) / 2) + 1 }),
     s1: seg.rounds.filter((r) => r.winner === 1).length,
     s2: seg.rounds.filter((r) => r.winner === 2).length,
   }));
@@ -115,14 +125,14 @@ function segments(rounds: MapRounds["rounds"]): Segment[] {
 const SIDE_CELL = { CT: "bg-ct/15 text-ct", T: "bg-t/15 text-t" } as const;
 
 /** История раундов как на HLTV: строка на команду, значок исхода — в строке победителя, цвет — сторона (CT/T) */
-function RoundHistory({ map, team1, team2 }: { map: MapRounds; team1: string; team2: string }) {
-  const segs = segments(map.rounds);
+function RoundHistory({ map, team1, team2, t }: { map: MapRounds; team1: string; team2: string; t: T }) {
+  const segs = segments(map.rounds, t);
   const cell = (r: MapRounds["rounds"][number], team: 1 | 2) => {
     const won = r.winner === team;
     return (
       <span
         className={cn("grid h-8 w-[26px] place-items-center rounded-[6px]", won ? (r.side ? SIDE_CELL[r.side] : "bg-surface-4 text-fg-2") : "bg-ink/[0.035]")}
-        title={won ? `Раунд ${r.n} · ${team === 1 ? team1 : team2}${r.side ? ` (${r.side})` : ""} · ${HOW_LABEL[r.how]}` : undefined}
+        title={won ? `${t("Раунд {n}", { n: r.n })} · ${team === 1 ? team1 : team2}${r.side ? ` (${r.side})` : ""} · ${t(HOW_LABEL[r.how])}` : undefined}
       >
         {won && <HowIcon how={r.how} className="size-[13px]" />}
       </span>
@@ -159,18 +169,18 @@ function RoundHistory({ map, team1, team2 }: { map: MapRounds; team1: string; te
   );
 }
 
-function KillFeed({ kills, round }: { kills: KillLine[]; round: number | null }) {
+function KillFeed({ kills, round, t }: { kills: KillLine[]; round: number | null; t: T }) {
   if (!kills.length) return null;
   return (
     <div className="rounded-control border border-line-subtle bg-shell p-4">
-      <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">Убийства раунда {round}</div>
+      <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">{t("Убийства раунда {n}", { n: round })}</div>
       <ul className="space-y-1.5">
         {kills.map((k, i) => (
           <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px]">
             {k.suicide ? (
               <>
                 <span className={cn("font-medium", k.victimTeam ? TEAM_TEXT[k.victimTeam] : "text-fg")}>{k.victim}</span>
-                <span className="text-fg-3">погиб сам</span>
+                <span className="text-fg-3">{t("погиб сам")}</span>
               </>
             ) : (
               <>
@@ -191,7 +201,7 @@ function KillFeed({ kills, round }: { kills: KillLine[]; round: number | null })
 }
 
 /** Блок «Раунды» страницы матча: по карте — фишки раундов, у идущей карты — убийства последнего раунда */
-export function RoundTimeline({
+export async function RoundTimeline({
   maps,
   mapNames,
   team1,
@@ -205,11 +215,12 @@ export function RoundTimeline({
   /** номер идущей карты — для неё показываем ленту убийств */
   liveMap?: number | null;
 }) {
+  const t = await getT();
   const shown = maps.filter((m) => m.rounds.length > 0);
   if (!shown.length) return null;
   return (
     <div className="space-y-5">
-      <Legend />
+      <Legend t={t} />
       <div className="divide-y divide-line-subtle rounded-surface border border-line-subtle bg-surface">
         {[...shown].reverse().map((m) => {
           const won1 = m.rounds.filter((r) => r.winner === 1).length;
@@ -219,7 +230,7 @@ export function RoundTimeline({
             <div key={m.mapNumber} className="space-y-4 p-5 lg:p-6">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="text-[15px] font-semibold">
-                  Карта {m.mapNumber}
+                  {t("Карта")} {m.mapNumber}
                   {mapNames[m.mapNumber] ? ` · ${mapName(mapNames[m.mapNumber])}` : ""}
                   {isLive && <span className="ml-2 inline-block size-1.5 rounded-full bg-danger align-middle animate-pulse" />}
                 </div>
@@ -229,8 +240,8 @@ export function RoundTimeline({
                   {won2}
                 </div>
               </div>
-              <RoundHistory map={m} team1={team1} team2={team2} />
-              {isLive && <KillFeed kills={m.lastKills} round={m.lastRound} />}
+              <RoundHistory map={m} team1={team1} team2={team2} t={t} />
+              {isLive && <KillFeed kills={m.lastKills} round={m.lastRound} t={t} />}
             </div>
           );
         })}

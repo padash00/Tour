@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, CircleAlert, Search, X } from "lucide-react";
 import { useId, type ComponentProps, type ReactNode } from "react";
+import { useT } from "@/lib/i18n/client";
 import { Spinner } from "./button";
 import { cn } from "./cn";
 
@@ -103,10 +104,12 @@ export function SearchInput({
   onChange,
   loading,
   label,
-  placeholder = "Поиск",
+  placeholder: placeholderProp,
   className,
   ...props
 }: Omit<ComponentProps<"input">, "onChange" | "value"> & { value: string; onChange: (v: string) => void; loading?: boolean; label?: string }) {
+  const t = useT();
+  const placeholder = placeholderProp ?? t("Поиск");
   // связан с видимой подписью Field (есть id) — отдельный aria-label не нужен, он перебил бы подпись
   const ariaLabel = props["aria-label"] ?? (props.id ? undefined : (label ?? placeholder));
   return (
@@ -125,7 +128,7 @@ export function SearchInput({
         {loading ? (
           <Spinner className="size-4" />
         ) : value ? (
-          <button type="button" aria-label="Очистить" onClick={() => onChange("")} className="grid size-7 place-items-center rounded-tiny hover:bg-ink/[0.06] hover:text-fg">
+          <button type="button" aria-label={t("Очистить")} onClick={() => onChange("")} className="grid size-7 place-items-center rounded-tiny hover:bg-ink/[0.06] hover:text-fg">
             <X className="size-4" />
           </button>
         ) : null}

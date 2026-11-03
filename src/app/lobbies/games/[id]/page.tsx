@@ -5,6 +5,7 @@ import { db } from "@/lib/supabase";
 import { getGame } from "@/lib/lobby";
 import { mapLabel } from "@/lib/maps";
 import { MODES } from "@/lib/modes";
+import { getT } from "@/lib/i18n/server";
 import { formatDateTime } from "@/lib/format";
 import { getMapImages } from "@/lib/settings";
 import { MapThumb } from "@/components/lobby/settings";
@@ -37,6 +38,7 @@ type Stat = {
 };
 
 export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id]">) {
+  const t = await getT();
   const { id } = await props.params;
   if (!UUID.test(id)) notFound();
   const game = await getGame(id);
@@ -69,16 +71,16 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div>
               <div className="text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">
-                Неофициальный матч · {MODES[game.settings.mode].label} · BO{game.best_of}
+                {t("Неофициальный матч")} · {t(MODES[game.settings.mode].label)} · BO{game.best_of}
               </div>
-              <PageTitle className="mt-2">Матч лобби</PageTitle>
+              <PageTitle className="mt-2">{t("Матч лобби")}</PageTitle>
               <p className="mt-2 text-meta text-fg-3">
-                {game.finished_at ? `Сыгран ${formatDateTime(game.finished_at)}. В статистику турниров не идёт.` : game.status === "cancelled" ? "Матч отменён." : "Матч ещё идёт."}
+                {game.finished_at ? t("Сыгран {date}. В статистику турниров не идёт.", { date: formatDateTime(game.finished_at, t.lang) }) : game.status === "cancelled" ? t("Матч отменён.") : t("Матч ещё идёт.")}
               </p>
             </div>
             {lobby?.code && (
               <Button href={`/lobby/${lobby.code}`} variant="secondary">
-                В лобби #{lobby.code}
+                {t("В лобби #{code}", { code: lobby.code })}
               </Button>
             )}
           </div>
@@ -92,7 +94,7 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
       </div>
 
       <Container width="wide" className="space-y-10 py-10 sm:py-12">
-        <Section title="Карты">
+        <Section title={t("Карты")}>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {game.maps.map((map, i) => (
               <MapThumb key={i} map={map.map} image={images[map.map]} className="h-24 rounded-surface border border-line-subtle">
@@ -107,13 +109,13 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
           const list = table(team);
           const squad = team === 1 ? game.team1 : game.team2;
           return (
-            <Section key={team} title={squad.name} description={squad.bots.length > 0 ? `+ ${squad.bots.length} бот(а)` : undefined}>
+            <Section key={team} title={squad.name} description={squad.bots.length > 0 ? t("+ {n} бот(а)", { n: squad.bots.length }) : undefined}>
               <Panel padded={false} className="overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className={cn(DATA_TABLE, "min-w-[720px]")}>
                     <thead>
                       <tr>
-                        <th>Игрок</th>
+                        <th>{t("Игрок")}</th>
                         {["K", "D", "A", "±", "ADR", "HS%", "KAST", "MVP"].map((heading) => (
                           <th key={heading} className="!text-right">{heading}</th>
                         ))}
@@ -122,7 +124,7 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
                     <tbody>
                       {list.length === 0 && (
                         <tr>
-                          <td colSpan={9} className="px-4 py-6 text-center text-fg-3">Статистики нет</td>
+                          <td colSpan={9} className="px-4 py-6 text-center text-fg-3">{t("Статистики нет")}</td>
                         </tr>
                       )}
                       {list.map((row) => {

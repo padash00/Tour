@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { cn } from "../ui";
 
 /**
@@ -9,6 +10,7 @@ import { cn } from "../ui";
  * ?q= в адресе поддерживается (ссылки на поиск продолжают работать).
  */
 export function ClientFilter({ scope, placeholder, className }: { scope: string; placeholder: string; className?: string }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [found, setFound] = useState<number | null>(null);
   const ref = useRef<HTMLInputElement>(null);
@@ -61,7 +63,7 @@ export function ClientFilter({ scope, placeholder, className }: { scope: string;
       </label>
       {found !== null && (
         <span className="t-meta">
-          Найдено: <span className="num text-fg-2">{found}</span>
+          {t("Найдено:")} <span className="num text-fg-2">{found}</span>
         </span>
       )}
     </div>

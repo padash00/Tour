@@ -1,6 +1,8 @@
 import "server-only";
 import { db } from "./supabase";
 import { getMapImages } from "./settings";
+import { getT } from "./i18n/server";
+import { tr, type T } from "./i18n/core";
 import {
   captainsOf,
   checkHostAway,
@@ -89,11 +91,32 @@ export type LobbyView = {
   mapImages: Record<string, string>;
 };
 
+/** Служебные пометки игры хранятся по-русски; игроку показываем на его языке (динамические — по шаблону) */
+const NOTES = [
+  tr("ждём свободный сервер"),
+  tr("лобби закрыто"),
+  tr("ищем другой сервер"),
+  tr("карта из мастерской прогревается на сервере…"),
+  tr("все серверы для лобби заняты — ждём, когда освободится"),
+  tr("агент серверного ПК не на связи"),
+  tr("идёт обслуживание серверов"),
+  tr("идёт турнир — серверы отданы турниру, лобби запустится после него"),
+  tr("матч снят с сервера"),
+  tr("за 20 минут матч так и не начался"),
+] as const;
+function noteText(note: string | null, t: T) {
+  if (!note) return note;
+  if ((NOTES as readonly string[]).includes(note)) return t(note);
+  const m = /^запускаем сервер (.+)…$/.exec(note);
+  return m ? t("запускаем сервер {name}…", { name: m[1] }) : note;
+}
+
 /**
  * Состояние лобби для страницы. Заодно: отмечает зрителя «в сети», применяет истёкшие таймеры
  * (драфт, проверка готовности, вето) и передаёт хоста, если он давно не заходил.
  */
 export async function buildLobbyView(code: string, viewer: Player | null, opts: { admin: boolean }): Promise<LobbyView | null> {
+  const t = await getT();
   let lobby = await getLobbyByCode(code);
   if (!lobby) return null;
 
@@ -227,7 +250,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             server_address: seesAddress && game.server_state === "ready" ? game.server_address : null,
             // GOTV раскрывает адрес сервера — только участникам лобби и админам
             gotv_address: game.server_state === "ready" && (!!mine || opts.admin) ? gotv : null,
-            note: game.note,
+            note: noteText(game.note, t),
             network: game.settings.network,
             finished_at: game.finished_at,
           }

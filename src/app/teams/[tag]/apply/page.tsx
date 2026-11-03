@@ -14,10 +14,12 @@ import { TeamOfferCard } from "@/components/team/team-offer";
 import { ProfileRequired } from "@/components/profile/profile-required";
 import { Button, Callout, Container, Field, Textarea } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Заявка в команду", robots: { index: false } };
 
 export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) {
+  const t = await getT();
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team || team.is_solo) notFound();
@@ -38,17 +40,17 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
   const blocker: { title: string; text: string } | null = !player
     ? null
     : player.is_banned
-      ? { title: "Ваш аккаунт заблокирован", text: "Подать заявку нельзя. Если это ошибка — напишите администратору." }
+      ? { title: t("Ваш аккаунт заблокирован"), text: t("Подать заявку нельзя. Если это ошибка — напишите администратору.") }
       : membership
         ? membership.team.id === team.id
-          ? { title: "Вы уже в этой команде", text: "Заявка не нужна." }
-          : { title: `Вы уже в команде ${membership.team.name}`, text: "Чтобы подать заявку сюда, сначала покиньте текущую команду в её настройках." }
+          ? { title: t("Вы уже в этой команде"), text: t("Заявка не нужна.") }
+          : { title: t("Вы уже в команде {name}", { name: membership.team.name }), text: t("Чтобы подать заявку сюда, сначала покиньте текущую команду в её настройках.") }
         : !team.accepts_applications
-          ? { title: "Команда не принимает заявки", text: "Капитан закрыл приём заявок. Можно попросить у него ссылку-приглашение." }
+          ? { title: t("Команда не принимает заявки"), text: t("Капитан закрыл приём заявок. Можно попросить у него ссылку-приглашение.") }
           : full
-            ? { title: "В команде нет свободных мест", text: `Основа и запас заполнены (${MAX_MAIN} + ${MAX_SUBS}).` }
+            ? { title: t("В команде нет свободных мест"), text: t("Основа и запас заполнены ({a} + {b}).", { a: MAX_MAIN, b: MAX_SUBS }) }
             : cooldownUntil && cooldownUntil.getTime() > serverNow()
-              ? { title: "Капитан отклонил вашу заявку", text: `Подать заявку снова можно после ${formatDateTime(cooldownUntil.toISOString())}.` }
+              ? { title: t("Капитан отклонил вашу заявку"), text: t("Подать заявку снова можно после {date}.", { date: formatDateTime(cooldownUntil.toISOString(), t.lang) }) }
               : null;
 
   return (
@@ -57,23 +59,23 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
         <ArrowLeft className="size-4" /> {team.name}
       </Link>
       <div className="mt-3">
-        <TeamOfferCard team={team} members={members} eyebrow="Заявка на вступление" maxMain={MAX_MAIN} maxSubs={MAX_SUBS}>
+        <TeamOfferCard team={team} members={members} eyebrow={t("Заявка на вступление")} maxMain={MAX_MAIN} maxSubs={MAX_SUBS}>
           {!player ? (
             <>
               <a href={`/api/auth/steam?next=${encodeURIComponent(next)}`} className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-control bg-accent px-6 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong">
                 <SteamMark className="size-5" />
-                Войти через Steam
+                {t("Войти через Steam")}
               </a>
-              <p className="mt-3 text-center text-meta text-fg-3">После входа вернём вас на эту страницу.</p>
+              <p className="mt-3 text-center text-meta text-fg-3">{t("После входа вернём вас на эту страницу.")}</p>
             </>
           ) : pending ? (
-            <Callout tone="info" title="Заявка отправлена — ждём решения капитана">
-              Подана {formatDateTime(pending.created_at)}
-              {pending.message ? <> · «{pending.message}»</> : null}. Ответ придёт уведомлением. Заявка действует {APPLICATION_TTL_DAYS} дней.
+            <Callout tone="info" title={t("Заявка отправлена — ждём решения капитана")}>
+              {t("Подана {date}", { date: formatDateTime(pending.created_at, t.lang) })}
+              {pending.message ? <> · «{pending.message}»</> : null}. {t("Ответ придёт уведомлением. Заявка действует {n} дней.", { n: APPLICATION_TTL_DAYS })}
               <ActionForm action={withdrawApplication} className="mt-3">
                 <input type="hidden" name="applicationId" value={pending.id} />
-                <SubmitButton variant="ghost" size="sm" confirm="Отозвать заявку?" pendingText="Отзываем…">
-                  Отозвать заявку
+                <SubmitButton variant="ghost" size="sm" confirm={t("Отозвать заявку?")} pendingText={t("Отзываем…")}>
+                  {t("Отозвать заявку")}
                 </SubmitButton>
               </ActionForm>
             </Callout>
@@ -82,19 +84,19 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
               {blocker.text}
             </Callout>
           ) : gated ? (
-            <ProfileRequired next={next} action="подать заявку в команду" />
+            <ProfileRequired next={next} action={t("подать заявку в команду")} />
           ) : (
             <ActionForm action={applyToTeam}>
               <input type="hidden" name="teamId" value={team.id} />
-              <Field label="Сообщение капитану" hint="Необязательно: роль, опыт, когда можете играть. До 200 символов.">
-                <Textarea name="message" maxLength={200} placeholder="Например: AWP, FACEIT 7, играю по вечерам" />
+              <Field label={t("Сообщение капитану")} hint={t("Необязательно: роль, опыт, когда можете играть. До 200 символов.")}>
+                <Textarea name="message" maxLength={200} placeholder={t("Например: AWP, FACEIT 7, играю по вечерам")} />
               </Field>
-              <SubmitButton size="lg" pendingText="Отправляем…" className="mt-4 w-full">
-                Подать заявку
+              <SubmitButton size="lg" pendingText={t("Отправляем…")} className="mt-4 w-full">
+                {t("Подать заявку")}
               </SubmitButton>
               <p className="mt-3 text-center text-meta text-fg-3">
-                {waiting > 0 ? `Вы ждёте ответа ещё от ${waiting} ${waiting === 1 ? "команды" : "команд"}. ` : ""}
-                Примут — вы попадёте {mains < MAX_MAIN ? "в основной состав" : "в запас"}, остальные заявки отменятся.
+                {waiting > 0 ? `${t("Вы ждёте ответа ещё от {count}.", { count: `${waiting} ${t.plural(waiting, "команды", "команд", "команд")}` })} ` : ""}
+                {mains < MAX_MAIN ? t("Примут — вы попадёте в основной состав, остальные заявки отменятся.") : t("Примут — вы попадёте в запас, остальные заявки отменятся.")}
               </p>
             </ActionForm>
           )}
@@ -104,7 +106,7 @@ export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) 
       {player && !membership && (
         <div className="mt-4 text-center">
           <Button href="/team" variant="ghost" size="sm">
-            Все мои заявки
+            {t("Все мои заявки")}
           </Button>
         </div>
       )}

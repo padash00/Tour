@@ -4,6 +4,8 @@ import { bracketLabel, formatDate, formatTime, formatMoney } from "@/lib/format"
 import { modeOf } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { MatchStatus, Tournament, TournamentStatus } from "@/lib/types";
+import { getT } from "@/lib/i18n/server";
+import type { T } from "@/lib/i18n/core";
 import { Status, TeamLogo, cn, matchStatus, tournamentStatus } from "@/components/ds";
 
 export function TStatus({ status }: { status: TournamentStatus }) {
@@ -14,14 +16,14 @@ export function MStatus({ status }: { status: MatchStatus }) {
   return <Status info={matchStatus(status)} size="sm" />;
 }
 
-function tournamentFacts(t: Tournament, approved?: number) {
+function tournamentFacts(t: Tournament, tx: T, approved?: number) {
   const mode = modeOf(t.format);
   return [
     t.game,
     mode.size === 5 ? "5v5" : mode.size === 2 ? "2v2" : "1v1",
-    bracketLabel[t.bracket_type] ?? t.bracket_type,
-    approved !== undefined ? `${approved} / ${t.max_teams} ${mode.size === 1 ? "игроков" : "команд"}` : `${t.max_teams} ${mode.size === 1 ? "игроков" : "команд"}`,
-    t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн"),
+    tx(bracketLabel[t.bracket_type] ?? t.bracket_type),
+    approved !== undefined ? `${approved} / ${t.max_teams} ${mode.size === 1 ? tx("игроков") : tx("команд")}` : `${t.max_teams} ${mode.size === 1 ? tx("игроков") : tx("команд")}`,
+    t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? tx("Онлайн")),
   ];
 }
 
@@ -35,11 +37,12 @@ function CoverImage({ url, className }: { url: string | null; className?: string
   );
 }
 
-export function TournamentLine({ t, approved }: { t: Tournament; approved: number }) {
+export async function TournamentLine({ t, approved }: { t: Tournament; approved: number }) {
+  const tx = await getT();
   const solo = modeOf(t.format).size === 1;
   const fill = Math.min(100, (approved / Math.max(1, t.max_teams)) * 100);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
-  const facts = tournamentFacts(t).filter((_, i) => i !== 3);
+  const facts = tournamentFacts(t, tx).filter((_, i) => i !== 3);
 
   return (
     <Link
@@ -50,7 +53,7 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
           <TStatus status={t.status} />
-          <span className="text-meta text-fg-3">{formatDate(t.starts_at)}</span>
+          <span className="text-meta text-fg-3">{formatDate(t.starts_at, tx.lang)}</span>
         </div>
         <div className="mt-2 truncate text-[20px] font-semibold tracking-[-0.015em] transition-colors group-hover:text-accent-strong lg:text-[24px]">
           {t.name}
@@ -68,7 +71,7 @@ export function TournamentLine({ t, approved }: { t: Tournament; approved: numbe
       <div className="flex items-center gap-6 sm:min-w-[200px] sm:justify-end">
         <div className="flex-1 sm:w-[150px] sm:flex-none">
           <div className="flex items-baseline justify-between text-meta">
-            <span className="text-fg-3">{solo ? "Участники" : "Команды"}</span>
+            <span className="text-fg-3">{solo ? tx("Участники") : tx("Команды")}</span>
             <span className="num text-fg">
               {approved}<span className="text-fg-3">/{t.max_teams}</span>
             </span>
@@ -95,7 +98,8 @@ function TeamCell({ team, lost, align }: { team: MatchWithTeams["team1"]; lost: 
   );
 }
 
-export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTournament?: boolean }) {
+export async function MatchLine({ m, showTournament = true }: { m: ListMatch; showTournament?: boolean }) {
+  const tx = await getT();
   const finished = m.status === "finished";
   const live = m.status === "live";
   const scored = finished || live;
@@ -118,7 +122,7 @@ export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTour
         <div className="hidden min-w-0 sm:block">
           <MStatus status={m.status} />
           <div className="mt-1.5 text-meta text-fg-3">
-            {m.scheduled_at ? `${formatDate(m.scheduled_at)}, ${formatTime(m.scheduled_at)}` : `Матч #${m.number}`}
+            {m.scheduled_at ? `${formatDate(m.scheduled_at, tx.lang)}, ${formatTime(m.scheduled_at, tx.lang)}` : tx("Матч #{n}", { n: m.number })}
           </div>
         </div>
         <TeamCell team={m.team1} lost={lost(m.team1_id)} align="right" />
@@ -131,14 +135,14 @@ export function MatchLine({ m, showTournament = true }: { m: ListMatch; showTour
             </span>
           ) : (
             <span className="num rounded-control border border-line-subtle px-2.5 py-1 text-meta text-fg-2">
-              {m.scheduled_at ? formatTime(m.scheduled_at) : "vs"}
+              {m.scheduled_at ? formatTime(m.scheduled_at, tx.lang) : "vs"}
             </span>
           )}
           <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-fg-4">BO{m.best_of}</div>
         </div>
         <TeamCell team={m.team2} lost={lost(m.team2_id)} align="left" />
         <div className="hidden truncate text-right text-meta text-fg-3 sm:block">
-          {showTournament && m.tournament ? m.tournament.name : `Матч #${m.number}`}
+          {showTournament && m.tournament ? m.tournament.name : tx("Матч #{n}", { n: m.number })}
         </div>
       </div>
     </Link>

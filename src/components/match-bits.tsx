@@ -4,15 +4,17 @@ import type { MatchWithTeams } from "@/lib/matches";
 import { formatDateTime } from "@/lib/format";
 import type { MatchStatus } from "@/lib/types";
 import { Pill, TeamLogo, cn } from "./ui";
+import { Tt } from "./ds/tt";
+import { makeT, tr, type T } from "@/lib/i18n/core";
 
 export const matchStatusLabel: Record<MatchStatus, string> = {
-  pending: "Ожидает",
-  upcoming: "Скоро",
-  veto: "Вето",
-  ready: "Готов",
+  pending: tr("Ожидает"),
+  upcoming: tr("Скоро"),
+  veto: tr("Вето"),
+  ready: tr("Готов"),
   live: "Live",
-  finished: "Завершён",
-  cancelled: "Отменён",
+  finished: tr("Завершён"),
+  cancelled: tr("Отменён"),
 };
 
 // единая система: LIVE — красный, готов — синий, вето — янтарный, ожидание — серый
@@ -32,13 +34,13 @@ export function MatchStatusBadge({ status, compact }: { status: MatchStatus; com
     return (
       <span className={cn("inline-flex items-center gap-1", color ?? "text-fg-3")}>
         {color && <span className={cn("size-1 rounded-full bg-current", status === "live" && "animate-pulse")} />}
-        {matchStatusLabel[status]}
+        <Tt text={matchStatusLabel[status]} />
       </span>
     );
   }
   return (
     <Pill tone={tone[status]} dot>
-      {matchStatusLabel[status]}
+      <Tt text={matchStatusLabel[status]} />
     </Pill>
   );
 }
@@ -46,12 +48,13 @@ export function MatchStatusBadge({ status, compact }: { status: MatchStatus; com
 export function matchStage(
   m: { bracket: MatchWithTeams["bracket"]; round: number; group_label?: string | null },
   all: { bracket: string; round: number }[],
+  t: T = makeT("ru"),
 ) {
-  if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
-  if (m.bracket === "swiss") return `Швейцарка · раунд ${m.round}`;
+  if (m.bracket === "group") return m.group_label ? t("Группа {g} · тур {n}", { g: m.group_label, n: m.round }) : t("тур {n}", { n: m.round });
+  if (m.bracket === "swiss") return t("Швейцарка · раунд {n}", { n: m.round });
   const totalUpper = Math.max(0, ...all.filter((x) => x.bracket === "upper").map((x) => x.round));
   const totalLower = Math.max(0, ...all.filter((x) => x.bracket === "lower").map((x) => x.round));
-  return roundTitle(m.bracket, m.round, totalUpper, totalLower);
+  return roundTitle(m.bracket, m.round, totalUpper, totalLower, t);
 }
 
 /** Строка матча: команды по краям, счёт или время по центру. Без рамки-карточки */

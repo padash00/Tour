@@ -10,6 +10,7 @@ import { PlayerProfile } from "@/components/player-profile";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { PlayerLobbyGames } from "@/components/lobby/player-lobby-games";
 import { PlayerContact } from "@/components/public/player-contact";
+import { getT } from "@/lib/i18n/server";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export async function generateMetadata(props: PageProps<"/players/[steamId]">): 
 }
 
 export default async function PlayerPage(props: PageProps<"/players/[steamId]">) {
+  const t = await getT();
   const { steamId } = await props.params;
   const player = await getPlayerBySteamId(steamId);
   if (!player) notFound();
@@ -70,7 +72,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
         actions={
           <>
             <PlayerContact playerId={player.id} lastSeen={player.last_seen_at ?? null} />
-            <ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label="Сравнить с игроком" />
+            <ComparePicker self={player.steam_id} players={(pickRes.data ?? []) as PickPlayer[]} label={t("Сравнить с игроком")} />
           </>
         }
       />

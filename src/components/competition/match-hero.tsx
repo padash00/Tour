@@ -4,6 +4,8 @@ import { formatDateTime, mapName } from "@/lib/format";
 import type { MatchFull } from "@/lib/matches";
 import type { Team } from "@/lib/types";
 import { Container, TeamLogo, cn } from "@/components/ds";
+import { tr, type T } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Шапка Match Room — табло: фон — картинка текущей карты, команды, крупный счёт, статус словами.
@@ -22,16 +24,16 @@ export function heroMap(m: MatchFull) {
 }
 
 const STATUS: Record<MatchFull["status"], { label: string; cls: string }> = {
-  pending: { label: "Ждём соперника", cls: "bg-white/90 text-fg-2" },
-  upcoming: { label: "Матч назначен", cls: "bg-white/90 text-fg-2" },
-  veto: { label: "Выбор карт", cls: "bg-white text-accent" },
-  ready: { label: "Ждём сервер", cls: "bg-white text-warn" },
-  live: { label: "Идёт игра", cls: "bg-white text-live" },
-  finished: { label: "Матч окончен", cls: "bg-white/90 text-fg" },
-  cancelled: { label: "Матч отменён", cls: "bg-white/90 text-danger" },
+  pending: { label: tr("Ждём соперника"), cls: "bg-white/90 text-fg-2" },
+  upcoming: { label: tr("Матч назначен"), cls: "bg-white/90 text-fg-2" },
+  veto: { label: tr("Выбор карт"), cls: "bg-white text-accent" },
+  ready: { label: tr("Ждём сервер"), cls: "bg-white text-warn" },
+  live: { label: tr("Идёт игра"), cls: "bg-white text-live" },
+  finished: { label: tr("Матч окончен"), cls: "bg-white/90 text-fg" },
+  cancelled: { label: tr("Матч отменён"), cls: "bg-white/90 text-danger" },
 };
 
-export function MatchHero({
+export async function MatchHero({
   m,
   stage,
   adminHref,
@@ -42,19 +44,20 @@ export function MatchHero({
   adminHref?: string;
   mapImages?: Record<string, string>;
 }) {
+  const t = await getT();
   const finished = m.status === "finished";
   const live = m.status === "live";
   const map = heroMap(m);
   const liveMap = live ? m.maps.find((x) => x.status === "live") : undefined;
   const image = (map && mapImages[map.map_name]) || "/home/tournament.jpg";
-  const status = m.status === "ready" && m.server_state === "ready" ? { label: "Сервер готов", cls: "bg-white text-ok" } : STATUS[m.status];
+  const status = m.status === "ready" && m.server_state === "ready" ? { label: tr("Сервер готов"), cls: "bg-white text-ok" } : STATUS[m.status];
   // BO1 в игре — счёт раундов текущей карты; иначе — счёт серии по картам
   const roundsMain = live && m.best_of === 1 && !!liveMap;
   const s1 = roundsMain ? liveMap.team1_score : m.team1_score;
   const s2 = roundsMain ? liveMap.team2_score : m.team2_score;
   const winner = finished ? (m.winner_id === m.team1_id ? 1 : m.winner_id === m.team2_id ? 2 : null) : null;
   const round = liveMap ? liveMap.team1_score + liveMap.team2_score + 1 : null;
-  const meta = [stage, m.best_of === 1 ? "до 1 победы" : `до ${Math.ceil(m.best_of / 2)} побед`, m.is_walkover && finished ? "техническая победа" : null]
+  const meta = [stage, m.best_of === 1 ? t("до 1 победы") : t("до {n} побед", { n: Math.ceil(m.best_of / 2) }), m.is_walkover && finished ? t("техническая победа") : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -73,7 +76,7 @@ export function MatchHero({
         )}
       </div>
 
-      <section className="relative isolate overflow-hidden rounded-feature text-white" aria-label="Табло матча">
+      <section className="relative isolate overflow-hidden rounded-feature text-white" aria-label={t("Табло матча")}>
         {/* eslint-disable-next-line @next/next/no-img-element -- картинка карты из настроек (Supabase Storage) */}
         <img src={image} alt="" className="absolute inset-0 -z-20 size-full object-cover" />
         <div className="absolute inset-0 -z-10 bg-ink/75" aria-hidden />
@@ -84,12 +87,12 @@ export function MatchHero({
             <span className="text-[15px] font-semibold text-white/85">{meta}</span>
             <span className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[14px] font-bold", status.cls)}>
               {(live || m.status === "veto" || m.status === "ready") && <span className="size-2 animate-pulse rounded-full bg-current" aria-hidden />}
-              {status.label}
+              {t(status.label)}
             </span>
           </div>
 
           <div className="mt-6 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-8 lg:gap-12">
-            <Side team={m.team1} align="left" winner={winner === 1} dim={winner === 2} />
+            <Side team={m.team1} align="left" winner={winner === 1} dim={winner === 2} t={t} />
             <div className="flex min-w-[84px] flex-col items-center text-center sm:min-w-[170px]">
               {finished || live ? (
                 <div className="num flex items-baseline gap-3 text-[40px] font-extrabold leading-none sm:gap-4 sm:text-[72px]">
@@ -102,17 +105,19 @@ export function MatchHero({
               )}
               <span className="mt-2.5 text-[14px] font-semibold text-white/85 sm:text-[15px]">
                 {liveMap
-                  ? `${mapName(liveMap.map_name)} · раунд ${round}${m.best_of > 1 ? ` · карты ${m.team1_score}:${m.team2_score}` : ""}`
+                  ? m.best_of > 1
+                    ? t("{map} · раунд {n} · карты {a}:{b}", { map: mapName(liveMap.map_name), n: round, a: m.team1_score, b: m.team2_score })
+                    : t("{map} · раунд {n}", { map: mapName(liveMap.map_name), n: round })
                   : map && finished && m.best_of === 1 && map.status === "finished"
                     ? `${mapName(map.map_name)} · ${map.team1_score}:${map.team2_score}`
                     : map && (finished || m.status === "ready")
                       ? mapName(map.map_name)
                       : m.scheduled_at && !finished
-                        ? formatDateTime(m.scheduled_at)
+                        ? formatDateTime(m.scheduled_at, t.lang)
                         : null}
               </span>
             </div>
-            <Side team={m.team2} align="right" winner={winner === 2} dim={winner === 1} />
+            <Side team={m.team2} align="right" winner={winner === 2} dim={winner === 1} t={t} />
           </div>
         </div>
       </section>
@@ -120,7 +125,7 @@ export function MatchHero({
   );
 }
 
-function Side({ team, align, winner, dim }: { team: Team | null; align: "left" | "right"; winner: boolean; dim: boolean }) {
+function Side({ team, align, winner, dim, t }: { team: Team | null; align: "left" | "right"; winner: boolean; dim: boolean; t: T }) {
   return (
     <div className={cn("flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:gap-4", align === "left" ? "sm:text-left" : "sm:flex-row-reverse sm:text-right")}>
       {team ? (
@@ -139,9 +144,9 @@ function Side({ team, align, winner, dim }: { team: Team | null; align: "left" |
             {team.name}
           </Link>
         ) : (
-          <div className="text-[15px] font-bold text-white/60 sm:text-[22px]">Ещё не определена</div>
+          <div className="text-[15px] font-bold text-white/60 sm:text-[22px]">{t("Ещё не определена")}</div>
         )}
-        {winner && <div className="mt-1 inline-block rounded-full bg-brand-from px-2.5 py-0.5 text-[12.5px] font-extrabold text-fg">Победитель</div>}
+        {winner && <div className="mt-1 inline-block rounded-full bg-brand-from px-2.5 py-0.5 text-[12.5px] font-extrabold text-fg">{t("Победитель")}</div>}
       </div>
     </div>
   );

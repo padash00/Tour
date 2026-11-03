@@ -8,6 +8,7 @@ import type { Player } from "@/lib/types";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { fmt, weaponName } from "@/components/stats-format";
 import { Avatar, EmptyState, Eyebrow, cn } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 const WRAP = "mx-auto w-full max-w-wide px-4 sm:px-6 lg:px-8";
 const CARD = "rounded-surface border border-line-subtle bg-surface";
@@ -100,6 +101,7 @@ function Head({ s, align, picker }: { s: Side; align: "left" | "right"; picker: 
 }
 
 export default async function ComparePage(props: PageProps<"/players/compare">) {
+  const t = await getT();
   const sp = await props.searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const [a, b, pick] = await Promise.all([
@@ -114,16 +116,16 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
     return (
       <div className={cn(WRAP, "pt-14 pb-10 space-y-8")}>
         <div>
-          <Eyebrow>Игроки F16 Arena</Eyebrow>
-          <h1 className="mt-4 text-[36px] sm:text-[48px] font-semibold tracking-[-0.015em]">Сравнение игроков</h1>
+          <Eyebrow>{t("Игроки F16 Arena")}</Eyebrow>
+          <h1 className="mt-4 text-[36px] sm:text-[48px] font-semibold tracking-[-0.015em]">{t("Сравнение игроков")}</h1>
         </div>
         {base ? (
           <div className="flex flex-wrap items-center gap-4">
-            <span className="text-fg-2">Выберите, с кем сравнить {base.player.nickname}:</span>
-            <ComparePicker self={base.player.steam_id} players={players} label="Выбрать игрока" />
+            <span className="text-fg-2">{t("Выберите, с кем сравнить {name}:", { name: base.player.nickname })}</span>
+            <ComparePicker self={base.player.steam_id} players={players} label={t("Выбрать игрока")} />
           </div>
         ) : (
-          <EmptyState title="Выберите двух игроков" text="Откройте профиль игрока и нажмите «Сравнить с игроком»." />
+          <EmptyState title={t("Выберите двух игроков")} text={t("Откройте профиль игрока и нажмите «Сравнить с игроком».")} />
         )}
       </div>
     );
@@ -136,11 +138,11 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
     { label: "K/D", a: A?.kd ?? null, b: B?.kd ?? null, show: (v) => v.toFixed(2) },
     { label: "ADR", a: A?.adr ?? null, b: B?.adr ?? null, show: fmt.d1 },
     { label: "KAST", a: A && A.kastRounds ? A.kast : null, b: B && B.kastRounds ? B.kast : null, show: fmt.pct },
-    { label: "В голову", a: A?.hsPct ?? null, b: B?.hsPct ?? null, show: fmt.pct },
+    { label: t("В голову"), a: A?.hsPct ?? null, b: B?.hsPct ?? null, show: fmt.pct },
     { label: "Swing", a: A?.swing ?? null, b: B?.swing ?? null, show: (v) => fmt.swing(v) },
-    { label: "Убийства", a: A?.kills ?? null, b: B?.kills ?? null, show: (v) => String(v) },
-    { label: "Смерти", a: A?.deaths ?? null, b: B?.deaths ?? null, show: (v) => String(v), lowerBetter: true },
-    { label: "Карты", a: A?.maps ?? null, b: B?.maps ?? null, show: (v) => String(v) },
+    { label: t("Убийства"), a: A?.kills ?? null, b: B?.kills ?? null, show: (v) => String(v) },
+    { label: t("Смерти"), a: A?.deaths ?? null, b: B?.deaths ?? null, show: (v) => String(v), lowerBetter: true },
+    { label: t("Карты"), a: A?.maps ?? null, b: B?.maps ?? null, show: (v) => String(v) },
   ];
 
   // личные встречи: матчи команд игрока A против команд игрока B
@@ -153,30 +155,30 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
   return (
     <div className={cn(WRAP, "pt-12 pb-10 space-y-10")}>
       <div>
-        <Eyebrow>Сравнение игроков</Eyebrow>
+        <Eyebrow>{t("Сравнение игроков")}</Eyebrow>
         <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
-          <Head s={a} align="left" picker={<ComparePicker self={b.player.steam_id} other={b.player.steam_id} side="a" players={players} label="Другой" />} />
+          <Head s={a} align="left" picker={<ComparePicker self={b.player.steam_id} other={b.player.steam_id} side="a" players={players} label={t("Другой")} />} />
           <span className="text-[14px] font-semibold uppercase tracking-[0.2em] text-fg-3">vs</span>
-          <Head s={b} align="right" picker={<ComparePicker self={a.player.steam_id} players={players} label="Другой" />} />
+          <Head s={b} align="right" picker={<ComparePicker self={a.player.steam_id} players={players} label={t("Другой")} />} />
         </div>
       </div>
 
       {meet.matches > 0 && (
         <div className={cn(CARD, "flex flex-wrap items-center justify-center gap-x-8 gap-y-2 p-5 text-center")}>
-          <span className="text-[13px] uppercase tracking-[0.18em] text-fg-3">Личные встречи</span>
+          <span className="text-[13px] uppercase tracking-[0.18em] text-fg-3">{t("Личные встречи")}</span>
           <span className="num text-[22px] font-semibold">
             <span className="text-accent">{meet.wins}</span>
             <span className="mx-1.5 text-fg-3">:</span>
             <span className="text-warn">{meet.matches - meet.wins}</span>
           </span>
           <span className="num text-[14px] text-fg-2">
-            карты {meet.mapWins}:{meet.maps - meet.mapWins}
+            {t("карты {score}", { score: `${meet.mapWins}:${meet.maps - meet.mapWins}` })}
           </span>
         </div>
       )}
 
       {!A && !B ? (
-        <EmptyState title="Статистики пока нет" text="Она появится, когда игроки сыграют матчи на серверах F16 Arena." />
+        <EmptyState title={t("Статистики пока нет")} text={t("Она появится, когда игроки сыграют матчи на серверах F16 Arena.")} />
       ) : (
         <div className={cn(CARD, "overflow-hidden")}>
           {metrics.map((m) => (
@@ -190,37 +192,37 @@ export default async function ComparePage(props: PageProps<"/players/compare">) 
           <div key={s.player.id} className={cn(CARD, "p-5 sm:p-6 space-y-6")}>
             <div className={cn("text-[15px] font-semibold", i === 0 ? "text-accent" : "text-warn")}>{s.player.nickname}</div>
             <div>
-              <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">Лучшие карты</div>
+              <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">{t("Лучшие карты")}</div>
               {s.maps.length ? (
                 <ul className="space-y-2">
                   {s.maps.map((m) => (
                     <li key={m.map} className="flex items-center justify-between gap-3 text-[14px]">
                       <span className="font-medium">{mapName(m.map)}</span>
                       <span className="num text-fg-3">
-                        {m.wins}/{m.played} побед · <span className="text-fg-2">{m.rating.toFixed(2)}</span>
+                        {t("{wins}/{played} побед", { wins: m.wins, played: m.played })} · <span className="text-fg-2">{m.rating.toFixed(2)}</span>
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="text-[13px] text-fg-3">Нет сыгранных карт</div>
+                <div className="text-[13px] text-fg-3">{t("Нет сыгранных карт")}</div>
               )}
             </div>
             <div>
-              <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">Оружие</div>
+              <div className="mb-2.5 text-[11px] uppercase tracking-[0.2em] text-fg-3">{t("Оружие")}</div>
               {s.weapons.length ? (
                 <ul className="space-y-2">
                   {s.weapons.map((w) => (
                     <li key={w.weapon} className="flex items-center justify-between gap-3 text-[14px]">
-                      <span className="font-medium">{weaponName(w.weapon)}</span>
+                      <span className="font-medium">{weaponName(w.weapon, t)}</span>
                       <span className="num text-fg-3">
-                        {w.kills} убийств · HS {w.kills ? Math.round((100 * w.hs) / w.kills) : 0}%
+                        {t("{n} убийств", { n: w.kills })} · HS {w.kills ? Math.round((100 * w.hs) / w.kills) : 0}%
                       </span>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="text-[13px] text-fg-3">Нет данных об оружии</div>
+                <div className="text-[13px] text-fg-3">{t("Нет данных об оружии")}</div>
               )}
             </div>
           </div>

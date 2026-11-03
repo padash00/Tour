@@ -3,6 +3,8 @@ import type { StandingRow } from "@/lib/formats";
 import type { Match, Team } from "@/lib/types";
 import { MatchStatusBadge } from "./match-bits";
 import { SubsectionTitle, TeamLogo, cn } from "./ds";
+import { getT } from "@/lib/i18n/server";
+import type { T } from "@/lib/i18n/core";
 
 type StageMatchRow = Match & { maps: { team1_score: number; team2_score: number; winner_id: string | null; status: string }[] };
 type TeamMap = Map<string, Pick<Team, "id" | "name" | "tag" | "logo_url">>;
@@ -20,7 +22,7 @@ function TeamCell({ team }: { team?: Pick<Team, "name" | "tag" | "logo_url"> }) 
 }
 
 /** Компактная строка матча стадии */
-function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
+function StageMatchLine({ m, teams, t }: { m: StageMatchRow; teams: TeamMap; t: T }) {
   const finished = m.status === "finished";
   const t1 = m.team1_id ? teams.get(m.team1_id) : undefined;
   const t2 = m.team2_id ? teams.get(m.team2_id) : undefined;
@@ -29,7 +31,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
       href={`/matches/${m.id}`}
       className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-control border border-line-subtle bg-surface px-4 text-[14px] transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-surface-2"
     >
-      <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? (finished ? "Бай" : "TBD")}</span>
+      <span className={cn("truncate", finished && m.winner_id !== m.team1_id ? "text-fg-3" : "text-fg")}>{t1?.name ?? (finished ? t("Бай") : "TBD")}</span>
       <span className="text-center">
         {finished || m.status === "live" ? (
           <span className="num font-semibold">
@@ -39,7 +41,7 @@ function StageMatchLine({ m, teams }: { m: StageMatchRow; teams: TeamMap }) {
           <MatchStatusBadge status={m.status} compact />
         )}
       </span>
-      <span className={cn("truncate text-right", finished && m.winner_id !== m.team2_id ? "text-fg-3" : "text-fg")}>{t2?.name ?? (finished ? "Бай" : "TBD")}</span>
+      <span className={cn("truncate text-right", finished && m.winner_id !== m.team2_id ? "text-fg-3" : "text-fg")}>{t2?.name ?? (finished ? t("Бай") : "TBD")}</span>
     </Link>
   );
 }
@@ -50,12 +52,14 @@ function StandingsTable({
   advance,
   swiss,
   solo,
+  t,
 }: {
   rows: StandingRow[];
   teams: TeamMap;
   advance?: number;
   swiss?: boolean;
   solo?: boolean;
+  t: T;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -63,13 +67,13 @@ function StandingsTable({
         <thead>
           <tr>
             <th className="w-8">#</th>
-            <th>{solo ? "Участник" : "Команда"}</th>
-            <th className="text-right">И</th>
-            <th className="text-right">{swiss ? "Счёт" : "В–П"}</th>
-            <th className="text-right">Карты</th>
-            <th className="text-right">Раунды</th>
-            {swiss && <th className="text-right" title="Бухгольц: сила соперников">Бх</th>}
-            {swiss && <th className="text-right">Статус</th>}
+            <th>{solo ? t("Участник") : t("Команда")}</th>
+            <th className="text-right">{t("И")}</th>
+            <th className="text-right">{swiss ? t("Счёт") : t("В–П")}</th>
+            <th className="text-right">{t("Карты")}</th>
+            <th className="text-right">{t("Раунды")}</th>
+            {swiss && <th className="text-right" title={t("Бухгольц: сила соперников")}>{t("Бх")}</th>}
+            {swiss && <th className="text-right">{t("Статус")}</th>}
           </tr>
         </thead>
         <tbody>
@@ -94,11 +98,11 @@ function StandingsTable({
                 {swiss && (
                   <td className="text-right">
                     {r.status === "advanced" ? (
-                      <span className="text-ok text-xs font-semibold">Вышел</span>
+                      <span className="text-ok text-xs font-semibold">{t("Вышел")}</span>
                     ) : r.status === "eliminated" ? (
-                      <span className="text-danger text-xs">Выбыл</span>
+                      <span className="text-danger text-xs">{t("Выбыл")}</span>
                     ) : (
-                      <span className="text-fg-3 text-xs">в игре</span>
+                      <span className="text-fg-3 text-xs">{t("в игре")}</span>
                     )}
                   </td>
                 )}
@@ -121,12 +125,14 @@ function CrossTable({
   teams,
   advance,
   solo,
+  t,
 }: {
   rows: StandingRow[];
   matches: StageMatchRow[];
   teams: TeamMap;
   advance?: number;
   solo?: boolean;
+  t: T;
 }) {
   const ids = rows.map((r) => r.teamId);
   const meet = (a: string, b: string) => matches.find((m) => (m.team1_id === a && m.team2_id === b) || (m.team1_id === b && m.team2_id === a));
@@ -136,7 +142,7 @@ function CrossTable({
         <thead>
           <tr className="text-[11px] uppercase tracking-[0.14em] text-fg-3">
             <th className="w-8 px-3 py-3 text-left font-medium">#</th>
-            <th className="px-3 py-3 text-left font-medium">{solo ? "Участник" : "Команда"}</th>
+            <th className="px-3 py-3 text-left font-medium">{solo ? t("Участник") : t("Команда")}</th>
             {ids.map((id, j) => (
               <th key={id} className="w-[76px] px-1 py-3 text-center font-medium" title={teams.get(id)?.name}>
                 <span className="inline-flex flex-col items-center gap-1">
@@ -145,9 +151,9 @@ function CrossTable({
                 </span>
               </th>
             ))}
-            <th className="px-3 py-3 text-right font-medium">В–П</th>
-            <th className="px-3 py-3 text-right font-medium">Карты</th>
-            <th className="px-3 py-3 text-right font-medium">Раунды</th>
+            <th className="px-3 py-3 text-right font-medium">{t("В–П")}</th>
+            <th className="px-3 py-3 text-right font-medium">{t("Карты")}</th>
+            <th className="px-3 py-3 text-right font-medium">{t("Раунды")}</th>
           </tr>
         </thead>
         <tbody>
@@ -213,7 +219,7 @@ function CrossTable({
 }
 
 /** Группы / круговая система: шахматка и матчи по турам */
-export function GroupStageView({
+export async function GroupStageView({
   groups,
   teams,
   advance,
@@ -224,6 +230,7 @@ export function GroupStageView({
   advance?: number;
   solo?: boolean;
 }) {
+  const t = await getT();
   const single = groups.length === 1;
   return (
     <div className={cn("grid gap-8", !single && "xl:grid-cols-2")}>
@@ -231,25 +238,25 @@ export function GroupStageView({
         const rounds = [...new Set(g.matches.map((m) => m.round))].sort((a, b) => a - b);
         return (
           <section key={g.label ?? "A"} className="min-w-0 space-y-4">
-            <SubsectionTitle action={advance != null ? <span className="text-meta text-fg-3">выходят {advance} лучших</span> : undefined}>
-              {single ? "Матчи по турам" : `Группа ${g.label}`}
+            <SubsectionTitle action={advance != null ? <span className="text-meta text-fg-3">{t("выходят {n} лучших", { n: advance })}</span> : undefined}>
+              {single ? t("Матчи по турам") : t("Группа {g}", { g: g.label })}
             </SubsectionTitle>
-            <CrossTable rows={g.table} matches={g.matches} teams={teams} advance={advance} solo={solo} />
+            <CrossTable rows={g.table} matches={g.matches} teams={teams} advance={advance} solo={solo} t={t} />
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-fg-3">
-              <span>В клетке — счёт по картам глазами участника строки</span>
-              <span><span className="text-ok">■</span> победа</span>
-              <span><span className="text-danger">■</span> поражение</span>
-              <span><span className="text-accent">■</span> идёт</span>
+              <span>{t("В клетке — счёт по картам глазами участника строки")}</span>
+              <span><span className="text-ok">■</span> {t("победа")}</span>
+              <span><span className="text-danger">■</span> {t("поражение")}</span>
+              <span><span className="text-accent">■</span> {t("идёт")}</span>
             </div>
             <div className={cn("grid gap-4", single && "md:grid-cols-2 lg:grid-cols-3")}>
               {rounds.map((r) => (
                 <div key={r}>
-                  <div className="mb-2 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">Тур {r}</div>
+                  <div className="mb-2 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">{t("Тур {n}", { n: r })}</div>
                   <div className="space-y-1.5">
                     {g.matches
                       .filter((m) => m.round === r)
                       .map((m) => (
-                        <StageMatchLine key={m.id} m={m} teams={teams} />
+                        <StageMatchLine key={m.id} m={m} teams={teams} t={t} />
                       ))}
                   </div>
                 </div>
@@ -263,7 +270,7 @@ export function GroupStageView({
 }
 
 /** Швейцарская система: раунды колонками, внутри — пулы по счёту; таблица со статусами */
-export function SwissView({
+export async function SwissView({
   table,
   matches,
   teams,
@@ -276,6 +283,7 @@ export function SwissView({
   wins: number;
   solo?: boolean;
 }) {
+  const t = await getT();
   const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   // счёт команды перед раундом r: победы/поражения в раундах < r
   const recordBefore = (teamId: string, r: number) => {
@@ -308,18 +316,18 @@ export function SwissView({
             });
             return (
               <div key={r} className="w-[260px] space-y-4">
-                <div className="text-[12px] text-fg-3">Раунд {r}</div>
+                <div className="text-[12px] text-fg-3">{t("Раунд {n}", { n: r })}</div>
                 {ordered.map(([rec, ms]) => (
                   <div key={rec} className="rounded-surface border border-line-subtle bg-surface p-2.5">
                     <div className="mb-2 flex items-center justify-between text-[11px]">
                       <span className="num font-semibold text-fg-2">{rec}</span>
                       <span className="text-fg-3">
-                        {rec.startsWith(`${wins - 1}–`) ? "матч за выход" : rec.endsWith(`–${wins - 1}`) ? "матч на вылет" : ""}
+                        {rec.startsWith(`${wins - 1}–`) ? t("матч за выход") : rec.endsWith(`–${wins - 1}`) ? t("матч на вылет") : ""}
                       </span>
                     </div>
                     <div className="space-y-1.5">
                       {ms.map((m) => (
-                        <StageMatchLine key={m.id} m={m} teams={teams} />
+                        <StageMatchLine key={m.id} m={m} teams={teams} t={t} />
                       ))}
                     </div>
                   </div>
@@ -330,8 +338,8 @@ export function SwissView({
         </div>
       </div>
       <div>
-        <h3 className="mb-4 text-title text-fg">Таблица</h3>
-        <StandingsTable rows={table} teams={teams} swiss solo={solo} />
+        <h3 className="mb-4 text-title text-fg">{t("Таблица")}</h3>
+        <StandingsTable rows={table} teams={teams} swiss solo={solo} t={t} />
       </div>
     </div>
   );

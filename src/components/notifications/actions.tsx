@@ -7,9 +7,11 @@ import { markNotificationRead, markNotificationsRead } from "@/app/actions/profi
 import { Button } from "@/components/ds";
 import { useToast } from "@/components/toast";
 import { refreshViewer } from "@/components/viewer";
+import { useT } from "@/lib/i18n/client";
 
 /** «Прочитать все» — массовая операция; после неё колокольчик в шапке обновляется сразу */
 export function MarkAllReadButton({ size = "md" }: { size?: "sm" | "md" }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [pending, start] = useTransition();
@@ -27,7 +29,7 @@ export function MarkAllReadButton({ size = "md" }: { size?: "sm" | "md" }) {
         })
       }
     >
-      {pending ? "Отмечаем…" : "Прочитать все"}
+      {pending ? t("Отмечаем…") : t("Прочитать все")}
     </Button>
   );
 }

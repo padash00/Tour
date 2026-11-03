@@ -6,6 +6,7 @@ import { ScrollText } from "lucide-react";
 import { Button, Dialog, cn } from "@/components/ds";
 import { useViewer } from "@/components/viewer";
 import { noChrome } from "@/components/shell/nav";
+import { useT } from "@/lib/i18n/client";
 
 /*
  * Регламент перед заявкой: текст в окне с прокруткой, галочка «прочитал» доступна только после прокрутки до конца.
@@ -35,6 +36,7 @@ export function useRulesOk(tournamentId: string) {
 
 /** Текст регламента с прокруткой; onRead — когда дочитали до конца */
 function RulesReader({ rules, onRead, className }: { rules: string; onRead: () => void; className?: string }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const done = useRef(false);
   const check = () => {
@@ -55,7 +57,7 @@ function RulesReader({ rules, onRead, className }: { rules: string; onRead: () =
       ref={ref}
       onScroll={check}
       tabIndex={0}
-      aria-label="Текст регламента"
+      aria-label={t("Текст регламента")}
       className={cn("prose-f16 overflow-y-auto overscroll-contain whitespace-pre-line rounded-control border border-line bg-bg-2 p-4 text-[14px] leading-relaxed text-fg-2", className)}
     >
       {rules}
@@ -64,12 +66,13 @@ function RulesReader({ rules, onRead, className }: { rules: string; onRead: () =
 }
 
 function AgreeRow({ read, checked, onChange }: { read: boolean; checked: boolean; onChange: (v: boolean) => void }) {
+  const t = useT();
   return (
     <div className="mt-3 space-y-2">
-      {!read && <p className="text-meta font-medium text-warn">Прокрутите регламент до конца — после этого можно поставить галочку.</p>}
+      {!read && <p className="text-meta font-medium text-warn">{t("Прокрутите регламент до конца — после этого можно поставить галочку.")}</p>}
       <label className={cn("flex items-start gap-3 text-[15px]", read ? "cursor-pointer text-fg" : "cursor-not-allowed text-fg-3")}>
         <input type="checkbox" className="mt-1 size-5 shrink-0 accent-[var(--color-accent)]" disabled={!read} checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span>Я прочитал регламент турнира полностью и согласен с ним</span>
+        <span>{t("Я прочитал регламент турнира полностью и согласен с ним")}</span>
       </label>
     </div>
   );
@@ -77,15 +80,16 @@ function AgreeRow({ read, checked, onChange }: { read: boolean; checked: boolean
 
 /** Блок «Регламент турнира» на странице заявки: без него кнопка «Подать заявку» не активна */
 export function RulesGate({ tournamentId, rules }: { tournamentId: string; rules: string }) {
+  const t = useT();
   const [read, setRead] = useState(false);
   const checked = useRulesOk(tournamentId);
   return (
     <section aria-labelledby="rules-gate-title" className="rounded-card border border-accent/30 bg-surface p-4 sm:p-5">
       <h2 id="rules-gate-title" className="flex items-center gap-2 text-heading text-fg">
         <ScrollText className="size-5 text-accent" aria-hidden />
-        Регламент турнира
+        {t("Регламент турнира")}
       </h2>
-      <p className="mt-1 text-meta text-fg-3">Перед подачей заявки прочитайте регламент полностью — кнопка «Подать заявку» станет доступна после подтверждения.</p>
+      <p className="mt-1 text-meta text-fg-3">{t("Перед подачей заявки прочитайте регламент полностью — кнопка «Подать заявку» станет доступна после подтверждения.")}</p>
       <RulesReader rules={rules} onRead={() => setRead(true)} className="mt-3 max-h-[55vh]" />
       <AgreeRow read={read} checked={checked} onChange={(v) => setOk(tournamentId, v)} />
     </section>
@@ -96,6 +100,7 @@ type Pending = { id: string; name: string; slug: string; rules: string };
 
 /** Окно с регламентом для игроков поданных команд — ставится один раз в layout */
 export function RulesAckModal() {
+  const t = useT();
   const { player } = useViewer();
   const pathname = usePathname();
   const [pending, setPending] = useState<Pending | null>(null);
@@ -134,11 +139,11 @@ export function RulesAckModal() {
       onClose={() => {}}
       dismissible={false}
       size="lg"
-      title={`Регламент «${pending.name}»`}
-      description="Ваша команда подала заявку на турнир. Прочитайте регламент полностью — это обязательно для всех игроков."
+      title={t("Регламент «{name}»", { name: pending.name })}
+      description={t("Ваша команда подала заявку на турнир. Прочитайте регламент полностью — это обязательно для всех игроков.")}
       footer={
         <Button onClick={confirm} loading={saving} disabled={!checked} className="w-full sm:w-auto">
-          Прочитал, согласен
+          {t("Прочитал, согласен")}
         </Button>
       }
     >

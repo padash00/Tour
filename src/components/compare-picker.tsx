@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, cn } from "./ui";
+import { useT } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/core";
 
 export type PickPlayer = { steam_id: string; nickname: string; avatar_url: string | null };
 
@@ -13,7 +15,7 @@ export type PickPlayer = { steam_id: string; nickname: string; avatar_url: strin
 export function ComparePicker({
   self,
   players,
-  label = "Сравнить",
+  label = tr("Сравнить"),
   side = "b",
   other,
   className,
@@ -27,6 +29,7 @@ export function ComparePicker({
   other?: string;
   className?: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -69,7 +72,7 @@ export function ComparePicker({
         <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
           <path d="M5 2v12M11 2v12M2 5h6M8 11h6" strokeLinecap="round" />
         </svg>
-        {label}
+        {t(label)}
       </button>
       {open && (
         // на телефоне — по центру экрана: кнопка может стоять у левого края, и выпадашка ушла бы за экран
@@ -78,8 +81,8 @@ export function ComparePicker({
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ник или SteamID"
-            aria-label="Найти игрока"
+            placeholder={t("Ник или SteamID")}
+            aria-label={t("Найти игрока")}
             className="field !h-10 w-full text-[14px]"
           />
           <ul className="mt-1.5 max-h-[300px] overflow-y-auto">
@@ -95,7 +98,7 @@ export function ComparePicker({
                 </button>
               </li>
             ))}
-            {list.length === 0 && <li className="px-2.5 py-3 text-[13px] text-fg-3">Никого не нашли</li>}
+            {list.length === 0 && <li className="px-2.5 py-3 text-[13px] text-fg-3">{t("Никого не нашли")}</li>}
           </ul>
         </div>
       )}

@@ -5,6 +5,8 @@ import { bracketLabel, formatDate, formatDateTime, formatMoney } from "@/lib/for
 import { liveMapOf, mapLabel } from "@/lib/maps";
 import type { MatchWithTeams } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
+import { tr, type T } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 import type { Tournament } from "@/lib/types";
 import { Button, CARD_SECTION, Container, Status, cn, tournamentStatus } from "@/components/ds";
 import { HomeMyMatch } from "./home-my-match";
@@ -38,17 +40,17 @@ export type HomeData = {
 };
 
 /** Стадия словами: «1/8 финала», «Полуфинал», «Финал» (по числу раундов сетки), иначе «раунд N» */
-function stageName(m: MatchWithTeams, totalUpper?: number) {
-  if (m.bracket === "grand_final") return "Гранд-финал";
-  if (m.bracket === "third_place") return "Матч за 3-е место";
-  if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
+function stageName(m: MatchWithTeams, t: T, totalUpper?: number) {
+  if (m.bracket === "grand_final") return t("Гранд-финал");
+  if (m.bracket === "third_place") return t("Матч за 3-е место");
+  if (m.bracket === "group") return m.group_label ? t("Группа {g} · тур {n}", { g: m.group_label, n: m.round }) : t("тур {n}", { n: m.round });
   if (m.bracket === "upper" && totalUpper) {
     const left = totalUpper - m.round; // 0 — финал, 1 — полуфинал, 2 — 1/4 …
-    if (left === 0) return "Финал";
-    if (left === 1) return "Полуфинал";
-    return `1/${2 ** left} финала`;
+    if (left === 0) return t("Финал");
+    if (left === 1) return t("Полуфинал");
+    return t("1/{n} финала", { n: 2 ** left });
   }
-  return `раунд ${m.round}`;
+  return t("Раунд {n}", { n: m.round });
 }
 
 function MapThumb({ src, className }: { src?: string; className?: string }) {
@@ -62,23 +64,24 @@ function MapThumb({ src, className }: { src?: string; className?: string }) {
 
 // ───────────────────────── ближайший турнир
 
-export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approved: number; isFirst: boolean }) {
+export function TournamentCard({ t: tour, approved, isFirst, tx }: { t: Tournament; approved: number; isFirst: boolean; tx: T }) {
+  const t = tour;
   const mode = modeOf(t.format);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
   const action =
     t.status === "registration"
-      ? { href: `/tournaments/${t.slug}/register`, label: "Подать заявку" }
+      ? { href: `/tournaments/${t.slug}/register`, label: tx("Подать заявку") }
       : t.status === "checkin"
-        ? { href: `/tournaments/${t.slug}/checkin`, label: "Пройти check-in" }
+        ? { href: `/tournaments/${t.slug}/checkin`, label: tx("Пройти check-in") }
         : t.status === "live"
-          ? { href: `/tournaments/${t.slug}?tab=bracket`, label: "Смотреть сетку" }
+          ? { href: `/tournaments/${t.slug}?tab=bracket`, label: tx("Смотреть сетку") }
           : null;
-  const who = mode.size === 1 ? "Участники" : "Команды";
+  const who = mode.size === 1 ? tx("Участники") : tx("Команды");
   const facts = [
-    { icon: <CalendarDays />, label: "Начало", value: t.starts_at ? formatDateTime(t.starts_at) : "дата будет объявлена" },
-    { icon: <Users />, label: who, value: `${approved} из ${t.max_teams}` },
-    { icon: <MapPin />, label: "Где", value: t.is_lan ? (t.location ?? "F16 Arena") : "онлайн" },
-    { icon: <Trophy />, label: "Призы", value: prize ?? "будут объявлены" },
+    { icon: <CalendarDays />, label: tx("Начало"), value: t.starts_at ? formatDateTime(t.starts_at, tx.lang) : tx("дата будет объявлена") },
+    { icon: <Users />, label: who, value: tx("{a} из {b}", { a: approved, b: t.max_teams }) },
+    { icon: <MapPin />, label: tx("Где"), value: t.is_lan ? (t.location ?? "F16 Arena") : tx("онлайн") },
+    { icon: <Trophy />, label: tx("Призы"), value: prize ?? tx("будут объявлены") },
   ];
 
   return (
@@ -89,12 +92,12 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
       <div className="flex flex-col justify-center gap-5 p-6 sm:p-8">
         <div className="flex flex-wrap items-center gap-2">
           <Status info={tournamentStatus[t.status]} />
-          {isFirst && <span className="rounded-full bg-surface-4 px-3 py-1 text-[13px] font-semibold text-fg-2">Первый турнир платформы</span>}
+          {isFirst && <span className="rounded-full bg-surface-4 px-3 py-1 text-[13px] font-semibold text-fg-2">{tx("Первый турнир платформы")}</span>}
         </div>
         <div>
           <h2 className="text-[30px] font-extrabold leading-tight tracking-[-0.02em] text-fg sm:text-[36px]">{t.name}</h2>
           <p className="mt-1.5 text-[16px] text-fg-2">
-            {t.game} · {mode.size === 5 ? "5 на 5" : mode.size === 2 ? "2 на 2" : "1 на 1"} · {bracketLabel[t.bracket_type] ?? t.bracket_type}
+            {t.game} · {tx(mode.size === 5 ? "5 на 5" : mode.size === 2 ? "2 на 2" : "1 на 1")} · {tx(bracketLabel[t.bracket_type] ?? t.bracket_type)}
           </p>
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -115,7 +118,7 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
             </Button>
           )}
           <Button href={`/tournaments/${t.slug}`} size="lg" variant="secondary">
-            Подробнее о турнире
+            {tx("Подробнее о турнире")}
           </Button>
         </div>
       </div>
@@ -124,12 +127,12 @@ export function TournamentCard({ t, approved, isFirst }: { t: Tournament; approv
 }
 
 /** Турниров ещё нет — честно, в той же композиции */
-function NoTournamentCard() {
+function NoTournamentCard({ t }: { t: T }) {
   return (
     <div className="flex flex-col gap-4 rounded-surface border border-line-subtle bg-surface p-6 sm:p-8">
-      <h2 className="text-[26px] font-extrabold text-fg">Скоро первый турнир</h2>
+      <h2 className="text-[26px] font-extrabold text-fg">{t("Скоро первый турнир")}</h2>
       <p className="max-w-[60ch] text-[16px] text-fg-2">
-        Турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.
+        {t("Турнир будет объявлен здесь. Соберите команду заранее — когда откроется регистрация, останется подать заявку.")}
       </p>
       <div>
         <TeamCta size="lg" />
@@ -138,19 +141,19 @@ function NoTournamentCard() {
   );
 }
 
-function NextTournaments({ list }: { list: Tournament[] }) {
+function NextTournaments({ list, t }: { list: Tournament[]; t: T }) {
   if (!list.length) return null;
   return (
     <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface">
-      {list.map((t, i) => (
-        <Link key={t.id} href={`/tournaments/${t.slug}`} className={cn("group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-2", i > 0 && "border-t border-line-subtle")}>
+      {list.map((tour, i) => (
+        <Link key={tour.id} href={`/tournaments/${tour.slug}`} className={cn("group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-2", i > 0 && "border-t border-line-subtle")}>
           <span className="grid size-10 shrink-0 place-items-center rounded-control bg-surface-4 text-fg-2">
             <CalendarDays className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[16px] font-bold text-fg">{t.name}</div>
+            <div className="truncate text-[16px] font-bold text-fg">{tour.name}</div>
             <div className="text-[14px] text-fg-3">
-              {formatDate(t.starts_at)} · {tournamentStatus[t.status].label}
+              {formatDate(tour.starts_at, t.lang)} · {t(tournamentStatus[tour.status].label)}
             </div>
           </div>
           <ArrowRight className="size-5 text-fg-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -163,14 +166,14 @@ function NextTournaments({ list }: { list: Tournament[] }) {
 // ───────────────────────── как участвовать
 
 const HOW = [
-  { title: "Войдите через Steam", text: "Кнопка в меню. Пароль на сайте не нужен." },
-  { title: "Соберите команду", text: "Капитан создаёт команду и приглашает игроков по ссылке." },
-  { title: "Подайте заявку", text: "На странице турнира. Статус заявки будет виден там же." },
+  { title: tr("Войдите через Steam"), text: tr("Кнопка в меню. Пароль на сайте не нужен.") },
+  { title: tr("Соберите команду"), text: tr("Капитан создаёт команду и приглашает игроков по ссылке.") },
+  { title: tr("Подайте заявку"), text: tr("На странице турнира. Статус заявки будет виден там же.") },
 ];
 
 // ───────────────────────── матчи
 
-function LiveCard({ m, img, totalUpper }: { m: HomeMatch; img?: string; totalUpper?: number }) {
+function LiveCard({ m, img, totalUpper, t }: { m: HomeMatch; img?: string; totalUpper?: number; t: T }) {
   const map = liveMapOf(m);
   const s1 = map ? map.team1_score : m.team1_score;
   const s2 = map ? map.team2_score : m.team2_score;
@@ -180,7 +183,7 @@ function LiveCard({ m, img, totalUpper }: { m: HomeMatch; img?: string; totalUpp
       <div className="flex flex-col gap-2 p-4">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-danger-dim px-2.5 py-0.5 text-[13px] font-bold text-live">
           <span className="size-2 animate-pulse rounded-full bg-live" aria-hidden />
-          Идёт{map ? ` · ${mapLabel(map.map_name)}` : ""}
+          {t("Идёт")}{map ? ` · ${mapLabel(map.map_name)}` : ""}
         </span>
         {[
           { name: m.team1?.name ?? "—", s: s1, lead: s1 > s2 },
@@ -192,14 +195,14 @@ function LiveCard({ m, img, totalUpper }: { m: HomeMatch; img?: string; totalUpp
           </div>
         ))}
         <span className="truncate text-[13px] text-fg-3">
-          {m.tournament.name} · {stageName(m, totalUpper)}
+          {m.tournament.name} · {stageName(m, t, totalUpper)}
         </span>
       </div>
     </Link>
   );
 }
 
-function ResultRow({ m, img }: { m: HomeMatch; img?: string }) {
+function ResultRow({ m, img, t }: { m: HomeMatch; img?: string; t: T }) {
   const w1 = m.winner_id != null && m.winner_id === m.team1_id;
   const w2 = m.winner_id != null && m.winner_id === m.team2_id;
   const single = m.best_of === 1 && m.maps?.[0];
@@ -214,7 +217,7 @@ function ResultRow({ m, img }: { m: HomeMatch; img?: string }) {
         {a} : {b}
       </span>
       <span className={cn("truncate text-right text-[16px]", w2 ? "font-bold text-accent" : "text-fg-3")}>{m.team2?.name ?? "—"}</span>
-      <span className="hidden truncate text-right text-[13px] text-fg-3 sm:block">{single ? mapLabel(single.map_name) : `до ${Math.floor(m.best_of / 2) + 1} побед`}</span>
+      <span className="hidden truncate text-right text-[13px] text-fg-3 sm:block">{single ? mapLabel(single.map_name) : t("до {n} побед", { n: Math.floor(m.best_of / 2) + 1 })}</span>
     </Link>
   );
 }
@@ -235,7 +238,8 @@ function SectionHead({ title, hint, href, link }: { title: string; hint?: string
   );
 }
 
-export function HomeView({ featured, approved, isFirst, upcoming, live = [], results = [], mapImages = {}, upperRounds = {} }: HomeData) {
+export async function HomeView({ featured, approved, isFirst, upcoming, live = [], results = [], mapImages = {}, upperRounds = {} }: HomeData) {
+  const t = await getT();
   const firstMap = (m: HomeMatch) => {
     const map = liveMapOf(m)?.map_name ?? m.maps?.[0]?.map_name;
     return map ? mapImages[map] : undefined;
@@ -248,15 +252,15 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
         {/* eslint-disable-next-line @next/next/no-img-element -- знак бренда, SVG как есть */}
         <img src="/brand/f16-symbol-light.svg" alt="" aria-hidden className="pointer-events-none absolute right-6 top-1/2 hidden h-auto w-[34%] -translate-y-1/2 opacity-[0.12] lg:block" />
         <div className="relative max-w-[640px]">
-          <span className="text-[14px] font-bold text-accent">F16 Arena · Усть-Каменогорск</span>
-          <h1 className="mt-1 text-[32px] font-extrabold leading-[1.1] tracking-[-0.02em] text-fg sm:text-[40px]">Турниры по CS2 в F16 Arena</h1>
-          <p className="mt-2 text-[16.5px] text-fg-2">Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.</p>
+          <span className="text-[14px] font-bold text-accent">{t("F16 Arena · Усть-Каменогорск")}</span>
+          <h1 className="mt-1 text-[32px] font-extrabold leading-[1.1] tracking-[-0.02em] text-fg sm:text-[40px]">{t("Турниры по CS2 в F16 Arena")}</h1>
+          <p className="mt-2 text-[16.5px] text-fg-2">{t("Регистрация команд, выбор карт, игра на серверах клуба и статистика — всё на одном сайте.")}</p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button href="/tournaments" iconRight={<ArrowRight />}>
-              Все турниры
+              {t("Все турниры")}
             </Button>
             <Button href="/stats" variant="secondary">
-              Рейтинг игроков
+              {t("Рейтинг игроков")}
             </Button>
           </div>
         </div>
@@ -265,19 +269,19 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
       <HomeMyMatch />
 
       <section className={cn(CARD_SECTION, "flex flex-col gap-3 [&>div:first-child]:mb-1")}>
-        <SectionHead title={featured && ["finished", "cancelled"].includes(featured.status) ? "Последний турнир" : "Ближайший турнир"} href="/tournaments" link="Все турниры" />
-        {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} /> : <NoTournamentCard />}
-        <NextTournaments list={upcoming} />
+        <SectionHead title={featured && ["finished", "cancelled"].includes(featured.status) ? t("Последний турнир") : t("Ближайший турнир")} href="/tournaments" link={t("Все турниры")} />
+        {featured ? <TournamentCard t={featured} approved={approved} isFirst={isFirst} tx={t} /> : <NoTournamentCard t={t} />}
+        <NextTournaments list={upcoming} t={t} />
       </section>
 
       <section className={CARD_SECTION}>
-        <SectionHead title="Как участвовать" />
+        <SectionHead title={t("Как участвовать")} />
         <ol className="grid gap-3 md:grid-cols-3">
           {HOW.map((s, i) => (
             <li key={s.title} className="flex flex-col gap-2 rounded-surface border border-line-subtle bg-surface p-5">
               <span className="grid size-9 place-items-center rounded-full bg-accent text-[15px] font-extrabold text-accent-ink">{i + 1}</span>
-              <span className="text-[17px] font-bold text-fg">{s.title}</span>
-              <span className="text-[15px] text-fg-2">{s.text}</span>
+              <span className="text-[17px] font-bold text-fg">{t(s.title)}</span>
+              <span className="text-[15px] text-fg-2">{t(s.text)}</span>
             </li>
           ))}
         </ol>
@@ -288,10 +292,10 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
 
       {live.length > 0 && (
         <section className={CARD_SECTION}>
-          <SectionHead title="Матчи, которые идут сейчас" hint="Счёт текущей карты. Зелёным — кто ведёт." href="/matches" link="Все матчи" />
+          <SectionHead title={t("Матчи, которые идут сейчас")} hint={t("Счёт текущей карты. Зелёным — кто ведёт.")} href="/matches" link={t("Все матчи")} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {live.map((m) => (
-              <LiveCard key={m.id} m={m} totalUpper={upperRounds[m.tournament_id]} img={firstMap(m)} />
+              <LiveCard key={m.id} m={m} t={t} totalUpper={upperRounds[m.tournament_id]} img={firstMap(m)} />
             ))}
           </div>
         </section>
@@ -299,11 +303,11 @@ export function HomeView({ featured, approved, isFirst, upcoming, live = [], res
 
       {results.length > 0 && (
         <section className={cn(CARD_SECTION, "pb-0 sm:pb-0")}>
-          <SectionHead title="Последние результаты" hint="Победитель выделен зелёным." href="/matches" link="Все матчи" />
+          <SectionHead title={t("Последние результаты")} hint={t("Победитель выделен зелёным.")} href="/matches" link={t("Все матчи")} />
           {/* список во всю ширину карточки-раздела, без своей рамки */}
           <div className="-mx-5 divide-y divide-line-subtle border-t border-line-subtle sm:-mx-6">
             {results.map((m) => (
-              <ResultRow key={m.id} m={m} img={firstMap(m)} />
+              <ResultRow key={m.id} m={m} t={t} img={firstMap(m)} />
             ))}
           </div>
         </section>

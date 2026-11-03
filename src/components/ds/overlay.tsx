@@ -28,6 +28,8 @@ type TriggerProps = {
 import { createPortal } from "react-dom";
 import { Button, IconButton } from "./button";
 import { cn } from "./cn";
+import { useT } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/core";
 
 /*
  * Всплывающие слои F16 DS — одна основа:
@@ -126,6 +128,7 @@ export function Dialog({
   const panel = useModal(open, close);
   const titleId = useId();
   const descriptionId = useId();
+  const t = useT();
   if (!open || typeof document === "undefined") return null;
   const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]" }[size];
   return (
@@ -150,7 +153,7 @@ export function Dialog({
             {description && <p id={descriptionId} className="mt-1.5 text-[14px] leading-relaxed text-fg-2">{description}</p>}
           </div>
           {dismissible && (
-            <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5 -mt-1">
+            <IconButton label={t("Закрыть")} size="sm" onClick={onClose} className="-mr-1.5 -mt-1">
               <X />
             </IconButton>
           )}
@@ -190,6 +193,7 @@ export function Sheet({
   const panel = useModal(open, onClose);
   const titleId = useId();
   const descriptionId = useId();
+  const t = useT();
   if (!open || typeof document === "undefined") return null;
   return (
     <ModalLayer onClose={onClose} align={center ? "center" : "right"}>
@@ -214,7 +218,7 @@ export function Sheet({
             </h2>
             {description && <p id={descriptionId} className="mt-1 text-meta text-fg-3">{description}</p>}
           </div>
-          <IconButton label="Закрыть" size="sm" onClick={onClose} className="-mr-1.5">
+          <IconButton label={t("Закрыть")} size="sm" onClick={onClose} className="-mr-1.5">
             <X />
           </IconButton>
         </div>
@@ -232,7 +236,7 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
   title,
-  description = "Это действие нельзя отменить.",
+  description,
   confirmLabel,
   danger,
   loading,
@@ -246,17 +250,18 @@ export function ConfirmDialog({
   danger?: boolean;
   loading?: boolean;
 }) {
+  const t = useT();
   return (
     <Dialog
       open={open}
       onClose={onCancel}
       size="sm"
       title={title}
-      description={description}
+      description={description ?? t("Это действие нельзя отменить.")}
       footer={
         <>
           <Button variant="ghost" onClick={onCancel}>
-            Отмена
+            {t("Отмена")}
           </Button>
           <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} loading={loading} data-autofocus>
             {confirmLabel}
@@ -280,7 +285,7 @@ export function Menu({
   trigger,
   children,
   align = "end",
-  label = "Действия",
+  label = tr("Действия"),
 }: {
   /** один интерактивный элемент (кнопка): ARIA-атрибуты и обработчики ставятся прямо на него */
   trigger: ReactElement<TriggerProps>;
@@ -294,6 +299,7 @@ export function Menu({
   const id = useId();
   const triggerId = `${id}-trigger`;
   const close = useCallback(() => setOpen(false), []);
+  const t = useT();
 
   useEffect(() => {
     if (!open) return;
@@ -348,7 +354,7 @@ export function Menu({
           ref={list}
           id={id}
           role="menu"
-          aria-label={label}
+          aria-label={t(label)}
           className={cn(
             "absolute top-full z-50 mt-2 min-w-56 overflow-hidden rounded-popover bg-elevated p-1.5 shadow-[var(--shadow-pop)]",
             "animate-[menu-in_var(--dur-pop)_ease-out]",

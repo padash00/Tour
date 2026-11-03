@@ -8,6 +8,7 @@ import { DATA_TABLE, NUM_CELL, tableBox } from "@/components/public/data-table";
 import { Avatar, Container, EmptyState, FaceitLevel, PageTitle, cn } from "@/components/ds";
 import { ClientFilter } from "@/components/public/client-filter";
 import { isOnline } from "@/lib/online";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Игроки",
@@ -16,9 +17,8 @@ export const metadata: Metadata = {
 };
 export const dynamic = "force-dynamic";
 
-const word = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "игрока" : "игроков");
-
 export default async function PlayersPage(props: PageProps<"/players">) {
+  const t = await getT();
   const sp = await props.searchParams;
   const onlyOnline = sp.online === "1";
   const [all, board] = await Promise.all([listPlayers(), getPlayerLeaderboard()]);
@@ -32,37 +32,37 @@ export default async function PlayersPage(props: PageProps<"/players">) {
   return (
     <Container width="wide" className="pb-16 pt-8 sm:pt-10">
       <header>
-        <PageTitle>Игроки</PageTitle>
-        <p className="mt-1 text-meta text-fg-3">{all.length ? `${all.length} ${word(all.length)} на платформе F16 Arena.` : "Игроки появятся после первого входа через Steam."}</p>
+        <PageTitle>{t("Игроки")}</PageTitle>
+        <p className="mt-1 text-meta text-fg-3">{all.length ? t("{players} на платформе F16 Arena.", { players: `${all.length} ${t.plural(all.length, "игрок", "игрока", "игроков")}` }) : t("Игроки появятся после первого входа через Steam.")}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-[14px] font-semibold">
           <Link href="/players" className={cn("rounded-full border px-3 py-1.5", !onlyOnline ? "border-accent bg-accent-dim text-fg" : "border-line text-fg-3 hover:text-fg")}>
-            Все
+            {t("Все")}
           </Link>
           <Link href="/players?online=1" className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5", onlyOnline ? "border-accent bg-accent-dim text-fg" : "border-line text-fg-3 hover:text-fg")}>
             <span className="size-2 rounded-full bg-ok" aria-hidden />
-            Сейчас в сети · {onlineCount}
+            {t("Сейчас в сети · {n}", { n: onlineCount })}
           </Link>
         </div>
       </header>
 
-      {players.length > 0 && <ClientFilter scope="players" placeholder="Ник или SteamID" className="mt-8 mb-5 max-w-xl" />}
+      {players.length > 0 && <ClientFilter scope="players" placeholder={t("Ник или SteamID")} className="mt-8 mb-5 max-w-xl" />}
 
       {players.length === 0 ? (
-        <EmptyState className="mt-8" icon={<Users />} title={onlyOnline ? "Сейчас никого нет в сети" : "Игроков пока нет"} text={onlyOnline ? "Загляните позже или посмотрите всех игроков." : "После первого входа через Steam игрок появится в списке."} />
+        <EmptyState className="mt-8" icon={<Users />} title={onlyOnline ? t("Сейчас никого нет в сети") : t("Игроков пока нет")} text={onlyOnline ? t("Загляните позже или посмотрите всех игроков.") : t("После первого входа через Steam игрок появится в списке.")} />
       ) : (
         <div className={tableBox(true, "mt-6")} data-filter-scope="players">
           <p data-filter-empty hidden className="px-6 py-10 text-[15px] text-fg-3">
-            Ничего не найдено — попробуйте другой ник или SteamID.
+            {t("Ничего не найдено — попробуйте другой ник или SteamID.")}
           </p>
           <table className={cn(DATA_TABLE, "min-w-[760px]")}>
             <thead>
               <tr>
-                <th>Игрок</th>
-                <th>Команда</th>
+                <th>{t("Игрок")}</th>
+                <th>{t("Команда")}</th>
                 <th className="!text-center">FACEIT</th>
                 <th className="!text-right">ELO</th>
                 <th className="!text-right">F16 Rating</th>
-                <th className="!text-right">Матчи</th>
+                <th className="!text-right">{t("Матчи")}</th>
               </tr>
             </thead>
             <tbody>
@@ -74,10 +74,10 @@ export default async function PlayersPage(props: PageProps<"/players">) {
                       <Link href={`/players/${player.steam_id}`} className="group flex min-h-11 items-center gap-3 text-fg">
                         <span className="relative shrink-0">
                           <Avatar src={player.avatar_url} name={player.nickname} size="md" />
-                          {isOnline(player.last_seen_at, now) && <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-ok" title="в сети" />}
+                          {isOnline(player.last_seen_at, now) && <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-ok" title={t("в сети")} />}
                         </span>
                         <span className="text-[15px] font-semibold transition-colors group-hover:text-accent">{player.nickname}</span>
-                        {player.is_banned && <span className="text-micro font-semibold uppercase tracking-[0.12em] text-danger">бан</span>}
+                        {player.is_banned && <span className="text-micro font-semibold uppercase tracking-[0.12em] text-danger">{t("бан")}</span>}
                       </Link>
                     </td>
                     <td>
@@ -86,7 +86,7 @@ export default async function PlayersPage(props: PageProps<"/players">) {
                           {player.team.name}
                         </Link>
                       ) : (
-                        <span className="text-fg-3">Без команды</span>
+                        <span className="text-fg-3">{t("Без команды")}</span>
                       )}
                     </td>
                     <td className="text-center">

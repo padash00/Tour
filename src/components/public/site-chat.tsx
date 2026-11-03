@@ -6,6 +6,8 @@ import { deleteChatMessage, sendChatMessage, setChatMuted } from "@/app/actions/
 import { useToast } from "@/components/toast";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/components/ds";
+import { intlLocale } from "@/lib/i18n/core";
+import { useT } from "@/lib/i18n/client";
 
 type Msg = { id: number; player_id: string; nickname: string; avatar_url: string | null; steam_id: string; body: string; created_at: string; is_admin: boolean };
 type Me = { id: string; admin: boolean; banned: boolean; muted: boolean } | null;
@@ -15,6 +17,7 @@ const MAX_KEEP = 200;
 
 /** Общий чат сайта: опрос /api/chat раз в 3 с (пока вкладка видна), у админа — удалить сообщение и запретить писать */
 export function SiteChat() {
+  const t = useT();
   const toast = useToast();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [me, setMe] = useState<Me>(null);
@@ -93,8 +96,8 @@ export function SiteChat() {
     });
   };
 
-  const time = useMemo(() => new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), []);
-  const day = useMemo(() => new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", timeZone: "Asia/Almaty" }), []);
+  const time = useMemo(() => new Intl.DateTimeFormat(intlLocale(t.lang), { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), [t.lang]);
+  const day = useMemo(() => new Intl.DateTimeFormat(intlLocale(t.lang), { day: "numeric", month: "long", timeZone: "Asia/Almaty" }), [t.lang]);
 
   return (
     <div className="flex h-[70vh] min-h-[420px] flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface">
@@ -107,8 +110,8 @@ export function SiteChat() {
         className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
         aria-live="polite"
       >
-        {!loaded && <p className="pt-10 text-center text-[13px] text-fg-3">Загружаем…</p>}
-        {loaded && msgs.length === 0 && <p className="pt-10 text-center text-[14px] text-fg-3">Сообщений пока нет — напишите первым!</p>}
+        {!loaded && <p className="pt-10 text-center text-[13px] text-fg-3">{t("Загружаем…")}</p>}
+        {loaded && msgs.length === 0 && <p className="pt-10 text-center text-[14px] text-fg-3">{t("Сообщений пока нет — напишите первым!")}</p>}
         {msgs.map((m, i) => {
           const d = day.format(new Date(m.created_at));
           const newDay = i === 0 || day.format(new Date(msgs[i - 1].created_at)) !== d;
@@ -124,7 +127,7 @@ export function SiteChat() {
                     <Link href={`/players/${m.steam_id}`} className={cn("text-[14px] font-semibold hover:underline", m.is_admin ? "text-accent" : "text-fg")}>
                       {m.nickname}
                     </Link>
-                    {m.is_admin && <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">админ</span>}
+                    {m.is_admin && <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{t("админ")}</span>}
                     <span className="num text-[11px] text-fg-4">{time.format(new Date(m.created_at))}</span>
                     {me?.admin && m.player_id !== me.id && (
                       <span className="ml-auto flex gap-3 text-[12px] opacity-60 group-hover:opacity-100">
@@ -154,14 +157,17 @@ export function SiteChat() {
 
       {!me ? (
         <div className="border-t border-line-subtle p-4 text-center text-[14px] text-fg-2">
-          <Link href="/login?next=%2Fchat" className="font-semibold text-accent hover:underline">
-            Войдите через Steam
-          </Link>
-          , чтобы писать в чат
+          {t.rich("<a>Войдите через Steam</a>, чтобы писать в чат", {
+            a: (c) => (
+              <Link href="/login?next=%2Fchat" className="font-semibold text-accent hover:underline">
+                {c}
+              </Link>
+            ),
+          })}
         </div>
       ) : me.banned || me.muted ? (
         <p className="border-t border-line-subtle p-4 text-center text-[14px] text-fg-3">
-          {me.banned ? "Ваш аккаунт заблокирован." : "Администратор запретил вам писать в чат."}
+          {me.banned ? t("Ваш аккаунт заблокирован.") : t("Администратор запретил вам писать в чат.")}
         </p>
       ) : (
         <form
@@ -175,8 +181,8 @@ export function SiteChat() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={300}
-            placeholder="Сообщение…"
-            aria-label="Сообщение"
+            placeholder={t("Сообщение…")}
+            aria-label={t("Сообщение")}
             className="h-11 min-w-0 flex-1 rounded-control border border-line bg-shell px-3.5 text-[15px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
           />
           <button
@@ -184,7 +190,7 @@ export function SiteChat() {
             disabled={pending || !text.trim()}
             className="h-11 shrink-0 rounded-control bg-accent px-5 text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-strong disabled:opacity-50"
           >
-            Отправить
+            {t("Отправить")}
           </button>
         </form>
       )}

@@ -5,9 +5,10 @@ import type { Team } from "@/lib/types";
 import { Avatar, CARD_SECTION, TeamLogo, cn } from "@/components/ds";
 import { RatingPill } from "../stats-table";
 import { fmt } from "../stats-format";
+import { getT } from "@/lib/i18n/server";
 
 /** MVP матча: игрок с лучшим рейтингом по сыгранным картам — аватар, команда и главные цифры */
-export function MatchMvp({
+export async function MatchMvp({
   p,
   player,
   team,
@@ -19,17 +20,18 @@ export function MatchMvp({
   /** матч идёт — «лучший игрок сейчас» */
   live?: boolean;
 }) {
+  const t = await getT();
   const nick = player?.nickname ?? p.name;
   const diff = p.kills - p.deaths;
   const facts: { label: string; value: string; tone?: string }[] = [
-    { label: "Убийства – смерти", value: `${p.kills}–${p.deaths}`, tone: diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : undefined },
-    { label: "Урон за раунд", value: fmt.d1(p.adr) },
+    { label: t("Убийства – смерти"), value: `${p.kills}–${p.deaths}`, tone: diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : undefined },
+    { label: t("Урон за раунд"), value: fmt.d1(p.adr) },
     ...(p.kastRounds > 0 ? [{ label: "KAST", value: fmt.pct(p.kast) }] : []),
     ...(p.swing != null ? [{ label: "Swing", value: fmt.swing(p.swing), tone: p.swing >= 1 ? "text-ok" : p.swing <= -1 ? "text-danger" : undefined }] : []),
   ];
   const name = <span className="truncate">{nick}</span>;
   return (
-    <section className={cn(CARD_SECTION, "border-gold/40")} aria-label="MVP матча">
+    <section className={cn(CARD_SECTION, "border-gold/40")} aria-label={t("MVP матча")}>
       <div className="flex flex-wrap items-center gap-x-8 gap-y-5">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <span className="relative shrink-0">
@@ -39,7 +41,7 @@ export function MatchMvp({
             </span>
           </span>
           <div className="min-w-0">
-            <div className="text-[13px] font-extrabold uppercase tracking-[0.06em] text-gold">{live ? "Лучший игрок сейчас" : "MVP матча"}</div>
+            <div className="text-[13px] font-extrabold uppercase tracking-[0.06em] text-gold">{live ? t("Лучший игрок сейчас") : t("MVP матча")}</div>
             <div className="flex min-w-0 items-center text-[22px] font-extrabold leading-tight text-fg">
               {player ? (
                 <Link href={`/players/${player.steam_id}`} className="flex min-w-0 hover:text-accent">
@@ -59,7 +61,7 @@ export function MatchMvp({
         </div>
         <dl className="flex flex-wrap items-end gap-x-7 gap-y-3">
           <div>
-            <dt className="text-[13px] text-fg-3">Рейтинг</dt>
+            <dt className="text-[13px] text-fg-3">{t("Рейтинг")}</dt>
             <dd className="mt-1">
               <RatingPill value={p.rating} className="text-[18px]" />
             </dd>

@@ -16,6 +16,8 @@ import { AwardsRow } from "@/components/public/awards";
 import { FormStrip } from "@/components/public/form-strip";
 import { ratingColor } from "@/components/stats-format";
 import { MatchListRow } from "@/components/match-row";
+import { tr } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 import {
   Avatar,
   Button,
@@ -52,9 +54,10 @@ export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promis
   };
 }
 
-const ROLE: Record<string, string> = { captain: "Капитан", player: "Основа", substitute: "Запас" };
+const ROLE: Record<string, string> = { captain: tr("Капитан"), player: tr("Основа"), substitute: tr("Запас") };
 
 export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
+  const t = await getT();
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
   if (!team) {
@@ -106,12 +109,12 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           <Avatar src={m.player.avatar_url} name={m.player.nickname} size="lg" />
           {m.role === "captain" && (
             <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full border border-line bg-surface-3 text-warn [&>svg]:size-3">
-              <Crown aria-label="Капитан" />
+              <Crown aria-label={t("Капитан")} />
             </span>
           )}
         </span>
         <span className="mt-3 w-full truncate text-[15px] font-semibold text-fg group-hover:text-accent">{m.player.nickname}</span>
-        <span className="text-meta text-fg-3">{m.player.is_banned ? <span className="text-danger">Заблокирован</span> : ROLE[m.role] ?? m.role}</span>
+        <span className="text-meta text-fg-3">{m.player.is_banned ? <span className="text-danger">{t("Заблокирован")}</span> : ROLE[m.role] ? t(ROLE[m.role]) : m.role}</span>
         <span className="mt-3 flex items-center gap-3 border-t border-line-subtle pt-3 text-meta">
           <span className={cn("num font-semibold", r?.rating != null ? ratingColor(r.rating) : "text-fg-3")} title="F16 Rating">
             {r?.rating != null ? r.rating.toFixed(2) : "—"}
@@ -131,7 +134,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
       <>
         <span className="grid size-14 place-items-center rounded-full border border-dashed border-line-strong text-fg-3 [&>svg]:size-5">{icon}</span>
         <span className="mt-3 text-[14px] font-medium text-fg-3">{label}</span>
-        {cta && <span className="mt-1 text-meta font-medium text-accent">Подать заявку →</span>}
+        {cta && <span className="mt-1 text-meta font-medium text-accent">{t("Подать заявку →")}</span>}
       </>
     );
     const cls = "flex min-h-[188px] flex-col items-center justify-center rounded-surface border border-dashed border-line-subtle px-3 py-5 text-center";
@@ -163,7 +166,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
         }}
       />
       <Link href="/teams" className="inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
-        <ArrowLeft className="size-4" /> Команды
+        <ArrowLeft className="size-4" /> {t("Команды")}
       </Link>
 
       {/* ── идентичность и цифры */}
@@ -173,10 +176,10 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
             <TeamLogo src={team.logo_url} tag={team.tag} size="xl" />
             <div className="min-w-0">
-              <Eyebrow>Команда · {team.tag}</Eyebrow>
+              <Eyebrow>{t("Команда · {tag}", { tag: team.tag })}</Eyebrow>
               <h1 className="mt-1 break-words text-page text-fg">{team.name}</h1>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fg-3">
-                {[team.region, captain ? `Капитан — ${captain.player.nickname}` : null, coach ? `Тренер — ${coach.nickname}` : null, `С ${formatDate(team.created_at)}`]
+                {[team.region, captain ? t("Капитан — {name}", { name: captain.player.nickname }) : null, coach ? t("Тренер — {name}", { name: coach.nickname }) : null, t("С {date}", { date: formatDate(team.created_at, t.lang) })]
                   .filter(Boolean)
                   .map((x, i) => (
                     <span key={i} className="flex items-center gap-3">
@@ -189,16 +192,16 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
               {canApply && (
                 <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
                   <Button href={apply} size="lg" icon={<UserPlus />}>
-                    Подать заявку в команду
+                    {t("Подать заявку в команду")}
                   </Button>
                   <span className="text-meta text-fg-3">
                     {recruiting ? (
                       <>
-                        <span className="font-medium text-accent">Ищет игроков</span>
-                        {recruiting.roles.length ? ` · ${recruiting.roles.map(roleLabel).join(", ")}` : ""}
+                        <span className="font-medium text-accent">{t("Ищет игроков")}</span>
+                        {recruiting.roles.length ? ` · ${recruiting.roles.map((r) => t(roleLabel(r))).join(", ")}` : ""}
                       </>
                     ) : (
-                      `Свободных мест: ${MAX_MAIN + MAX_SUBS - members.length}`
+                      t("Свободных мест: {n}", { n: MAX_MAIN + MAX_SUBS - members.length })
                     )}
                   </span>
                 </div>
@@ -209,10 +212,10 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           <div>
             <dl className="grid grid-cols-2 gap-2">
               {[
-                { label: "Игроков", value: `${members.length}/${MAX_MAIN + MAX_SUBS}`, cls: "text-fg" },
-                { label: "Средний ELO", value: averageElo(mains) ?? "—", cls: "text-fg" },
+                { label: t("Игроков"), value: `${members.length}/${MAX_MAIN + MAX_SUBS}`, cls: "text-fg" },
+                { label: t("Средний ELO"), value: averageElo(mains) ?? "—", cls: "text-fg" },
                 { label: "F16 Rating", value: teamRating ? teamRating.toFixed(2) : "—", cls: teamRating ? ratingColor(teamRating) : "text-fg-3" },
-                { label: "Турниров", value: participations.length, cls: "text-fg" },
+                { label: t("Турниров"), value: participations.length, cls: "text-fg" },
               ].map((f) => (
                 <div key={f.label} className="rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
                   <dt className="text-micro text-fg-3">{f.label}</dt>
@@ -221,7 +224,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
               ))}
             </dl>
             <div className="mt-2 flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-ink/[0.02] px-4 py-3">
-              <span className="text-micro text-fg-3">Форма</span>
+              <span className="text-micro text-fg-3">{t("Форма")}</span>
               {form.length ? (
                 <span className="flex items-center gap-3">
                   <FormStrip results={form} />
@@ -230,7 +233,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                   </span>
                 </span>
               ) : (
-                <span className="text-meta text-fg-3">Первый матч впереди</span>
+                <span className="text-meta text-fg-3">{t("Первый матч впереди")}</span>
               )}
             </div>
           </div>
@@ -238,26 +241,26 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
       </header>
 
       {/* ── состав: основа в ряд, ниже запас и тренер */}
-      <Section title="Состав" className="pt-12" action={<span className="num text-meta text-fg-3">Основа {mains.length}/{MAX_MAIN}</span>}>
+      <Section title={t("Состав")} className="pt-12" action={<span className="num text-meta text-fg-3">{t("Основа")} {mains.length}/{MAX_MAIN}</span>}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {mains.map((m) => playerCard(m))}
-          {Array.from({ length: Math.max(0, MAX_MAIN - mains.length) }, (_, i) => emptyCard(`m${i}`, "Свободно", <UserPlus />, canApply && i === 0))}
+          {Array.from({ length: Math.max(0, MAX_MAIN - mains.length) }, (_, i) => emptyCard(`m${i}`, t("Свободно"), <UserPlus />, canApply && i === 0))}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {subs.map((m) => playerCard(m, "Запас"))}
-          {Array.from({ length: Math.max(0, MAX_SUBS - subs.length) }, (_, i) => emptyCard(`s${i}`, "Запас · свободно", <UserPlus />, false))}
+          {subs.map((m) => playerCard(m, t("Запас")))}
+          {Array.from({ length: Math.max(0, MAX_SUBS - subs.length) }, (_, i) => emptyCard(`s${i}`, t("Запас · свободно"), <UserPlus />, false))}
           {coach ? (
             <Link
               href={`/players/${coach.steam_id}`}
               className="group relative flex flex-col items-center rounded-surface border border-line-subtle bg-surface px-3 pb-4 pt-5 text-center transition-colors hover:border-line-hover"
             >
-              <span className="absolute left-3 top-3 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">Тренер</span>
+              <span className="absolute left-3 top-3 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("Тренер")}</span>
               <Avatar src={coach.avatar_url} name={coach.nickname} size="lg" />
               <span className="mt-3 w-full truncate text-[15px] font-semibold text-fg group-hover:text-accent">{coach.nickname}</span>
-              <span className="text-meta text-fg-3">Не играет</span>
+              <span className="text-meta text-fg-3">{t("Не играет")}</span>
             </Link>
           ) : (
-            emptyCard("coach", "Тренер не назначен", <GraduationCap />, false)
+            emptyCard("coach", t("Тренер не назначен"), <GraduationCap />, false)
           )}
         </div>
       </Section>
@@ -268,17 +271,17 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
           compact
           className="mt-12"
           icon={<Trophy />}
-          title="Команда ещё не играла турниров"
-          text="Матчи, турниры и трофеи появятся здесь после первого участия."
+          title={t("Команда ещё не играла турниров")}
+          text={t("Матчи, турниры и трофеи появятся здесь после первого участия.")}
           action={
             <Button href="/tournaments" variant="secondary" size="sm">
-              Ближайшие турниры
+              {t("Ближайшие турниры")}
             </Button>
           }
         />
       ) : (
         <div className="grid items-start gap-12 pt-12 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
-          <Section title="Последние матчи">
+          <Section title={t("Последние матчи")}>
             {recent.length ? (
               <RowList>
                 {recent.map((m) => (
@@ -286,20 +289,20 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
                 ))}
               </RowList>
             ) : (
-              <EmptyState compact icon={<Gamepad2 />} title="Матчей пока нет" text="История появится после первого участия в турнире." />
+              <EmptyState compact icon={<Gamepad2 />} title={t("Матчей пока нет")} text={t("История появится после первого участия в турнире.")} />
             )}
           </Section>
 
           <Stack className="!gap-12">
             {h2h.length > 0 && (
-              <Section title="Личные встречи">
+              <Section title={t("Личные встречи")}>
                 <Panel className="py-2">
                   <HeadToHeadList items={h2h} />
                 </Panel>
               </Section>
             )}
             {visibleRegs.length > 0 && (
-              <Section title="Турниры">
+              <Section title={t("Турниры")}>
                 <RowList>
                   {visibleRegs.map((r) => (
                     <div key={r.id} className="flex items-center gap-3 px-4 py-3">
@@ -313,7 +316,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
               </Section>
             )}
             {awards.length > 0 && (
-              <Section title="Трофеи">
+              <Section title={t("Трофеи")}>
                 <Panel>
                   <AwardsRow awards={awards} />
                 </Panel>

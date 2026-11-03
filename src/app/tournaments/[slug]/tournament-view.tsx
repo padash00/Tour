@@ -50,35 +50,35 @@ import {
 } from "@/components/ds";
 import { Check } from "lucide-react";
 import { groupSponsors } from "@/lib/sponsors";
+import { getT } from "@/lib/i18n/server";
+import { tr, type T } from "@/lib/i18n/core";
 
 const real = (v: string | null | undefined) => !!v && !/^\s*0+\s*$/.test(v);
 
 /** Статус турнира словами — для баннера на тёмной обложке */
 const STATUS_WORD: Record<Tournament["status"], { text: string; tone: "live" | "ok" | "warn" | "muted" }> = {
-  draft: { text: "Черновик", tone: "muted" },
-  registration: { text: "Регистрация открыта", tone: "ok" },
-  registration_closed: { text: "Регистрация закрыта", tone: "warn" },
-  checkin: { text: "Идёт check-in", tone: "warn" },
-  live: { text: "Турнир идёт", tone: "live" },
-  finished: { text: "Турнир завершён", tone: "muted" },
-  cancelled: { text: "Турнир отменён", tone: "muted" },
+  draft: { text: tr("Черновик"), tone: "muted" },
+  registration: { text: tr("Регистрация открыта"), tone: "ok" },
+  registration_closed: { text: tr("Регистрация закрыта"), tone: "warn" },
+  checkin: { text: tr("Идёт check-in"), tone: "warn" },
+  live: { text: tr("Турнир идёт"), tone: "live" },
+  finished: { text: tr("Турнир завершён"), tone: "muted" },
+  cancelled: { text: tr("Турнир отменён"), tone: "muted" },
 };
 
-function StatusWord({ status }: { status: Tournament["status"] }) {
+async function StatusWord({ status }: { status: Tournament["status"] }) {
+  const tx = await getT();
   const s = STATUS_WORD[status];
   const color = { live: "text-live", ok: "text-ok", warn: "text-warn", muted: "text-fg-2" }[s.tone];
   return (
     <span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[13.5px] font-bold ${color}`}>
       {s.tone !== "muted" && <span className={`size-2 rounded-full bg-current ${s.tone === "live" ? "animate-pulse" : ""}`} aria-hidden />}
-      {s.text}
+      {tx(s.text)}
     </span>
   );
 }
 
-const modeLabel = (format: string) => {
-  const n = modeOf(format).size;
-  return n === 1 ? "1 на 1" : `${n} на ${n}`;
-};
+const modeLabel = (format: string, tx: T) => tx(modeOf(format).label);
 
 /** Медаль места: 1 — золото, 2 — серебро, 3 — бронза */
 function Medal({ n }: { n: number }) {
@@ -92,6 +92,7 @@ function Medal({ n }: { n: number }) {
  * Структура: шапка турнира → липкие вкладки (ClientTabs, мгновенные) → содержимое.
  */
 export async function TournamentView({ t }: { t: Tournament }) {
+  const tx = await getT();
   const finished = t.status === "finished";
   // у завершённого турнира по умолчанию открываются итоги
   const defaultTab = finished ? "recap" : "overview";
@@ -100,7 +101,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
     getTournamentRegistrations(t.id),
     getTournamentMatches(t.id),
     getMapImages(),
-    finished ? getTournamentRecap(t) : Promise.resolve(null),
+    finished ? getTournamentRecap(t, tx) : Promise.resolve(null),
     t.bracket_published_at ? getLastDraw(t.id) : Promise.resolve(null),
   ]);
   const approved = regs.filter((r) => r.status === "approved");
@@ -132,13 +133,13 @@ export async function TournamentView({ t }: { t: Tournament }) {
       <Container className="pt-4 sm:pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/tournaments" className="inline-flex min-h-11 items-center gap-2 text-meta text-fg-3 hover:text-fg">
-            <ArrowLeft className="size-4" /> Турниры
+            <ArrowLeft className="size-4" /> {tx("Турниры")}
           </Link>
           <AdminControlLink t={lite} />
         </div>
         {t.status === "draft" && (
-          <Callout tone="warn" title="Черновик" className="mt-3 max-w-2xl">
-            Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.
+          <Callout tone="warn" title={tx("Черновик")} className="mt-3 max-w-2xl">
+            {tx("Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.")}
           </Callout>
         )}
         <section className="relative isolate mt-3 overflow-hidden rounded-feature bg-ink text-white">
@@ -148,7 +149,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusWord status={t.status} />
-                {[t.game ? `${t.game} · ${modeLabel(t.format)}` : modeLabel(t.format), bracketLabel[t.bracket_type] ?? t.bracket_type, t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? "Онлайн")]
+                {[t.game ? `${t.game} · ${modeLabel(t.format, tx)}` : modeLabel(t.format, tx), tx(bracketLabel[t.bracket_type] ?? t.bracket_type), t.is_lan ? (t.location ? `LAN · ${t.location}` : "LAN") : (t.location ?? tx("Онлайн"))]
                   .filter(Boolean)
                   .map((x) => (
                     <span key={x} className="rounded-full bg-white/15 px-3 py-1 text-[13.5px] font-semibold backdrop-blur-sm">
@@ -159,9 +160,9 @@ export async function TournamentView({ t }: { t: Tournament }) {
               <h1 className="mt-3 break-words text-[30px] font-extrabold leading-[1.08] tracking-[-0.02em] sm:text-[44px]">{t.name}</h1>
               <dl className="mt-4 flex flex-wrap gap-2.5">
                 {[
-                  { k: "Старт", v: t.starts_at ? formatDateTime(t.starts_at) : "дата уточняется" },
-                  { k: solo ? "Участники" : "Команды", v: `${approved.length} из ${t.max_teams}` },
-                  ...(real(t.prize_pool) ? [{ k: "Призовой фонд", v: formatMoney(t.prize_pool) }] : places[0] ? [{ k: "Главный приз", v: places[0].prize }] : []),
+                  { k: tx("Старт"), v: t.starts_at ? formatDateTime(t.starts_at, tx.lang) : tx("дата уточняется") },
+                  { k: solo ? tx("Участники") : tx("Команды"), v: tx("{a} из {b}", { a: approved.length, b: t.max_teams }) },
+                  ...(real(t.prize_pool) ? [{ k: tx("Призовой фонд"), v: formatMoney(t.prize_pool) }] : places[0] ? [{ k: tx("Главный приз"), v: places[0].prize }] : []),
                 ].map((f) => (
                   <div key={f.k} className="rounded-control bg-white/12 px-3.5 py-2 backdrop-blur-sm">
                     <dt className="text-[12px] font-semibold text-white/70">{f.k}</dt>
@@ -174,7 +175,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
               <div className="hidden sm:block">
                 <HeroCta t={lite} approvedCount={approved.length} />
               </div>
-              <p className="max-w-sm text-[14.5px] text-white/80 lg:text-right">{nextStepText(t)}</p>
+              <p className="max-w-sm text-[14.5px] text-white/80 lg:text-right">{nextStepText(t, tx)}</p>
             </div>
           </div>
         </section>
@@ -190,13 +191,13 @@ export async function TournamentView({ t }: { t: Tournament }) {
           defaultKey={defaultTab}
           sticky
           items={[
-            ...(finished ? [{ key: "recap", label: "Итоги" }] : []),
-            { key: "overview", label: "Обзор" },
-            { key: "teams", label: solo ? "Участники" : "Команды" },
-            { key: "bracket", label: "Сетка" },
-            { key: "matches", label: "Матчи" },
-            { key: "stats", label: "Статистика" },
-            { key: "rules", label: "Правила" },
+            ...(finished ? [{ key: "recap", label: tx("Итоги") }] : []),
+            { key: "overview", label: tx("Обзор") },
+            { key: "teams", label: solo ? tx("Участники") : tx("Команды") },
+            { key: "bracket", label: tx("Сетка") },
+            { key: "matches", label: tx("Матчи") },
+            { key: "stats", label: tx("Статистика") },
+            { key: "rules", label: tx("Правила") },
           ]}
         />
 
@@ -204,9 +205,9 @@ export async function TournamentView({ t }: { t: Tournament }) {
           {finished && recap && (
             <TabPanel tab="recap" defaultKey={defaultTab}>
               <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-[14px] text-fg-3">Отдельная страница итогов — её удобно отправить в чат или соцсети.</p>
+                <p className="text-[14px] text-fg-3">{tx("Отдельная страница итогов — её удобно отправить в чат или соцсети.")}</p>
                 <Button href={`${base}/recap`} variant="secondary" iconRight={<ExternalLink />}>
-                  Страница итогов
+                  {tx("Страница итогов")}
                 </Button>
               </div>
               <RecapView recap={recap} solo={solo} imageBase={`${base}/recap/image`} />
@@ -222,12 +223,12 @@ export async function TournamentView({ t }: { t: Tournament }) {
               <aside className="space-y-5 lg:sticky lg:top-[calc(var(--shell-h)+72px)]">
                 <ParticipationPanel t={lite} approvedCount={approved.length} />
                 <div className="rounded-surface border border-line-subtle bg-surface p-5">
-                  <SubsectionTitle>Даты</SubsectionTitle>
+                  <SubsectionTitle>{tx("Даты")}</SubsectionTitle>
                   <dl className="divide-y divide-line-subtle text-[14px]">
                     {[
-                      ["Регистрация", t.registration_opens_at || t.registration_closes_at ? `${formatDate(t.registration_opens_at)} — ${formatDate(t.registration_closes_at)}` : "уточняется"],
-                      ["Check-in", t.checkin_opens_at ? formatDateTime(t.checkin_opens_at) : "перед стартом"],
-                      ["Старт", t.starts_at ? formatDateTime(t.starts_at) : "уточняется"],
+                      [tx("Регистрация"), t.registration_opens_at || t.registration_closes_at ? `${formatDate(t.registration_opens_at, tx.lang)} — ${formatDate(t.registration_closes_at, tx.lang)}` : tx("уточняется")],
+                      ["Check-in", t.checkin_opens_at ? formatDateTime(t.checkin_opens_at, tx.lang) : tx("перед стартом")],
+                      [tx("Старт"), t.starts_at ? formatDateTime(t.starts_at, tx.lang) : tx("уточняется")],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 py-2.5">
                         <dt className="text-fg-3">{k}</dt>
@@ -238,32 +239,32 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 </div>
                 {progress.total > 0 && t.status !== "finished" && (
                   <div className="rounded-surface border border-line-subtle bg-surface p-5">
-                    <SubsectionTitle>Ход турнира</SubsectionTitle>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-ink/[0.07]" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.played} aria-label="Сыграно матчей">
+                    <SubsectionTitle>{tx("Ход турнира")}</SubsectionTitle>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-ink/[0.07]" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.played} aria-label={tx("Сыграно матчей")}>
                       <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round((100 * progress.played) / progress.total)}%` }} />
                     </div>
                     <dl className="mt-3 divide-y divide-line-subtle text-[15px]">
                       <div className="flex justify-between gap-4 py-2.5">
-                        <dt className="text-fg-3">Сыграно</dt>
+                        <dt className="text-fg-3">{tx("Сыграно")}</dt>
                         <dd className="font-bold text-fg">
-                          {progress.played} из {progress.total} матчей
+                          {tx("{a} из {b} матчей", { a: progress.played, b: progress.total })}
                         </dd>
                       </div>
                       {progress.now > 0 && (
                         <div className="flex justify-between gap-4 py-2.5">
-                          <dt className="text-fg-3">Идут сейчас</dt>
+                          <dt className="text-fg-3">{tx("Идут сейчас")}</dt>
                           <dd className="font-bold text-live">{progress.now}</dd>
                         </div>
                       )}
                     </dl>
                     <Button href={`${base}?tab=bracket`} variant="secondary" block className="mt-2">
-                      Смотреть сетку
+                      {tx("Смотреть сетку")}
                     </Button>
                   </div>
                 )}
                 {hasPrize && (
                   <div className="rounded-surface border border-line-subtle bg-surface p-5">
-                    <SubsectionTitle>Призы</SubsectionTitle>
+                    <SubsectionTitle>{tx("Призы")}</SubsectionTitle>
                     {real(t.prize_pool) && <div className="mb-2 text-heading text-fg">{formatMoney(t.prize_pool)}</div>}
                     {places.length > 0 && (
                       <ul className="space-y-2.5">
@@ -282,24 +283,24 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 )}
                 {(t.entry_fee || t.discord_url || t.contact) && (
                   <div className="rounded-surface border border-line-subtle bg-surface p-5">
-                    <SubsectionTitle>Организатор</SubsectionTitle>
+                    <SubsectionTitle>{tx("Организатор")}</SubsectionTitle>
                     <dl className="divide-y divide-line-subtle text-[14px]">
                       {t.entry_fee && (
                         <div className="flex justify-between gap-4 py-2.5">
-                          <dt className="text-fg-3">Взнос</dt>
+                          <dt className="text-fg-3">{tx("Взнос")}</dt>
                           <dd className="text-fg">{formatMoney(t.entry_fee)}</dd>
                         </div>
                       )}
                       {t.contact && (
                         <div className="flex justify-between gap-4 py-2.5">
-                          <dt className="text-fg-3">Контакт</dt>
+                          <dt className="text-fg-3">{tx("Контакт")}</dt>
                           <dd className="text-right text-fg">{t.contact}</dd>
                         </div>
                       )}
                     </dl>
                     {t.discord_url && (
                       <Button href={t.discord_url} external variant="secondary" block className="mt-3" iconRight={<ExternalLink />}>
-                        Discord турнира
+                        {tx("Discord турнира")}
                       </Button>
                     )}
                   </div>
@@ -315,7 +316,7 @@ export async function TournamentView({ t }: { t: Tournament }) {
           <TabPanel tab="bracket" defaultKey={defaultTab}>
             {matches.length > 0 && draw && (
               <p className="mb-8 max-w-read text-meta text-fg-3">
-                Посев определён жеребьёвкой {formatDateTime(draw.at)}. Порядок: {drawOrderText(draw)}.
+                {tx("Посев определён жеребьёвкой {date}. Порядок: {order}.", { date: formatDateTime(draw.at, tx.lang), order: drawOrderText(draw) })}
               </p>
             )}
             {matches.length ? (
@@ -323,9 +324,9 @@ export async function TournamentView({ t }: { t: Tournament }) {
             ) : (
               <EmptyState
                 icon={<Swords />}
-                title="Сетки пока нет"
-                text={`${bracketLabel[t.bracket_type] ?? t.bracket_type} на ${t.max_teams} ${solo ? "участников" : "команд"}. Посев опубликуют после check-in.`}
-                next={t.starts_at ? formatDateTime(t.starts_at) : undefined}
+                title={tx("Сетки пока нет")}
+                text={solo ? tx("{bracket} на {n} участников. Посев опубликуют после check-in.", { bracket: tx(bracketLabel[t.bracket_type] ?? t.bracket_type), n: t.max_teams }) : tx("{bracket} на {n} команд. Посев опубликуют после check-in.", { bracket: tx(bracketLabel[t.bracket_type] ?? t.bracket_type), n: t.max_teams })}
+                next={t.starts_at ? formatDateTime(t.starts_at, tx.lang) : undefined}
               />
             )}
           </TabPanel>
@@ -341,11 +342,11 @@ export async function TournamentView({ t }: { t: Tournament }) {
                 <div className="prose-f16">{t.rules}</div>
               ) : (
                 <EmptyState
-                  title="Регламент турнира ещё не опубликован"
-                  text="Пока действуют общие правила платформы."
+                  title={tx("Регламент турнира ещё не опубликован")}
+                  text={tx("Пока действуют общие правила платформы.")}
                   action={
                     <Button href="/rules" variant="secondary" size="sm">
-                      Общие правила
+                      {tx("Общие правила")}
                     </Button>
                   }
                 />
@@ -360,17 +361,18 @@ export async function TournamentView({ t }: { t: Tournament }) {
   );
 }
 
-function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite; mapImages: Record<string, string> }) {
+async function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite; mapImages: Record<string, string> }) {
+  const tx = await getT();
   const mode = modeOf(t.format);
-  const bo = t.default_best_of === t.final_best_of ? `BO${t.default_best_of}` : `BO${t.default_best_of} → BO${t.final_best_of} в финале`;
+  const bo = t.default_best_of === t.final_best_of ? `BO${t.default_best_of}` : tx("BO{a} → BO{b} в финале", { a: t.default_best_of, b: t.final_best_of });
   return (
     <Stack className="gap-5 lg:gap-5">
       {t.stream_url && (
         <Section card
-          title="Трансляция"
+          title={tx("Трансляция")}
           action={
             <a href={t.stream_url} target="_blank" rel="noreferrer" className="text-meta font-medium text-accent hover:text-accent-strong">
-              Открыть отдельно ↗
+              {tx("Открыть отдельно ↗")}
             </a>
           }
         >
@@ -379,17 +381,17 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
       )}
 
       {t.description && (
-        <Section card title="О турнире">
+        <Section card title={tx("О турнире")}>
           <div className="prose-f16 max-w-read">{t.description}</div>
         </Section>
       )}
 
-      <Section card title="Формат турнира" description="Как будет проходить соревнование">
+      <Section card title={tx("Формат турнира")} description={tx("Как будет проходить соревнование")}>
         {/* главное — сразу, крупно */}
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-heading text-fg">
-          <span>{mode.size === 1 ? "1 на 1" : `${mode.size} на ${mode.size}`}</span>
+          <span>{tx(mode.label)}</span>
           <span className="text-fg-4" aria-hidden>·</span>
-          <span>{bracketLabel[t.bracket_type] ?? t.bracket_type}</span>
+          <span>{tx(bracketLabel[t.bracket_type] ?? t.bracket_type)}</span>
           <span className="text-fg-4" aria-hidden>·</span>
           <span className="num">{bo}</span>
         </div>
@@ -397,19 +399,19 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
           columns={4}
           className="mt-6 border-t border-line-subtle pt-6"
           items={[
-            { label: "Стороны", value: t.knife_round ? "Ножевой раунд" : "Фиксированные" },
-            { label: "Овертайм", value: t.overtime ? `MR3 при ${mode.size === 2 ? "8:8" : "12:12"}` : "Нет" },
-            { label: "Тактические паузы", value: <span className="num">{t.timeouts_per_team} × {t.timeout_seconds} с</span> },
-            { label: "Технические паузы", value: <span className="num">{t.tech_pauses} × {Math.round(t.tech_pause_seconds / 60)} мин</span> },
+            { label: tx("Стороны"), value: t.knife_round ? tx("Ножевой раунд") : tx("Фиксированные") },
+            { label: tx("Овертайм"), value: t.overtime ? tx("MR3 при {score}", { score: mode.size === 2 ? "8:8" : "12:12" }) : tx("Нет") },
+            { label: tx("Тактические паузы"), value: <span className="num">{tx("{n} × {s} с", { n: t.timeouts_per_team, s: t.timeout_seconds })}</span> },
+            { label: tx("Технические паузы"), value: <span className="num">{tx("{n} × {m} мин", { n: t.tech_pauses, m: Math.round(t.tech_pause_seconds / 60) })}</span> },
             ...(t.map_pool.some((map) => /^de_/i.test(map.split("@")[0]))
-              ? [{ label: "Голос на смене сторон", value: "Обе команды на de-картах" }]
+              ? [{ label: tx("Голос на смене сторон"), value: tx("Обе команды на de-картах") }]
               : []),
-            ...(t.match_format ? [{ label: "Матчи", value: t.match_format }] : []),
+            ...(t.match_format ? [{ label: tx("Матчи"), value: t.match_format }] : []),
           ]}
         />
       </Section>
 
-      <Section card title="Маппул" description={`${t.map_pool.length} ${t.map_pool.length === 1 ? "карта" : t.map_pool.length < 5 ? "карты" : "карт"}`}>
+      <Section card title={tx("Маппул")} description={`${t.map_pool.length} ${tx.plural(t.map_pool.length, "карта", "карты", "карт")}`}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {t.map_pool.map((m) => (
             <MapTile key={m} map={m} image={mapImages[m]} className="!h-24 sm:!h-28" />
@@ -418,16 +420,18 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
         <span className="sr-only">{t.map_pool.map(mapName).join(", ")}</span>
       </Section>
 
-      <Section card title="Требования">
+      <Section card title={tx("Требования")}>
         {t.requirements ? (
           <div className="prose-f16 max-w-read">{t.requirements}</div>
         ) : (
           <ul className="max-w-read space-y-2.5">
             {[
-              "Вход на платформу через Steam у каждого игрока",
-              `${mode.title}: в основе ${mainPlayersLabel(mode.size)}${mode.subs ? `, до ${mode.subs} запасных` : ""}`,
-              "Один игрок — одна команда в рамках турнира",
-              "Check-in капитаном в отведённое время",
+              tx("Вход на платформу через Steam у каждого игрока"),
+              mode.subs
+                ? tx("{mode}: в основе {players}, до {n} запасных", { mode: tx(mode.title), players: mainPlayersLabel(mode.size, tx), n: mode.subs })
+                : tx("{mode}: в основе {players}", { mode: tx(mode.title), players: mainPlayersLabel(mode.size, tx) }),
+              tx("Один игрок — одна команда в рамках турнира"),
+              tx("Check-in капитаном в отведённое время"),
             ].map((x) => (
               <li key={x} className="flex items-start gap-2.5 text-[14px] text-fg-2">
                 <Check className="mt-0.5 size-4 shrink-0 text-fg-3" aria-hidden />
@@ -440,11 +444,11 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
       </Section>
 
       {t.sponsors?.length > 0 && (
-        <Section card title="Организаторы и партнёры">
+        <Section card title={tx("Организаторы и партнёры")}>
           <dl className="grid gap-x-10 gap-y-5 sm:grid-cols-2">
             {groupSponsors(t.sponsors).map((g) => (
               <div key={g.role}>
-                <dt className="text-[13px] font-semibold uppercase tracking-wide text-fg-3">{g.label}</dt>
+                <dt className="text-[13px] font-semibold uppercase tracking-wide text-fg-3">{tx(g.label)}</dt>
                 <dd className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-title text-fg">
                   {g.items.map((sp) =>
                     sp.url ? (
@@ -465,13 +469,18 @@ function Overview({ t, lite, mapImages }: { t: Tournament; lite: TournamentLite;
   );
 }
 
-function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaited<ReturnType<typeof getTournamentRegistrations>>; pendingCount: number; solo: boolean; maxTeams: number }) {
+async function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaited<ReturnType<typeof getTournamentRegistrations>>; pendingCount: number; solo: boolean; maxTeams: number }) {
+  const tx = await getT();
   if (approved.length === 0) {
     return (
       <EmptyState
         icon={<Users />}
-        title={solo ? "Пока нет участников" : "Пока нет одобренных команд"}
-        text={pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "заявка ожидает" : "заявки ожидают"} подтверждения.` : "Станьте первыми, кто подаст заявку."}
+        title={solo ? tx("Пока нет участников") : tx("Пока нет одобренных команд")}
+        text={
+          pendingCount > 0
+            ? tx.plural(pendingCount, "{n} заявка ожидает подтверждения.", "{n} заявки ожидают подтверждения.", "{n} заявок ожидают подтверждения.").replace("{n}", String(pendingCount))
+            : tx("Станьте первыми, кто подаст заявку.")
+        }
       />
     );
   }
@@ -487,15 +496,15 @@ function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaite
       <div className="rounded-surface border border-line-subtle bg-surface p-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="text-meta font-semibold uppercase tracking-wide text-fg-3">{solo ? "Участники" : "Команды"}</div>
+            <div className="text-meta font-semibold uppercase tracking-wide text-fg-3">{solo ? tx("Участники") : tx("Команды")}</div>
             <div className="mt-1 text-[28px] font-bold leading-none text-fg">
               <span className="num">{filled}</span>
               <span className="text-fg-3"> / {maxTeams}</span>
             </div>
           </div>
           <div className="text-right text-meta text-fg-2">
-            {filled >= maxTeams ? "Мест больше нет" : `Свободно мест: ${maxTeams - filled}`}
-            {pendingCount > 0 && <div className="text-fg-3">ещё на рассмотрении: {pendingCount}</div>}
+            {filled >= maxTeams ? tx("Мест больше нет") : tx("Свободно мест: {n}", { n: maxTeams - filled })}
+            {pendingCount > 0 && <div className="text-fg-3">{tx("ещё на рассмотрении: {n}", { n: pendingCount })}</div>}
           </div>
         </div>
         <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-surface-3">
@@ -524,10 +533,10 @@ function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaite
                   {elo != null && (
                     <>
                       <div className="num text-[17px] font-bold text-fg">{elo}</div>
-                      <div className="text-micro text-fg-3">средний ELO</div>
+                      <div className="text-micro text-fg-3">{tx("средний ELO")}</div>
                     </>
                   )}
-                  {r.seed ? <div className="text-micro text-fg-3">посев {r.seed}</div> : <div className="num text-micro text-fg-4">#{i + 1}</div>}
+                  {r.seed ? <div className="text-micro text-fg-3">{tx("посев {n}", { n: r.seed })}</div> : <div className="num text-micro text-fg-4">#{i + 1}</div>}
                 </div>
               </header>
               {!solo && (
@@ -539,8 +548,8 @@ function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaite
                         <Link href={`/players/${rp.player.steam_id}`} className="flex items-center gap-3 py-2 text-[14px] text-fg-2 hover:text-fg">
                           <Avatar src={rp.player.avatar_url} name={rp.player.nickname} size="sm" />
                           <span className="min-w-0 flex-1 truncate font-medium text-fg">{rp.player.nickname}</span>
-                          {captain && <Crown className="size-4 shrink-0 text-warn" aria-label="Капитан" />}
-                          {rp.role === "sub" && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-micro text-fg-3">запас</span>}
+                          {captain && <Crown className="size-4 shrink-0 text-warn" aria-label={tx("Капитан")} />}
+                          {rp.role === "sub" && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-micro text-fg-3">{tx("запас")}</span>}
                           <FaceitLevel level={rp.player.faceit_level} className="!size-6 !text-[11px]" />
                         </Link>
                       </li>
@@ -550,7 +559,7 @@ function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaite
               )}
               {r.checked_in_at && (
                 <footer className="border-t border-line-subtle px-4 py-2.5">
-                  <Status info={{ label: "Check-in пройден", tone: "ok" }} size="sm" />
+                  <Status info={{ label: tx("Check-in пройден"), tone: "ok" }} size="sm" />
                 </footer>
               )}
             </article>
@@ -561,10 +570,11 @@ function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: Awaite
   );
 }
 
-function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
+async function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
+  const tx = await getT();
   const list = visibleMatches(matches);
   if (list.length === 0) {
-    return <EmptyState icon={<Gamepad2 />} title="Матчей пока нет" text="Расписание появится вместе с сеткой турнира." />;
+    return <EmptyState icon={<Gamepad2 />} title={tx("Матчей пока нет")} text={tx("Расписание появится вместе с сеткой турнира.")} />;
   }
   // предстоящие — по дням расписания, без времени — отдельной группой
   const upcoming = list
@@ -572,14 +582,14 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
     .sort((a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999") || a.number - b.number);
   const byDay = new Map<string, typeof upcoming>();
   for (const m of upcoming) {
-    const key = m.scheduled_at ? formatDate(m.scheduled_at) : "Время не назначено";
+    const key = m.scheduled_at ? formatDate(m.scheduled_at, tx.lang) : tx("Время не назначено");
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key)!.push(m);
   }
   const groups = [
-    { title: "Сейчас", items: list.filter((m) => ["veto", "ready", "live"].includes(m.status)) },
+    { title: tx("Сейчас"), items: list.filter((m) => ["veto", "ready", "live"].includes(m.status)) },
     ...[...byDay].map(([day, items]) => ({ title: day, items })),
-    { title: "Сыгранные", items: list.filter((m) => m.status === "finished").reverse() },
+    { title: tx("Сыгранные"), items: list.filter((m) => m.status === "finished").reverse() },
   ];
   return (
     <Stack className="max-w-[1100px]">
@@ -589,7 +599,7 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
           <Section key={g.title} title={g.title}>
             <RowList>
               {g.items.map((m) => (
-                <MatchListRow key={m.id} m={m} meta={`${matchStage(m, matches)} · BO${m.best_of}${m.scheduled_at && m.status !== "finished" ? ` · ${formatDateTime(m.scheduled_at)}` : ""}`} />
+                <MatchListRow key={m.id} m={m} meta={`${matchStage(m, matches)} · BO${m.best_of}${m.scheduled_at && m.status !== "finished" ? ` · ${formatDateTime(m.scheduled_at, tx.lang)}` : ""}`} />
               ))}
             </RowList>
           </Section>
@@ -599,8 +609,9 @@ function MatchesTab({ matches }: { matches: Awaited<ReturnType<typeof getTournam
 }
 
 async function StatsTab({ tournamentId, slug, solo, finished }: { tournamentId: string; slug: string; solo: boolean; finished: boolean }) {
+  const tx = await getT();
   // getPlayerLeaderboard кэширован на запрос — getTeamStats и MvpBlock берут ту же таблицу, а не считают заново
-  const [rows, teams, nominations, days] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId), getTournamentNominations(tournamentId), getTournamentDays(tournamentId)]);
+  const [rows, teams, nominations, days] = await Promise.all([getPlayerLeaderboard(tournamentId), getTeamStats(tournamentId), getTournamentNominations(tournamentId, tx), getTournamentDays(tournamentId)]);
   return (
     <div className="space-y-10">
       {rows.length > 0 && <TopDownloads slug={slug} days={days} gate />}
@@ -612,14 +623,14 @@ async function StatsTab({ tournamentId, slug, solo, finished }: { tournamentId: 
             param="stat"
             defaultKey="players"
             items={[
-              { key: "players", label: "Игроки" },
-              { key: "teams", label: solo ? "Участники" : "Команды" },
+              { key: "players", label: tx("Игроки") },
+              { key: "teams", label: solo ? tx("Участники") : tx("Команды") },
             ]}
           />
           <div data-tabs-scope="tstats">
             <TabPanel tab="players" defaultKey="players" className="space-y-6">
               <p className="max-w-read text-[15px] text-fg-2">
-                <b className="text-fg">Рейтинг</b> показывает, насколько игрок помог команде: больше — лучше, средний игрок — около 1.00.
+                {tx.rich("<b>Рейтинг</b> показывает, насколько игрок помог команде: больше — лучше, средний игрок — около 1.00.", { b: (c) => <b className="text-fg">{c}</b> })}
               </p>
               <StatLeaders rows={rows} />
               <PlayerStatsTable rows={rows} solo={solo} showTeam={!solo} plain />
@@ -628,13 +639,13 @@ async function StatsTab({ tournamentId, slug, solo, finished }: { tournamentId: 
               {teams.length ? (
                 <TeamStatsTable rows={teams} solo={solo} />
               ) : (
-                <EmptyState compact title="Появится после первого сыгранного матча" text="Победы, карты, раунды и сумма по игрокам." />
+                <EmptyState compact title={tx("Появится после первого сыгранного матча")} text={tx("Победы, карты, раунды и сумма по игрокам.")} />
               )}
             </TabPanel>
           </div>
         </div>
       ) : (
-        <EmptyState title="Статистика появится после первого матча" text="Убийства, ADR, KAST и F16 Rating считаются с наших серверов автоматически." />
+        <EmptyState title={tx("Статистика появится после первого матча")} text={tx("Убийства, ADR, KAST и F16 Rating считаются с наших серверов автоматически.")} />
       )}
       <RatingExplainer />
     </div>
@@ -642,12 +653,13 @@ async function StatsTab({ tournamentId, slug, solo, finished }: { tournamentId: 
 }
 
 async function MvpBlock({ tournamentId, finished }: { tournamentId: string; finished: boolean }) {
+  const tx = await getT();
   const mvp = await getTournamentMvp(tournamentId);
   if (!mvp) return null;
   const nick = mvp.player?.nickname ?? mvp.name;
   return (
     <section className={CARD_SECTION}>
-      <SectionTitle>{finished ? "MVP турнира" : mvp.by === "swing" ? "Лидер по Swing" : "Лидер по рейтингу"}</SectionTitle>
+      <SectionTitle>{finished ? tx("MVP турнира") : mvp.by === "swing" ? tx("Лидер по Swing") : tx("Лидер по рейтингу")}</SectionTitle>
       <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
         <div className="flex min-w-0 items-center gap-4">
           <Avatar src={mvp.player?.avatar_url} name={nick} size="lg" />
@@ -670,7 +682,7 @@ async function MvpBlock({ tournamentId, finished }: { tournamentId: string; fini
             { l: "Rating", v: fmt.r(mvp.rating) },
             { l: "ADR", v: fmt.d1(mvp.adr) },
             { l: "K/D", v: mvp.kd.toFixed(2) },
-            { l: "Карты", v: String(mvp.maps) },
+            { l: tx("Карты"), v: String(mvp.maps) },
           ].map((x) => (
             <div key={x.l}>
               <dd className={`num text-title ${x.c ?? "text-fg"}`}>{x.v}</dd>
@@ -684,6 +696,7 @@ async function MvpBlock({ tournamentId, finished }: { tournamentId: string; fini
 }
 
 async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<ReturnType<typeof getTournamentMatches>> }) {
+  const tx = await getT();
   const teams = new Map(matches.flatMap((m) => [m.team1, m.team2]).filter((x): x is NonNullable<typeof x> => !!x).map((x) => [x.id, x]));
   const hasStage = matches.some((m) => m.stage === "group" || m.stage === "swiss");
   const playoff = matches.filter((m) => (m.stage ?? "playoff") === "playoff");
@@ -702,12 +715,12 @@ async function StagesTab({ t, matches }: { t: Tournament; matches: Awaited<Retur
       )}
       {playoff.length > 0 ? (
         <div className={cn(CARD_SECTION, "overflow-x-auto")}>
-          {hasStage && <SectionTitle>Плей-офф</SectionTitle>}
+          {hasStage && <SectionTitle>{tx("Плей-офф")}</SectionTitle>}
           <BracketView matches={playoff} />
         </div>
       ) : (
         hasStage &&
-        (t.bracket_type === "groups_playoff" || t.bracket_type === "swiss_playoff") && <EmptyState compact title="Плей-офф" text="Сетка плей-офф появится автоматически после групповой стадии." />
+        (t.bracket_type === "groups_playoff" || t.bracket_type === "swiss_playoff") && <EmptyState compact title={tx("Плей-офф")} text={tx("Сетка плей-офф появится автоматически после групповой стадии.")} />
       )}
     </div>
   );

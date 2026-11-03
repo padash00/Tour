@@ -7,6 +7,7 @@ import { PlayerPostCard, PostForm, TeamPostCard } from "@/components/public/find
 import { Button, Container, ContextNav, EmptyState, PageTitle, Select } from "@/components/ds";
 import { TeamsNav } from "@/components/team/teams-nav";
 import { HelpHint } from "@/components/help-hint";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Поиск команды",
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 type Tab = "players" | "teams";
 
 export default async function FindPage(props: PageProps<"/find">) {
+  const tx = await getT();
   const sp = await props.searchParams;
   const tab: Tab = sp.tab === "teams" ? "teams" : "players";
   const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -50,14 +52,14 @@ export default async function FindPage(props: PageProps<"/find">) {
     <Container className="pb-16 pt-8 sm:pt-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <PageTitle>Поиск команды</PageTitle>
+          <PageTitle>{tx("Поиск команды")}</PageTitle>
           <p className="mt-1 max-w-read text-meta text-fg-3">
-            Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, заявки и приглашения приходят уведомлением.
+            {tx("Игроки ищут команду, команды — игроков. Объявление живёт 14 дней, заявки и приглашения приходят уведомлением.")}
           </p>
         </div>
         {!player && (
           <Button href={`/login?next=${encodeURIComponent(base(tab))}`}>
-            Войти, чтобы разместить объявление
+            {tx("Войти, чтобы разместить объявление")}
           </Button>
         )}
       </header>
@@ -72,8 +74,8 @@ export default async function FindPage(props: PageProps<"/find">) {
         className="mt-6"
         match="tab"
         items={[
-          { key: "players", label: "Ищут команду", href: "/find" },
-          { key: "teams", label: "Ищут игрока", href: "/find?tab=teams" },
+          { key: "players", label: tx("Ищут команду"), href: "/find" },
+          { key: "teams", label: tx("Ищут игрока"), href: "/find?tab=teams" },
         ]}
       />
 
@@ -83,25 +85,25 @@ export default async function FindPage(props: PageProps<"/find">) {
             {tab === "teams" && <input type="hidden" name="tab" value="teams" />}
 
             <label className="block">
-              <span className="mb-1.5 block text-meta font-medium text-fg-3">Роль</span>
+              <span className="mb-1.5 block text-meta font-medium text-fg-3">{tx("Роль")}</span>
               <Select name="role" defaultValue={role || "all"} className="w-[150px]">
-                <option value="all">Любая</option>
+                <option value="all">{tx("Любая")}</option>
                 {FINDER_ROLES.filter((r) => r.key !== "any").map((r) => (
-                  <option key={r.key} value={r.key}>{r.label}</option>
+                  <option key={r.key} value={r.key}>{tx(r.label)}</option>
                 ))}
               </Select>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-meta font-medium text-fg-3">Режим</span>
+              <span className="mb-1.5 block text-meta font-medium text-fg-3">{tx("Режим")}</span>
               <Select name="mode" defaultValue={mode || "all"} className="w-[120px]">
-                <option value="all">Все</option>
+                <option value="all">{tx("Все")}</option>
                 {FINDER_MODES.map((m) => <option key={m} value={m}>{m === "2v2" ? "2×2" : "5×5"}</option>)}
               </Select>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-meta font-medium text-fg-3">FACEIT от</span>
+              <span className="mb-1.5 block text-meta font-medium text-fg-3">{tx("FACEIT от")}</span>
               <Select name="min" defaultValue={faceitMin ? String(faceitMin) : ""} className="w-[100px]">
                 <option value="">—</option>
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
@@ -109,17 +111,17 @@ export default async function FindPage(props: PageProps<"/find">) {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-meta font-medium text-fg-3">до</span>
+              <span className="mb-1.5 block text-meta font-medium text-fg-3">{tx("до")}</span>
               <Select name="max" defaultValue={faceitMax ? String(faceitMax) : ""} className="w-[100px]">
                 <option value="">—</option>
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
               </Select>
             </label>
 
-            <Button type="submit" variant="secondary">Показать</Button>
+            <Button type="submit" variant="secondary">{tx("Показать")}</Button>
             {filtered && (
               <Link href={base(tab)} className="inline-flex h-10 items-center px-2 text-meta text-fg-3 hover:text-fg">
-                Сбросить
+                {tx("Сбросить")}
               </Link>
             )}
           </form>
@@ -127,13 +129,13 @@ export default async function FindPage(props: PageProps<"/find">) {
           {posts.length === 0 ? (
             <EmptyState
               compact
-              title={filtered ? "Ничего не найдено" : tab === "players" ? "Пока никто не ищет команду" : "Пока ни одна команда не ищет игроков"}
+              title={filtered ? tx("Ничего не найдено") : tab === "players" ? tx("Пока никто не ищет команду") : tx("Пока ни одна команда не ищет игроков")}
               text={
                 filtered
-                  ? "Попробуйте снять часть фильтров."
+                  ? tx("Попробуйте снять часть фильтров.")
                   : tab === "players"
-                    ? "Разместите объявление первым — капитаны увидят ваш уровень FACEIT."
-                    : "Капитаны могут разместить объявление на этой вкладке."
+                    ? tx("Разместите объявление первым — капитаны увидят ваш уровень FACEIT.")
+                    : tx("Капитаны могут разместить объявление на этой вкладке.")
               }
             />
           ) : (
@@ -153,18 +155,18 @@ export default async function FindPage(props: PageProps<"/find">) {
           {form ?? (
             <EmptyState
               compact
-              title={tab === "players" ? (player ? "Вы уже в команде" : "Ищете команду?") : isCaptain ? "Команда не подходит" : "Ищете игроков?"}
+              title={tab === "players" ? (player ? tx("Вы уже в команде") : tx("Ищете команду?")) : isCaptain ? tx("Команда не подходит") : tx("Ищете игроков?")}
               text={
                 tab === "players"
                   ? player
-                    ? "Объявление «ищу команду» доступно игрокам без команды. Капитаны могут пригласить игрока из списка."
-                    : "Войдите через Steam и разместите объявление."
-                  : "Объявление от команды публикует капитан. Игроки могут откликнуться на объявления в списке."
+                    ? tx("Объявление «ищу команду» доступно игрокам без команды. Капитаны могут пригласить игрока из списка.")
+                    : tx("Войдите через Steam и разместите объявление.")
+                  : tx("Объявление от команды публикует капитан. Игроки могут откликнуться на объявления в списке.")
               }
               action={
                 tab === "players" && membership && isCaptain ? (
                   <Button href={base("teams")} variant="secondary" size="sm">
-                    Разместить объявление команды
+                    {tx("Разместить объявление команды")}
                   </Button>
                 ) : undefined
               }

@@ -3,6 +3,7 @@
  * и перевод в cvars CS2 для конфига MatchZy.
  */
 import { MODES, type ModeKey } from "./modes";
+import { makeT, tr, type T } from "./i18n/core";
 
 export type LobbySettings = {
   // основные
@@ -169,14 +170,16 @@ export function withMode(s: LobbySettings, mode: ModeKey): LobbySettings {
 }
 
 /** Почему с такими картами матч не начать (null — всё в порядке) */
-export function mapsProblem(s: LobbySettings): string | null {
+export function mapsProblem(s: LobbySettings, t: T = makeT("ru")): string | null {
   const n = s.maps.length;
   if (s.map_choice === "host" && n !== s.best_of) {
     const left = s.best_of - n;
-    return left > 0 ? `Выберите ещё ${left} ${plural(left, "карту", "карты", "карт")} для игры в формате BO${s.best_of}` : `Для BO${s.best_of} нужно ровно ${s.best_of} — уберите лишние`;
+    return left > 0
+      ? t("Выберите ещё {left} {word} для игры в формате BO{bo}", { left, word: t.plural(left, "карту", "карты", "карт"), bo: s.best_of })
+      : t("Для BO{bo} нужно ровно {bo} — уберите лишние", { bo: s.best_of });
   }
-  if (s.map_choice === "veto" && n < s.best_of + 1) return `Для вето в BO${s.best_of} нужно хотя бы ${s.best_of + 1} карт в пуле`;
-  if (s.map_choice === "random" && n < 1) return "Выберите хотя бы одну карту";
+  if (s.map_choice === "veto" && n < s.best_of + 1) return t("Для вето в BO{bo} нужно хотя бы {n} карт в пуле", { bo: s.best_of, n: s.best_of + 1 });
+  if (s.map_choice === "random" && n < 1) return t("Выберите хотя бы одну карту");
   return null;
 }
 
@@ -238,26 +241,26 @@ export function lobbyCvars(s: LobbySettings, bots: number, humans: number): Reco
 export const PRESETS: { key: string; name: string; text: string; settings: Partial<LobbySettings> }[] = [
   {
     key: "classic",
-    name: "Классика 5×5",
-    text: "MR24, нож, овертаймы, вето карт",
+    name: tr("Классика 5×5"),
+    text: tr("MR24, нож, овертаймы, вето карт"),
     settings: { mode: "5v5", team_size: 5, max_rounds: 24, knife: true, overtime: true, map_choice: "veto", maps: ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_train"] },
   },
   {
     key: "wingman",
-    name: "Wingman 2×2",
-    text: "MR16, компактные карты",
+    name: tr("Wingman 2×2"),
+    text: tr("MR16, компактные карты"),
     settings: { mode: "2v2", team_size: 2, max_rounds: 16, knife: true, overtime: true, map_choice: "host", best_of: 1, maps: ["de_inferno"] },
   },
   {
     key: "duel",
-    name: "Дуэль 1×1",
-    text: "Один на один, без ножа",
+    name: tr("Дуэль 1×1"),
+    text: tr("Один на один, без ножа"),
     settings: { mode: "1v1", team_size: 1, max_rounds: 24, knife: false, overtime: false, map_choice: "host", best_of: 1, maps: ["de_dust2"] },
   },
   {
     key: "fun",
-    name: "Фан",
-    text: "Только в голову, низкая гравитация, автобхоп",
+    name: tr("Фан"),
+    text: tr("Только в голову, низкая гравитация, автобхоп"),
     settings: { headshot_only: true, low_gravity: true, autobhop: true, knife: false, max_rounds: 16, start_money: 16000, max_money: 16000 },
   },
 ];
@@ -267,4 +270,4 @@ export const BOT_NAMES = [
   "Wolf", "Elliot", "Gunner", "Hank", "Ivan", "Jacob", "Keith", "Lou", "Moe", "Norm",
 ];
 
-export const BOT_DIFFICULTY = ["Лёгкие", "Нормальные", "Сложные", "Эксперт"] as const;
+export const BOT_DIFFICULTY = [tr("Лёгкие"), tr("Нормальные"), tr("Сложные"), tr("Эксперт")] as const;

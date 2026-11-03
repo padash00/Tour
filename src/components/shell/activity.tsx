@@ -6,7 +6,9 @@ import { Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Timer, Tooltip, cn } from "@/components/ds";
 import { useViewer, type Activity } from "../viewer";
+import type { T } from "@/lib/i18n/core";
 import { useToast } from "../toast";
+import { useT } from "@/lib/i18n/client";
 
 /*
  * Глобальная активность в шапке — одно самое срочное действие игрока (модель приоритетов — lib/activity.ts).
@@ -91,16 +93,17 @@ function useAlert(a: Activity | null) {
 /** Сервер готов: копирует «connect адрес» — игрок вставляет в консоль CS2 (~) */
 function ConnectButton({ connect, compact }: { connect: string; compact?: boolean }) {
   const toast = useToast();
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() =>
         navigator.clipboard.writeText(`connect ${connect}`).then(
-          () => toast.success(`Скопировано: connect ${connect} — вставьте в консоль CS2 (~)`),
-          () => toast.error(`Адрес сервера: ${connect}`),
+          () => toast.success(t("Скопировано: connect {addr} — вставьте в консоль CS2 (~)", { addr: connect })),
+          () => toast.error(t("Адрес сервера: {addr}", { addr: connect })),
         )
       }
-      aria-label={`Скопировать адрес сервера ${connect}`}
+      aria-label={`${t("Скопировать адрес сервера")} ${connect}`}
       title={`connect ${connect}`}
       className={cn(
         "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control bg-ok font-semibold text-ok-ink transition-opacity hover:opacity-90",
@@ -114,9 +117,10 @@ function ConnectButton({ connect, compact }: { connect: string; compact?: boolea
 }
 
 function More({ n }: { n: number }) {
+  const t = useT();
   if (n <= 0) return null;
   return (
-    <span className="num shrink-0 rounded-tiny bg-black/25 px-1.5 text-micro" aria-label={`и ещё ${n}`}>
+    <span className="num shrink-0 rounded-tiny bg-black/25 px-1.5 text-micro" aria-label={t("и ещё {n}", { n })}>
       +{n}
     </span>
   );
@@ -185,11 +189,8 @@ export function MobileActivityBar() {
   );
 }
 
-function secondsText(s: number) {
-  const a = s % 100;
-  const b = s % 10;
-  const word = a > 10 && a < 20 ? "секунд" : b === 1 ? "секунда" : b > 1 && b < 5 ? "секунды" : "секунд";
-  return `${s} ${word}`;
+function secondsText(s: number, t: T) {
+  return `${s} ${t.plural(s, "секунда", "секунды", "секунд")}`;
 }
 
 /**
@@ -198,6 +199,7 @@ function secondsText(s: number) {
  */
 export function ActivityAnnouncer() {
   const { activity } = useViewer();
+  const t = useT();
   const [text, setText] = useState("");
   const last = useRef<string | null>(null);
   useAlert(activity);
@@ -207,10 +209,10 @@ export function ActivityAnnouncer() {
     last.current = key;
     if (!activity) return;
     const left = activity.deadline ? Math.max(0, Math.ceil((new Date(activity.deadline).getTime() - Date.now()) / 1000)) : null;
-    const msg = `${activity.label}. ${activity.detail}.${left != null ? ` Осталось ${left >= 120 ? `${Math.round(left / 60)} мин` : secondsText(left)}.` : ""}`;
-    const t = setTimeout(() => setText(msg), 0);
-    return () => clearTimeout(t);
-  }, [activity]);
+    const msg = `${activity.label}. ${activity.detail}.${left != null ? ` ${t("Осталось {x}", { x: left >= 120 ? t("{n} мин", { n: Math.round(left / 60) }) : secondsText(left, t) })}.` : ""}`;
+    const timer = setTimeout(() => setText(msg), 0);
+    return () => clearTimeout(timer);
+  }, [activity, t]);
   return (
     <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
       {text}

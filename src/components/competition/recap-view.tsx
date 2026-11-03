@@ -4,6 +4,8 @@ import { mapName } from "@/lib/format";
 import type { MapHighlight, Placement, TournamentRecap } from "@/lib/recap";
 import { fmt } from "@/components/stats-format";
 import { Avatar, Eyebrow, TeamLogo, cn } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
+import { tr, type T } from "@/lib/i18n/core";
 
 const CARD = "rounded-surface border border-line-subtle bg-surface";
 
@@ -18,7 +20,7 @@ const MEDAL: Record<string, string> = {
   "3": "text-[#d39a6a] border-[#d39a6a]/35 bg-[#d39a6a]/[0.06]",
   "3–4": "text-[#d39a6a] border-[#d39a6a]/35 bg-[#d39a6a]/[0.06]",
 };
-const PLACE_LABEL: Record<string, string> = { "1": "Чемпион", "2": "2 место", "3": "3 место", "3–4": "3–4 место" };
+const PLACE_LABEL: Record<string, string> = { "1": tr("Чемпион"), "2": tr("2 место"), "3": tr("3 место"), "3–4": tr("3–4 место") };
 
 /** одиночный участник (1×1): «команда» — это сам игрок */
 const isSoloPlacement = (p: Placement) => !!p.team.is_solo || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
@@ -27,7 +29,7 @@ const isSoloPlacement = (p: Placement) => !!p.team.is_solo || (p.roster.length =
  * Карточка пьедестала: компактная, высота по содержимому. 1 место — крупнее и с золотым свечением,
  * вместо пустоты — итог на турнире (серии, карты) и отметка MVP.
  */
-function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?: string | null }) {
+function PlaceCard({ p, big, mvpName, tx }: { p: Placement; big?: boolean; mvpName?: string | null; tx: T }) {
   const solo = isSoloPlacement(p);
   const player = solo ? p.roster[0] : null;
   const href = player ? `/players/${player.steam_id}` : `/teams/${encodeURIComponent(p.team.tag)}`;
@@ -43,7 +45,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
     >
       {big && <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#e8c27a]/[0.10] to-transparent" />}
       <span className={cn("relative inline-flex items-center gap-1.5 rounded-[6px] border px-2.5 h-7 text-[12px] font-semibold", MEDAL[p.place])}>
-        {p.place === "1" ? "🏆" : p.place === "2" ? "🥈" : "🥉"} {PLACE_LABEL[p.place] ?? `${p.place} место`}
+        {p.place === "1" ? "🏆" : p.place === "2" ? "🥈" : "🥉"} {PLACE_LABEL[p.place] ? tx(PLACE_LABEL[p.place]) : tx("{n} место", { n: p.place })}
       </span>
       <Link href={href} className="group relative mt-5 flex flex-col items-center gap-3 min-w-0 max-w-full">
         <span className={cn("rounded-full p-[3px]", big ? "bg-[#e8c27a]/40" : p.place === "2" ? "bg-fg-2/25" : "bg-[#d39a6a]/30")}>
@@ -59,11 +61,11 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
       </Link>
       <div className="relative mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-fg-3">
         <span>
-          серии <span className="num text-fg-2">{r.wins}–{r.losses}</span>
+          {tx("серии")} <span className="num text-fg-2">{r.wins}–{r.losses}</span>
         </span>
         <span aria-hidden>·</span>
         <span>
-          карты <span className="num text-fg-2">{r.mapWins}–{r.mapLosses}</span>
+          {tx("карты")} <span className="num text-fg-2">{r.mapWins}–{r.mapLosses}</span>
         </span>
         {mvpName && (
           <span className="rounded-[5px] border border-accent/30 bg-accent/[0.08] px-1.5 text-[11px] font-semibold text-accent">MVP {solo ? "" : mvpName}</span>
@@ -83,7 +85,7 @@ function PlaceCard({ p, big, mvpName }: { p: Placement; big?: boolean; mvpName?:
   );
 }
 
-function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
+function MapRecord({ label, h, tx }: { label: string; h: MapHighlight; tx: T }) {
   const m = h.match;
   return (
     <Link href={`/matches/${m.id}`} className={cn(CARD, "block p-6 hover:border-line-strong transition-colors")}>
@@ -95,7 +97,7 @@ function MapRecord({ label, h }: { label: string; h: MapHighlight }) {
         </div>
       </div>
       <div className="mt-2 text-[14px] text-fg-3 break-words">
-        {m.team1?.name ?? "—"} — {m.team2?.name ?? "—"} · {h.rounds} раундов
+        {m.team1?.name ?? "—"} — {m.team2?.name ?? "—"} · {tx("{n} раундов", { n: h.rounds })}
       </div>
     </Link>
   );
@@ -107,7 +109,8 @@ function cardGrid(n: number) {
   return cn("grid gap-4", n >= 2 && "grid-cols-2", n === 4 ? "lg:grid-cols-4" : n >= 5 ? "lg:grid-cols-5" : n === 2 ? "" : "lg:grid-cols-3");
 }
 
-export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
+export async function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
+  const tx = await getT();
   const { placements, nominations, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
   // на пьедестале — места 1–3; 4-е (проигравший матча за 3-е место) — строкой под ним
@@ -119,18 +122,18 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
   if (!champion) {
     return (
       <div className={cn(CARD, "border-dashed p-8 lg:p-10")}>
-        <div className="text-[20px] font-semibold">Итоги появятся после финала</div>
-        <p className="mt-2 max-w-xl text-fg-3">Когда будет сыгран решающий матч, здесь соберутся призёры, путь чемпиона, MVP и рекорды турнира.</p>
+        <div className="text-[20px] font-semibold">{tx("Итоги появятся после финала")}</div>
+        <p className="mt-2 max-w-xl text-fg-3">{tx("Когда будет сыгран решающий матч, здесь соберутся призёры, путь чемпиона, MVP и рекорды турнира.")}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-14">
-      {imageBase && <SocialDownloads base={imageBase} title="Картинка итогов" text="Пьедестал, MVP и лидеры — для поста, сторис или превью ссылки." />}
+      {imageBase && <SocialDownloads base={imageBase} title={tx("Картинка итогов")} text={tx("Пьедестал, MVP и лидеры — для поста, сторис или превью ссылки.")} />}
       {/* пьедестал */}
       <section>
-        <Eyebrow className="mb-6">Призёры</Eyebrow>
+        <Eyebrow className="mb-6">{tx("Призёры")}</Eyebrow>
         {/* пьедестал: на десктопе 2 · 1 · 3 по нижнему краю, на телефоне — чемпион сверху, 2 и 3 рядом */}
         <div className={cn("grid grid-cols-2 items-end gap-3 md:gap-4", rest.length >= 3 ? "md:grid-cols-4" : rest.length === 2 ? "md:grid-cols-[1fr_1.18fr_1fr]" : "md:grid-cols-[1.18fr_1fr]")}>
           {[champion, ...rest].map((p) => {
@@ -142,7 +145,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
                 key={`${p.place}-${p.team.id}`}
                 className={cn(first && "col-span-2 md:col-span-1", rest.length >= 2 && (first ? "md:order-2" : second ? "md:order-1" : "md:order-3"))}
               >
-                <PlaceCard p={p} big={first} mvpName={mvpHere} />
+                <PlaceCard p={p} big={first} mvpName={mvpHere} tx={tx} />
               </div>
             );
           })}
@@ -151,18 +154,18 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
 
       {fourth && (
         <p className="-mt-10 text-[14px] text-fg-3">
-          4 место — <span className="text-fg-2">{fourth.team.name}</span> (проиграли матч за 3-е место)
+          {tx.rich("4 место — <b>{name}</b> (проиграли матч за 3-е место)", { b: (c) => <span className="text-fg-2">{c}</span> }, { name: fourth.team.name })}
         </p>
       )}
 
       {/* номинации: решение судей или кандидат по статистике */}
       {shownNominations.length > 0 && (
         <section>
-          <Eyebrow className="mb-6">Номинации</Eyebrow>
+          <Eyebrow className="mb-6">{tx("Номинации")}</Eyebrow>
           <div className={cardGrid(shownNominations.length)}>
             {shownNominations.map((n) => (
               <div key={n.key} className={cn(CARD, "min-w-0 p-4 sm:p-6")}>
-                <div className="text-[13px] text-fg-3">{n.title}</div>
+                <div className="text-[13px] text-fg-3">{tx(n.title)}</div>
                 <div className="mt-3 flex items-center gap-3 min-w-0">
                   {n.team && <TeamLogo src={n.team.logo_url} tag={n.team.tag} size="sm" />}
                   <div className="min-w-0">
@@ -170,7 +173,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
                     <div className="truncate text-[12px] text-fg-3">{n.team && n.team.name !== n.name ? n.team.name : ""}</div>
                   </div>
                 </div>
-                <div className="mt-3 text-[12px] text-fg-3">{n.source === "judges" ? `решение судей${n.value ? ` · ${n.value}` : ""}` : n.value}</div>
+                <div className="mt-3 text-[12px] text-fg-3">{n.source === "judges" ? `${tx("решение судей")}${n.value ? ` · ${n.value}` : ""}` : n.value}</div>
               </div>
             ))}
           </div>
@@ -180,7 +183,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       {/* MVP */}
       {mvp && (
         <section className={cn(CARD, "p-8 lg:p-10 border-accent/20")}>
-          <Eyebrow>MVP турнира</Eyebrow>
+          <Eyebrow>{tx("MVP турнира")}</Eyebrow>
           <div className="mt-5 flex flex-wrap items-center gap-x-12 gap-y-6">
             <div className="flex items-center gap-5 min-w-0">
               <Avatar src={mvp.player?.avatar_url} name={mvp.player?.nickname ?? mvp.name} size="lg" />
@@ -203,7 +206,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
                 { l: "F16 Rating", v: fmt.r(mvp.rating) },
                 { l: "ADR", v: fmt.d1(mvp.adr) },
                 { l: "K/D", v: mvp.kd.toFixed(2) },
-                { l: "Карты", v: String(mvp.maps) },
+                { l: tx("Карты"), v: String(mvp.maps) },
               ].map((x) => (
                 <div key={x.l}>
                   <div className={cn("num text-[26px] font-semibold", "c" in x ? x.c : "")}>{x.v}</div>
@@ -218,7 +221,7 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
       {/* лидеры */}
       {leaders.length > 0 && (
         <section>
-          <Eyebrow className="mb-6">Лидеры турнира</Eyebrow>
+          <Eyebrow className="mb-6">{tx("Лидеры турнира")}</Eyebrow>
           <div className={cardGrid(leaders.length)}>
             {leaders.map((l) => (
               <div key={l.key} className={cn(CARD, "min-w-0 p-4 sm:p-6")}>
@@ -248,19 +251,19 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
         <div className={cn("grid items-start gap-14 lg:gap-6", championPath.length > 0 && (longestMap || closestMap) && "lg:grid-cols-2")}>
           {championPath.length > 0 && (
             <section>
-              <Eyebrow className="mb-6">Путь чемпиона</Eyebrow>
+              <Eyebrow className="mb-6">{tx("Путь чемпиона")}</Eyebrow>
               <ol className={cn(CARD, "divide-y divide-ink/[0.06]")}>
                 {championPath.map((s) => (
                   <li key={s.matchId}>
                     <Link href={`/matches/${s.matchId}`} className="grid grid-cols-[1fr_auto] sm:grid-cols-[140px_1fr_auto] items-center gap-x-5 gap-y-1 px-5 py-4 hover:bg-surface-2">
                       <span className="text-[13px] text-fg-3">{s.stage}</span>
                       <span className="order-3 sm:order-none col-span-2 sm:col-span-1 flex items-center gap-3 min-w-0">
-                        <span className="text-fg-3 text-[13px]">против</span>
+                        <span className="text-fg-3 text-[13px]">{tx("против")}</span>
                         {s.opponent && <TeamLogo src={s.opponent.logo_url} tag={s.opponent.tag} size="xs" />}
                         <span className="font-medium break-words">{s.opponent?.name ?? "—"}</span>
                       </span>
                       <span className={cn("num text-right text-[18px] font-semibold", s.won ? "text-ok" : "text-danger")}>
-                        {s.walkover ? "тех." : s.score}
+                        {s.walkover ? tx("тех.") : s.score}
                       </span>
                     </Link>
                   </li>
@@ -271,10 +274,10 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
 
           {(longestMap || closestMap) && (
             <section>
-              <Eyebrow className="mb-6">Карты турнира</Eyebrow>
+              <Eyebrow className="mb-6">{tx("Карты турнира")}</Eyebrow>
               <div className={cn("grid gap-4", championPath.length === 0 && "md:grid-cols-2")}>
-                {longestMap && <MapRecord label="Самая длинная карта" h={longestMap} />}
-                {closestMap && <MapRecord label="Самая напряжённая карта" h={closestMap} />}
+                {longestMap && <MapRecord label={tx("Самая длинная карта")} h={longestMap} tx={tx} />}
+                {closestMap && <MapRecord label={tx("Самая напряжённая карта")} h={closestMap} tx={tx} />}
               </div>
             </section>
           )}
@@ -283,15 +286,15 @@ export function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; 
 
       {/* цифры */}
       <section>
-        <Eyebrow className="mb-6">Турнир в цифрах</Eyebrow>
+        <Eyebrow className="mb-6">{tx("Турнир в цифрах")}</Eyebrow>
         <div className={cn(CARD, "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-ink/[0.06]")}>
           {[
-            { l: solo ? "Участников" : "Команд", v: totals.teams },
-            { l: "Игроков", v: totals.players || "—" },
-            { l: "Матчей", v: totals.matches },
-            { l: "Карт", v: totals.maps },
-            { l: "Раундов", v: totals.rounds },
-            { l: "Убийств", v: totals.kills || "—" },
+            { l: solo ? tx("Участников") : tx("Команд"), v: totals.teams },
+            { l: tx("Игроков"), v: totals.players || "—" },
+            { l: tx("Матчей"), v: totals.matches },
+            { l: tx("Карт"), v: totals.maps },
+            { l: tx("Раундов"), v: totals.rounds },
+            { l: tx("Убийств"), v: totals.kills || "—" },
           ].map((x) => (
             <div key={x.l} className="p-6 border-line-subtle [&:not(:first-child)]:border-l max-sm:[&:nth-child(odd)]:border-l-0 max-sm:[&:nth-child(n+3)]:border-t">
               <div className="num text-[30px] font-semibold">{x.v}</div>

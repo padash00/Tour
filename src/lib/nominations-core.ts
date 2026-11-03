@@ -19,6 +19,8 @@
  *   за раунд дают 0,28. При равенстве — KAST.
  */
 
+import { makeT, tr, type T } from "./i18n/core";
+
 export type NominationKey = "mvp" | "sniper" | "rifler" | "support" | "entry" | "clutch" | "stable" | "multikill" | "captain";
 
 export type NominationDef = {
@@ -31,15 +33,15 @@ export type NominationDef = {
 };
 
 export const NOMINATIONS: NominationDef[] = [
-  { key: "mvp", title: "Лучший игрок (MVP)", auto: true, rule: "Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше половины карт команды, минимум 2." },
-  { key: "sniper", title: "Лучший снайпер", auto: true, rule: "Больше всего убийств из AWP и SSG 08 по логу сервера; при равенстве — за раунд." },
-  { key: "rifler", title: "Лучший рифлер", auto: true, rule: "Лучший F16 Rating среди игроков, у кого снайперские убийства < 30% всех; при равенстве — ADR." },
-  { key: "support", title: "Лучший опорник", auto: true, rule: "(Ассисты + флеш-ассисты) за раунд + урон гранатами / 100 за раунд; при равенстве — KAST." },
-  { key: "entry", title: "Лучший энтри-фраггер", auto: true, rule: "Больше всего первых убийств в раунде; при равенстве — разница первых убийств и первых смертей." },
-  { key: "clutch", title: "Клатч-мастер", auto: true, rule: "Больше всего выигранных клатчей (последний живой в команде против одного и более); при равенстве — F16 Rating." },
-  { key: "stable", title: "Самый стабильный игрок", auto: true, rule: "Лучший KAST — доля раундов с убийством, ассистом, выживанием или разменом; при равенстве — F16 Rating." },
-  { key: "multikill", title: "Мастер мультикиллов", auto: true, rule: "Больше всего эйсов (5 убийств за раунд), затем раундов с 4 убийствами; при равенстве — 3 убийства за раунд." },
-  { key: "captain", title: "Лучший капитан команды", auto: false, rule: "Решение судей." },
+  { key: "mvp", title: tr("Лучший игрок (MVP)"), auto: true, rule: "Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше половины карт команды, минимум 2." },
+  { key: "sniper", title: tr("Лучший снайпер"), auto: true, rule: "Больше всего убийств из AWP и SSG 08 по логу сервера; при равенстве — за раунд." },
+  { key: "rifler", title: tr("Лучший рифлер"), auto: true, rule: "Лучший F16 Rating среди игроков, у кого снайперские убийства < 30% всех; при равенстве — ADR." },
+  { key: "support", title: tr("Лучший опорник"), auto: true, rule: "(Ассисты + флеш-ассисты) за раунд + урон гранатами / 100 за раунд; при равенстве — KAST." },
+  { key: "entry", title: tr("Лучший энтри-фраггер"), auto: true, rule: "Больше всего первых убийств в раунде; при равенстве — разница первых убийств и первых смертей." },
+  { key: "clutch", title: tr("Клатч-мастер"), auto: true, rule: "Больше всего выигранных клатчей (последний живой в команде против одного и более); при равенстве — F16 Rating." },
+  { key: "stable", title: tr("Самый стабильный игрок"), auto: true, rule: "Лучший KAST — доля раундов с убийством, ассистом, выживанием или разменом; при равенстве — F16 Rating." },
+  { key: "multikill", title: tr("Мастер мультикиллов"), auto: true, rule: "Больше всего эйсов (5 убийств за раунд), затем раундов с 4 убийствами; при равенстве — 3 убийства за раунд." },
+  { key: "captain", title: tr("Лучший капитан команды"), auto: false, rule: "Решение судей." },
 ];
 
 export const nominationTitle = (key: string) => NOMINATIONS.find((n) => n.key === key)?.title ?? key;
@@ -92,10 +94,10 @@ function top(lines: NominationLine[], score: (l: NominationLine) => number, tie:
 
 const fixed = (n: number, d = 2) => n.toFixed(d).replace(".", ",");
 
-export function bestSniper(lines: NominationLine[]): NominationPick | null {
+export function bestSniper(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const pool = eligibleLines(lines).filter((l) => l.sniperKills != null);
   const best = top(pool, (l) => l.sniperKills!, (l) => l.sniperKills! / l.rounds);
-  return best ? { line: best, score: best.sniperKills!, value: `${best.sniperKills} убийств из AWP/SSG 08` } : null;
+  return best ? { line: best, score: best.sniperKills!, value: tx("{n} убийств из AWP/SSG 08", { n: best.sniperKills }) } : null;
 }
 
 /** Доля снайперских убийств; null — лога с оружием нет */
@@ -113,7 +115,7 @@ export function bestRifler(lines: NominationLine[]): NominationPick | null {
 export const supportScore = (l: NominationLine) =>
   l.rounds > 0 ? (l.assists + l.flashAssists) / l.rounds + l.utilityDamage / (100 * l.rounds) : 0;
 
-export function bestSupport(lines: NominationLine[]): NominationPick | null {
+export function bestSupport(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const pool = eligibleLines(lines);
   const best = top(pool, supportScore, (l) => l.kast);
   if (!best) return null;
@@ -121,18 +123,23 @@ export function bestSupport(lines: NominationLine[]): NominationPick | null {
   return {
     line: best,
     score: supportScore(best),
-    value: `индекс ${fixed(supportScore(best))} · ассисты ${fixed(best.assists / r)}/р · флеш ${fixed(best.flashAssists / r)}/р · гранаты ${fixed(best.utilityDamage / r, 1)}/р`,
+    value: tx("индекс {index} · ассисты {assists}/р · флеш {flash}/р · гранаты {util}/р", {
+      index: fixed(supportScore(best)),
+      assists: fixed(best.assists / r),
+      flash: fixed(best.flashAssists / r),
+      util: fixed(best.utilityDamage / r, 1),
+    }),
   };
 }
 
-export function bestEntry(lines: NominationLine[]): NominationPick | null {
+export function bestEntry(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const best = top(eligibleLines(lines), (l) => l.firstKills, (l) => l.firstKills - l.firstDeaths);
-  return best ? { line: best, score: best.firstKills, value: `${best.firstKills} первых убийств · ${best.firstKills - best.firstDeaths >= 0 ? "+" : ""}${best.firstKills - best.firstDeaths}` } : null;
+  return best ? { line: best, score: best.firstKills, value: tx("{n} первых убийств · {diff}", { n: best.firstKills, diff: `${best.firstKills - best.firstDeaths >= 0 ? "+" : ""}${best.firstKills - best.firstDeaths}` }) } : null;
 }
 
-export function bestClutch(lines: NominationLine[]): NominationPick | null {
+export function bestClutch(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const best = top(eligibleLines(lines), (l) => l.clutches, (l) => l.rating);
-  return best ? { line: best, score: best.clutches, value: `${best.clutches} выигранных клатчей` } : null;
+  return best ? { line: best, score: best.clutches, value: tx("{n} выигранных клатчей", { n: best.clutches }) } : null;
 }
 
 export function bestStable(lines: NominationLine[]): NominationPick | null {
@@ -140,9 +147,9 @@ export function bestStable(lines: NominationLine[]): NominationPick | null {
   return best ? { line: best, score: best.kast, value: `KAST ${Math.round(best.kast)}%` } : null;
 }
 
-export function bestMultikill(lines: NominationLine[]): NominationPick | null {
+export function bestMultikill(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const best = top(eligibleLines(lines), (l) => l.k5 * 1000 + l.k4, (l) => l.k3);
   if (!best) return null;
-  const parts = [best.k5 && `${best.k5} эйс`, best.k4 && `${best.k4}×4K`, best.k3 && `${best.k3}×3K`].filter(Boolean);
+  const parts = [best.k5 && tx("{n} эйс", { n: best.k5 }), best.k4 && `${best.k4}×4K`, best.k3 && `${best.k3}×3K`].filter(Boolean);
   return { line: best, score: best.k5 * 1000 + best.k4, value: parts.join(" · ") };
 }

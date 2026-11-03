@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { SteamMark } from "@/components/ds/icons";
 import { Spinner, buttonClass, cn } from "@/components/ds";
 
@@ -9,6 +10,7 @@ import { Spinner, buttonClass, cn } from "@/components/ds";
  * Обычная ссылка: работает и без JavaScript.
  */
 export function SteamLoginButton({ href }: { href: string }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   return (
     <a
@@ -22,7 +24,7 @@ export function SteamLoginButton({ href }: { href: string }) {
       className={cn(buttonClass("primary", "lg", "w-full"), busy && "pointer-events-none opacity-80")}
     >
       {busy ? <Spinner className="size-5" /> : <SteamMark className="size-5" />}
-      {busy ? "Переходим в Steam…" : "Войти через Steam"}
+      {busy ? t("Переходим в Steam…") : t("Войти через Steam")}
     </a>
   );
 }

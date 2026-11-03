@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 import { IdCard } from "lucide-react";
 import { useViewer } from "@/components/viewer";
 import { noChrome } from "@/components/shell/nav";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Напоминание под шапкой, пока анкета игрока не заполнена. Ничего не блокирует — только ведёт к анкете.
  * Страница из кэша CDN одинакова для всех, поэтому флаг приходит с /api/me на клиенте.
  */
 export function ProfileNudge() {
+  const t = useT();
   const { player, profileIncomplete, contactMissing } = useViewer();
   const pathname = usePathname();
   if (!player || !(profileIncomplete || contactMissing) || noChrome(pathname) || pathname.startsWith("/me/profile") || pathname === "/privacy") return null;
@@ -23,11 +25,11 @@ export function ProfileNudge() {
         <p className="min-w-0 flex-1 text-meta text-fg-2">
           {profileIncomplete ? (
             <>
-              <span className="font-medium text-fg">Заполните анкету игрока.</span> Она нужна, чтобы создать команду, вступить в неё и подать заявку на турнир.
+              <span className="font-medium text-fg">{t("Заполните анкету игрока.")}</span> {t("Она нужна, чтобы создать команду, вступить в неё и подать заявку на турнир.")}
             </>
           ) : (
             <>
-              <span className="font-medium text-fg">Оставьте WhatsApp или Telegram.</span> Организатору нужно связаться с вами по турниру — это обязательно.
+              <span className="font-medium text-fg">{t("Оставьте WhatsApp или Telegram.")}</span> {t("Организатору нужно связаться с вами по турниру — это обязательно.")}
             </>
           )}
         </p>
@@ -35,7 +37,7 @@ export function ProfileNudge() {
           href={`/me/profile?next=${encodeURIComponent(pathname)}`}
           className="inline-flex h-8 items-center rounded-control bg-accent px-3 text-meta font-semibold text-accent-ink hover:bg-accent-strong"
         >
-          Заполнить
+          {t("Заполнить")}
         </Link>
       </div>
     </div>

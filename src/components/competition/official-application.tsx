@@ -12,6 +12,7 @@ import { OrganizationInput } from "@/components/profile/profile-form";
 import { RosterPicker, type PickerMember, type Slot } from "@/components/competition/registration";
 import { coachAgeWarning, officialChecklist, officialRoster, parseApplication, type CheckItem, type OfficialSettings, type PlayerCheck } from "@/lib/official";
 import { parseDay } from "@/lib/profile";
+import { useT } from "@/lib/i18n/client";
 
 /*
  * Заявка на официальный турнир: состав без запасных, данные организации, ответственного лица и тренера,
@@ -57,6 +58,7 @@ export function OfficialApplicationForm({
   label: string;
   footer: string;
 }) {
+  const tx = useT();
   const [state, action, pending] = useActionState<ActionResult, FormData>(registerTeam, null);
   const toast = useToast();
   const router = useRouter();
@@ -77,17 +79,18 @@ export function OfficialApplicationForm({
   const chosen = members.filter((m) => !m.banned && (slots[m.player_id] === "main" || slots[m.player_id] === "sub"));
   const subCount = chosen.filter((m) => slots[m.player_id] === "sub").length;
   const coachFromTeam = settings.require_coach && !!teamCoach?.ready;
-  const { errors } = useMemo(() => parseApplication((k) => v[k as keyof ApplicationValues], settings.require_coach && !coachFromTeam), [v, settings.require_coach, coachFromTeam]);
+  const { errors } = useMemo(() => parseApplication((k) => v[k as keyof ApplicationValues], settings.require_coach && !coachFromTeam, tx), [v, settings.require_coach, coachFromTeam, tx]);
   const items = officialChecklist({
     t: settings,
     players: chosen.map(
-      (m) => checks.find((c) => c.player_id === m.player_id) ?? { player_id: m.player_id, nickname: m.nickname, issues: [`${m.nickname}: анкета не заполнена`], warnings: [] },
+      (m) => checks.find((c) => c.player_id === m.player_id) ?? { player_id: m.player_id, nickname: m.nickname, issues: [`${m.nickname}: ${tx("анкета не заполнена")}`], warnings: [] },
     ),
     mains: chosen.length - subCount,
     subs: subCount,
     application: errors,
+    tx,
   });
-  const coachWarning = settings.require_coach && !coachFromTeam ? coachAgeWarning(settings, parseDay(v.coach_birth_date), day) : null;
+  const coachWarning = settings.require_coach && !coachFromTeam ? coachAgeWarning(settings, parseDay(v.coach_birth_date), day, tx) : null;
   const blocked = items.filter((i) => !i.ok);
   const set = (k: keyof ApplicationValues) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [k]: e.target.value }));
   const show = (k: keyof ApplicationValues) => (touched && errors[k] ? errors[k] : undefined);
@@ -114,18 +117,19 @@ export function OfficialApplicationForm({
 
       {/* состав */}
       <div className="border-b border-line-subtle px-4 pb-1 pt-4 sm:px-5">
-        <h3 className="text-title text-fg">Игроки</h3>
+        <h3 className="text-title text-fg">{tx("Игроки")}</h3>
         <p className="mt-0.5 text-meta text-fg-3">
-          В основе {size}
-          {subs ? `, запасных — до ${subs}` : ", без запасных — состав в заявке окончательный"}. У каждого должна быть заполнена анкета.
+          {subs
+            ? tx("В основе {size}, запасных — до {n}. У каждого должна быть заполнена анкета.", { size, n: subs })
+            : tx("В основе {size}, без запасных — состав в заявке окончательный. У каждого должна быть заполнена анкета.", { size })}
         </p>
       </div>
       <RosterPicker members={members} size={size} subs={subs} initial={initial} onChange={setSlots} />
 
       {/* организация и контакты */}
       <div className="space-y-5 border-t border-line-subtle px-4 py-5 sm:px-5">
-        <h3 className="text-title text-fg">Организация</h3>
-        <Field label="Полное название организации, которую представляет команда" required error={show("organization")} hint="Предприятие, учреждение, вуз или колледж — как в Приложении №1">
+        <h3 className="text-title text-fg">{tx("Организация")}</h3>
+        <Field label={tx("Полное название организации, которую представляет команда")} required error={show("organization")} hint={tx("Предприятие, учреждение, вуз или колледж — как в Приложении №1")}>
           {(p) => (
             <OrganizationInput
               {...p}
@@ -141,9 +145,9 @@ export function OfficialApplicationForm({
           )}
         </Field>
         <div className="grid gap-5 sm:grid-cols-3">
-          {text("captain_phone", "Телефон капитана", { type: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
-          {text("responsible_name", "Ответственное лицо (ФИО)", { placeholder: "Петров Пётр Петрович", max: 120 })}
-          {text("responsible_phone", "Телефон ответственного", { type: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
+          {text("captain_phone", tx("Телефон капитана"), { type: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
+          {text("responsible_name", tx("Ответственное лицо (ФИО)"), { placeholder: "Петров Пётр Петрович", max: 120 })}
+          {text("responsible_phone", tx("Телефон ответственного"), { type: "tel", placeholder: "+7 705 123 45 67", max: 24 })}
         </div>
       </div>
 
@@ -151,54 +155,53 @@ export function OfficialApplicationForm({
       {coachFromTeam && (
         <div className="border-t border-line-subtle px-4 py-5 sm:px-5">
           <input type="hidden" name="coach_from_team" value="1" />
-          <h3 className="text-title text-fg">Тренер</h3>
+          <h3 className="text-title text-fg">{tx("Тренер")}</h3>
           <p className="mt-0.5 text-meta text-fg-3">
-            Тренер команды — <span className="text-fg-2">{teamCoach!.nickname}</span>. ФИО, дата рождения, место работы и должность попадут в заявку из его анкеты.
+            {tx.rich("Тренер команды — <b>{name}</b>. ФИО, дата рождения, место работы и должность попадут в заявку из его анкеты.", { b: (c) => <span className="text-fg-2">{c}</span> }, { name: teamCoach!.nickname })}
           </p>
         </div>
       )}
       {settings.require_coach && !coachFromTeam && (
         <div className="space-y-5 border-t border-line-subtle px-4 py-5 sm:px-5">
           <div>
-            <h3 className="text-title text-fg">Тренер</h3>
+            <h3 className="text-title text-fg">{tx("Тренер")}</h3>
             <p className="mt-0.5 text-meta text-fg-3">
               {teamCoach
-                ? `У тренера команды ${teamCoach.nickname} не заполнена анкета — попросите его заполнить её или впишите данные вручную.`
-                : "Шестой участник команды. Можно вписать вручную или пригласить тренера в команду на сайте — тогда данные подставятся из его анкеты."}
+                ? tx("У тренера команды {name} не заполнена анкета — попросите его заполнить её или впишите данные вручную.", { name: teamCoach.nickname })
+                : tx("Шестой участник команды. Можно вписать вручную или пригласить тренера в команду на сайте — тогда данные подставятся из его анкеты.")}
             </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            {text("coach_name", "ФИО тренера", { placeholder: "Сидоров Сидор Сидорович", max: 120 })}
-            {text("coach_birth_date", "Дата рождения", { type: "date" })}
+            {text("coach_name", tx("ФИО тренера"), { placeholder: "Сидоров Сидор Сидорович", max: 120 })}
+            {text("coach_birth_date", tx("Дата рождения"), { type: "date" })}
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
-            {text("coach_workplace", "Место работы или учёбы")}
-            {text("coach_position", "Должность или курс, группа", { max: 120 })}
+            {text("coach_workplace", tx("Место работы или учёбы"))}
+            {text("coach_position", tx("Должность или курс, группа"), { max: 120 })}
           </div>
         </div>
       )}
 
       {/* чек-лист */}
       <div className="border-t border-line-subtle px-4 py-5 sm:px-5">
-        <h3 className="text-title text-fg">Проверка заявки</h3>
+        <h3 className="text-title text-fg">{tx("Проверка заявки")}</h3>
         <ul className="mt-3 divide-y divide-line-subtle">
           {items.map((i) => (
             <ChecklistRow key={i.key} item={i} />
           ))}
-          {coachWarning && <ChecklistRow item={{ key: "coach-age", label: "Возраст тренера", ok: true, warn: true, detail: coachWarning }} />}
+          {coachWarning && <ChecklistRow item={{ key: "coach-age", label: tx("Возраст тренера"), ok: true, warn: true, detail: coachWarning }} />}
         </ul>
         <p className="mt-3 text-meta text-fg-3">
-          Справки с места работы или учёбы (студенческие билеты) участники сдают организатору на бумаге — без полного комплекта документов команда не
-          допускается.
+          {tx("Справки с места работы или учёбы (студенческие билеты) участники сдают организатору на бумаге — без полного комплекта документов команда не допускается.")}
         </p>
       </div>
 
       <div className="flex flex-col gap-3 border-t border-line-subtle px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className={cn("min-w-0 text-meta", rulesLocked && !blocked.length ? "font-medium text-warn" : "text-fg-3")}>
-          {blocked.length ? `Осталось исправить: ${blocked.length}` : rulesLocked ? "Сначала прочитайте регламент турнира выше и поставьте галочку." : footer}
+          {blocked.length ? tx("Осталось исправить: {n}", { n: blocked.length }) : rulesLocked ? tx("Сначала прочитайте регламент турнира выше и поставьте галочку.") : footer}
         </div>
         <Button type="submit" size="lg" loading={pending} disabled={blocked.length > 0 || rulesLocked} className="w-full sm:w-auto">
-          {pending ? (update ? "Сохраняем…" : "Отправляем…") : label}
+          {pending ? (update ? tx("Сохраняем…") : tx("Отправляем…")) : label}
         </Button>
       </div>
       {state?.error && (
@@ -211,6 +214,7 @@ export function OfficialApplicationForm({
 }
 
 function ChecklistRow({ item }: { item: CheckItem }) {
+  const tx = useT();
   const tone = !item.ok ? "fail" : item.warn ? "warn" : "ok";
   return (
     <li className="flex items-start gap-3 py-2.5">
@@ -223,7 +227,7 @@ function ChecklistRow({ item }: { item: CheckItem }) {
         )}
       >
         {tone === "ok" ? <Check className="size-3.5" /> : tone === "warn" ? <TriangleAlert className="size-3.5" /> : <X className="size-3.5" />}
-        <span className="sr-only">{tone === "ok" ? "выполнено" : tone === "warn" ? "предупреждение" : "не выполнено"}</span>
+        <span className="sr-only">{tone === "ok" ? tx("выполнено") : tone === "warn" ? tx("предупреждение") : tx("не выполнено")}</span>
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] text-fg">{item.label}</span>

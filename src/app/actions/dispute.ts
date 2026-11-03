@@ -8,6 +8,7 @@ import { getMatch } from "@/lib/matches";
 import { adminIds } from "@/lib/server/admins";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
+import { getT } from "@/lib/i18n/server";
 
 const snapshot = (m: { status: string; winner_id: string | null; team1_score: number; team2_score: number; is_walkover: boolean }) => ({
   status: m.status,
@@ -20,21 +21,22 @@ const snapshot = (m: { status: string; winner_id: string | null; team1_score: nu
 /** Открыть спор по матчу: капитан одной из команд или админ */
 export async function openDispute(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const matchId = String(formData.get("matchId"));
+  const t = await getT();
   const player = await requirePlayer(`/matches/${matchId}`);
   if (player.is_banned && !isAdmin(player)) return { error: BANNED_ERROR };
-  if (await isRateLimited(player.id, "dispute.open", 30)) return { error: "Спор уже отправлен — подождите немного" };
+  if (await isRateLimited(player.id, "dispute.open", 30)) return { error: t("Спор уже отправлен — подождите немного") };
   const reason = String(formData.get("reason") ?? "").trim();
-  if (reason.length < 10) return { error: "Опишите проблему подробнее (минимум 10 символов)" };
-  if (reason.length > 1000) return { error: "Слишком длинное описание" };
+  if (reason.length < 10) return { error: t("Опишите проблему подробнее (минимум 10 символов)") };
+  if (reason.length > 1000) return { error: t("Слишком длинное описание") };
 
   const m = await getMatch(matchId);
-  if (!m) return { error: "Матч не найден" };
-  if (!["ready", "live", "finished"].includes(m.status)) return { error: "Спор можно открыть после начала матча" };
+  if (!m) return { error: t("Матч не найден") };
+  if (!["ready", "live", "finished"].includes(m.status)) return { error: t("Спор можно открыть после начала матча") };
 
   const admin = isAdmin(player);
   const team = m.team1?.captain_id === player.id ? m.team1 : m.team2?.captain_id === player.id ? m.team2 : null;
   const isCaptain = !!team;
-  if (!isCaptain && !admin) return { error: "Спор может открыть капитан команды этого матча" };
+  if (!isCaptain && !admin) return { error: t("Спор может открыть капитан команды этого матча") };
 
   if (isCaptain) {
     const { count } = await db()
@@ -43,7 +45,7 @@ export async function openDispute(_prev: ActionResult, formData: FormData): Prom
       .eq("match_id", m.id)
       .eq("team_id", team!.id)
       .eq("status", "open");
-    if ((count ?? 0) > 0) return { error: "У вашей команды уже есть открытый спор по этому матчу" };
+    if ((count ?? 0) > 0) return { error: t("У вашей команды уже есть открытый спор по этому матчу") };
   }
 
   const { data: d, error } = await db()
@@ -57,7 +59,7 @@ export async function openDispute(_prev: ActionResult, formData: FormData): Prom
     })
     .select("id")
     .single();
-  if (error || !d) return { error: "Не удалось открыть спор" };
+  if (error || !d) return { error: t("Не удалось открыть спор") };
   await db().from("matches").update({ under_review: true }).eq("id", m.id);
 
   const captains = [m.team1?.captain_id, m.team2?.captain_id].filter((id): id is string => !!id && id !== player.id);
@@ -70,7 +72,7 @@ export async function openDispute(_prev: ActionResult, formData: FormData): Prom
   await audit(player.id, "dispute.open", { type: "match", id: m.id }, { dispute: d.id, reason });
   revalidatePath(`/matches/${m.id}`);
   revalidatePath(`/admin/matches/${m.id}`);
-  return { success: "Спор открыт. Матч помечен «На рассмотрении», администратор получит уведомление." };
+  return { success: t("Спор открыт. Матч помечен «На рассмотрении», администратор получит уведомление.") };
 }
 
 /** Решение по спору. Если результат нужно изменить — сначала «Отменить результат» / «Тех. победа», потом закрыть спор. */

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "@/lib/i18n/client";
 import { buttonClass, cn } from "./ui";
 
 /** Модальное окно сайта (вместо window.confirm / alert браузера) */
@@ -102,7 +103,7 @@ export function Modal({
 export function ConfirmModal({
   open,
   message,
-  confirmLabel = "Подтвердить",
+  confirmLabel,
   danger,
   onCancel,
   onConfirm,
@@ -114,6 +115,7 @@ export function ConfirmModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useT();
   return (
     <Modal
       open={open}
@@ -123,10 +125,10 @@ export function ConfirmModal({
       footer={
         <>
           <button type="button" className={buttonClass("ghost")} onClick={onCancel}>
-            Отмена
+            {t("Отмена")}
           </button>
           <button type="button" data-autofocus className={buttonClass(danger ? "danger" : "primary", "md", "sm:min-w-[140px]")} onClick={onConfirm}>
-            {confirmLabel}
+            {confirmLabel ?? t("Подтвердить")}
           </button>
         </>
       }

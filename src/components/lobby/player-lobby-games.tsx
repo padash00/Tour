@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/supabase";
 import { mapLabel } from "@/lib/maps";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { Container, RowList, Section, cn } from "@/components/ds";
 
 type Row = {
@@ -17,6 +18,7 @@ type Row = {
 
 /** Неофициальные матчи игрока в лобби: отдельно от турнирной статистики */
 export async function PlayerLobbyGames({ playerId }: { playerId: string }) {
+  const t = await getT();
   const { data } = await db()
     .from("lobby_player_stats")
     .select("game_id, team, kills, deaths, assists, damage, rounds_played, game:lobby_games(id, status, team1, team2, team1_score, team2_score, winner, maps, finished_at)")
@@ -43,8 +45,8 @@ export async function PlayerLobbyGames({ playerId }: { playerId: string }) {
   return (
     <Container width="wide" className="pb-14">
       <Section
-        title={`Матчи в лобби · ${wins}/${list.length} побед`}
-        description="Неофициальные игры — в статистику турниров не входят."
+        title={t("Матчи в лобби · {wins}/{total} побед", { wins, total: list.length })}
+        description={t("Неофициальные игры — в статистику турниров не входят.")}
       >
         <RowList>
           {list.map((r) => {
@@ -64,7 +66,7 @@ export async function PlayerLobbyGames({ playerId }: { playerId: string }) {
                 </span>
                 <span className="num w-20 text-right text-fg-2">{r.kills}-{r.deaths}-{r.assists}</span>
                 <span className="num hidden w-16 text-right text-fg-3 md:inline">{Math.round(r.damage / Math.max(1, r.rounds_played))} ADR</span>
-                <span className="hidden w-24 text-right text-meta text-fg-3 lg:inline">{formatDate(g.finished_at)}</span>
+                <span className="hidden w-24 text-right text-meta text-fg-3 lg:inline">{formatDate(g.finished_at, t.lang)}</span>
               </Link>
             );
           })}

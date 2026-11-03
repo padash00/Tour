@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { db } from "./supabase";
 import { AGENT_OFFLINE_AFTER_MS } from "./server/state";
 import { modeOf } from "./modes";
+import { makeT, tr, type T } from "./i18n/core";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
 import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, type LobbySettings } from "./lobby-settings";
@@ -155,13 +156,13 @@ export async function playedMatches(playerId: string) {
 }
 
 /** Причина, по которой фильтр лобби не пускает игрока (null — пускает) */
-export async function filterProblem(s: LobbySettings, p: Pick<Player, "id" | "faceit_level">) {
+export async function filterProblem(s: LobbySettings, p: Pick<Player, "id" | "faceit_level">, t: T = makeT("ru")) {
   if (!s.filter) return null;
   const lvl = p.faceit_level ?? 0;
-  if (s.filter_faceit_min > 0 && lvl < s.filter_faceit_min) return `Нужен уровень FACEIT от ${s.filter_faceit_min}`;
-  if (s.filter_faceit_max < 10 && lvl > s.filter_faceit_max) return `Лобби для уровня FACEIT до ${s.filter_faceit_max}`;
+  if (s.filter_faceit_min > 0 && lvl < s.filter_faceit_min) return t("Нужен уровень FACEIT от {n}", { n: s.filter_faceit_min });
+  if (s.filter_faceit_max < 10 && lvl > s.filter_faceit_max) return t("Лобби для уровня FACEIT до {n}", { n: s.filter_faceit_max });
   if (s.filter_min_matches > 0 && (await playedMatches(p.id)) < s.filter_min_matches) {
-    return `Нужно хотя бы ${s.filter_min_matches} сыгранных матчей на сайте`;
+    return t("Нужно хотя бы {n} сыгранных матчей на сайте", { n: s.filter_min_matches });
   }
   return null;
 }
@@ -195,7 +196,7 @@ export async function closeLobby(lobby: Lobby, reason: string) {
   await touch(lobby.id, { status: "closed", closed_at: new Date().toISOString(), ready_check_until: null, draft: null });
   await systemMessage(lobby.id, reason);
   // игра, которая ещё не на сервере, отменяется; идущую доигрывают
-  await db().from("lobby_games").update({ status: "cancelled", note: "лобби закрыто" }).eq("lobby_id", lobby.id).in("status", ["veto"]);
+  await db().from("lobby_games").update({ status: "cancelled", note: tr("лобби закрыто") }).eq("lobby_id", lobby.id).in("status", ["veto"]);
   const { data: waiting } = await db()
     .from("lobby_games")
     .select("id, server_instance")
@@ -203,7 +204,7 @@ export async function closeLobby(lobby: Lobby, reason: string) {
     .eq("status", "waiting");
   for (const g of waiting ?? []) {
     if (g.server_instance) await db().from("agent_commands").insert({ instance: g.server_instance, type: "end_match", payload: {} });
-    await db().from("lobby_games").update({ status: "cancelled", note: "лобби закрыто", server_instance: null, server_state: null }).eq("id", g.id);
+    await db().from("lobby_games").update({ status: "cancelled", note: tr("лобби закрыто"), server_instance: null, server_state: null }).eq("id", g.id);
   }
 }
 
@@ -226,15 +227,15 @@ export function teamCount(lobby: Lobby, members: LobbyMember[], team: "team1" | 
 }
 
 /** Можно ли поставить игрока в слот (без учёта прав) */
-export function slotProblem(lobby: Lobby, members: LobbyMember[], slot: Slot, playerId: string) {
+export function slotProblem(lobby: Lobby, members: LobbyMember[], slot: Slot, playerId: string, t: T = makeT("ru")) {
   const s = lobby.settings;
   const others = members.filter((m) => m.player_id !== playerId);
   if (slot === "team1" || slot === "team2") {
-    if (teamCount(lobby, others, slot) >= s.team_size) return "В команде нет мест";
+    if (teamCount(lobby, others, slot) >= s.team_size) return t("В команде нет мест");
   } else if (slot === "wait") {
-    if (others.filter((m) => m.slot === "wait").length >= s.max_waiting) return "Список ожидания заполнен";
+    if (others.filter((m) => m.slot === "wait").length >= s.max_waiting) return t("Список ожидания заполнен");
   } else if (others.filter((m) => m.slot === "spec").length >= s.max_spectators) {
-    return "Мест для наблюдателей нет";
+    return t("Мест для наблюдателей нет");
   }
   return null;
 }
@@ -289,11 +290,11 @@ export async function startDraft(lobby: Lobby, captains: [string, string]) {
 }
 
 /** Капитан берёт игрока из ожидания. Драфт заканчивается, когда команды полные или выбирать некого. */
-export async function draftPick(lobby: Lobby, pickedId: string, auto = false) {
-  if (!lobby.draft) return "Драфт не идёт";
+export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t: T = makeT("ru")) {
+  if (!lobby.draft) return t("Драфт не идёт");
   const members = await getMembers(lobby.id);
   const picked = members.find((m) => m.player_id === pickedId && m.slot === "wait");
-  if (!picked) return "Этого игрока нельзя выбрать";
+  if (!picked) return t("Этого игрока нельзя выбрать");
   if (!auto) {
     // забираем ход условным обновлением: двойной клик или авто-пик в ту же секунду не возьмут двух игроков
     const { data } = await db()
@@ -302,7 +303,7 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false) {
       .eq("id", lobby.id)
       .eq("draft->>deadline", lobby.draft.deadline)
       .select("id");
-    if (!data?.length) return "Ход уже сделан — обновите страницу";
+    if (!data?.length) return t("Ход уже сделан — обновите страницу");
   }
   const team = lobby.draft.turn === 1 ? "team1" : "team2";
   await setSlot(lobby.id, pickedId, team);
@@ -328,18 +329,18 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false) {
 // ───────────────────────── старт игры
 
 /** Что мешает начать игру (null — можно) */
-export function startProblem(lobby: Lobby, members: LobbyMember[]) {
-  if (lobby.status !== "waiting") return "Игра уже идёт";
-  if (lobby.draft) return "Сначала закончите драфт";
-  const maps = mapsProblem(lobby.settings);
+export function startProblem(lobby: Lobby, members: LobbyMember[], t: T = makeT("ru")) {
+  if (lobby.status !== "waiting") return t("Игра уже идёт");
+  if (lobby.draft) return t("Сначала закончите драфт");
+  const maps = mapsProblem(lobby.settings, t);
   if (maps) return maps;
   const h1 = members.filter((m) => m.slot === "team1").length;
   const h2 = members.filter((m) => m.slot === "team2").length;
-  if (h1 + h2 === 0) return "В командах никого нет";
+  if (h1 + h2 === 0) return t("В командах никого нет");
   const c1 = teamCount(lobby, members, "team1");
   const c2 = teamCount(lobby, members, "team2");
-  if (c1 === 0 || c2 === 0) return "В каждой команде должен быть хотя бы один игрок или бот";
-  if (c1 !== c2) return `Команды неравные: ${c1} против ${c2} — добавьте игрока или бота`;
+  if (c1 === 0 || c2 === 0) return t("В каждой команде должен быть хотя бы один игрок или бот");
+  if (c1 !== c2) return t("Команды неравные: {c1} против {c2} — добавьте игрока или бота", { c1, c2 });
   return null;
 }
 
@@ -381,7 +382,7 @@ export async function createGame(lobby: Lobby) {
       veto_pool: status === "veto" ? s.maps : [],
       veto_deadline: status === "veto" ? new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() : null,
       maps,
-      note: status === "veto" ? null : "ждём свободный сервер",
+      note: status === "veto" ? null : tr("ждём свободный сервер"),
     })
     .select("*")
     .single();
@@ -407,10 +408,10 @@ export function lobbyVetoState(g: LobbyGame) {
 }
 
 /** Шаг вето (капитан или авто по таймеру). Последняя карта — decider, дальше ждём сервер. */
-export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean) {
+export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: T = makeT("ru")) {
   const state = lobbyVetoState(g);
-  if (!state.current || state.current.action === "decider") return "Вето завершено";
-  if (!state.remaining.includes(map)) return "Эта карта уже выбрана";
+  if (!state.current || state.current.action === "decider") return t("Вето завершено");
+  if (!state.remaining.includes(map)) return t("Эта карта уже выбрана");
   const veto = [...g.veto, { step: state.current.step, team: state.current.team, action: state.current.action, map, auto }];
   const next = vetoState(g.best_of, g.veto_pool, toVeto({ ...g, veto }));
   const patch: TablesUpdate<"lobby_games"> = { veto, veto_deadline: new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() };
@@ -419,13 +420,13 @@ export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean) {
     const maps = veto
       .filter((v) => v.action === "pick" || v.action === "decider")
       .map((v) => ({ map: v.map, team1_score: 0, team2_score: 0, status: "pending" as const, winner: null }));
-    Object.assign(patch, { veto, maps, status: "waiting", veto_deadline: null, note: "ждём свободный сервер" });
+    Object.assign(patch, { veto, maps, status: "waiting", veto_deadline: null, note: tr("ждём свободный сервер") });
   }
   // защита от двойного шага: дедлайн меняется на каждом шаге — обновляем, только если он тот же, что мы прочитали
   let q = db().from("lobby_games").update(patch).eq("id", g.id).eq("status", "veto");
   q = g.veto_deadline ? q.eq("veto_deadline", g.veto_deadline) : q.is("veto_deadline", null);
   const { data } = await q.select("id");
-  if (!data?.length) return "Не удалось — обновите страницу";
+  if (!data?.length) return t("Не удалось — обновите страницу");
   return null;
 }
 
@@ -563,11 +564,11 @@ export async function pickLobbyInstance() {
     db().from("tournaments").select("id", { count: "exact", head: true }).in("status", ["checkin", "live"]),
   ]);
   const online = !!host?.last_seen_at && Date.now() - new Date(host.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
-  if (!online) return { inst: null, stopped: [] as string[], reason: "агент серверного ПК не на связи" };
-  if ((host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[], reason: "идёт обслуживание серверов" };
+  if (!online) return { inst: null, stopped: [] as string[], reason: tr("агент серверного ПК не на связи") };
+  if ((host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[], reason: tr("идёт обслуживание серверов") };
   const marked = (all ?? []).filter((i) => i.for_lobby);
   if (!marked.length && (activeTournaments ?? 0) > 0) {
-    return { inst: null, stopped: [] as string[], reason: "идёт турнир — серверы отданы турниру, лобби запустится после него" };
+    return { inst: null, stopped: [] as string[], reason: tr("идёт турнир — серверы отданы турниру, лобби запустится после него") };
   }
   const insts = marked.length ? marked : (all ?? []);
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));
@@ -591,13 +592,13 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
       await db().from("agent_commands").insert({ instance: g.server_instance, type: "end_match", payload: {} });
       await db()
         .from("lobby_games")
-        .update({ server_instance: null, server_state: null, server_address: null, note: g.note ?? "ищем другой сервер" })
+        .update({ server_instance: null, server_state: null, server_address: null, note: g.note ?? tr("ищем другой сервер") })
         .eq("id", g.id)
         .eq("server_state", "error");
       return; // новый сервер — на следующем тике, когда старый освободится
     }
     if (await opts.workshopBusy(g.maps.map((m) => m.map), g.id)) {
-      await setNote(g, "карта из мастерской прогревается на сервере…");
+      await setNote(g, tr("карта из мастерской прогревается на сервере…"));
       continue;
     }
     const { inst, stopped, reason } = await pickLobbyInstance();
@@ -614,7 +615,7 @@ export async function assignLobbyServers(opts: { workshopBusy: (maps: string[], 
         if (!count) await db().from("agent_commands").insert({ instance: stopped[0], type: "start", payload: { lobby: true } });
         await setNote(g, `запускаем сервер ${stopped[0]}…`);
       } else {
-        await setNote(g, reason ?? "все серверы для лобби заняты — ждём, когда освободится");
+        await setNote(g, reason ?? tr("все серверы для лобби заняты — ждём, когда освободится"));
       }
       return; // по одному за тик
     }
@@ -882,10 +883,10 @@ export async function lobbyGameWatchdog() {
         await db().from("lobby_games").update({ team1_score: s1, team2_score: s2, winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }).eq("id", g.id);
         await finishGame(g.id);
       } else {
-        await cancelGame(g, "матч снят с сервера");
+        await cancelGame(g, tr("матч снят с сервера"));
       }
     } else if (g.status === "waiting" && readyFor > NO_START_MS) {
-      await cancelGame(g, "за 20 минут матч так и не начался");
+      await cancelGame(g, tr("за 20 минут матч так и не начался"));
     }
   }
 }

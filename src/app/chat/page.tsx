@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Container, PageTitle } from "@/components/ds";
 import { SiteChat } from "@/components/public/site-chat";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Чат",
@@ -10,13 +11,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function ChatPage() {
+export default async function ChatPage() {
+  const t = await getT();
   return (
     <Container width="read" className="pb-16 pt-6 sm:pt-8">
-      <PageTitle>Чат</PageTitle>
+      <PageTitle>{t("Чат")}</PageTitle>
       <p className="mt-2 text-[15px] leading-relaxed text-fg-2">
-        Общий чат игроков: найти тиммейтов, договориться об игре, спросить о турнире. Писать могут вошедшие через Steam. Без оскорблений и
-        рекламы — за нарушения администратор удаляет сообщения и закрывает доступ к чату.
+        {t("Общий чат игроков: найти тиммейтов, договориться об игре, спросить о турнире. Писать могут вошедшие через Steam. Без оскорблений и рекламы — за нарушения администратор удаляет сообщения и закрывает доступ к чату.")}
       </p>
       <div className="mt-6">
         <SiteChat />

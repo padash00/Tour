@@ -1,6 +1,7 @@
 "use server";
 
 import { randomInt } from "node:crypto";
+import { getT } from "@/lib/i18n/server";
 import { z } from "zod";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -67,7 +68,7 @@ function invalid(...checks: [z.ZodType, unknown][]): LobbyResult {
 
 /** Пароль лобби: новый — от 4 символов; старые короткие пароли при входе по-прежнему принимаются */
 const PASSWORD_MIN = 4;
-const PASSWORD_ERROR = `Пароль — от ${PASSWORD_MIN} до 32 символов`;
+const passwordError = (t: Awaited<ReturnType<typeof getT>>) => t("Пароль — от {min} до 32 символов", { min: PASSWORD_MIN });
 
 // подбор пароля: не чаще попытки в 3 с, не больше 10 неверных за 10 минут с игрока.
 // Общий лимит лобби (30 неверных) касается только тех, кто уже ошибался в этом лобби: иначе любой
@@ -85,57 +86,62 @@ async function failedJoins(by: { actor?: string; lobby?: string }, seconds: numb
   return count ?? 0;
 }
 async function passwordThrottle(playerId: string, lobbyId: string): Promise<string | null> {
+  const t = await getT();
   const [recent, mine, mineHere, lobby] = await Promise.all([
     isRateLimited(playerId, JOIN_FAILED, 3),
     failedJoins({ actor: playerId }, 600),
     failedJoins({ actor: playerId, lobby: lobbyId }, 600),
     failedJoins({ lobby: lobbyId }, 600),
   ]);
-  if (recent) return "Слишком часто — подождите пару секунд";
-  if (mine >= 10 || (mineHere > 0 && lobby >= 30)) return "Слишком много неверных паролей — попробуйте через несколько минут или войдите по ссылке-приглашению";
+  if (recent) return t("Слишком часто — подождите пару секунд");
+  if (mine >= 10 || (mineHere > 0 && lobby >= 30)) return t("Слишком много неверных паролей — попробуйте через несколько минут или войдите по ссылке-приглашению");
   return null;
 }
 const touch = (id: string, patch: Record<string, unknown> = {}) => db().from("lobbies").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
 
 async function me(): Promise<Player | { error: string }> {
+  const t = await getT();
   const p = await getCurrentPlayer();
-  if (!p) return { error: "Войдите через Steam" };
-  if (p.is_banned) return { error: BANNED_ERROR };
+  if (!p) return { error: t("Войдите через Steam") };
+  if (p.is_banned) return { error: t(BANNED_ERROR) };
   return p;
 }
 
 /** Лобби + игрок + проверка: хост (или админ сайта) */
 async function asHost(code: string): Promise<{ lobby: Lobby; player: Player } | { error: string }> {
+  const t = await getT();
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
-  if (!lobby || lobby.status === "closed") return { error: "Лобби не найдено или закрыто" };
-  if (lobby.host_id !== player.id && !isAdmin(player)) return { error: "Это может только хост лобби" };
+  if (!lobby || lobby.status === "closed") return { error: t("Лобби не найдено или закрыто") };
+  if (lobby.host_id !== player.id && !isAdmin(player)) return { error: t("Это может только хост лобби") };
   return { lobby, player };
 }
 
 async function asMember(code: string): Promise<{ lobby: Lobby; player: Player; slot: Slot } | { error: string }> {
+  const t = await getT();
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
-  if (!lobby || lobby.status === "closed") return { error: "Лобби не найдено или закрыто" };
+  if (!lobby || lobby.status === "closed") return { error: t("Лобби не найдено или закрыто") };
   const { data } = await db().from("lobby_members").select("slot").eq("lobby_id", lobby.id).eq("player_id", player.id).maybeSingle();
-  if (!data) return { error: "Вы не в этом лобби" };
+  if (!data) return { error: t("Вы не в этом лобби") };
   return { lobby, player, slot: data.slot as Slot };
 }
 
 // ───────────────────────── создание, вход, выход
 
 export async function createLobby(visibility: Lobby["visibility"], password: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Visibility, visibility], [Password, password]);
   if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
-  if (!["public", "closed", "private"].includes(visibility)) return { error: "Неизвестный тип лобби" };
+  if (!["public", "closed", "private"].includes(visibility)) return { error: t("Неизвестный тип лобби") };
   const pw = password.trim();
-  if (visibility !== "public" && (pw.length < PASSWORD_MIN || pw.length > 32)) return { error: PASSWORD_ERROR };
+  if (visibility !== "public" && (pw.length < PASSWORD_MIN || pw.length > 32)) return { error: passwordError(t) };
   const other = await playerLobby(player.id);
-  if (other) return { error: "Вы уже в другом лобби — выйдите из него", code: other.code };
+  if (other) return { error: t("Вы уже в другом лобби — выйдите из него"), code: other.code };
 
   // последние настройки этого хоста — удобно пересоздавать
   const { data: last } = await db().from("lobbies").select("settings").eq("host_id", player.id).order("created_at", { ascending: false }).limit(1);
@@ -165,33 +171,34 @@ export async function createLobby(visibility: Lobby["visibility"], password: str
     await audit(player.id, "lobby.create", { type: "lobby", id: data.id }, { visibility });
     return { ok: true, code };
   }
-  return { error: "Не удалось создать лобби — попробуйте ещё раз" };
+  return { error: t("Не удалось создать лобби — попробуйте ещё раз") };
 }
 
 export async function joinLobby(code: string, opts: { password?: string; invite?: string; slot?: Slot }): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [JoinOpts, opts]);
   if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
-  if (!lobby || lobby.status === "closed") return { error: "Лобби не найдено или закрыто" };
+  if (!lobby || lobby.status === "closed") return { error: t("Лобби не найдено или закрыто") };
   const members = await getMembers(lobby.id);
   if (members.some((m) => m.player_id === player.id)) return { ok: true, code: lobby.code };
 
   const { data: banned } = await db().from("lobby_bans").select("player_id").eq("lobby_id", lobby.id).eq("player_id", player.id).maybeSingle();
-  if (banned) return { error: "Хост запретил вам вход в это лобби" };
+  if (banned) return { error: t("Хост запретил вам вход в это лобби") };
   if (lobby.visibility !== "public" && !checkInvite(opts.invite, lobby)) {
     const throttled = await passwordThrottle(player.id, lobby.id);
     if (throttled) return { error: throttled };
     if (!(await checkPassword(opts.password ?? "", lobby.password_hash))) {
       await audit(player.id, JOIN_FAILED, { type: "lobby", id: lobby.id });
-      return { error: "Неверный пароль" };
+      return { error: t("Неверный пароль") };
     }
   }
-  const filter = await filterProblem(lobby.settings, player);
+  const filter = await filterProblem(lobby.settings, player, t);
   if (filter) return { error: filter };
   const other = await playerLobby(player.id);
-  if (other) return { error: "Вы уже в другом лобби — выйдите из него", code: other.code };
+  if (other) return { error: t("Вы уже в другом лобби — выйдите из него"), code: other.code };
 
   // куда встать: просили слот — туда, иначе в команду, где меньше (если можно), иначе в ожидание
   let slot: Slot = opts.slot && SLOTS.includes(opts.slot) ? opts.slot : "wait";
@@ -204,7 +211,7 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
     if (c1 < size || c2 < size) slot = c1 <= c2 && c1 < size ? "team1" : "team2";
   }
   if ((slot === "team1" || slot === "team2") && !teamsOpen) slot = "wait";
-  let problem = slotProblem(lobby, members, slot, player.id);
+  let problem = slotProblem(lobby, members, slot, player.id, t);
   if (problem && slot !== "spec") {
     slot = "wait";
     problem = slotProblem(lobby, members, slot, player.id);
@@ -212,7 +219,7 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
   if (problem) return { error: problem };
 
   const { error } = await db().from("lobby_members").insert({ lobby_id: lobby.id, player_id: player.id, slot });
-  if (error) return { error: "Не удалось войти — обновите страницу" };
+  if (error) return { error: t("Не удалось войти — обновите страницу") };
   if (slot === "team1" || slot === "team2") {
     // двое зашли в одну секунду — места проверяем ещё раз уже после записи
     const after = await getMembers(lobby.id);
@@ -245,48 +252,51 @@ export async function leaveLobby(code: string): Promise<LobbyResult> {
 // ───────────────────────── слоты
 
 export async function moveSelf(code: string, slot: Slot): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [SlotArg, slot]);
   if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
-  if (!SLOTS.includes(slot)) return { error: "Неизвестное место" };
+  if (!SLOTS.includes(slot)) return { error: t("Неизвестное место") };
   const isHost = lobby.host_id === player.id;
   if ((slot === "team1" || slot === "team2") && !isHost) {
-    if (lobby.draft) return { error: "Идёт драфт — игроков выбирают капитаны" };
-    if (!lobby.settings.allow_join_team) return { error: "В команды расставляет хост" };
-    if (lobby.settings.player_pick === "captains") return { error: "Составы собирают капитаны через драфт" };
+    if (lobby.draft) return { error: t("Идёт драфт — игроков выбирают капитаны") };
+    if (!lobby.settings.allow_join_team) return { error: t("В команды расставляет хост") };
+    if (lobby.settings.player_pick === "captains") return { error: t("Составы собирают капитаны через драфт") };
   }
-  if (lobby.ready_check_until) return { error: "Идёт проверка готовности" };
-  const problem = slotProblem(lobby, await getMembers(lobby.id), slot, player.id);
+  if (lobby.ready_check_until) return { error: t("Идёт проверка готовности") };
+  const problem = slotProblem(lobby, await getMembers(lobby.id), slot, player.id, t);
   if (problem) return { error: problem };
   await setSlot(lobby.id, player.id, slot);
   return { ok: true };
 }
 
 export async function movePlayer(code: string, playerId: string, slot: Slot): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Id, playerId], [SlotArg, slot]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
-  if (!SLOTS.includes(slot)) return { error: "Неизвестное место" };
-  if (lobby.draft) return { error: "Идёт драфт" };
+  if (!SLOTS.includes(slot)) return { error: t("Неизвестное место") };
+  if (lobby.draft) return { error: t("Идёт драфт") };
   const members = await getMembers(lobby.id);
-  if (!members.some((m) => m.player_id === playerId)) return { error: "Игрок уже вышел" };
-  const problem = slotProblem(lobby, members, slot, playerId);
+  if (!members.some((m) => m.player_id === playerId)) return { error: t("Игрок уже вышел") };
+  const problem = slotProblem(lobby, members, slot, playerId, t);
   if (problem) return { error: problem };
   await setSlot(lobby.id, playerId, slot);
   return { ok: true };
 }
 
 export async function kickPlayer(code: string, playerId: string, ban: boolean): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Id, playerId], [z.boolean(), ban]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
-  if (playerId === lobby.host_id) return { error: "Хоста выгнать нельзя — сначала передайте хоста" };
+  if (playerId === lobby.host_id) return { error: t("Хоста выгнать нельзя — сначала передайте хоста") };
   const members = await getMembers(lobby.id);
   const target = members.find((m) => m.player_id === playerId);
   await db().from("lobby_members").delete().eq("lobby_id", lobby.id).eq("player_id", playerId);
@@ -307,13 +317,14 @@ export async function unbanPlayer(code: string, playerId: string): Promise<Lobby
 }
 
 export async function transferHost(code: string, playerId: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Id, playerId]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const members = await getMembers(ctx.lobby.id);
   const target = members.find((m) => m.player_id === playerId);
-  if (!target) return { error: "Игрок уже вышел" };
+  if (!target) return { error: t("Игрок уже вышел") };
   await touch(ctx.lobby.id, { host_id: playerId });
   await systemMessage(ctx.lobby.id, `Новый хост — ${target.player.nickname}`);
   return { ok: true };
@@ -322,25 +333,27 @@ export async function transferHost(code: string, playerId: string): Promise<Lobb
 // ───────────────────────── команды: имена, боты, перемешать, баланс
 
 export async function setTeamName(code: string, team: "team1" | "team2", name: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [TeamArg, team], [Text(200), name]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const clean = name.replace(/[\u0000-\u001f";#|]/g, "").trim().slice(0, 24);
-  if (clean.length < 2) return { error: "Название — от 2 символов" };
+  if (clean.length < 2) return { error: t("Название — от 2 символов") };
   await touch(ctx.lobby.id, { [team === "team1" ? "team1_name" : "team2_name"]: clean });
   return { ok: true };
 }
 
 export async function addBot(code: string, team: "team1" | "team2"): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [TeamArg, team]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
-  if (lobby.status !== "waiting") return { error: "Игра уже идёт" };
-  if (lobby.draft) return { error: "Идёт драфт" };
-  if (teamCount(lobby, await getMembers(lobby.id), team) >= lobby.settings.team_size) return { error: "В команде нет мест" };
+  if (lobby.status !== "waiting") return { error: t("Игра уже идёт") };
+  if (lobby.draft) return { error: t("Идёт драфт") };
+  if (teamCount(lobby, await getMembers(lobby.id), team) >= lobby.settings.team_size) return { error: t("В команде нет мест") };
   const bots = { ...lobby.bots, [team]: [...lobby.bots[team], nextBotName(lobby)] };
   await touch(lobby.id, { bots });
   return { ok: true };
@@ -359,13 +372,14 @@ export async function removeBot(code: string, team: "team1" | "team2", name: str
 
 /** Командные инструменты хоста: баланс по ELO, перемешать, поменять местами, очистить */
 export async function teamTool(code: string, tool: "balance" | "shuffle" | "swap" | "clear"): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [TeamTool, tool]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
-  if (lobby.status !== "waiting") return { error: "Игра уже идёт" };
-  if (lobby.draft) return { error: "Идёт драфт" };
+  if (lobby.status !== "waiting") return { error: t("Игра уже идёт") };
+  if (lobby.draft) return { error: t("Идёт драфт") };
   const members = await getMembers(lobby.id);
   const inTeams = members.filter((m) => m.slot === "team1" || m.slot === "team2");
   const assign = async (team1: string[], team2: string[]) => {
@@ -411,16 +425,17 @@ export async function teamTool(code: string, tool: "balance" | "shuffle" | "swap
 // ───────────────────────── настройки
 
 export async function updateSettings(code: string, patch: Partial<LobbySettings>): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [SettingsPatch, patch]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
-  if (lobby.status !== "waiting") return { error: "Настройки меняются между играми" };
+  if (lobby.status !== "waiting") return { error: t("Настройки меняются между играми") };
   const next = normalizeSettings({ ...lobby.settings, ...patch });
   if (patch.maps) {
     const bad = await badMaps(next.maps);
-    if (bad.length) return { error: `Эту карту поставить нельзя: ${bad.join(", ")}` };
+    if (bad.length) return { error: t("Эту карту поставить нельзя: {maps}", { maps: bad.join(", ") }) };
   }
   await touch(lobby.id, { settings: next, ready_check_until: null });
   if (next.team_size < lobby.settings.team_size) await fitTeams({ ...lobby, settings: next });
@@ -428,18 +443,19 @@ export async function updateSettings(code: string, patch: Partial<LobbySettings>
 }
 
 export async function setVisibility(code: string, visibility: Lobby["visibility"], password: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Visibility, visibility], [Password, password]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
-  if (!["public", "closed", "private"].includes(visibility)) return { error: "Неизвестный тип лобби" };
+  if (!["public", "closed", "private"].includes(visibility)) return { error: t("Неизвестный тип лобби") };
   const pw = password.trim();
   const patch: Record<string, unknown> = { visibility };
   if (visibility === "public") patch.password_hash = null;
   else if (pw) {
-    if (pw.length < PASSWORD_MIN || pw.length > 32) return { error: PASSWORD_ERROR };
+    if (pw.length < PASSWORD_MIN || pw.length > 32) return { error: passwordError(t) };
     patch.password_hash = await hashPassword(pw);
-  } else if (!ctx.lobby.password_hash) return { error: "Задайте пароль" };
+  } else if (!ctx.lobby.password_hash) return { error: t("Задайте пароль") };
   await touch(ctx.lobby.id, patch);
   return { ok: true };
 }
@@ -455,14 +471,15 @@ export async function resetInvite(code: string): Promise<LobbyResult> {
 }
 
 export async function saveTemplate(name: string, settings: Partial<LobbySettings>): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Text(200), name], [SettingsPatch, settings]);
   if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const clean = name.trim().slice(0, 40);
-  if (clean.length < 2) return { error: "Название шаблона — от 2 символов" };
+  if (clean.length < 2) return { error: t("Название шаблона — от 2 символов") };
   const { count } = await db().from("lobby_templates").select("id", { count: "exact", head: true }).eq("player_id", player.id);
-  if ((count ?? 0) >= 20) return { error: "Не больше 20 шаблонов — удалите ненужные" };
+  if ((count ?? 0) >= 20) return { error: t("Не больше 20 шаблонов — удалите ненужные") };
   await db().from("lobby_templates").insert({ player_id: player.id, name: clean, settings: normalizeSettings(settings) });
   return { ok: true };
 }
@@ -485,9 +502,10 @@ export async function myTemplates(): Promise<{ id: string; name: string; setting
 
 /** Карта из мастерской по ссылке или ID: название и превью из Steam */
 export async function lookupWorkshop(input: string): Promise<{ error?: string; map?: string; title?: string; image?: string | null }> {
-  if (!Text(500).safeParse(input).success) return { error: "Вставьте ссылку на карту в мастерской Steam или её ID" };
+  const t = await getT();
+  if (!Text(500).safeParse(input).success) return { error: t("Вставьте ссылку на карту в мастерской Steam или её ID") };
   const id = /(?:id=)?(\d{6,12})/.exec(input.trim())?.[1];
-  if (!id) return { error: "Вставьте ссылку на карту в мастерской Steam или её ID" };
+  if (!id) return { error: t("Вставьте ссылку на карту в мастерской Steam или её ID") };
   try {
     const res = await fetch("https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/", {
       method: "POST",
@@ -497,30 +515,31 @@ export async function lookupWorkshop(input: string): Promise<{ error?: string; m
     });
     const json = (await res.json()) as { response?: { publishedfiledetails?: { result: number; title?: string; preview_url?: string; consumer_app_id?: number }[] } };
     const d = json.response?.publishedfiledetails?.[0];
-    if (!d || d.result !== 1) return { error: "Карта не найдена в мастерской (или она скрыта)" };
-    if (d.consumer_app_id && d.consumer_app_id !== 730) return { error: "Это не карта Counter-Strike" };
+    if (!d || d.result !== 1) return { error: t("Карта не найдена в мастерской (или она скрыта)") };
+    if (d.consumer_app_id && d.consumer_app_id !== 730) return { error: t("Это не карта Counter-Strike") };
     const slug = (d.title ?? "")
       .toLowerCase()
       .replace(/[^a-z0-9_]+/g, "_")
       .replace(/^_+|_+$/g, "")
       .slice(0, 40);
     const map = `${slug.length >= 2 ? slug : "workshop"}@${id}`;
-    if (!MAP_RE.test(map)) return { error: "Не удалось разобрать карту" };
+    if (!MAP_RE.test(map)) return { error: t("Не удалось разобрать карту") };
     return { map, title: d.title ?? map, image: d.preview_url ?? null };
   } catch {
-    return { error: "Steam не ответил — попробуйте ещё раз" };
+    return { error: t("Steam не ответил — попробуйте ещё раз") };
   }
 }
 
 // ───────────────────────── готовность и старт
 
 export async function toggleReady(code: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code]);
   if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player, slot } = ctx;
-  if (slot !== "team1" && slot !== "team2") return { error: "Готовность — для игроков команд" };
+  if (slot !== "team1" && slot !== "team2") return { error: t("Готовность — для игроков команд") };
   const { data } = await db().from("lobby_members").select("ready").eq("lobby_id", lobby.id).eq("player_id", player.id).single();
   await db().from("lobby_members").update({ ready: !data?.ready }).eq("lobby_id", lobby.id).eq("player_id", player.id);
   await touch(lobby.id);
@@ -530,13 +549,14 @@ export async function toggleReady(code: string): Promise<LobbyResult> {
 
 /** «Начать матч»: проверка готовности на 30 секунд; если в командах только хост — сразу */
 export async function startMatch(code: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
   const members = await getMembers(lobby.id);
-  const problem = startProblem(lobby, members);
+  const problem = startProblem(lobby, members, t);
   if (problem) return { error: problem };
   // кто не на странице — не блокирует старт: не подтвердил готовность за 30 с — уходит в ожидание
   await db().from("lobby_members").update({ ready: false }).eq("lobby_id", lobby.id);
@@ -559,13 +579,14 @@ export async function cancelReadyCheck(code: string): Promise<LobbyResult> {
 }
 
 export async function cancelCurrentGame(code: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const g = ctx.lobby.current_game_id ? await getGame(ctx.lobby.current_game_id) : null;
-  if (!g || !["veto", "waiting", "live"].includes(g.status)) return { error: "Игры нет" };
-  if (g.status === "live" && !isAdmin(ctx.player)) return { error: "Матч уже идёт на сервере — его может остановить только админ" };
+  if (!g || !["veto", "waiting", "live"].includes(g.status)) return { error: t("Игры нет") };
+  if (g.status === "live" && !isAdmin(ctx.player)) return { error: t("Матч уже идёт на сервере — его может остановить только админ") };
   await cancelGame(g, `отменил ${ctx.player.nickname}`);
   return { ok: true };
 }
@@ -582,12 +603,13 @@ export async function closeLobbyAction(code: string): Promise<LobbyResult> {
 // ───────────────────────── драфт и вето
 
 export async function beginDraft(code: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code]);
   if (bad) return bad;
   const ctx = await asHost(code);
   if ("error" in ctx) return ctx;
   const { lobby } = ctx;
-  if (lobby.status !== "waiting") return { error: "Игра уже идёт" };
+  if (lobby.status !== "waiting") return { error: t("Игра уже идёт") };
   const members = await getMembers(lobby.id);
   let [c1, c2] = captainsOf({ ...lobby, draft: null }, members);
   // капитанов нет в обеих командах — случайные из тех, кто на месте
@@ -597,52 +619,55 @@ export async function beginDraft(code: string): Promise<LobbyResult> {
     c1 ??= pick();
     c2 ??= pick();
   }
-  if (!c1 || !c2 || c1 === c2) return { error: "Для драфта нужны хотя бы двое игроков" };
+  if (!c1 || !c2 || c1 === c2) return { error: t("Для драфта нужны хотя бы двое игроков") };
   await startDraft(lobby, [c1, c2]);
   return { ok: true };
 }
 
 export async function pickInDraft(code: string, playerId: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Id, playerId]);
   if (bad) return bad;
   const ctx = await asMember(code);
   if ("error" in ctx) return ctx;
   const { lobby, player } = ctx;
-  if (!lobby.draft) return { error: "Драфт не идёт" };
-  if (lobby.draft.captains[lobby.draft.turn - 1] !== player.id) return { error: "Сейчас выбирает другой капитан" };
-  const err = await draftPick(lobby, playerId);
+  if (!lobby.draft) return { error: t("Драфт не идёт") };
+  if (lobby.draft.captains[lobby.draft.turn - 1] !== player.id) return { error: t("Сейчас выбирает другой капитан") };
+  const err = await draftPick(lobby, playerId, false, t);
   return err ? { error: err } : { ok: true };
 }
 
 export async function lobbyVeto(code: string, map: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Text(120), map]);
   if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
   const g = lobby?.current_game_id ? await getGame(lobby.current_game_id) : null;
-  if (!lobby || !g || g.status !== "veto") return { error: "Вето сейчас не идёт" };
+  if (!lobby || !g || g.status !== "veto") return { error: t("Вето сейчас не идёт") };
   const st = lobbyVetoState(g);
-  if (!st.current?.team) return { error: "Вето завершено" };
+  if (!st.current?.team) return { error: t("Вето завершено") };
   const team = st.current.team === 1 ? g.team1 : g.team2;
   // ход капитана команды; за команду из одних ботов выбирает хост
   const captain = team.players[0]?.id ?? lobby.host_id;
-  if (captain !== player.id) return { error: team.players.length ? `Сейчас выбирает капитан ${team.name}` : "За команду ботов выбирает хост" };
-  const err = await lobbyVetoAct(g, map, false);
+  if (captain !== player.id) return { error: team.players.length ? t("Сейчас выбирает капитан {name}", { name: team.name }) : t("За команду ботов выбирает хост") };
+  const err = await lobbyVetoAct(g, map, false, t);
   return err ? { error: err } : { ok: true };
 }
 
 // ───────────────────────── чат
 
 export async function sendLobbyMessage(code: string, body: string): Promise<LobbyResult> {
+  const t = await getT();
   const bad = invalid([Code, code], [Text(4000), body]);
   if (bad) return bad;
   const player = await me();
   if ("error" in player) return player;
   const lobby = await getLobbyByCode(code);
-  if (!lobby) return { error: "Лобби не найдено" };
+  if (!lobby) return { error: t("Лобби не найдено") };
   const { data: member } = await db().from("lobby_members").select("player_id").eq("lobby_id", lobby.id).eq("player_id", player.id).maybeSingle();
-  if (!member && !isAdmin(player)) return { error: "Писать в чат могут участники лобби" };
+  if (!member && !isAdmin(player)) return { error: t("Писать в чат могут участники лобби") };
   const text = body.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").trim().slice(0, 300);
   if (!text) return null;
   // не чаще сообщения в секунду
@@ -653,7 +678,7 @@ export async function sendLobbyMessage(code: string, body: string): Promise<Lobb
     .eq("player_id", player.id)
     .order("id", { ascending: false })
     .limit(1);
-  if (last?.[0] && Date.now() - new Date(last[0].created_at).getTime() < 1000) return { error: "Не так быстро" };
+  if (last?.[0] && Date.now() - new Date(last[0].created_at).getTime() < 1000) return { error: t("Не так быстро") };
   await db().from("lobby_messages").insert({ lobby_id: lobby.id, player_id: player.id, body: text });
   return { ok: true };
 }

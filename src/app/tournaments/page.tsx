@@ -3,6 +3,7 @@ import Link from "next/link";
 import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
 import { TournamentList, type TournamentItem } from "@/components/competition/tournament-list";
 import { Container, PageTitle } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 const ORDER: Record<string, number> = { live: 0, checkin: 1, registration: 2, registration_closed: 3, finished: 4, cancelled: 5, draft: 6 };
 
 export default async function TournamentsPage() {
+  const tx = await getT();
   const [all, featured] = await Promise.all([listPublicTournaments(), getFeaturedTournament()]);
   const counts = await approvedCounts(all.map((t) => t.id));
   const current = featured && !["finished", "cancelled"].includes(featured.status) ? featured : null;
@@ -43,11 +45,11 @@ export default async function TournamentsPage() {
     <Container className="pt-8 sm:pt-10">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <PageTitle>Турниры</PageTitle>
-          <p className="mt-1 text-meta text-fg-3">Турниры по CS2 на серверах клуба F16 Arena.</p>
+          <PageTitle>{tx("Турниры")}</PageTitle>
+          <p className="mt-1 text-meta text-fg-3">{tx("Турниры по CS2 на серверах клуба F16 Arena.")}</p>
         </div>
         <Link href="/stats" className="text-meta font-medium text-accent hover:text-accent-strong">
-          Рейтинг и статистика →
+          {tx("Рейтинг и статистика →")}
         </Link>
       </header>
       <TournamentList items={items} featuredId={current?.id ?? null} />

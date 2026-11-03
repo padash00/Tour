@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { tournamentStatusLabel } from "@/lib/format";
+import { tr } from "@/lib/i18n/core";
 import type { MatchStatus, TournamentStatus } from "@/lib/types";
+import { Tt } from "../ds/tt";
 import { cn } from "../ui";
 
 /*
@@ -370,7 +372,7 @@ export const tournamentTone: Record<TournamentStatus, Tone> = {
 export function TournamentStatusChip({ status, size }: { status: TournamentStatus; size?: "sm" | "md" }) {
   return (
     <StatusChip tone={tournamentTone[status]} size={size}>
-      {status === "live" ? "Турнир идёт" : tournamentStatusLabel[status]}
+      <Tt text={status === "live" ? tr("Турнир идёт") : tournamentStatusLabel[status]} />
     </StatusChip>
   );
 }
@@ -386,19 +388,19 @@ const matchTone: Record<MatchStatus, Tone> = {
 };
 
 export const matchStatusLabel: Record<MatchStatus, string> = {
-  pending: "Ожидает",
-  upcoming: "Скоро",
-  veto: "Вето",
-  ready: "Сервер готов",
-  live: "Идёт игра",
-  finished: "Завершён",
-  cancelled: "Отменён",
+  pending: tr("Ожидает"),
+  upcoming: tr("Скоро"),
+  veto: tr("Вето"),
+  ready: tr("Сервер готов"),
+  live: tr("Идёт игра"),
+  finished: tr("Завершён"),
+  cancelled: tr("Отменён"),
 };
 
 export function MatchStatusChip({ status, size = "sm" }: { status: MatchStatus; size?: "sm" | "md" }) {
   return (
     <StatusChip tone={matchTone[status]} size={size}>
-      {matchStatusLabel[status]}
+      <Tt text={matchStatusLabel[status]} />
     </StatusChip>
   );
 }
@@ -498,7 +500,9 @@ export function FlowHeader({ back, title, description }: { back?: ReactNode; tit
   return (
     <div className="pt-12 pb-10 lg:pt-16">
       {back && <div className="mb-8 text-[14px] text-fg-2">{back}</div>}
-      <Eyebrow>Турнир F16 Arena</Eyebrow>
+      <Eyebrow>
+        <Tt text={tr("Турнир F16 Arena")} />
+      </Eyebrow>
       <h1 className="mt-4 text-[34px] font-semibold leading-[1.05] tracking-[-0.015em] sm:text-[44px] lg:text-[52px]">{title}</h1>
       {description && <p className="mt-5 text-[16px] leading-[1.6] text-fg-2 lg:text-[18px]">{description}</p>}
     </div>

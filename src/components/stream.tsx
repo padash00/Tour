@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { buttonClass as btnClass } from "@/components/ds";
+import { useT } from "@/lib/i18n/client";
 
 /** Twitch / YouTube → адрес для встраивания; null — ссылку встроить нельзя */
 export function streamEmbed(url: string, host: string): string | null {
@@ -27,6 +28,7 @@ const DEFAULT_HOST = "tournament.f16-arena.kz";
 const noSubscribe = () => () => {};
 
 export function StreamEmbed({ url }: { url: string }) {
+  const t = useT();
   // адрес сайта — не читаем window при рендере: на сервере и при гидрации — основной домен,
   // после гидрации — фактический (превью Vercel и т.п.), без расхождения разметки
   const host = useSyncExternalStore(noSubscribe, () => window.location.hostname, () => DEFAULT_HOST);
@@ -34,20 +36,21 @@ export function StreamEmbed({ url }: { url: string }) {
   if (!src) {
     return (
       <a href={url} target="_blank" rel="noreferrer" className={btnClass("secondary", "md")}>
-        Смотреть трансляцию ↗
+        {t("Смотреть трансляцию")} ↗
       </a>
     );
   }
   return (
     <div className="overflow-hidden rounded-feature">
       <div className="relative aspect-video bg-bg-2">
-        <iframe src={src} allowFullScreen className="absolute inset-0 h-full w-full" title="Трансляция" />
+        <iframe src={src} allowFullScreen className="absolute inset-0 h-full w-full" title={t("Трансляция")} />
       </div>
     </div>
   );
 }
 
 export function ShareButton({ title }: { title: string }) {
+  const t = useT();
   const [done, setDone] = useState(false);
   return (
     <button
@@ -66,7 +69,7 @@ export function ShareButton({ title }: { title: string }) {
         setTimeout(() => setDone(false), 1800);
       }}
     >
-      {done ? "Ссылка скопирована" : "Поделиться ↗"}
+      {done ? t("Ссылка скопирована") : `${t("Поделиться")} ↗`}
     </button>
   );
 }

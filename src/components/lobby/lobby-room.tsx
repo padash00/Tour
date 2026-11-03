@@ -18,13 +18,16 @@ import { Countdown, LobbyClock } from "./countdown";
 import { Gate, JoinGate } from "./join-gate";
 import { EmptySlot, Panel, PlayerLine, TeamCard } from "./team-card";
 import { phaseOf, useLobbyView, type Run } from "./use-lobby-view";
+import { useT } from "@/lib/i18n/client";
+import { tr } from "@/lib/i18n/core";
 
 type Slot = ViewMember["slot"];
 
 function LobbyProgress({ phase }: { phase: ReturnType<typeof phaseOf> }) {
+  const t = useT();
   if (phase === "closed") return null;
 
-  const labels = ["Комната", "Готовность", "Вето", "Сервер", "Игра"] as const;
+  const labels = [tr("Комната"), tr("Готовность"), tr("Вето"), tr("Сервер"), tr("Игра")] as const;
   const current =
     phase === "waiting" || phase === "draft"
       ? 0
@@ -40,7 +43,7 @@ function LobbyProgress({ phase }: { phase: ReturnType<typeof phaseOf> }) {
     <Steps
       direction="horizontal"
       steps={labels.map((title, index) => ({
-        title,
+        title: t(title),
         state: index < current ? "done" : index === current ? "current" : "todo",
       }))}
     />
@@ -85,6 +88,7 @@ export function LobbyRoom({
   /** адрес сайта для ссылки-приглашения (с сервера — разметка совпадает) */
   origin: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const { view, setView, load, offset, beginMutation, endMutation } = useLobbyView(code, initial);
@@ -142,9 +146,9 @@ export function LobbyRoom({
 
   if (view.access === "closed_lobby") {
     return (
-      <Gate title="Лобби закрыто" text="Это лобби уже закрыто. Создайте новое или найдите открытое в списке.">
+      <Gate title={t("Лобби закрыто")} text={t("Это лобби уже закрыто. Создайте новое или найдите открытое в списке.")}>
         <Link href="/lobbies" className={btnClass("primary", "md")}>
-          К списку лобби
+          {t("К списку лобби")}
         </Link>
       </Gate>
     );
@@ -180,7 +184,7 @@ export function LobbyRoom({
     ? () =>
         navigator.clipboard
           .writeText(inviteUrl)
-          .then(() => toast.success(lobby.visibility === "public" ? "Ссылка скопирована" : "Ссылка скопирована — по ней можно войти без пароля"))
+          .then(() => toast.success(lobby.visibility === "public" ? t("Ссылка скопирована") : t("Ссылка скопирована — по ней можно войти без пароля")))
     : null;
   const showProgress = phase !== "waiting" && phase !== "draft" && phase !== "closed";
 
@@ -196,16 +200,16 @@ export function LobbyRoom({
                   <div className="flex items-center gap-1.5">
                     <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-control bg-bg/70 px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
                       {Icon.back("size-4")}
-                      <span className="hidden sm:inline">К списку лобби</span>
+                      <span className="hidden sm:inline">{t("К списку лобби")}</span>
                     </Link>
                     {copyInvite && (
-                      <button type="button" onClick={copyInvite} title="Скопировать ссылку-приглашение" aria-label="Скопировать ссылку-приглашение" className="grid size-10 place-items-center rounded-control bg-bg/70 text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
+                      <button type="button" onClick={copyInvite} title={t("Скопировать ссылку-приглашение")} aria-label={t("Скопировать ссылку-приглашение")} className="grid size-10 place-items-center rounded-control bg-bg/70 text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
                         {Icon.link("size-[18px]")}
                       </button>
                     )}
                   </div>
                   <span className="num absolute left-1/2 top-0 hidden -translate-x-1/2 rounded-b-control bg-bg/80 px-4 py-2 text-[13px] font-medium text-fg-2 backdrop-blur-sm sm:block">
-                    Игроков <span className="text-fg">{playersNow}/{s.team_size * 2}</span>
+                    {t("Игроков")} <span className="text-fg">{playersNow}/{s.team_size * 2}</span>
                   </span>
                   {isMember ? (
                     <button
@@ -220,12 +224,12 @@ export function LobbyRoom({
                       }
                       className="inline-flex h-10 items-center gap-2 rounded-control border border-danger/40 bg-[#1a0b10cc] px-3 text-[14px] font-medium text-danger backdrop-blur-sm transition-colors hover:bg-danger/20 disabled:opacity-60"
                     >
-                      Покинуть лобби {Icon.exit("size-4")}
+                      {t("Покинуть лобби")} {Icon.exit("size-4")}
                     </button>
                   ) : (
                     lobby.status !== "closed" && (
                       <Button size="sm" onClick={() => (me ? join() : clickEmpty("wait"))}>
-                        Войти в лобби
+                        {t("Войти в лобби")}
                       </Button>
                     )
                   )}
@@ -233,11 +237,11 @@ export function LobbyRoom({
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">Лобби #{lobby.code}</h1>
+                      <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">{t("Лобби #{code}", { code: lobby.code })}</h1>
                       <Status info={lobbyStatus[phase]} size="sm" />
                     </div>
                     <p className="mt-1 truncate text-meta text-fg-2">
-                      {mapLabel(headMap)} · {lobby.visibility === "public" ? "открытое" : lobby.visibility === "closed" ? "по паролю" : "приватное"}
+                      {mapLabel(headMap)} · {lobby.visibility === "public" ? t("открытое") : lobby.visibility === "closed" ? t("по паролю") : t("приватное")}
                     </p>
                   </div>
                   <span className="num rounded-control bg-bg/70 px-3 py-1.5 text-meta text-fg-2 backdrop-blur-sm sm:hidden">
@@ -289,8 +293,8 @@ export function LobbyRoom({
             </div>
 
             {(game?.maps.length ?? 0) > 1 || (!game && s.map_choice === "host" && s.best_of > 1) ? (
-              <section aria-label="Карты серии">
-                <div className="mb-3 text-title text-fg">Карты</div>
+              <section aria-label={t("Карты серии")}>
+                <div className="mb-3 text-title text-fg">{t("Карты")}</div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {(game && game.maps.length ? game.maps.map((m) => m.map) : s.maps).map((m, i) => {
                     const gm = game?.maps[i];
@@ -316,15 +320,15 @@ export function LobbyRoom({
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               <Panel
-                title="В ожидании"
+                title={t("В ожидании")}
                 count={waiting.length}
                 right={
                   draft ? (
                     <span className="text-meta text-accent">
-                      выбирает {byId.get(draft.captains[draft.turn - 1])?.nickname ?? "капитан"} · <Countdown deadline={draft.deadline} /> с
+                      {t("выбирает {name}", { name: byId.get(draft.captains[draft.turn - 1])?.nickname ?? t("капитан") })} · <Countdown deadline={draft.deadline} /> {t("с")}
                     </span>
                   ) : (
-                    s.filter && <span className="text-meta text-fg-3">Фильтр игроков включён</span>
+                    s.filter && <span className="text-meta text-fg-3">{t("Фильтр игроков включён")}</span>
                   )
                 }
               >
@@ -333,7 +337,7 @@ export function LobbyRoom({
                     <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code}>
                       {myTurnInDraft && (
                         <Button size="sm" disabled={busy} onClick={() => run(() => A.pickInDraft(code, m.id))}>
-                          Выбрать
+                          {t("Выбрать")}
                         </Button>
                       )}
                     </PlayerLine>
@@ -342,7 +346,7 @@ export function LobbyRoom({
                 </div>
               </Panel>
 
-              <Panel title="Наблюдатели" count={`${specs.length}/${s.max_spectators}`}>
+              <Panel title={t("Наблюдатели")} count={`${specs.length}/${s.max_spectators}`}>
                 <div className="grid gap-2">
                   {specs.map((m) => (
                     <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} />
@@ -353,7 +357,7 @@ export function LobbyRoom({
             </div>
 
             {view.history.length > 0 && (
-              <Panel title="Сыгранные матчи" count={view.history.length}>
+              <Panel title={t("Сыгранные матчи")} count={view.history.length}>
                 <div className="divide-y divide-line-subtle">
                   {view.history.map((h) => (
                     <Link key={h.id} href={`/lobbies/games/${h.id}`} className="flex min-h-14 items-center gap-3 py-2.5 text-[14px] hover:text-accent">
@@ -372,17 +376,17 @@ export function LobbyRoom({
 
           <aside className="min-w-0 xl:sticky xl:top-[calc(var(--shell-h)+24px)] xl:self-start">
             <div className="mb-3 grid grid-cols-2 gap-1 rounded-control border border-line-subtle bg-shell p-1">
-              {(["chat", "settings"] as const).map((t) => (
+              {(["chat", "settings"] as const).map((k) => (
                 <button
-                  key={t}
+                  key={k}
                   type="button"
-                  onClick={() => setTab(t)}
+                  onClick={() => setTab(k)}
                   className={cn(
                     "h-9 rounded-[6px] text-[14px] font-medium transition-colors",
-                    tab === t ? "bg-elevated text-fg" : "text-fg-3 hover:text-fg",
+                    tab === k ? "bg-elevated text-fg" : "text-fg-3 hover:text-fg",
                   )}
                 >
-                  {t === "chat" ? "Чат" : "Настройки"}
+                  {k === "chat" ? t("Чат") : t("Настройки")}
                 </button>
               ))}
             </div>
@@ -393,17 +397,17 @@ export function LobbyRoom({
               <div className="space-y-3">
                 {!editable && (
                   <div className="rounded-control border border-line-subtle bg-shell px-4 py-3 text-meta text-fg-3">
-                    {lobby.status !== "waiting" ? "Идёт игра — настройки меняются между матчами." : "Менять настройки может только хост лобби."}
+                    {lobby.status !== "waiting" ? t("Идёт игра — настройки меняются между матчами.") : t("Менять настройки может только хост лобби.")}
                   </div>
                 )}
                 <QuickSettings s={s} editable={editable} patch={patch} maps={maps} images={view.mapImages} onAdvanced={() => setAdvanced(true)} />
                 {editable && <VisibilityRow view={view} run={run} code={code} />}
                 <Button block onClick={() => setAdvanced(true)}>
-                  {Icon.gear("size-5")} Расширенные настройки
+                  {Icon.gear("size-5")} {t("Расширенные настройки")}
                 </Button>
                 {isHost && lobby.status !== "closed" && (
                   <Button variant="danger" size="sm" block onClick={() => run(() => A.closeLobbyAction(code))}>
-                    Закрыть лобби
+                    {t("Закрыть лобби")}
                   </Button>
                 )}
               </div>
@@ -428,12 +432,12 @@ export function LobbyRoom({
         <MobileStickyCta
           note={
             <>
-              Проверка готовности · <Countdown deadline={lobby.ready_check_until} /> с
+              {t("Проверка готовности")} · <Countdown deadline={lobby.ready_check_until} /> {t("с")}
             </>
           }
         >
           <Button block size="lg" loading={busy} onClick={() => run(() => A.toggleReady(code))}>
-            Я готов
+            {t("Я готов")}
           </Button>
         </MobileStickyCta>
       )}
@@ -444,6 +448,7 @@ export function LobbyRoom({
 // ───────────────────────── тип лобби (в панели настроек)
 
 function VisibilityRow({ view, run, code }: { view: LobbyView; run: Run; code: string }) {
+  const t = useT();
   const [vis, setVis] = useState(view.lobby.visibility);
   const [pw, setPw] = useState("");
   const changed = vis !== view.lobby.visibility || pw.length > 0;
@@ -451,19 +456,19 @@ function VisibilityRow({ view, run, code }: { view: LobbyView; run: Run; code: s
     <div className="space-y-2 rounded-control bg-ink/[0.03] px-4 py-3">
       <div className="flex items-center gap-3">
         <span className="text-fg-3">{Icon.lock()}</span>
-        <span className="flex-1 text-[14px]">Тип лобби</span>
+        <span className="flex-1 text-[14px]">{t("Тип лобби")}</span>
         <select value={vis} onChange={(e) => setVis(e.target.value as typeof vis)} className="h-9 rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg">
-          <option value="public">Открытое</option>
-          <option value="closed">Закрытое</option>
-          <option value="private">Приватное</option>
+          <option value="public">{t("Открытое")}</option>
+          <option value="closed">{t("Закрытое")}</option>
+          <option value="private">{t("Приватное")}</option>
         </select>
       </div>
       {vis !== "public" && (
-        <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={view.lobby.has_password ? "Новый пароль (не обязательно)" : "Пароль"} maxLength={32} className="h-9 w-full rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg outline-none" />
+        <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder={view.lobby.has_password ? t("Новый пароль (не обязательно)") : t("Пароль")} maxLength={32} className="h-9 w-full rounded-[8px] border border-line bg-surface-3 px-3 text-[13px] text-fg outline-none" />
       )}
       {changed && (
-        <button type="button" onClick={() => (setPw(""), run(() => A.setVisibility(code, vis, pw), "Тип лобби изменён"))} className={btnClass("primary", "sm", "w-full")}>
-          Сохранить
+        <button type="button" onClick={() => (setPw(""), run(() => A.setVisibility(code, vis, pw), t("Тип лобби изменён")))} className={btnClass("primary", "sm", "w-full")}>
+          {t("Сохранить")}
         </button>
       )}
     </div>

@@ -10,6 +10,7 @@ import { getActiveMembership, getTournamentBySlug } from "@/lib/data";
 import { formatDateTime } from "@/lib/format";
 import { loadOfficial } from "@/lib/official-data";
 import { auditPersonalView } from "@/lib/profiles";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Заявка — Приложение №1", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function CaptainApplicationPage(props: PageProps<"/tournaments/[slug]/application">) {
   const { slug } = await props.params;
+  const tx = await getT();
   const t = await getTournamentBySlug(slug);
   if (!t || !t.is_official) notFound();
   const player = await requirePlayer(`/tournaments/${slug}/application`);
@@ -42,8 +44,8 @@ export default async function CaptainApplicationPage(props: PageProps<"/tourname
         {back}
         <div className="mt-6">
           <EmptyState
-            title="Заявки нет"
-            text={isCaptain ? "Заявку можно скачать, когда организатор одобрит участие вашей команды." : "Скачать заявку может только капитан команды-участника."}
+            title={tx("Заявки нет")}
+            text={isCaptain ? tx("Заявку можно скачать, когда организатор одобрит участие вашей команды.") : tx("Скачать заявку может только капитан команды-участника.")}
           />
         </div>
       </Container>
@@ -58,21 +60,22 @@ export default async function CaptainApplicationPage(props: PageProps<"/tourname
       {back}
       <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <PageTitle>Заявка — Приложение №1</PageTitle>
-          <p className="mt-1 text-meta text-fg-3">Команда {data.teams[index].registration.team.name}</p>
+          <PageTitle>{tx("Заявка — Приложение №1")}</PageTitle>
+          <p className="mt-1 text-meta text-fg-3">{tx("Команда {name}", { name: data.teams[index].registration.team.name })}</p>
         </div>
-        <PrintButton label="Скачать / распечатать" />
+        <PrintButton label={tx("Скачать / распечатать")} />
       </div>
       <div className="mt-5 max-w-read">
-        <Callout tone="warn" title="Что сделать с заявкой">
-          1. Нажмите «Скачать / распечатать» — в окне печати выберите принтер или «Сохранить как PDF».
+        <Callout tone="warn" title={tx("Что сделать с заявкой")}>
+          {tx("1. Нажмите «Скачать / распечатать» — в окне печати выберите принтер или «Сохранить как PDF».")}
           <br />
-          2. Подпишите: от организации — руководитель или уполномоченное лицо (печать — при наличии); самостоятельная команда — капитан.
+          {tx("2. Подпишите: от организации — руководитель или уполномоченное лицо (печать — при наличии); самостоятельная команда — капитан.")}
           <br />
-          3. Принесите распечатанную и подписанную заявку организатору вместе со справками с места учёбы или работы
-          {t.registration_closes_at ? ` — до ${formatDateTime(t.registration_closes_at)}` : ""}.
+          {t.registration_closes_at
+            ? tx("3. Принесите распечатанную и подписанную заявку организатору вместе со справками с места учёбы или работы — до {date}.", { date: formatDateTime(t.registration_closes_at, tx.lang) })
+            : tx("3. Принесите распечатанную и подписанную заявку организатору вместе со справками с места учёбы или работы.")}
         </Callout>
-        <p className="mt-3 text-meta text-fg-3">Если в листе ошибка — исправьте анкету игрока или напишите организатору: после подачи заявку меняет только он.</p>
+        <p className="mt-3 text-meta text-fg-3">{tx("Если в листе ошибка — исправьте анкету игрока или напишите организатору: после подачи заявку меняет только он.")}</p>
       </div>
       <div className="f16-print mt-8">
         <ApplicationSheet t={t} data={data} index={index} />

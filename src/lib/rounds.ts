@@ -1,4 +1,5 @@
 import type { LogEvent, Side } from "./swing";
+import { tr } from "./i18n/core";
 
 /**
  * Лента раундов матча: кто выиграл каждый раунд и как, плюс убийства последнего раунда.
@@ -32,10 +33,10 @@ export type RoundRow = { map_number: number; round_number: number; winner_side: 
 type Row = RoundRow;
 
 export const HOW_LABEL: Record<RoundHow, string> = {
-  kill: "все убиты",
-  bomb: "бомба взорвалась",
-  defuse: "бомба разминирована",
-  time: "время вышло",
+  kill: tr("все убиты"),
+  bomb: tr("бомба взорвалась"),
+  defuse: tr("бомба разминирована"),
+  time: tr("время вышло"),
 };
 
 /** Раунды одной карты → фишки; team1/team2 — SteamID64 игроков составов */

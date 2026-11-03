@@ -7,12 +7,14 @@ import type { Notification } from "@/lib/types";
 import { MarkAllReadButton } from "@/components/notifications/actions";
 import { NotificationFeed } from "@/components/public/notification-feed";
 import { Container, EmptyState, Meta, PageTitle, cn } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = { title: "Уведомления", robots: { index: false } };
 
 const PAGE = 30;
 
 export default async function NotificationsPage(props: PageProps<"/notifications">) {
+  const t = await getT();
   const player = await requirePlayer("/notifications");
   const sp = await props.searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
@@ -32,8 +34,8 @@ export default async function NotificationsPage(props: PageProps<"/notifications
   const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE));
   const pageHref = (p: number) => `/notifications?f=${filter}${p > 1 ? `&page=${p}` : ""}`;
   const tabs = [
-    { key: "unread", label: "Непрочитанные", n: unread ?? 0 },
-    { key: "all", label: "Все", n: null },
+    { key: "unread", label: t("Непрочитанные"), n: unread ?? 0 },
+    { key: "all", label: t("Все"), n: null },
   ];
 
   return (
@@ -41,25 +43,25 @@ export default async function NotificationsPage(props: PageProps<"/notifications
       <div className="max-w-[820px]">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <PageTitle>Уведомления</PageTitle>
-            <Meta className="mt-1 block">{unread ? `Непрочитанных: ${unread}` : "Всё прочитано"}</Meta>
+            <PageTitle>{t("Уведомления")}</PageTitle>
+            <Meta className="mt-1 block">{unread ? t("Непрочитанных: {n}", { n: unread }) : t("Всё прочитано")}</Meta>
           </div>
           {(unread ?? 0) > 0 && <MarkAllReadButton />}
         </header>
 
-        <nav aria-label="Фильтр уведомлений" className="mt-6 flex gap-1 border-b border-line-subtle">
-          {tabs.map((t) => (
+        <nav aria-label={t("Фильтр уведомлений")} className="mt-6 flex gap-1 border-b border-line-subtle">
+          {tabs.map((tab) => (
             <Link
-              key={t.key}
-              href={`/notifications?f=${t.key}`}
-              aria-current={filter === t.key ? "page" : undefined}
+              key={tab.key}
+              href={`/notifications?f=${tab.key}`}
+              aria-current={filter === tab.key ? "page" : undefined}
               className={cn(
                 "-mb-px inline-flex h-11 items-center gap-2 border-b-2 px-3 text-[14px] font-medium transition-colors",
-                filter === t.key ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
+                filter === tab.key ? "border-accent text-fg" : "border-transparent text-fg-3 hover:text-fg",
               )}
             >
-              {t.label}
-              {t.n ? <span className="num rounded-chip bg-accent-dim px-1.5 text-micro text-accent">{t.n}</span> : null}
+              {tab.label}
+              {tab.n ? <span className="num rounded-chip bg-accent-dim px-1.5 text-micro text-accent">{tab.n}</span> : null}
             </Link>
           ))}
         </nav>
@@ -68,16 +70,16 @@ export default async function NotificationsPage(props: PageProps<"/notifications
           {items.length === 0 ? (
             <EmptyState
               icon={<Bell />}
-              title={filter === "unread" ? "Всё прочитано" : "Уведомлений пока нет"}
+              title={filter === "unread" ? t("Всё прочитано") : t("Уведомлений пока нет")}
               text={
                 filter === "unread"
-                  ? "Новые уведомления появятся здесь и на колокольчике в шапке."
-                  : "Здесь появятся приглашения в команду, решения по заявкам, вето и готовность сервера."
+                  ? t("Новые уведомления появятся здесь и на колокольчике в шапке.")
+                  : t("Здесь появятся приглашения в команду, решения по заявкам, вето и готовность сервера.")
               }
               action={
                 filter === "unread" ? (
                   <Link href="/notifications?f=all" className="text-[14px] font-medium text-accent hover:text-accent-strong">
-                    Показать все →
+                    {t("Показать все →")}
                   </Link>
                 ) : undefined
               }
@@ -87,10 +89,10 @@ export default async function NotificationsPage(props: PageProps<"/notifications
           )}
 
           {pages > 1 && (
-            <nav aria-label="Страницы" className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
+            <nav aria-label={t("Страницы")} className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
               {page > 1 && (
                 <Link href={pageHref(page - 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-ink/[0.04] hover:text-fg">
-                  ← Назад
+                  {t("← Назад")}
                 </Link>
               )}
               {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
@@ -105,7 +107,7 @@ export default async function NotificationsPage(props: PageProps<"/notifications
               ))}
               {page < pages && (
                 <Link href={pageHref(page + 1)} className="grid h-10 place-items-center rounded-control px-3 text-[14px] text-fg-3 hover:bg-ink/[0.04] hover:text-fg">
-                  Дальше →
+                  {t("Дальше →")}
                 </Link>
               )}
             </nav>

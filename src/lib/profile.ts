@@ -4,6 +4,7 @@
  * Правило «анкета заполнена» совпадает с SQL-функцией player_profile_complete.
  */
 import type { PlayerProfile } from "./types";
+import { tr } from "./i18n/core";
 
 /** Версия политики /privacy. Меняется вместе с текстом политики — согласие хранится с версией */
 export const PRIVACY_VERSION = "2026-10-09";
@@ -11,9 +12,9 @@ export const PRIVACY_VERSION = "2026-10-09";
 export type Occupation = "works" | "studies" | "other";
 
 export const OCCUPATIONS: Record<Occupation, string> = {
-  works: "Работаю",
-  studies: "Учусь",
-  other: "Не работаю и не учусь",
+  works: tr("Работаю"),
+  studies: tr("Учусь"),
+  other: tr("Не работаю и не учусь"),
 };
 
 /** Поля анкеты, которые заполняет игрок */
@@ -26,17 +27,17 @@ export type ProfileInput = Pick<
 export type ProfileLike = Omit<ProfileInput, "telegram" | "whatsapp"> & Partial<Pick<ProfileInput, "telegram" | "whatsapp">> & Pick<PlayerProfile, "consent_at">;
 
 const FIELD_LABELS = {
-  last_name: "фамилия",
-  first_name: "имя",
-  birth_date: "дата рождения",
-  phone: "телефон",
-  city: "город",
-  occupation: "занятость",
-  organization: "место работы или учёбы",
-  position: "должность",
-  course: "курс",
-  study_group: "группа",
-  consent_at: "согласие на обработку данных",
+  last_name: tr("фамилия"),
+  first_name: tr("имя"),
+  birth_date: tr("дата рождения"),
+  phone: tr("телефон"),
+  city: tr("город"),
+  occupation: tr("занятость"),
+  organization: tr("место работы или учёбы"),
+  position: tr("должность"),
+  course: tr("курс"),
+  study_group: tr("группа"),
+  consent_at: tr("согласие на обработку данных"),
 } as const;
 
 // ───────────────────────── текст
@@ -129,7 +130,7 @@ export function formatDay(day: string | null | undefined): string {
 
 /** Чего не хватает в анкете — подписи полей по-русски. Пусто — анкета заполнена */
 export function missingProfileFields(p: ProfileLike | null | undefined): string[] {
-  if (!p) return ["анкета не заполнена"];
+  if (!p) return [tr("анкета не заполнена")];
   const missing: string[] = [];
   const empty = (v: string | null | undefined) => !v || !v.trim();
   if (empty(p.last_name)) missing.push(FIELD_LABELS.last_name);
@@ -215,26 +216,26 @@ export function parseProfileForm(get: (key: string) => unknown, today: string = 
     whatsapp: get("whatsapp") === "on",
   };
   // связь с игроком: WhatsApp на номер из анкеты или Telegram — хотя бы одно
-  if (cleanText(get("telegram")) && !value.telegram) errors.telegram = "Ник Telegram: латиница, цифры и «_», от 5 символов (например @dimon_kz)";
-  else if (requireContact && !value.telegram && !value.whatsapp) errors.telegram = "Укажите Telegram или отметьте, что номер есть в WhatsApp — так организатор свяжется с вами";
+  if (cleanText(get("telegram")) && !value.telegram) errors.telegram = tr("Ник Telegram: латиница, цифры и «_», от 5 символов (например @dimon_kz)");
+  else if (requireContact && !value.telegram && !value.whatsapp) errors.telegram = tr("Укажите Telegram или отметьте, что номер есть в WhatsApp — так организатор свяжется с вами");
   // в ФИО — буквы, пробел, дефис и апостроф
   const badName = (v: string | null) => !!v && !/^\p{L}[\p{L}' -]*$/u.test(v);
-  if (!value.last_name) errors.last_name = "Укажите фамилию";
-  else if (badName(value.last_name)) errors.last_name = "Только буквы, пробел и дефис";
-  if (!value.first_name) errors.first_name = "Укажите имя";
-  else if (badName(value.first_name)) errors.first_name = "Только буквы, пробел и дефис";
-  if (badName(value.patronymic)) errors.patronymic = "Только буквы, пробел и дефис";
-  if (!value.birth_date) errors.birth_date = cleanText(get("birth_date")) ? "Неверная дата" : "Укажите дату рождения";
-  else if (value.birth_date > today) errors.birth_date = "Дата рождения в будущем";
-  else if (ageOn(value.birth_date, today) > 100) errors.birth_date = "Проверьте год рождения";
-  if (!value.phone) errors.phone = cleanText(get("phone")) ? "Номер в формате +7 7XX XXX XX XX" : "Укажите телефон";
-  if (!value.city) errors.city = "Укажите город";
-  if (!occupation) errors.occupation = "Выберите вариант";
+  if (!value.last_name) errors.last_name = tr("Укажите фамилию");
+  else if (badName(value.last_name)) errors.last_name = tr("Только буквы, пробел и дефис");
+  if (!value.first_name) errors.first_name = tr("Укажите имя");
+  else if (badName(value.first_name)) errors.first_name = tr("Только буквы, пробел и дефис");
+  if (badName(value.patronymic)) errors.patronymic = tr("Только буквы, пробел и дефис");
+  if (!value.birth_date) errors.birth_date = cleanText(get("birth_date")) ? tr("Неверная дата") : tr("Укажите дату рождения");
+  else if (value.birth_date > today) errors.birth_date = tr("Дата рождения в будущем");
+  else if (ageOn(value.birth_date, today) > 100) errors.birth_date = tr("Проверьте год рождения");
+  if (!value.phone) errors.phone = cleanText(get("phone")) ? tr("Номер в формате +7 7XX XXX XX XX") : tr("Укажите телефон");
+  if (!value.city) errors.city = tr("Укажите город");
+  if (!occupation) errors.occupation = tr("Выберите вариант");
   if ((occupation === "works" || occupation === "studies") && !value.organization) {
-    errors.organization = occupation === "works" ? "Укажите место работы" : "Укажите учебное заведение";
+    errors.organization = occupation === "works" ? tr("Укажите место работы") : tr("Укажите учебное заведение");
   }
-  if (occupation === "works" && !value.position) errors.position = "Укажите должность";
-  if (occupation === "studies" && !value.course) errors.course = "Укажите курс или класс";
-  if (occupation === "studies" && !value.study_group) errors.study_group = "Укажите группу";
+  if (occupation === "works" && !value.position) errors.position = tr("Укажите должность");
+  if (occupation === "studies" && !value.course) errors.course = tr("Укажите курс или класс");
+  if (occupation === "studies" && !value.study_group) errors.study_group = tr("Укажите группу");
   return { value, errors };
 }

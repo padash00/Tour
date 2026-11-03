@@ -2,6 +2,7 @@
  * Сетка Double Elimination / Single Elimination (с матчем за 3-е место по желанию).
  * Чистые функции: генерация структуры и «разрешение» сетки (баи, продвижение по результатам).
  */
+import { makeT, tr, type T } from "./i18n/core";
 
 /** Гранд-финал Double Elimination: BO5, команда из верхней сетки начинает с +1 картой */
 export const GRAND_FINAL_BEST_OF = 5;
@@ -26,7 +27,7 @@ export type BracketMatch = {
   loser_to: { key: string; slot: 1 | 2 } | null;
 };
 
-export const THIRD_PLACE_TITLE = "Матч за 3-е место";
+export const THIRD_PLACE_TITLE = tr("Матч за 3-е место");
 
 export const matchKey = (bracket: Side, round: number, position: number) => `${bracket}:${round}:${position}`;
 
@@ -251,18 +252,18 @@ export function resolveBracket(matches: BracketMatch[]): Set<string> {
   return changed;
 }
 
-export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number) {
-  if (bracket === "grand_final") return "Гранд-финал · фора 1:0";
-  if (bracket === "third_place") return THIRD_PLACE_TITLE;
-  if (bracket === "group") return `Тур ${round}`;
-  if (bracket === "swiss") return `Раунд ${round}`;
+export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number, t: T = makeT("ru")) {
+  if (bracket === "grand_final") return t("Гранд-финал · фора 1:0");
+  if (bracket === "third_place") return t(THIRD_PLACE_TITLE);
+  if (bracket === "group") return t("Тур {n}", { n: round });
+  if (bracket === "swiss") return t("Раунд {n}", { n: round });
   if (bracket === "upper") {
-    if (round === totalUpper) return totalLower ? "Финал верхней сетки" : "Финал";
-    if (round === totalUpper - 1) return totalLower ? "Полуфинал верхней сетки" : "Полуфинал";
+    if (round === totalUpper) return totalLower ? t("Финал верхней сетки") : t("Финал");
+    if (round === totalUpper - 1) return totalLower ? t("Полуфинал верхней сетки") : t("Полуфинал");
     // олимпийка без нижней сетки: «1/4 финала», «1/8 финала» — так понятнее, чем «раунд 2»
-    if (!totalLower) return `1/${2 ** (totalUpper - round)} финала`;
-    return `Верхняя · раунд ${round}`;
+    if (!totalLower) return t("1/{n} финала", { n: 2 ** (totalUpper - round) });
+    return t("Верхняя · раунд {n}", { n: round });
   }
-  if (round === totalLower) return "Финал нижней сетки";
-  return `Нижняя · раунд ${round}`;
+  if (round === totalLower) return t("Финал нижней сетки");
+  return t("Нижняя · раунд {n}", { n: round });
 }

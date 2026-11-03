@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { CornerDownLeft, Search, Swords, Trophy, Users, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SearchResult } from "@/lib/search";
+import { useT } from "@/lib/i18n/client";
+import { tr, type T } from "@/lib/i18n/core";
 import { Avatar, FaceitLevel, ModalLayer, Score, Spinner, Status, TeamLogo, cn, matchStatus, tournamentStatus, useModal } from "@/components/ds";
 import type { MatchStatus, TournamentStatus } from "@/lib/types";
 
@@ -14,13 +16,13 @@ import type { MatchStatus, TournamentStatus } from "@/lib/types";
 
 type Item = { key: string; href: string; group: "players" | "teams" | "tournaments" | "matches"; node: ReactNode };
 const GROUPS: { key: Item["group"]; title: string; icon: ReactNode }[] = [
-  { key: "players", title: "Игроки", icon: <Users /> },
-  { key: "teams", title: "Команды", icon: <Users /> },
-  { key: "tournaments", title: "Турниры", icon: <Trophy /> },
-  { key: "matches", title: "Матчи", icon: <Swords /> },
+  { key: "players", title: tr("Игроки"), icon: <Users /> },
+  { key: "teams", title: tr("Команды"), icon: <Users /> },
+  { key: "tournaments", title: tr("Турниры"), icon: <Trophy /> },
+  { key: "matches", title: tr("Матчи"), icon: <Swords /> },
 ];
 
-function toItems(r: SearchResult): Item[] {
+function toItems(r: SearchResult, tx: T): Item[] {
   return [
     ...r.players.map((p) => ({
       key: `p${p.id}`,
@@ -74,7 +76,7 @@ function toItems(r: SearchResult): Item[] {
               {m.team1} — {m.team2}
             </span>
             <span className="block truncate text-meta text-fg-3">
-              {m.tournament} · матч #{m.number}
+              {tx("{tournament} · матч #{n}", { tournament: m.tournament, n: m.number })}
             </span>
           </span>
           {m.status === "finished" || m.status === "live" ? <Score a={m.team1_score} b={m.team2_score} size="sm" /> : null}
@@ -112,13 +114,14 @@ function useSearch(q: string) {
 }
 
 export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const router = useRouter();
   const panel = useModal(open, onClose);
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
   const listId = useId();
   const { result, loading, error } = useSearch(q);
-  const items = useMemo(() => (result ? toItems(result) : []), [result]);
+  const items = useMemo(() => (result ? toItems(result, t) : []), [result, t]);
   const list = useRef<HTMLDivElement>(null);
 
   const go = useCallback(
@@ -145,7 +148,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
         ref={panel}
         role="dialog"
         aria-modal="true"
-        aria-label="Поиск"
+        aria-label={t("Поиск")}
         className="relative flex max-h-[88dvh] w-full max-w-[640px] flex-col overflow-hidden rounded-feature border border-line bg-elevated shadow-[var(--shadow-pop)] animate-[pop_var(--dur-modal)_cubic-bezier(.2,.8,.2,1)] sm:max-h-[80dvh]"
       >
         <div className="flex items-center gap-2 border-b border-line-subtle px-3 sm:gap-3 sm:px-4">
@@ -157,7 +160,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-controls={listId}
             aria-activedescendant={items[active] ? `${listId}-${active}` : undefined}
             aria-autocomplete="list"
-            aria-label="Поиск игроков, команд и турниров"
+            aria-label={t("Поиск игроков, команд и турниров")}
             value={q}
             onChange={(e) => { setQ(e.target.value); setActive(0); }}
             onKeyDown={(e) => {
@@ -172,37 +175,37 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
                 go(items[active].href);
               }
             }}
-            placeholder="Игроки, команды, турниры"
+            placeholder={t("Игроки, команды, турниры")}
             className="h-14 min-w-0 flex-1 bg-transparent text-[16px] text-fg outline-none placeholder:text-fg-3"
           />
           {loading ? (
             <Spinner className="size-4 text-fg-3" />
           ) : q ? (
-            <button type="button" onClick={() => { setQ(""); setActive(0); }} aria-label="Очистить запрос" className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-ink/[0.06] hover:text-fg">
+            <button type="button" onClick={() => { setQ(""); setActive(0); }} aria-label={t("Очистить запрос")} className="grid size-8 place-items-center rounded-tiny text-fg-3 hover:bg-ink/[0.06] hover:text-fg">
               <X className="size-4" />
             </button>
           ) : null}
           <kbd className="kbd hidden sm:inline-grid">Esc</kbd>
           {/* на телефоне Esc нет: отдельное закрытие (крестик рядом — очистка запроса) */}
           <button type="button" onClick={onClose} className="-mr-1 h-10 shrink-0 rounded-control px-2 text-[14px] font-medium text-accent hover:text-accent-strong sm:hidden">
-            Отмена
+            {t("Отмена")}
           </button>
         </div>
 
-        <div ref={list} id={listId} role="listbox" aria-label="Результаты поиска" className="min-h-0 flex-1 overflow-y-auto p-2">
-          {short && <p className="px-3 py-8 text-center text-[14px] text-fg-3">Начните вводить ник, название команды или турнира — от 2 символов.</p>}
-          {error && <p className="px-3 py-8 text-center text-[14px] text-danger">Поиск не ответил. Попробуйте ещё раз.</p>}
+        <div ref={list} id={listId} role="listbox" aria-label={t("Результаты поиска")} className="min-h-0 flex-1 overflow-y-auto p-2">
+          {short && <p className="px-3 py-8 text-center text-[14px] text-fg-3">{t("Начните вводить ник, название команды или турнира — от 2 символов.")}</p>}
+          {error && <p className="px-3 py-8 text-center text-[14px] text-danger">{t("Поиск не ответил. Попробуйте ещё раз.")}</p>}
           {empty && (
             <p className="px-3 py-8 text-center text-[14px] text-fg-3">
-              По запросу «<span className="text-fg">{q.trim()}</span>» ничего не нашли.
+              {t.rich("По запросу «<q>{q}</q>» ничего не нашли.", { q: (c) => <span className="text-fg">{c}</span> }, { q: q.trim() })}
             </p>
           )}
           {GROUPS.map((g) => {
             const groupItems = items.filter((i) => i.group === g.key);
             if (!groupItems.length) return null;
             return (
-              <div key={g.key} role="group" aria-label={g.title} className="mb-1">
-                <div className="px-3 pb-1 pt-3 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">{g.title}</div>
+              <div key={g.key} role="group" aria-label={t(g.title)} className="mb-1">
+                <div className="px-3 pb-1 pt-3 text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">{t(g.title)}</div>
                 {groupItems.map((it) => {
                   index++;
                   const i = index;
@@ -229,13 +232,13 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
         </div>
         <div className="hidden items-center gap-4 border-t border-line-subtle px-4 py-2.5 text-micro text-fg-3 sm:flex">
           <span>
-            <kbd className="kbd">↑</kbd> <kbd className="kbd">↓</kbd> выбрать
+            <kbd className="kbd">↑</kbd> <kbd className="kbd">↓</kbd> {t("выбрать")}
           </span>
           <span>
-            <kbd className="kbd">Enter</kbd> открыть
+            <kbd className="kbd">Enter</kbd> {t("открыть")}
           </span>
           <span className="ml-auto">
-            <kbd className="kbd">Ctrl</kbd> <kbd className="kbd">K</kbd> — поиск с любой страницы
+            <kbd className="kbd">Ctrl</kbd> <kbd className="kbd">K</kbd> — {t("поиск с любой страницы")}
           </span>
         </div>
       </div>
@@ -245,6 +248,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
 
 /** Кнопка поиска в шапке: на широком экране — как поле, на узком — иконка. Ctrl/⌘+K и «/» открывают поиск */
 export function SearchTrigger() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   useEffect(() => {
@@ -266,18 +270,18 @@ export function SearchTrigger() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Поиск"
+        aria-label={t("Поиск")}
         aria-keyshortcuts="Control+K"
         className="hidden h-10 w-56 items-center gap-2.5 rounded-control border border-line bg-ink/[0.02] px-3 text-[14px] text-fg-3 transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:text-fg-2 xl:flex"
       >
         <Search className="size-4" />
-        <span className="flex-1 text-left">Поиск</span>
+        <span className="flex-1 text-left">{t("Поиск")}</span>
         <kbd className="kbd">Ctrl K</kbd>
       </button>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Поиск"
+        aria-label={t("Поиск")}
         className="grid size-10 place-items-center rounded-control text-fg-2 transition-colors duration-[var(--dur-hover)] hover:bg-ink/[0.06] hover:text-fg xl:hidden"
       >
         <Search className="size-[18px]" />

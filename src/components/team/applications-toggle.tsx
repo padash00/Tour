@@ -5,9 +5,11 @@ import { useState, useTransition } from "react";
 import { setAcceptsApplications } from "@/app/actions/applications";
 import { Toggle } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/client";
 
 /** Капитан включает или выключает приём заявок на вступление */
 export function ApplicationsToggle({ accepts }: { accepts: boolean }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [on, setOn] = useState(accepts);
@@ -24,5 +26,5 @@ export function ApplicationsToggle({ accepts }: { accepts: boolean }) {
       } else if (r?.success) toast.success(r.success);
       router.refresh();
     });
-  return <Toggle on={on} onChange={change} disabled={pending} label="Принимать заявки на вступление" />;
+  return <Toggle on={on} onChange={change} disabled={pending} label={t("Принимать заявки на вступление")} />;
 }

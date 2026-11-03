@@ -16,6 +16,8 @@ import { tournamentEta } from "@/lib/schedule";
 import { getPlayerActivity, type Activity } from "@/lib/activity";
 import { modeOf } from "@/lib/modes";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { getT } from "@/lib/i18n/server";
+import { tr } from "@/lib/i18n/core";
 import { CopyConnect } from "@/components/copy-connect";
 import { MatchListRow } from "@/components/match-row";
 import { NotificationItem } from "@/components/public/notification-feed";
@@ -55,18 +57,19 @@ type Current = {
 };
 
 const ACTIVITY_COPY: Record<Activity["kind"], { eyebrow: string; text: string; cta: string }> = {
-  veto_turn: { eyebrow: "Вето · ваш ход", text: "Выберите карту на странице матча. Не успеете — карта выберется случайно.", cta: "К вето" },
-  lobby_veto_turn: { eyebrow: "Вето в лобби · ваш ход", text: "Выберите карту в комнате лобби.", cta: "В лобби" },
-  lobby_draft_turn: { eyebrow: "Драфт · ваш ход", text: "Выберите игрока в свою команду.", cta: "В лобби" },
-  lobby_ready_check: { eyebrow: "Проверка готовности", text: "Подтвердите, что вы на месте, иначе вас переведут в ожидание.", cta: "Подтвердить" },
-  server_ready: { eyebrow: "Сервер готов", text: "Подключайтесь — в разминке напишите .ready в чат.", cta: "Открыть матч" },
-  lobby_server_ready: { eyebrow: "Сервер готов", text: "Подключайтесь — в разминке напишите .r в чат.", cta: "Открыть лобби" },
-  checkin: { eyebrow: "Check-in открыт", text: "Подтвердите участие команды, иначе место займёт другая.", cta: "Пройти check-in" },
-  live: { eyebrow: "Матч идёт", text: "Вы должны быть на сервере. Счёт — на странице матча.", cta: "Открыть матч" },
-  lobby_live: { eyebrow: "Матч в лобби идёт", text: "Счёт и статистика — в комнате лобби.", cta: "Открыть лобби" },
+  veto_turn: { eyebrow: tr("Вето · ваш ход"), text: tr("Выберите карту на странице матча. Не успеете — карта выберется случайно."), cta: tr("К вето") },
+  lobby_veto_turn: { eyebrow: tr("Вето в лобби · ваш ход"), text: tr("Выберите карту в комнате лобби."), cta: tr("В лобби") },
+  lobby_draft_turn: { eyebrow: tr("Драфт · ваш ход"), text: tr("Выберите игрока в свою команду."), cta: tr("В лобби") },
+  lobby_ready_check: { eyebrow: tr("Проверка готовности"), text: tr("Подтвердите, что вы на месте, иначе вас переведут в ожидание."), cta: tr("Подтвердить") },
+  server_ready: { eyebrow: tr("Сервер готов"), text: tr("Подключайтесь — в разминке напишите .ready в чат."), cta: tr("Открыть матч") },
+  lobby_server_ready: { eyebrow: tr("Сервер готов"), text: tr("Подключайтесь — в разминке напишите .r в чат."), cta: tr("Открыть лобби") },
+  checkin: { eyebrow: tr("Check-in открыт"), text: tr("Подтвердите участие команды, иначе место займёт другая."), cta: tr("Пройти check-in") },
+  live: { eyebrow: tr("Матч идёт"), text: tr("Вы должны быть на сервере. Счёт — на странице матча."), cta: tr("Открыть матч") },
+  lobby_live: { eyebrow: tr("Матч в лобби идёт"), text: tr("Счёт и статистика — в комнате лобби."), cta: tr("Открыть лобби") },
 };
 
 export default async function MyGamePage() {
+  const t = await getT();
   const player = await requirePlayer("/me");
   refreshIfStale(player); // профиль Steam/FACEIT обновится после ответа, если старше 6 ч
   const membership = await getActiveMembership(player.id);
@@ -99,7 +102,7 @@ export default async function MyGamePage() {
   const myTeamIds = [membership?.team.id, solo?.id].filter(Boolean) as string[];
   // капитан команды, допущенной (одобренной) на официальный турнир, скачивает Приложение №1 своей команды
   const printable = isCaptain ? activeRegs.filter((r) => r.tournament.is_official && r.status === "approved" && r.team_id === membership?.team.id) : [];
-  const openTournament = tournaments.find((t) => t.status === "registration" && !regs.some((r) => r.tournament_id === t.id && isActiveRegistration(r)));
+  const openTournament = tournaments.find((tn) => tn.status === "registration" && !regs.some((r) => r.tournament_id === tn.id && isActiveRegistration(r)));
   const teamSize = openTournament ? modeOf(openTournament.format).size : 5;
 
   // ── текущее действие: срочное из глобальной активности, иначе — следующий шаг пути игрока
@@ -109,94 +112,101 @@ export default async function MyGamePage() {
     const copy = ACTIVITY_COPY[top.kind];
     current = {
       tone: top.tone,
-      eyebrow: copy.eyebrow,
+      eyebrow: t(copy.eyebrow),
       title: top.detail,
-      text: copy.text,
-      cta: { href: top.href, label: copy.cta },
+      text: t(copy.text),
+      cta: { href: top.href, label: t(copy.cta) },
       deadline: top.deadline,
       connect: top.connect,
     };
   } else if (next && next.status === "veto") {
-    current = { tone: "accent", eyebrow: "Вето карт", title: `${next.team1?.name} vs ${next.team2?.name}`, text: "Капитаны выбирают карты. Дальше — подготовка сервера.", cta: { href: `/matches/${next.id}`, label: "Смотреть вето" } };
+    current = { tone: "accent", eyebrow: t("Вето карт"), title: `${next.team1?.name} vs ${next.team2?.name}`, text: t("Капитаны выбирают карты. Дальше — подготовка сервера."), cta: { href: `/matches/${next.id}`, label: t("Смотреть вето") } };
   } else if (next && next.status === "ready") {
-    current = { tone: "warn", eyebrow: "Готовим сервер", title: `${next.team1?.name} vs ${next.team2?.name}`, text: "Вето закончено. Как только сервер будет готов, здесь появится кнопка подключения.", cta: { href: `/matches/${next.id}`, label: "Открыть матч" } };
+    current = { tone: "warn", eyebrow: t("Готовим сервер"), title: `${next.team1?.name} vs ${next.team2?.name}`, text: t("Вето закончено. Как только сервер будет готов, здесь появится кнопка подключения."), cta: { href: `/matches/${next.id}`, label: t("Открыть матч") } };
   } else if (next && next.status === "upcoming") {
     current = {
       tone: "accent",
-      eyebrow: "Соперник известен",
+      eyebrow: t("Соперник известен"),
       title: `${next.team1?.name} vs ${next.team2?.name}`,
-      text: next.scheduled_at ? `Начало — ${formatDateTime(next.scheduled_at)}.` : nextEta ? `Примерно в ${formatTime(new Date(nextEta).toISOString())}.` : "Время матча появится, когда освободится сервер.",
-      cta: { href: `/matches/${next.id}`, label: "Открыть матч" },
+      text: next.scheduled_at ? t("Начало — {when}.", { when: formatDateTime(next.scheduled_at, t.lang) }) : nextEta ? t("Примерно в {time}.", { time: formatTime(new Date(nextEta).toISOString(), t.lang) }) : t("Время матча появится, когда освободится сервер."),
+      cta: { href: `/matches/${next.id}`, label: t("Открыть матч") },
     };
   } else if (activeRegs.some((r) => r.status === "approved" && r.tournament.status === "live")) {
     // турнир идёт, а следующего матча нет: команда ждёт соперника или уже закончила — не обещаем матч
     const r = activeRegs.find((x) => x.status === "approved" && x.tournament.status === "live")!;
     current = {
       tone: "neutral",
-      eyebrow: "Турнир идёт",
+      eyebrow: t("Турнир идёт"),
       title: r.tournament.name,
-      text: "Следите за сеткой. Если для вашей команды появится следующий матч, он появится здесь и в уведомлениях.",
-      cta: { href: `/tournaments/${r.tournament.slug}?tab=bracket`, label: "Открыть сетку" },
+      text: t("Следите за сеткой. Если для вашей команды появится следующий матч, он появится здесь и в уведомлениях."),
+      cta: { href: `/tournaments/${r.tournament.slug}?tab=bracket`, label: t("Открыть сетку") },
     };
   } else if (activeRegs.some((r) => r.status === "approved" && r.checked_in_at && r.tournament.status === "checkin")) {
     const r = activeRegs.find((x) => x.checked_in_at && x.tournament.status === "checkin")!;
-    current = { tone: "ok", eyebrow: "Check-in пройден", title: r.tournament.name, text: "Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен.", cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" } };
+    current = { tone: "ok", eyebrow: t("Check-in пройден"), title: r.tournament.name, text: t("Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен."), cta: { href: `/tournaments/${r.tournament.slug}`, label: t("Страница турнира") } };
   } else if (activeRegs.some((r) => r.status === "approved" && ["registration", "registration_closed", "checkin"].includes(r.tournament.status))) {
     const r = activeRegs.find((x) => x.status === "approved" && ["registration", "registration_closed", "checkin"].includes(x.tournament.status))!;
     current = {
       tone: "ok",
-      eyebrow: "Вы участвуете",
+      eyebrow: t("Вы участвуете"),
       title: r.tournament.name,
-      text: r.tournament.checkin_opens_at ? `Дальше: check-in ${formatDateTime(r.tournament.checkin_opens_at)}${r.tournament.checkin_closes_at ? `–${formatTime(r.tournament.checkin_closes_at)}` : ""}.` : "Дальше: check-in перед стартом — мы напомним.",
-      cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" },
+      text: r.tournament.checkin_opens_at
+        ? r.tournament.checkin_closes_at
+          ? t("Дальше: check-in {from}–{to}.", { from: formatDateTime(r.tournament.checkin_opens_at, t.lang), to: formatTime(r.tournament.checkin_closes_at, t.lang) })
+          : t("Дальше: check-in {from}.", { from: formatDateTime(r.tournament.checkin_opens_at, t.lang) })
+        : t("Дальше: check-in перед стартом — мы напомним."),
+      cta: { href: `/tournaments/${r.tournament.slug}`, label: t("Страница турнира") },
     };
   } else if (activeRegs.some((r) => r.status === "pending")) {
     const r = activeRegs.find((x) => x.status === "pending")!;
-    current = { tone: "warn", eyebrow: "Заявка на рассмотрении", title: r.tournament.name, text: "Администратор проверит заявку — о решении придёт уведомление.", cta: { href: `/tournaments/${r.tournament.slug}`, label: "Страница турнира" } };
+    current = { tone: "warn", eyebrow: t("Заявка на рассмотрении"), title: r.tournament.name, text: t("Администратор проверит заявку — о решении придёт уведомление."), cta: { href: `/tournaments/${r.tournament.slug}`, label: t("Страница турнира") } };
   } else if (rejected) {
     current = {
       tone: "danger",
-      eyebrow: "Заявку нужно исправить",
+      eyebrow: t("Заявку нужно исправить"),
       title: rejected.tournament.name,
-      text: rejected.note ? `Причина: ${rejected.note}` : "Администратор отклонил заявку. Проверьте состав и подайте снова, пока открыта регистрация.",
-      cta: isCaptain || solo ? { href: `/tournaments/${rejected.tournament.slug}/register`, label: "Исправить заявку" } : undefined,
+      text: rejected.note ? t("Причина: {note}", { note: rejected.note }) : t("Администратор отклонил заявку. Проверьте состав и подайте снова, пока открыта регистрация."),
+      cta: isCaptain || solo ? { href: `/tournaments/${rejected.tournament.slug}/register`, label: t("Исправить заявку") } : undefined,
     };
   } else if (!membership && !solo) {
     current = {
       tone: "neutral",
-      eyebrow: "Добро пожаловать",
-      title: `${player.nickname}, с чего начнём?`,
-      text: "Для турнира нужна команда: создайте свою и пригласите друзей — или найдите команду, которой нужен игрок.",
-      cta: { href: "/tournaments", label: "Найти турнир" },
+      eyebrow: t("Добро пожаловать"),
+      title: t("{name}, с чего начнём?", { name: player.nickname }),
+      text: t("Для турнира нужна команда: создайте свою и пригласите друзей — или найдите команду, которой нужен игрок."),
+      cta: { href: "/tournaments", label: t("Найти турнир") },
       secondary: [
-        { href: "/team/create", label: "Создать команду" },
-        { href: "/find", label: "Найти команду" },
+        { href: "/team/create", label: t("Создать команду") },
+        { href: "/find", label: t("Найти команду") },
       ],
       steps: [
         { title: "Steam", state: "done" },
-        { title: "Команда", state: "current" },
-        { title: "Турнир", state: "todo" },
-        { title: "Матч", state: "todo" },
+        { title: t("Команда"), state: "current" },
+        { title: t("Турнир"), state: "todo" },
+        { title: t("Матч"), state: "todo" },
       ],
     };
   } else if (membership && isCaptain && mains < teamSize) {
     current = {
       tone: "warn",
-      eyebrow: "Состав неполный",
-      title: `${membership.team.name} · основной состав: ${mains} из ${teamSize}`,
-      text: `В основу нужно ещё ${teamSize - mains}. Отправьте игрокам ссылку-приглашение${members.length > mains ? " или переведите запасного в основу" : ""}.`,
-      cta: { href: "/team", label: "Пригласить игроков" },
+      eyebrow: t("Состав неполный"),
+      title: t("{team} · основной состав: {mains} из {size}", { team: membership.team.name, mains, size: teamSize }),
+      text:
+        members.length > mains
+          ? t("В основу нужно ещё {n}. Отправьте игрокам ссылку-приглашение или переведите запасного в основу.", { n: teamSize - mains })
+          : t("В основу нужно ещё {n}. Отправьте игрокам ссылку-приглашение.", { n: teamSize - mains }),
+      cta: { href: "/team", label: t("Пригласить игроков") },
     };
   } else if (openTournament && (isCaptain || solo)) {
     current = {
       tone: "accent",
-      eyebrow: "Регистрация открыта",
+      eyebrow: t("Регистрация открыта"),
       title: openTournament.name,
-      text: openTournament.registration_closes_at ? `Заявки принимаются до ${formatDateTime(openTournament.registration_closes_at)}.` : "Подайте заявку, пока есть места.",
-      cta: { href: `/tournaments/${openTournament.slug}/register`, label: "Подать заявку" },
+      text: openTournament.registration_closes_at ? t("Заявки принимаются до {when}.", { when: formatDateTime(openTournament.registration_closes_at, t.lang) }) : t("Подайте заявку, пока есть места."),
+      cta: { href: `/tournaments/${openTournament.slug}/register`, label: t("Подать заявку") },
     };
   } else if (openTournament) {
-    current = { tone: "neutral", eyebrow: "Регистрация открыта", title: openTournament.name, text: "Заявку на турнир подаёт капитан команды.", cta: { href: `/tournaments/${openTournament.slug}`, label: "Страница турнира" } };
+    current = { tone: "neutral", eyebrow: t("Регистрация открыта"), title: openTournament.name, text: t("Заявку на турнир подаёт капитан команды."), cta: { href: `/tournaments/${openTournament.slug}`, label: t("Страница турнира") } };
   }
 
   return (
@@ -207,12 +217,12 @@ export default async function MyGamePage() {
         <header className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <Avatar src={player.avatar_url} name={player.nickname} size="lg" />
           <div className="min-w-0 flex-1">
-            <Eyebrow>Моя игра</Eyebrow>
+            <Eyebrow>{t("Моя игра")}</Eyebrow>
             <h1 className="mt-1 truncate text-page text-fg">{player.nickname}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-meta text-fg-2">
               <span className="inline-flex items-center gap-2">
                 <FaceitLevel level={player.faceit_level} />
-                {player.faceit_elo ? <span className="num">{player.faceit_elo} ELO</span> : <span className="text-fg-3">FACEIT не найден</span>}
+                {player.faceit_elo ? <span className="num">{player.faceit_elo} ELO</span> : <span className="text-fg-3">{t("FACEIT не найден")}</span>}
               </span>
               {membership && (
                 <Link href="/team" className="inline-flex items-center gap-2 hover:text-fg">
@@ -224,21 +234,21 @@ export default async function MyGamePage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <ActionForm action={refreshProfile} inline>
-              <SubmitButton variant="ghost" size="sm" pendingText="Обновляем…">
+              <SubmitButton variant="ghost" size="sm" pendingText={t("Обновляем…")}>
                 <RefreshCw className="mr-1.5 size-4" />
-                Обновить Steam и FACEIT
+                {t("Обновить Steam и FACEIT")}
               </SubmitButton>
             </ActionForm>
             {printable.map((r) => (
               <Button key={r.id} href={`/tournaments/${r.tournament.slug}/application`} size="sm" icon={<FileText />}>
-                Скачать заявку{printable.length > 1 ? ` · ${r.tournament.name}` : ""}
+                {t("Скачать заявку")}{printable.length > 1 ? ` · ${r.tournament.name}` : ""}
               </Button>
             ))}
             <Button href="/me/profile" variant="secondary" size="sm" icon={<IdCard />}>
-              Анкета игрока
+              {t("Анкета игрока")}
             </Button>
             <Button href={`/players/${player.steam_id}`} variant="secondary" size="sm" icon={<User />}>
-              Публичный профиль
+              {t("Публичный профиль")}
             </Button>
           </div>
         </header>
@@ -249,14 +259,14 @@ export default async function MyGamePage() {
         <div className="mt-12 grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-10">
           <div className="min-w-0 space-y-12">
             {next && (
-              <Section title="Ближайший матч" action={<Status info={tournamentStatus[next.tournament.status]} size="sm" />}>
+              <Section title={t("Ближайший матч")} action={<Status info={tournamentStatus[next.tournament.status]} size="sm" />}>
                 <RowList>
                   <MatchListRow m={next} highlight={myTeamIds.find((id) => id === next.team1_id || id === next.team2_id)} meta={`${next.tournament.name} · BO${next.best_of}`} />
                 </RowList>
               </Section>
             )}
 
-            <Section title="Турниры" action={<Link href="/tournaments" className="text-meta font-medium text-accent hover:text-accent-strong">Все турниры →</Link>}>
+            <Section title={t("Турниры")} action={<Link href="/tournaments" className="text-meta font-medium text-accent hover:text-accent-strong">{t("Все турниры →")}</Link>}>
               {activeRegs.length ? (
                 <RowList>
                   {activeRegs.map((r) => (
@@ -266,24 +276,24 @@ export default async function MyGamePage() {
                         <Link href={`/tournaments/${r.tournament.slug}`} className="block truncate text-[14px] font-medium text-fg hover:text-accent">
                           {r.tournament.name}
                         </Link>
-                        <div className="text-meta text-fg-3">Старт {formatDateTime(r.tournament.starts_at)}</div>
+                        <div className="text-meta text-fg-3">{t("Старт {when}", { when: formatDateTime(r.tournament.starts_at, t.lang) })}</div>
                       </div>
                       <Status info={tournamentStatus[r.tournament.status]} size="sm" />
                       <Status info={registrationStatus[r.status]} size="sm" />
                       {r.tournament.status === "checkin" && r.status === "approved" && !r.checked_in_at && (isCaptain || solo) && (
                         <Button href={`/tournaments/${r.tournament.slug}/checkin`} size="sm">
-                          Check-in
+                          {t("Check-in")}
                         </Button>
                       )}
                     </div>
                   ))}
                 </RowList>
               ) : (
-                <EmptyState compact icon={<Trophy />} title="Нет активных заявок" text="Здесь появится турнир, в котором вы участвуете." action={<Button href="/tournaments" variant="secondary" size="sm">Смотреть турниры</Button>} />
+                <EmptyState compact icon={<Trophy />} title={t("Нет активных заявок")} text={t("Здесь появится турнир, в котором вы участвуете.")} action={<Button href="/tournaments" variant="secondary" size="sm">{t("Смотреть турниры")}</Button>} />
               )}
             </Section>
 
-            <Section title="Команда">
+            <Section title={t("Команда")}>
               {membership ? (
                 <Panel padded={false}>
                   <Link href="/team" className="flex items-center gap-4 rounded-surface p-4 transition-colors hover:bg-surface-2 sm:p-5">
@@ -291,8 +301,8 @@ export default async function MyGamePage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-title text-fg">{membership.team.name}</div>
                       <div className="text-meta text-fg-3">
-                        {isCaptain ? "Вы капитан" : "Вы игрок"} · основа {mains}
-                        {members.length > mains ? ` · запас ${members.length - mains}` : ""}
+                        {isCaptain ? t("Вы капитан") : t("Вы игрок")} · {t("основа {n}", { n: mains })}
+                        {members.length > mains ? ` · ${t("запас {n}", { n: members.length - mains })}` : ""}
                       </div>
                     </div>
                     <div className="hidden -space-x-1.5 sm:flex">
@@ -309,15 +319,15 @@ export default async function MyGamePage() {
                 <EmptyState
                   compact
                   icon={<Users />}
-                  title="Вы пока не в команде"
-                  text="Создайте свою, попросите капитана прислать приглашение или разместите объявление."
+                  title={t("Вы пока не в команде")}
+                  text={t("Создайте свою, попросите капитана прислать приглашение или разместите объявление.")}
                   action={
                     <>
                       <Button href="/team/create" size="sm">
-                        Создать команду
+                        {t("Создать команду")}
                       </Button>
                       <Button href="/find" variant="secondary" size="sm">
-                        Найти команду
+                        {t("Найти команду")}
                       </Button>
                     </>
                   }
@@ -325,7 +335,7 @@ export default async function MyGamePage() {
               )}
             </Section>
 
-            <Section title="Последние матчи">
+            <Section title={t("Последние матчи")}>
               {recent.length || upcoming.length > 1 ? (
                 <RowList>
                   {[...upcoming.filter((m) => m.id !== next?.id), ...recent].slice(0, 8).map((m) => (
@@ -333,7 +343,7 @@ export default async function MyGamePage() {
                   ))}
                 </RowList>
               ) : (
-                <EmptyState compact icon={<Gamepad2 />} title="Матчей пока нет" text="Ваши матчи появятся здесь после публикации сетки турнира." />
+                <EmptyState compact icon={<Gamepad2 />} title={t("Матчей пока нет")} text={t("Ваши матчи появятся здесь после публикации сетки турнира.")} />
               )}
             </Section>
           </div>
@@ -342,18 +352,18 @@ export default async function MyGamePage() {
           <aside id="notifications" className="scroll-mt-24 lg:sticky lg:top-[calc(var(--shell-h)+24px)]">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-heading text-fg">
-                Уведомления
+                {t("Уведомления")}
                 {unread > 0 && <span className="num ml-2 rounded-chip bg-accent-dim px-1.5 align-middle text-micro text-accent">{unread}</span>}
               </h2>
               <div className="flex items-center gap-3">
                 {unread > 0 && <MarkAllReadButton size="sm" />}
                 <Link href="/notifications" className="text-meta font-medium text-accent hover:text-accent-strong">
-                  Все →
+                  {t("Все →")}
                 </Link>
               </div>
             </div>
             {notifications.length === 0 ? (
-              <p className="rounded-surface border border-dashed border-line px-4 py-6 text-meta text-fg-3">Уведомлений нет — здесь появятся приглашения, заявки, вето и готовность сервера.</p>
+              <p className="rounded-surface border border-dashed border-line px-4 py-6 text-meta text-fg-3">{t("Уведомлений нет — здесь появятся приглашения, заявки, вето и готовность сервера.")}</p>
             ) : (
               <div className="divide-y divide-line-subtle rounded-surface border border-line-subtle bg-surface px-4">
                 {notifications.map((n) => (
@@ -368,7 +378,8 @@ export default async function MyGamePage() {
   );
 }
 
-function CurrentActivity({ c }: { c: Current }) {
+async function CurrentActivity({ c }: { c: Current }) {
+  const t = await getT();
   const body = (
     <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0">
@@ -380,7 +391,7 @@ function CurrentActivity({ c }: { c: Current }) {
       <div className="flex shrink-0 flex-wrap items-center gap-3 md:flex-col md:items-end">
         {c.deadline && (
           <div className="text-right">
-            <div className="text-micro text-fg-3">Осталось</div>
+            <div className="text-micro text-fg-3">{t("Осталось")}</div>
             <Timer deadline={c.deadline} className="text-[28px] font-semibold" />
           </div>
         )}
@@ -401,7 +412,7 @@ function CurrentActivity({ c }: { c: Current }) {
     </div>
   );
   return (
-    <section aria-label="Текущее действие" className="mt-8">
+    <section aria-label={t("Текущее действие")} className="mt-8">
       {c.tone === "neutral" ? <Panel className="p-5 sm:p-7">{body}</Panel> : <CriticalSurface tone={c.tone}>{body}</CriticalSurface>}
     </section>
   );

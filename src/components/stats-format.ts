@@ -1,4 +1,5 @@
 /** Форматирование и цвета статистики — без "use client", чтобы ими пользовались и серверные страницы */
+import { tr, type T } from "@/lib/i18n/core";
 
 export function ratingColor(r: number) {
   if (r >= 1.2) return "text-ok";
@@ -57,17 +58,17 @@ const WEAPONS: Record<string, string> = {
   negev: "Negev",
   m249: "M249",
   taser: "Zeus x27",
-  hegrenade: "HE-граната",
-  inferno: "Молотов",
-  molotov: "Молотов",
-  incgrenade: "Зажигательная",
-  knife: "Нож",
-  world: "Падение",
+  hegrenade: tr("HE-граната"),
+  inferno: tr("Молотов"),
+  molotov: tr("Молотов"),
+  incgrenade: tr("Зажигательная"),
+  knife: tr("Нож"),
+  world: tr("Падение"),
 };
 
 /** weapon_ak47 / ak47 → AK-47; ножи любых скинов → «Нож» */
-export function weaponName(raw: string) {
+export function weaponName(raw: string, t?: T) {
   const w = raw.replace(/^weapon_/, "").toLowerCase();
-  if (w.startsWith("knife") || w === "bayonet") return "Нож";
-  return WEAPONS[w] ?? w.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  const name = w.startsWith("knife") || w === "bayonet" ? tr("Нож") : (WEAPONS[w] ?? w.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()));
+  return t ? t(name) : name;
 }

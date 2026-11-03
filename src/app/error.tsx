@@ -2,12 +2,14 @@
 
 import { useEffect } from "react";
 import { Button, Container, Eyebrow } from "@/components/ds";
+import { useT } from "@/lib/i18n/client";
 
 /** признаки «вкладка открыта на старой версии сайта» после выкладки */
 const STALE_BUILD = /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|Minified React error #306|Failed to find Server Action|Server Action "?\w*"? was not found|reading 'call'/i;
 
 /** Ошибка на странице: спокойное сообщение без технических деталей */
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+  const t = useT();
   useEffect(() => {
     // сайт обновился, а вкладка держит старую версию (ChunkLoadError, React #306 — модуль не найден):
     // один раз перезагружаем страницу — она подхватит новую версию; повтор в течение минуты не зацикливает
@@ -35,18 +37,18 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
 
   return (
     <Container className="py-24 sm:py-32 lg:py-40">
-      <Eyebrow>Ошибка</Eyebrow>
-      <h1 className="mt-5 text-[36px] font-semibold tracking-[-0.025em] text-fg sm:text-[48px]">Что-то пошло не так</h1>
+      <Eyebrow>{t("Ошибка")}</Eyebrow>
+      <h1 className="mt-5 text-[36px] font-semibold tracking-[-0.025em] text-fg sm:text-[48px]">{t("Что-то пошло не так")}</h1>
       <p className="mt-6 max-w-[560px] text-[17px] leading-relaxed text-fg-2">
-        Страница не загрузилась. Попробуйте ещё раз — если ошибка повторится, сообщите администратору турнира.
+        {t("Страница не загрузилась. Попробуйте ещё раз — если ошибка повторится, сообщите администратору турнира.")}
       </p>
-      {error.digest && <p className="mt-3 text-[13px] text-fg-3 num">Код: {error.digest}</p>}
+      {error.digest && <p className="mt-3 text-[13px] text-fg-3 num">{t("Код: {code}", { code: error.digest })}</p>}
       <div className="mt-10 flex flex-wrap gap-4">
         <Button onClick={() => retry()} size="lg" className="min-w-[220px]">
-          Попробовать снова
+          {t("Попробовать снова")}
         </Button>
         <Button href="/" variant="secondary" size="lg" className="min-w-[180px]">
-          На главную
+          {t("На главную")}
         </Button>
       </div>
     </Container>

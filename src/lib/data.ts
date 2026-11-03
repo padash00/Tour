@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "./supabase";
 import { modeOf } from "./modes";
+import { tr } from "./i18n/core";
 import type {
   Player,
   Registration,
@@ -344,7 +345,8 @@ export async function getEntrantTeam(player: Player, tournament: Pick<Tournament
 
 // ───────────────────────── защита действий игроков
 
-export const BANNED_ERROR = "Ваш аккаунт заблокирован";
+/** Показывать через t(BANNED_ERROR) */
+export const BANNED_ERROR = tr("Ваш аккаунт заблокирован");
 
 /**
  * Ограничение частоты: было ли такое же действие этого игрока за последние `seconds` секунд
@@ -376,7 +378,7 @@ export function sniffImage(buf: Uint8Array): "image/png" | "image/jpeg" | "image
 
 /** Окно check-in: null — можно, иначе текст ошибки */
 export function checkinWindowError(t: Pick<Tournament, "checkin_opens_at" | "checkin_closes_at">, now = Date.now()) {
-  if (t.checkin_opens_at && now < new Date(t.checkin_opens_at).getTime()) return "Check-in ещё не открылся";
-  if (t.checkin_closes_at && now > new Date(t.checkin_closes_at).getTime()) return "Check-in закрыт — обратитесь к администратору";
+  if (t.checkin_opens_at && now < new Date(t.checkin_opens_at).getTime()) return tr("Check-in ещё не открылся");
+  if (t.checkin_closes_at && now > new Date(t.checkin_closes_at).getTime()) return tr("Check-in закрыт — обратитесь к администратору");
   return null;
 }

@@ -5,21 +5,23 @@ import { audit } from "@/lib/audit";
 import { cleanChatText } from "@/lib/chat";
 import { isRateLimited } from "@/lib/data";
 import { db } from "@/lib/supabase";
+import { getT } from "@/lib/i18n/server";
 
 type Result = { ok?: true; error?: string };
 
 /** Отправить сообщение в общий чат: только вошедшие, не заблокированные и без запрета чата; не чаще раза в 3 с */
 export async function sendChatMessage(body: string): Promise<Result> {
+  const t = await getT();
   const player = await getCurrentPlayer();
-  if (!player) return { error: "Войдите через Steam, чтобы писать в чат" };
-  if (player.is_banned) return { error: "Ваш аккаунт заблокирован" };
+  if (!player) return { error: t("Войдите через Steam, чтобы писать в чат") };
+  if (player.is_banned) return { error: t("Ваш аккаунт заблокирован") };
   const { data: me } = await db().from("players").select("chat_muted").eq("id", player.id).maybeSingle();
-  if (me?.chat_muted) return { error: "Администратор запретил вам писать в чат" };
+  if (me?.chat_muted) return { error: t("Администратор запретил вам писать в чат") };
   const text = cleanChatText(body);
-  if (!text) return { error: "Пустое сообщение" };
-  if (await isRateLimited(player.id, "chat.send", 3)) return { error: "Не так быстро — подождите пару секунд" };
+  if (!text) return { error: t("Пустое сообщение") };
+  if (await isRateLimited(player.id, "chat.send", 3)) return { error: t("Не так быстро — подождите пару секунд") };
   const { error } = await db().from("chat_messages").insert({ player_id: player.id, body: text });
-  if (error) return { error: "Не удалось отправить — попробуйте ещё раз" };
+  if (error) return { error: t("Не удалось отправить — попробуйте ещё раз") };
   return { ok: true };
 }
 

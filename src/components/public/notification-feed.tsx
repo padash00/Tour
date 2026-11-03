@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import type { Notification } from "@/lib/types";
 import { cn } from "@/components/ds";
 import { UnreadNotificationLink } from "@/components/notifications/actions";
+import { getT } from "@/lib/i18n/server";
+import { intlLocale, type T } from "@/lib/i18n/core";
 
 /*
  * Уведомления — строками (не карточками). У строки: иконка, заголовок, контекст, время, действие, прочитано или нет.
@@ -13,13 +15,13 @@ import { UnreadNotificationLink } from "@/components/notifications/actions";
 
 const tz = "Asia/Almaty";
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString("ru-RU", { timeZone: tz });
-const time = (iso: string) => new Date(iso).toLocaleTimeString("ru-RU", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+const time = (iso: string, t: T) => new Date(iso).toLocaleTimeString(intlLocale(t.lang), { timeZone: tz, hour: "2-digit", minute: "2-digit" });
 
-function dayLabel(iso: string, now: Date) {
+function dayLabel(iso: string, now: Date, t: T) {
   const k = dayKey(iso);
-  if (k === dayKey(now.toISOString())) return "Сегодня";
-  if (k === dayKey(new Date(now.getTime() - 86_400_000).toISOString())) return "Вчера";
-  return new Date(iso).toLocaleDateString("ru-RU", { timeZone: tz, day: "numeric", month: "long" });
+  if (k === dayKey(now.toISOString())) return t("Сегодня");
+  if (k === dayKey(new Date(now.getTime() - 86_400_000).toISOString())) return t("Вчера");
+  return new Date(iso).toLocaleDateString(intlLocale(t.lang), { timeZone: tz, day: "numeric", month: "long" });
 }
 
 type Kind = "server" | "veto" | "check" | "team" | "admin" | "other";
@@ -51,7 +53,8 @@ const KIND: Record<Kind, { icon: ReactNode; tone: keyof typeof TONE_ICON; urgent
   other: { icon: <Bell />, tone: "neutral" },
 };
 
-export function NotificationItem({ n, compact }: { n: Notification; compact?: boolean }) {
+export async function NotificationItem({ n, compact }: { n: Notification; compact?: boolean }) {
+  const t = await getT();
   const unread = !n.read_at;
   const k = KIND[kind(n)];
   const inner = (
@@ -70,8 +73,8 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
         {n.body && <div className={cn("mt-0.5 text-meta leading-relaxed text-fg-3", compact && "line-clamp-2")}>{n.body}</div>}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        <span className="num text-micro text-fg-3">{time(n.created_at)}</span>
-        {unread && <span className="size-2 rounded-full bg-accent" aria-label="Не прочитано" />}
+        <span className="num text-micro text-fg-3">{time(n.created_at, t)}</span>
+        {unread && <span className="size-2 rounded-full bg-accent" aria-label={t("Не прочитано")} />}
         {n.link && !compact && <ChevronRight className="size-4 text-fg-4" aria-hidden />}
       </div>
     </div>
@@ -99,10 +102,11 @@ export function NotificationItem({ n, compact }: { n: Notification; compact?: bo
 }
 
 /** Полная лента: группы по дням, в группе — список строк с разделителями */
-export function NotificationFeed({ items, now }: { items: Notification[]; now: Date }) {
+export async function NotificationFeed({ items, now }: { items: Notification[]; now: Date }) {
+  const t = await getT();
   const groups: { label: string; items: Notification[] }[] = [];
   for (const n of items) {
-    const label = dayLabel(n.created_at, now);
+    const label = dayLabel(n.created_at, now, t);
     const g = groups.at(-1);
     if (g && g.label === label) g.items.push(n);
     else groups.push({ label, items: [n] });

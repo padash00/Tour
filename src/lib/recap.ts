@@ -1,5 +1,6 @@
 import "server-only";
 import { roundTitle } from "./bracket";
+import { makeT, type T } from "./i18n/core";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
 import { getTournamentNominations } from "./nominations";
@@ -113,12 +114,13 @@ async function placementsOf(t: Tournament, matches: MatchWithTeams[]): Promise<{
     .filter((x): x is { place: string; team: Team } => !!x.team);
 }
 
-export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap> {
+/** tx — язык подписей (страница турнира); без него по-русски (пульт, картинки, выгрузки) */
+export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Promise<TournamentRecap> {
   const [matches, regs, board, allNominations] = await Promise.all([
     getTournamentMatches(t.id),
     getTournamentRegistrations(t.id),
     getPlayerLeaderboard(t.id),
-    getTournamentNominations(t.id),
+    getTournamentNominations(t.id, tx),
   ]);
   const nominations: RecapNomination[] = allNominations
     .filter((n) => n.winner)
@@ -158,10 +160,12 @@ export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap
   const totalLower = Math.max(0, ...matches.filter((x) => x.bracket === "lower").map((x) => x.round));
   const stageOf = (m: MatchWithTeams) =>
     m.bracket === "group"
-      ? `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`
+      ? m.group_label
+        ? tx("Группа {g} · тур {n}", { g: m.group_label, n: m.round })
+        : tx("тур {n}", { n: m.round })
       : m.bracket === "swiss"
-        ? `Швейцарка · раунд ${m.round}`
-        : roundTitle(m.bracket, m.round, totalUpper, totalLower);
+        ? tx("Швейцарка · раунд {n}", { n: m.round })
+        : roundTitle(m.bracket, m.round, totalUpper, totalLower, tx);
   const championPath: PathStep[] = champion
     ? matches
         .filter((m) => m.status === "finished" && (m.team1_id === champion.id || m.team2_id === champion.id))
@@ -198,12 +202,12 @@ export async function getTournamentRecap(t: Tournament): Promise<TournamentRecap
     return { key, label, value: show(best), player: best.player, name: best.player?.nickname ?? best.name, team: best.team };
   };
   const leaders = [
-    leader("rating", "Лучший F16 Rating", steady, (p) => p.rating, (p) => p.rating.toFixed(2)),
-    leader("kills", "Больше всего убийств", pool, (p) => p.kills, (p) => String(p.kills)),
-    leader("adr", "Лучший ADR", steady, (p) => p.adr, (p) => p.adr.toFixed(1)),
-    leader("swing", "Лучший Swing", steady, (p) => p.swing, (p) => `${p.swing! > 0 ? "+" : ""}${p.swing!.toFixed(2)} п.п.`),
-    leader("clutches", "Больше всего клатчей", pool, (p) => p.clutches, (p) => String(p.clutches)),
-    leader("hs", "Лучший % в голову", steady.filter((p) => p.kills >= 10), (p) => p.hsPct, (p) => `${p.hsPct.toFixed(0)}%`),
+    leader("rating", tx("Лучший F16 Rating"), steady, (p) => p.rating, (p) => p.rating.toFixed(2)),
+    leader("kills", tx("Больше всего убийств"), pool, (p) => p.kills, (p) => String(p.kills)),
+    leader("adr", tx("Лучший ADR"), steady, (p) => p.adr, (p) => p.adr.toFixed(1)),
+    leader("swing", tx("Лучший Swing"), steady, (p) => p.swing, (p) => tx("{v} п.п.", { v: `${p.swing! > 0 ? "+" : ""}${p.swing!.toFixed(2)}` })),
+    leader("clutches", tx("Больше всего клатчей"), pool, (p) => p.clutches, (p) => String(p.clutches)),
+    leader("hs", tx("Лучший % в голову"), steady.filter((p) => p.kills >= 10), (p) => p.hsPct, (p) => `${p.hsPct.toFixed(0)}%`),
   ].filter((x): x is StatLeader => !!x);
 
   // ── карты: самая длинная и самая напряжённая

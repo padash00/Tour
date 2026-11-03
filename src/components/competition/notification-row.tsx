@@ -2,9 +2,11 @@ import Link from "next/link";
 import { formatDateTime } from "@/lib/format";
 import type { Notification } from "@/lib/types";
 import { cn } from "../ui";
+import { getT } from "@/lib/i18n/server";
 
 /** Уведомление строкой ленты: точка «не прочитано», заголовок, текст, время */
-export function NotificationRow({ n }: { n: Notification }) {
+export async function NotificationRow({ n }: { n: Notification }) {
+  const tx = await getT();
   const inner = (
     <div className="flex items-start gap-4">
       <span className={cn("mt-2 size-1.5 rounded-full shrink-0", n.read_at ? "bg-transparent" : "bg-accent")} />
@@ -12,7 +14,7 @@ export function NotificationRow({ n }: { n: Notification }) {
         <div className={cn("text-[15px]", n.read_at ? "text-fg-2" : "text-fg font-medium")}>{n.title}</div>
         {n.body && <div className="text-sm text-fg-3 mt-0.5">{n.body}</div>}
       </div>
-      <div className="text-[12px] text-fg-3 whitespace-nowrap pt-0.5">{formatDateTime(n.created_at)}</div>
+      <div className="text-[12px] text-fg-3 whitespace-nowrap pt-0.5">{formatDateTime(n.created_at, tx.lang)}</div>
     </div>
   );
   return n.link ? (

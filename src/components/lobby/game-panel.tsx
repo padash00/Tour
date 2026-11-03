@@ -8,12 +8,14 @@ import { Button, CriticalSurface, FeatureSurface, cn } from "@/components/ds";
 import { Countdown } from "./countdown";
 import { CopyConnect } from "../copy-connect";
 import type { Run } from "./use-lobby-view";
+import { useT } from "@/lib/i18n/client";
 
 /** Адрес сервера виден, кнопка копирует его — как на FACEIT */
 function ConnectBox({ address, label }: { address: string; label?: string }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <CopyConnect address={address} label={label ? `Скопировать ${label}` : "Скопировать IP"} />
+      <CopyConnect address={address} label={label ? t("Скопировать {label}", { label }) : t("Скопировать IP")} />
       <code className="num select-all rounded-control border border-line bg-shell px-3 py-2.5 text-[14px] text-fg-2">connect {address}</code>
     </div>
   );
@@ -22,6 +24,7 @@ function ConnectBox({ address, label }: { address: string; label?: string }) {
 // ───────────────────────── игра: вето, сервер, LIVE
 
 export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string }) {
+  const t = useT();
   const game = view.game!;
   const me = view.me;
 
@@ -35,18 +38,18 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
       <CriticalSurface tone={myTurn ? "accent" : "warn"}>
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myTurn ? "Ваш ход" : "Вето карт"}</div>
+            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myTurn ? t("Ваш ход") : t("Вето карт")}</div>
             <h2 className="mt-2 text-heading text-fg">
-              {game.veto_turn ? `${team.name} · ${game.veto_action === "ban" ? "бан карты" : "пик карты"}` : "Вето завершается"}
+              {game.veto_turn ? `${team.name} · ${game.veto_action === "ban" ? t("бан карты") : t("пик карты")}` : t("Вето завершается")}
             </h2>
             <p className="mt-2 text-[14px] text-fg-2">
-              {myTurn ? "Нажмите на доступную карту ниже." : "Дождитесь выбора капитана. Комната обновится автоматически."}
+              {myTurn ? t("Нажмите на доступную карту ниже.") : t("Дождитесь выбора капитана. Комната обновится автоматически.")}
             </p>
           </div>
           {game.veto_deadline && (
             <div className="text-right">
-              <div className="text-micro text-fg-3">Осталось</div>
-              <div className="num mt-1 text-[36px] font-semibold leading-none"><Countdown deadline={game.veto_deadline} /> с</div>
+              <div className="text-micro text-fg-3">{t("Осталось")}</div>
+              <div className="num mt-1 text-[36px] font-semibold leading-none"><Countdown deadline={game.veto_deadline} /> {t("с")}</div>
             </div>
           )}
         </div>
@@ -78,7 +81,7 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
                   <span className="absolute bottom-2 left-2 text-[12px] font-medium text-fg">{mapLabel(map)}</span>
                   {action && (
                     <span className={cn("absolute right-2 top-2 text-micro font-semibold uppercase", action.action === "ban" ? "text-danger" : "text-accent")}>
-                      {action.action === "ban" ? "бан" : action.action === "pick" ? "пик" : "decider"}
+                      {action.action === "ban" ? t("бан") : action.action === "pick" ? t("пик") : "decider"}
                     </span>
                   )}
                 </MapThumb>
@@ -90,7 +93,7 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         {isHost && (
           <div className="mt-4">
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
-              Отменить игру
+              {t("Отменить игру")}
             </Button>
           </div>
         )}
@@ -112,7 +115,7 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
           <div className="truncate text-title text-fg">{game.team2.name}</div>
         </div>
         <div className="mt-3 text-center text-meta text-fg-3">
-          {liveMap ? mapLabel(liveMap.map) : "Матч"}{game.best_of > 1 ? ` · серия ${game.team1_score}:${game.team2_score}` : ""}
+          {liveMap ? mapLabel(liveMap.map) : t("Матч")}{game.best_of > 1 ? ` · ${t("серия")} ${game.team1_score}:${game.team2_score}` : ""}
         </div>
 
         <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -120,7 +123,7 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
           {game.gotv_address && <ConnectBox address={game.gotv_address} label="GOTV" />}
           {me?.isAdmin && (
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
-              Остановить матч
+              {t("Остановить матч")}
             </Button>
           )}
         </div>
@@ -131,19 +134,19 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
   if (game.server_state === "ready") {
     return (
       <CriticalSurface tone="ok">
-        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-ok">Сервер готов</div>
-        <h2 className="mt-2 text-heading text-fg">{game.server_address ? "Подключайтесь к матчу" : "Игроки подключаются"}</h2>
+        <div className="text-micro font-semibold uppercase tracking-[0.14em] text-ok">{t("Сервер готов")}</div>
+        <h2 className="mt-2 text-heading text-fg">{game.server_address ? t("Подключайтесь к матчу") : t("Игроки подключаются")}</h2>
         <p className="mt-2 max-w-read text-[14px] text-fg-2">
           {game.server_address
-            ? "Скопируйте адрес и вставьте в консоль CS2 (~). В разминке напишите .r — матч начнётся после готовности всех игроков."
-            : "Адрес сервера доступен только игрокам матча и наблюдателям лобби."}
+            ? t("Скопируйте адрес и вставьте в консоль CS2 (~). В разминке напишите .r — матч начнётся после готовности всех игроков.")
+            : t("Адрес сервера доступен только игрокам матча и наблюдателям лобби.")}
         </p>
         <div className="mt-5 flex flex-col items-start gap-3">
           {game.server_address && <ConnectBox address={game.server_address} />}
           {game.gotv_address && <ConnectBox address={game.gotv_address} label="GOTV" />}
           {isHost && (
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
-              Отменить игру
+              {t("Отменить игру")}
             </Button>
           )}
         </div>
@@ -153,17 +156,17 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
 
   return (
     <FeatureSurface>
-      <div className="text-micro font-semibold uppercase tracking-[0.14em] text-warn">Сервер</div>
-      <h2 className="mt-2 text-heading text-fg">Готовим сервер</h2>
-      <p className="mt-2 text-[14px] text-fg-2">{game.note ?? "Назначаем инстанс, загружаем карту и составы. Адрес появится здесь автоматически."}</p>
+      <div className="text-micro font-semibold uppercase tracking-[0.14em] text-warn">{t("Сервер")}</div>
+      <h2 className="mt-2 text-heading text-fg">{t("Готовим сервер")}</h2>
+      <p className="mt-2 text-[14px] text-fg-2">{game.note ?? t("Назначаем инстанс, загружаем карту и составы. Адрес появится здесь автоматически.")}</p>
       <div className="mt-5 flex items-center gap-2 text-meta text-fg-3">
         <span className="size-2 animate-pulse rounded-full bg-warn" />
-        Ожидание агента
+        {t("Ожидание агента")}
       </div>
       {isHost && (
         <div className="mt-5">
           <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
-            Отменить игру
+            {t("Отменить игру")}
           </Button>
         </div>
       )}

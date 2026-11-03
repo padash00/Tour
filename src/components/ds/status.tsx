@@ -1,5 +1,7 @@
 import type { MatchStatus, RegistrationStatus, TournamentStatus } from "@/lib/types";
+import { tr } from "@/lib/i18n/core";
 import { cn } from "./cn";
+import { Tt } from "./tt";
 
 /*
  * Статусы F16 DS — одна система для турнира, матча, заявки и лобби.
@@ -31,58 +33,58 @@ export function Status({ info, size = "md", className }: { info: StatusInfo; siz
       )}
     >
       <span className={cn("size-1.5 rounded-full bg-current", info.pulse && "animate-pulse")} aria-hidden />
-      {info.label}
+      <Tt text={info.label} />
     </span>
   );
 }
 
 export const tournamentStatus: Record<TournamentStatus, StatusInfo> = {
-  draft: { label: "Черновик", tone: "neutral" },
-  registration: { label: "Регистрация открыта", tone: "accent" },
-  registration_closed: { label: "Регистрация закрыта", tone: "warn" },
-  checkin: { label: "Check-in", tone: "warn", pulse: true },
-  live: { label: "Турнир идёт", tone: "live", pulse: true },
-  finished: { label: "Завершён", tone: "neutral" },
-  cancelled: { label: "Отменён", tone: "danger" },
+  draft: { label: tr("Черновик"), tone: "neutral" },
+  registration: { label: tr("Регистрация открыта"), tone: "accent" },
+  registration_closed: { label: tr("Регистрация закрыта"), tone: "warn" },
+  checkin: { label: tr("Check-in"), tone: "warn", pulse: true },
+  live: { label: tr("Турнир идёт"), tone: "live", pulse: true },
+  finished: { label: tr("Завершён"), tone: "neutral" },
+  cancelled: { label: tr("Отменён"), tone: "danger" },
 };
 
 /** Матч: «готов» без сервера — ждёт сервер, с сервером — «Сервер готов» */
 export function matchStatus(status: MatchStatus, serverReady?: boolean, underReview?: boolean): StatusInfo {
-  if (underReview && status === "finished") return { label: "На проверке", tone: "warn" };
+  if (underReview && status === "finished") return { label: tr("На проверке"), tone: "warn" };
   switch (status) {
     case "pending":
-      return { label: "Ждёт соперника", tone: "neutral" };
+      return { label: tr("Ждёт соперника"), tone: "neutral" };
     case "upcoming":
-      return { label: "Скоро", tone: "neutral" };
+      return { label: tr("Скоро"), tone: "neutral" };
     case "veto":
-      return { label: "Вето", tone: "accent", pulse: true };
+      return { label: tr("Вето"), tone: "accent", pulse: true };
     case "ready":
-      return serverReady ? { label: "Сервер готов", tone: "ok", pulse: true } : { label: "Готовим сервер", tone: "warn" };
+      return serverReady ? { label: tr("Сервер готов"), tone: "ok", pulse: true } : { label: tr("Готовим сервер"), tone: "warn" };
     case "live":
-      return { label: "Идёт игра", tone: "live", pulse: true };
+      return { label: tr("Идёт игра"), tone: "live", pulse: true };
     case "finished":
-      return { label: "Матч окончен", tone: "neutral" };
+      return { label: tr("Матч окончен"), tone: "neutral" };
     case "cancelled":
-      return { label: "Отменён", tone: "danger" };
+      return { label: tr("Отменён"), tone: "danger" };
   }
 }
 
 export const registrationStatus: Record<RegistrationStatus, StatusInfo> = {
-  pending: { label: "На рассмотрении", tone: "warn" },
-  approved: { label: "Одобрена", tone: "ok" },
-  rejected: { label: "Отклонена", tone: "danger" },
-  withdrawn: { label: "Отозвана", tone: "neutral" },
+  pending: { label: tr("На рассмотрении"), tone: "warn" },
+  approved: { label: tr("Одобрена"), tone: "ok" },
+  rejected: { label: tr("Отклонена"), tone: "danger" },
+  withdrawn: { label: tr("Отозвана"), tone: "neutral" },
 };
 
 export type LobbyPhase = "waiting" | "ready_check" | "draft" | "veto" | "server" | "live" | "finished" | "closed";
 
 export const lobbyStatus: Record<LobbyPhase, StatusInfo> = {
-  waiting: { label: "Набор игроков", tone: "accent" },
-  ready_check: { label: "Проверка готовности", tone: "warn", pulse: true },
-  draft: { label: "Драфт", tone: "accent", pulse: true },
-  veto: { label: "Вето", tone: "accent", pulse: true },
-  server: { label: "Сервер", tone: "warn" },
-  live: { label: "Идёт игра", tone: "live", pulse: true },
-  finished: { label: "Матч окончен", tone: "neutral" },
-  closed: { label: "Закрыто", tone: "neutral" },
+  waiting: { label: tr("Набор игроков"), tone: "accent" },
+  ready_check: { label: tr("Проверка готовности"), tone: "warn", pulse: true },
+  draft: { label: tr("Драфт"), tone: "accent", pulse: true },
+  veto: { label: tr("Вето"), tone: "accent", pulse: true },
+  server: { label: tr("Сервер"), tone: "warn" },
+  live: { label: tr("Идёт игра"), tone: "live", pulse: true },
+  finished: { label: tr("Матч окончен"), tone: "neutral" },
+  closed: { label: tr("Закрыто"), tone: "neutral" },
 };

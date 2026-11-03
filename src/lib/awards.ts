@@ -6,6 +6,7 @@ import { getStandings } from "./matches";
 import { getPlayerLeaderboard, mvpOf } from "./stats";
 import { bestBy, computePlacements, isPlayoffSide, type PlacementMatch } from "./awards-core";
 import type { Tournament } from "./types";
+import { tr } from "./i18n/core";
 
 /**
  * Награды считаются из результатов завершённых турниров (никаких выдуманных данных):
@@ -25,7 +26,7 @@ export type Award = {
 };
 
 export const awardTitle = (a: Award) =>
-  a.kind === "place" ? (a.place === 1 ? "Чемпион" : a.place === 2 ? "2 место" : "3 место") : a.kind === "mvp" ? "MVP турнира" : a.kind === "clutch" ? "Лучший клатч" : "Лучший ADR";
+  a.kind === "place" ? (a.place === 1 ? tr("Чемпион") : a.place === 2 ? tr("2 место") : tr("3 место")) : a.kind === "mvp" ? tr("MVP турнира") : a.kind === "clutch" ? tr("Лучший клатч") : tr("Лучший ADR");
 
 async function tournamentAwards(t: Tournament): Promise<Award[]> {
   const meta = { id: t.id, name: t.name, slug: t.slug, starts_at: t.starts_at };

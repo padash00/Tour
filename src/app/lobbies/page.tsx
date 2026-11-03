@@ -6,6 +6,8 @@ import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { getMapImages } from "@/lib/settings";
 import { mapLabel } from "@/lib/maps";
 import { MODES } from "@/lib/modes";
+import { getT } from "@/lib/i18n/server";
+import { tr } from "@/lib/i18n/core";
 import { LiveRefresh } from "@/components/live-refresh";
 import { CreateLobbyButton } from "@/components/lobby/create-lobby";
 import { MapThumb } from "@/components/lobby/settings";
@@ -40,6 +42,7 @@ function lobbyPhase(l: Awaited<ReturnType<typeof listOpenLobbies>>[number]) {
 }
 
 export default async function LobbiesPage(props: PageProps<"/lobbies">) {
+  const t = await getT();
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 60) : "";
   const filter: Filter = sp.state === "waiting" || sp.state === "playing" ? sp.state : "all";
@@ -80,9 +83,9 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
       <Container width="wide" className="pb-16 pt-8 sm:pt-10">
         <header className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <PageTitle>Лобби</PageTitle>
+            <PageTitle>{t("Лобби")}</PageTitle>
             <p className="mt-1 max-w-read text-meta text-fg-3">
-              Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя.
+              {t("Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя.")}
             </p>
           </div>
           {!mine && <CreateLobbyButton loggedIn={!!player} />}
@@ -91,12 +94,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
         {mine && (
           <FeatureSurface className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">Ваше лобби</div>
+              <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{t("Ваше лобби")}</div>
               <div className="mt-1 text-title text-fg">#{mine.code}</div>
-              <p className="mt-1 text-meta text-fg-3">Вы уже состоите в активном лобби. Сначала завершите или покиньте его.</p>
+              <p className="mt-1 text-meta text-fg-3">{t("Вы уже состоите в активном лобби. Сначала завершите или покиньте его.")}</p>
             </div>
             <Button href={`/lobby/${mine.code}`} iconRight={<ArrowRight />}>
-              Вернуться в лобби
+              {t("Вернуться в лобби")}
             </Button>
           </FeatureSurface>
         )}
@@ -109,20 +112,20 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
               type="search"
               name="q"
               defaultValue={q}
-              placeholder="Код, хост, карта или режим"
-              aria-label="Поиск лобби"
+              placeholder={t("Код, хост, карта или режим")}
+              aria-label={t("Поиск лобби")}
               className="h-11 w-full rounded-control border border-line bg-shell pl-9 pr-24 text-[14px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
             />
             <button type="submit" className="absolute right-1.5 top-1.5 h-8 rounded-control px-3 text-meta font-medium text-fg-2 hover:bg-ink/[0.06] hover:text-fg">
-              Найти
+              {t("Найти")}
             </button>
           </form>
 
-          <nav className="flex gap-1 overflow-x-auto rounded-control border border-line-subtle bg-shell p-1" aria-label="Состояние лобби">
+          <nav className="flex gap-1 overflow-x-auto rounded-control border border-line-subtle bg-shell p-1" aria-label={t("Состояние лобби")}>
             {[
-              ["all", "Все", lobbies.length],
-              ["waiting", "Набор", waitingCount],
-              ["playing", "Идёт игра", playingCount],
+              ["all", tr("Все"), lobbies.length],
+              ["waiting", tr("Набор"), waitingCount],
+              ["playing", tr("Идёт игра"), playingCount],
             ].map(([key, label, count]) => {
               const active = filter === key;
               return (
@@ -135,7 +138,7 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                     active ? "bg-elevated text-fg" : "text-fg-3 hover:text-fg",
                   )}
                 >
-                  {label}
+                  {t(String(label))}
                   <span className="num text-micro text-fg-3">{count}</span>
                 </Link>
               );
@@ -147,12 +150,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
           {filtered.length === 0 ? (
             <EmptyState
               icon={<Users />}
-              title={q || filter !== "all" ? "Подходящих лобби нет" : "Открытых лобби нет"}
-              text={q || filter !== "all" ? "Измените поиск или фильтр состояния." : "Создайте своё лобби и пригласите друзей по ссылке."}
+              title={q || filter !== "all" ? t("Подходящих лобби нет") : t("Открытых лобби нет")}
+              text={q || filter !== "all" ? t("Измените поиск или фильтр состояния.") : t("Создайте своё лобби и пригласите друзей по ссылке.")}
               action={
                 q || filter !== "all" ? (
                   <Button href="/lobbies" variant="secondary" size="sm">
-                    Сбросить фильтры
+                    {t("Сбросить фильтры")}
                   </Button>
                 ) : mine ? undefined : (
                   <CreateLobbyButton loggedIn={!!player} />
@@ -183,14 +186,14 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="num shrink-0 text-fg-3">#{l.code}</span>
                         <span className="truncate">{l.host.nickname}</span>
-                        {l.visibility === "closed" && <Lock className="size-3.5 shrink-0 text-fg-3" aria-label="Вход по паролю" />}
+                        {l.visibility === "closed" && <Lock className="size-3.5 shrink-0 text-fg-3" aria-label={t("Вход по паролю")} />}
                       </span>
                     }
                     meta={
                       <span>
-                        {MODES[l.settings.mode].label.replace(" на ", "×")} · BO{l.settings.best_of} · {l.settings.network === "lan" ? "LAN" : "Интернет"} ·{" "}
-                        <span className={full ? "text-fg-3" : "text-fg-2"}>{l.players}/{total} игроков</span>
-                        {l.settings.filter ? " · фильтр" : ""}
+                        {MODES[l.settings.mode].label.replace(" на ", "×")} · BO{l.settings.best_of} · {l.settings.network === "lan" ? "LAN" : t("Интернет")} ·{" "}
+                        <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${l.players}/${total}` })}</span>
+                        {l.settings.filter ? ` · ${t("фильтр")}` : ""}
                       </span>
                     }
                     trailing={

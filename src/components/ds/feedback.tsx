@@ -1,6 +1,8 @@
 import { Check, CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { tr } from "@/lib/i18n/core";
 import { cn } from "./cn";
+import { Tt } from "./tt";
 
 /*
  * Обратная связь F16 DS.
@@ -38,7 +40,7 @@ export function EmptyState({
       {text && <p className="relative max-w-read text-[14px] leading-relaxed text-fg-2">{text}</p>}
       {next && (
         <p className="relative text-meta text-fg-3">
-          Дальше: <span className="text-fg-2">{next}</span>
+          <Tt text={tr("Дальше:")} /> <span className="text-fg-2">{next}</span>
         </p>
       )}
       {action && <div className="relative mt-2 flex flex-wrap gap-2">{action}</div>}
@@ -53,7 +55,10 @@ export function Skeleton({ className }: { className?: string }) {
 /** Строки-скелетоны списка */
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="divide-y divide-line-subtle overflow-hidden rounded-surface border border-line-subtle" aria-busy="true" aria-label="Загрузка">
+    <div className="divide-y divide-line-subtle overflow-hidden rounded-surface border border-line-subtle" aria-busy="true">
+      <span className="sr-only">
+        <Tt text={tr("Загрузка")} />
+      </span>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-3 px-4 py-3.5">
           <Skeleton className="size-9 rounded-full" />
@@ -111,7 +116,7 @@ export function Steps({ steps, direction = "vertical", className }: { steps: { t
       {s === "done" ? <Check className="size-3.5" /> : s === "error" ? "!" : String(i + 1).padStart(2, "0")}
     </span>
   );
-  const label = (s: StepState) => ({ done: "пройдено", current: "сейчас", todo: "впереди", error: "ошибка" })[s];
+  const label = (s: StepState) => <Tt text={{ done: tr("пройдено"), current: tr("сейчас"), todo: tr("впереди"), error: tr("ошибка") }[s]} />;
   if (direction === "horizontal") {
     return (
       <ol className={cn("flex items-start", className)}>

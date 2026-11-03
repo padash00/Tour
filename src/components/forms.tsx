@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useT } from "@/lib/i18n/client";
 import { ConfirmModal } from "./modal";
 import { useToast } from "./toast";
 import { Spinner, buttonClass, cn } from "./ui";
@@ -43,6 +44,7 @@ export function SubmitButton({
   name?: string;
   value?: string;
 }) {
+  const t = useT();
   const { pending, data } = useFormStatus();
   const [asking, setAsking] = useState(false);
   const confirmed = useRef(false);
@@ -84,7 +86,7 @@ export function SubmitButton({
           open={asking}
           message={confirm}
           danger={variant === "danger"}
-          confirmLabel={typeof children === "string" ? children : "Подтвердить"}
+          confirmLabel={typeof children === "string" ? children : t("Подтвердить")}
           onCancel={() => setAsking(false)}
           onConfirm={() => {
             setAsking(false);
@@ -135,22 +137,23 @@ export function ActionForm({
 }
 
 export function CopyField({ value }: { value: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const toast = useToast();
   return (
     <div className="flex gap-2">
-      <input readOnly value={value} aria-label="Ссылка для копирования" className="field num text-[13px]" onFocus={(e) => e.currentTarget.select()} />
+      <input readOnly value={value} aria-label={t("Ссылка для копирования")} className="field num text-[13px]" onFocus={(e) => e.currentTarget.select()} />
       <button
         type="button"
         className={buttonClass("secondary", "md", "shrink-0 w-32")}
         onClick={async () => {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          toast.success("Скопировано в буфер обмена");
+          toast.success(t("Скопировано в буфер обмена"));
           setTimeout(() => setCopied(false), 1600);
         }}
       >
-        {copied ? "Скопировано" : "Копировать"}
+        {copied ? t("Скопировано") : t("Копировать")}
       </button>
     </div>
   );

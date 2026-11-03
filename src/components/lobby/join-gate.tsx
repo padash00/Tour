@@ -6,6 +6,7 @@ import * as A from "@/app/actions/lobby";
 import type { LobbyView } from "@/lib/lobby-view";
 import { useToast } from "../toast";
 import { Button, FeatureSurface } from "@/components/ds";
+import { useT } from "@/lib/i18n/client";
 
 // ───────────────────────── вход в закрытое лобби
 
@@ -22,6 +23,7 @@ export function Gate({ title, text, children }: { title: string; text: string; c
 }
 
 export function JoinGate({ code, view, invite, onJoined }: { code: string; view: LobbyView; invite: string | null; onJoined: () => Promise<void> }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [pw, setPw] = useState("");
@@ -29,9 +31,9 @@ export function JoinGate({ code, view, invite, onJoined }: { code: string; view:
 
   if (!view.me) {
     return (
-      <Gate title="Вход в лобби" text="Авторизуйтесь через Steam — после входа вернём вас в эту же комнату.">
+      <Gate title={t("Вход в лобби")} text={t("Авторизуйтесь через Steam — после входа вернём вас в эту же комнату.")}>
         <Button href={`/login?next=${encodeURIComponent(`/lobby/${code}${invite ? `?t=${invite}` : ""}`)}`} size="lg">
-          Войти через Steam
+          {t("Войти через Steam")}
         </Button>
       </Gate>
     );
@@ -50,8 +52,8 @@ export function JoinGate({ code, view, invite, onJoined }: { code: string; view:
 
   return (
     <Gate
-      title={view.lobby.visibility === "private" ? "Приватное лобби" : "Лобби по паролю"}
-      text={invite ? "У вас действующая ссылка-приглашение — пароль не нужен." : `Хост ${view.lobby.host_name !== "—" ? view.lobby.host_name : ""} ограничил вход в комнату.`}
+      title={view.lobby.visibility === "private" ? t("Приватное лобби") : t("Лобби по паролю")}
+      text={invite ? t("У вас действующая ссылка-приглашение — пароль не нужен.") : t("Хост {name} ограничил вход в комнату.", { name: view.lobby.host_name !== "—" ? view.lobby.host_name : "" })}
     >
       <form
         className="mx-auto max-w-sm space-y-3"
@@ -64,13 +66,13 @@ export function JoinGate({ code, view, invite, onJoined }: { code: string; view:
           <input
             value={pw}
             onChange={(e) => setPw(e.target.value)}
-            placeholder="Пароль"
+            placeholder={t("Пароль")}
             autoFocus
             className="h-12 w-full rounded-control border border-line bg-shell px-4 text-[15px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]"
           />
         )}
         <Button type="submit" block size="lg" loading={pending}>
-          Войти в лобби
+          {t("Войти в лобби")}
         </Button>
       </form>
     </Gate>

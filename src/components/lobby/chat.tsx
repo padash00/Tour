@@ -7,10 +7,13 @@ import { useToast } from "../toast";
 import { Avatar } from "../ui";
 import { cn } from "@/components/ds";
 import { Icon } from "./ui";
+import { useT } from "@/lib/i18n/client";
+import { intlLocale } from "@/lib/i18n/core";
 
 // ───────────────────────── чат
 
 export function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: string; onSent: () => Promise<void>; canWrite: boolean }) {
+  const t = useT();
   const toast = useToast();
   const [text, setText] = useState("");
   const [pending, start] = useTransition();
@@ -33,11 +36,11 @@ export function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: 
       await onSent();
     });
   };
-  const time = useMemo(() => new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), []);
+  const time = useMemo(() => new Intl.DateTimeFormat(intlLocale(t.lang), { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" }), [t.lang]);
   return (
     <div className="flex h-[440px] flex-col overflow-hidden rounded-surface border border-line-subtle bg-surface sm:h-[560px]">
       <div ref={box} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4">
-        {view.messages.length === 0 && <p className="pt-10 text-center text-[13px] text-fg-3">Сообщений пока нет</p>}
+        {view.messages.length === 0 && <p className="pt-10 text-center text-[13px] text-fg-3">{t("Сообщений пока нет")}</p>}
         {view.messages.map((m) =>
           m.player_id ? (
             <div key={m.id} className="flex gap-2.5">
@@ -65,13 +68,13 @@ export function Chat({ view, code, onSent, canWrite }: { view: LobbyView; code: 
             send();
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="Сообщение…" className="h-10 min-w-0 flex-1 rounded-control border border-line bg-shell px-3 text-[14px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]" />
-          <button type="submit" disabled={pending || !text.trim()} className="grid size-10 place-items-center rounded-control bg-accent text-accent-ink transition-colors hover:bg-accent-strong disabled:opacity-50" aria-label="Отправить">
+          <input value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder={t("Сообщение…")} className="h-10 min-w-0 flex-1 rounded-control border border-line bg-shell px-3 text-[14px] text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:shadow-[0_0_0_3px_var(--color-accent-dim)]" />
+          <button type="submit" disabled={pending || !text.trim()} className="grid size-10 place-items-center rounded-control bg-accent text-accent-ink transition-colors hover:bg-accent-strong disabled:opacity-50" aria-label={t("Отправить")}>
             {Icon.send("size-4")}
           </button>
         </form>
       ) : (
-        <p className="border-t border-line-subtle p-3 text-center text-[13px] text-fg-3">Войдите в лобби, чтобы писать в чат</p>
+        <p className="border-t border-line-subtle p-3 text-center text-[13px] text-fg-3">{t("Войдите в лобби, чтобы писать в чат")}</p>
       )}
     </div>
   );

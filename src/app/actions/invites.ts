@@ -8,8 +8,10 @@ import { INVITE_TTL_DAYS, type InviteRole } from "@/lib/invites";
 import { profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
+import { tr } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 
-const NOT_CAPTAIN = "Только капитан может это сделать";
+const NOT_CAPTAIN = tr("Только капитан может это сделать");
 
 async function requireCaptain() {
   const player = await requirePlayer("/team?tab=roster");
@@ -55,19 +57,20 @@ export async function searchInvitees(query: string): Promise<InviteCandidate[]> 
 
 /** Капитан приглашает игрока (в состав) или тренера — тот получает уведомление и подтверждает */
 export async function sendInvite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const t = await getT();
   const ctx = await requireCaptain();
-  if (!ctx) return { error: NOT_CAPTAIN };
+  if (!ctx) return { error: t(NOT_CAPTAIN) };
   const { player, team } = ctx;
   const role: InviteRole = formData.get("role") === "coach" ? "coach" : "player";
   const target = String(formData.get("playerId") ?? "");
   if (role === "player") {
     const locked = await getLockingTournament(team.id);
-    if (locked) return { error: `Состав заблокирован турниром «${locked.name}». Новых игроков добавляет только администратор.` };
+    if (locked) return { error: t("Состав заблокирован турниром «{name}». Новых игроков добавляет только администратор.", { name: locked.name }) };
   }
-  if (await isRateLimited(player.id, "team.invite", 2)) return { error: "Слишком часто — попробуйте через пару секунд" };
+  if (await isRateLimited(player.id, "team.invite", 2)) return { error: t("Слишком часто — попробуйте через пару секунд") };
 
   const { data: invitee } = await db().from("players").select("id, nickname, steam_id, is_banned").eq("id", target).maybeSingle();
-  if (!invitee || invitee.is_banned) return { error: "Игрок не найден" };
+  if (!invitee || invitee.is_banned) return { error: t("Игрок не найден") };
 
   const { error } = await db().rpc("create_team_invite", {
     p_team: team.id,
@@ -79,15 +82,15 @@ export async function sendInvite(_prev: ActionResult, formData: FormData): Promi
   });
   if (error) {
     const m = error.message;
-    if (m.includes("already_in_team")) return { error: `${invitee.nickname} уже в вашей команде` };
-    if (m.includes("already_invited")) return { error: `${invitee.nickname} уже приглашён — ждём ответа` };
-    if (m.includes("already_member")) return { error: `${invitee.nickname} уже в другой команде` };
-    if (m.includes("no_slots")) return { error: "Свободных мест нет — с учётом отправленных приглашений состав заполнен" };
-    if (m.includes("coach_taken")) return { error: "У команды уже есть тренер" };
-    if (m.includes("coach_invited")) return { error: "Тренер уже приглашён — дождитесь ответа или отмените приглашение" };
-    if (m.includes("self")) return { error: "Нельзя пригласить себя" };
-    if (m.includes("captain_required")) return { error: NOT_CAPTAIN };
-    return { error: "Не удалось отправить приглашение" };
+    if (m.includes("already_in_team")) return { error: t("{name} уже в вашей команде", { name: invitee.nickname }) };
+    if (m.includes("already_invited")) return { error: t("{name} уже приглашён — ждём ответа", { name: invitee.nickname }) };
+    if (m.includes("already_member")) return { error: t("{name} уже в другой команде", { name: invitee.nickname }) };
+    if (m.includes("no_slots")) return { error: t("Свободных мест нет — с учётом отправленных приглашений состав заполнен") };
+    if (m.includes("coach_taken")) return { error: t("У команды уже есть тренер") };
+    if (m.includes("coach_invited")) return { error: t("Тренер уже приглашён — дождитесь ответа или отмените приглашение") };
+    if (m.includes("self")) return { error: t("Нельзя пригласить себя") };
+    if (m.includes("captain_required")) return { error: t(NOT_CAPTAIN) };
+    return { error: t("Не удалось отправить приглашение") };
   }
 
   await notify(
@@ -98,13 +101,14 @@ export async function sendInvite(_prev: ActionResult, formData: FormData): Promi
   );
   await audit(player.id, "team.invite_send", { type: "team", id: team.id }, { player: invitee.steam_id, role });
   revalidatePath("/team");
-  return { success: `Приглашение отправлено: ${invitee.nickname}` };
+  return { success: t("Приглашение отправлено: {name}", { name: invitee.nickname }) };
 }
 
 /** Капитан отменяет отправленное приглашение */
 export async function cancelInvite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const t = await getT();
   const ctx = await requireCaptain();
-  if (!ctx) return { error: NOT_CAPTAIN };
+  if (!ctx) return { error: t(NOT_CAPTAIN) };
   const id = String(formData.get("inviteId") ?? "");
   const { data } = await db()
     .from("team_invites")
@@ -114,16 +118,17 @@ export async function cancelInvite(_prev: ActionResult, formData: FormData): Pro
     .eq("status", "pending")
     .select("id")
     .maybeSingle();
-  if (!data) return { error: "Приглашение уже неактуально — обновите страницу" };
+  if (!data) return { error: t("Приглашение уже неактуально — обновите страницу") };
   await audit(ctx.player.id, "team.invite_cancel", { type: "team", id: ctx.team.id });
   revalidatePath("/team");
-  return { success: "Приглашение отменено" };
+  return { success: t("Приглашение отменено") };
 }
 
 /** Игрок принимает приглашение: вступает в состав или становится тренером */
 export async function acceptInvite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const t = await getT();
   const player = await requirePlayer("/team");
-  if (player.is_banned) return { error: BANNED_ERROR };
+  if (player.is_banned) return { error: t(BANNED_ERROR) };
   const id = String(formData.get("inviteId") ?? "");
   const { data: inv } = await db()
     .from("team_invites")
@@ -131,12 +136,12 @@ export async function acceptInvite(_prev: ActionResult, formData: FormData): Pro
     .eq("id", id)
     .eq("player_id", player.id)
     .maybeSingle();
-  if (!inv) return { error: "Приглашение не найдено" };
+  if (!inv) return { error: t("Приглашение не найдено") };
   if (inv.role === "player") {
     const gate = await profileGateError(player);
     if (gate) return { error: gate };
     const locked = await getLockingTournament(inv.team.id);
-    if (locked) return { error: `Состав команды заблокирован турниром «${locked.name}» — вступить можно после турнира` };
+    if (locked) return { error: t("Состав команды заблокирован турниром «{name}» — вступить можно после турнира", { name: locked.name }) };
   }
 
   const { data: role, error } = await db().rpc("accept_team_invite", {
@@ -148,13 +153,13 @@ export async function acceptInvite(_prev: ActionResult, formData: FormData): Pro
   });
   if (error) {
     const m = error.message;
-    if (m.includes("already_member")) return { error: "Вы уже состоите в команде. Сначала покиньте её." };
-    if (m.includes("team_full")) return { error: "В команде уже нет свободных мест" };
-    if (m.includes("coach_taken")) return { error: "У команды уже есть тренер" };
-    if (m.includes("already_in_team")) return { error: "Вы игрок этой команды — тренером быть нельзя" };
-    if (m.includes("is_coach")) return { error: "Вы тренер этой команды — игроком быть нельзя" };
-    if (m.includes("invite_missing") || m.includes("team_missing")) return { error: "Приглашение уже неактуально" };
-    return { error: "Не удалось принять приглашение" };
+    if (m.includes("already_member")) return { error: t("Вы уже состоите в команде. Сначала покиньте её.") };
+    if (m.includes("team_full")) return { error: t("В команде уже нет свободных мест") };
+    if (m.includes("coach_taken")) return { error: t("У команды уже есть тренер") };
+    if (m.includes("already_in_team")) return { error: t("Вы игрок этой команды — тренером быть нельзя") };
+    if (m.includes("is_coach")) return { error: t("Вы тренер этой команды — игроком быть нельзя") };
+    if (m.includes("invite_missing") || m.includes("team_missing")) return { error: t("Приглашение уже неактуально") };
+    return { error: t("Не удалось принять приглашение") };
   }
 
   if (role !== "coach") await syncOpenRosters(inv.team.id);
@@ -166,11 +171,12 @@ export async function acceptInvite(_prev: ActionResult, formData: FormData): Pro
   );
   await audit(player.id, "team.invite_accept", { type: "team", id: inv.team.id }, { role });
   revalidateTeam(inv.team.tag);
-  return { success: role === "coach" ? `Вы тренер ${inv.team.name}` : `Вы в команде ${inv.team.name}` };
+  return { success: role === "coach" ? t("Вы тренер {name}", { name: inv.team.name }) : t("Вы в команде {name}", { name: inv.team.name }) };
 }
 
 /** Игрок отклоняет приглашение — капитан получает уведомление */
 export async function declineInvite(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const t = await getT();
   const player = await requirePlayer("/team");
   const id = String(formData.get("inviteId") ?? "");
   const { data } = await db()
@@ -181,28 +187,30 @@ export async function declineInvite(_prev: ActionResult, formData: FormData): Pr
     .eq("status", "pending")
     .select("role, team:teams(id, name, captain_id)")
     .maybeSingle();
-  if (!data) return { error: "Приглашение уже неактуально — обновите страницу" };
+  if (!data) return { error: t("Приглашение уже неактуально — обновите страницу") };
   await notify([data.team.captain_id], `${player.nickname} отклонил приглашение${data.role === "coach" ? " тренером" : ""} в ${data.team.name}`, undefined, "/team?tab=roster");
   await audit(player.id, "team.invite_decline", { type: "team", id: data.team.id });
   revalidatePath("/team");
-  return { success: "Приглашение отклонено" };
+  return { success: t("Приглашение отклонено") };
 }
 
 /** Капитан убирает тренера из команды */
 export async function removeCoach(): Promise<ActionResult> {
+  const t = await getT();
   const ctx = await requireCaptain();
-  if (!ctx) return { error: NOT_CAPTAIN };
+  if (!ctx) return { error: t(NOT_CAPTAIN) };
   const { player, team } = ctx;
-  if (!team.coach_id) return { error: "У команды нет тренера" };
+  if (!team.coach_id) return { error: t("У команды нет тренера") };
   await db().from("teams").update({ coach_id: null }).eq("id", team.id);
   await notify([team.coach_id], `Вы больше не тренер ${team.name}`);
   await audit(player.id, "team.coach_remove", { type: "team", id: team.id });
   revalidateTeam(team.tag);
-  return { success: "Тренер убран" };
+  return { success: t("Тренер убран") };
 }
 
 /** Тренер сам уходит из команды */
 export async function leaveCoaching(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const t = await getT();
   const player = await requirePlayer("/team");
   const teamId = String(formData.get("teamId") ?? "");
   const { data } = await db()
@@ -212,9 +220,9 @@ export async function leaveCoaching(_prev: ActionResult, formData: FormData): Pr
     .eq("coach_id", player.id)
     .select("id, name, tag, captain_id")
     .maybeSingle();
-  if (!data) return { error: "Вы уже не тренер этой команды" };
+  if (!data) return { error: t("Вы уже не тренер этой команды") };
   await notify([data.captain_id], `${player.nickname} больше не тренер ${data.name}`, undefined, "/team?tab=roster");
   await audit(player.id, "team.coach_leave", { type: "team", id: data.id });
   revalidateTeam(data.tag);
-  return { success: `Вы больше не тренер ${data.name}` };
+  return { success: t("Вы больше не тренер {name}", { name: data.name }) };
 }

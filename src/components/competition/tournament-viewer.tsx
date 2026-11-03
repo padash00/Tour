@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { Check, CircleAlert, Circle } from "lucide-react";
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatTime } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n/core";
 import { modeOf } from "@/lib/modes";
 import type { RegistrationStatus, TournamentStatus } from "@/lib/types";
 import { Button, Skeleton, Status, cn, registrationStatus } from "@/components/ds";
@@ -79,7 +81,7 @@ type Participation = {
 };
 
 /** Состояние участника → текст, статусы и одно главное действие (ведёт в существующие flows) */
-function participation(t: TournamentLite, me: TournamentMe, approvedCount: number): Participation {
+function participation(t: TournamentLite, me: TournamentMe, approvedCount: number, tx: T): Participation {
   const base = `/tournaments/${t.slug}`;
   const free = Math.max(0, t.max_teams - approvedCount);
   const mode = modeOf(t.format);
@@ -87,67 +89,71 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
   const { loggedIn, team, isCaptain, reg } = me;
   const active = reg && (reg.status === "pending" || reg.status === "approved");
   const canManage = isCaptain || soloFormat;
-  const checkin = t.checkin_opens_at ? `${formatDateTime(t.checkin_opens_at)}${t.checkin_closes_at ? `–${formatDateTime(t.checkin_closes_at).split(", ").pop()}` : ""}` : null;
+  const checkin = t.checkin_opens_at ? `${formatDateTime(t.checkin_opens_at, tx.lang)}${t.checkin_closes_at ? `–${formatTime(t.checkin_closes_at, tx.lang)}` : ""}` : null;
 
-  if (t.status === "cancelled") return { tone: "neutral", label: "Турнир отменён", title: "Турнир отменён" };
+  if (t.status === "cancelled") return { tone: "neutral", label: tx("Турнир отменён"), title: tx("Турнир отменён") };
   if (t.status === "finished") {
     // участие = одобрена + check-in пройден; одобренная без check-in — не «участвовали»
     if (reg?.status === "approved" && reg.checked_in_at) {
-      return { tone: "neutral", label: "Вы участвовали", title: team?.name ?? "Участие", text: "Итоги, сетка и статистика — во вкладках турнира.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } };
+      return { tone: "neutral", label: tx("Вы участвовали"), title: team?.name ?? tx("Участие"), text: tx("Итоги, сетка и статистика — во вкладках турнира."), cta: { href: `${base}?tab=recap`, label: tx("Итоги турнира"), variant: "secondary" } };
     }
     if (reg?.status === "approved") {
-      return { tone: "neutral", label: "Заявка была одобрена", title: team?.name ?? "Заявка", text: "Команда не прошла check-in. Турнир уже завершён.", cta: { href: `${base}?tab=recap`, label: "Итоги турнира", variant: "secondary" } };
+      return { tone: "neutral", label: tx("Заявка была одобрена"), title: team?.name ?? tx("Заявка"), text: tx("Команда не прошла check-in. Турнир уже завершён."), cta: { href: `${base}?tab=recap`, label: tx("Итоги турнира"), variant: "secondary" } };
     }
-    return { tone: "neutral", label: "Турнир завершён", title: "Турнир завершён", text: "Итоги и статистика — во вкладках турнира." };
+    return { tone: "neutral", label: tx("Турнир завершён"), title: tx("Турнир завершён"), text: tx("Итоги и статистика — во вкладках турнира.") };
   }
 
   if (active && reg) {
     if (reg.status === "pending") {
       return {
         tone: "warn",
-        label: "Ваша заявка",
-        title: team?.name ?? "Заявка",
+        label: tx("Ваша заявка"),
+        title: team?.name ?? tx("Заявка"),
         status: [registrationStatus.pending],
         text:
           t.status === "checkin"
-            ? "Check-in уже открыт, а заявка ещё не одобрена. Обратитесь к администратору турнира."
+            ? tx("Check-in уже открыт, а заявка ещё не одобрена. Обратитесь к администратору турнира.")
             : t.status === "registration"
-              ? "Заявка на рассмотрении. Администратор рассмотрит её до check-in."
-              : "Заявка на рассмотрении. Она ожидает решения администратора.",
-        cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
+              ? tx("Заявка на рассмотрении. Администратор рассмотрит её до check-in.")
+              : tx("Заявка на рассмотрении. Она ожидает решения администратора."),
+        cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: tx("Управлять заявкой"), variant: "secondary" } : undefined,
       };
     }
     // одобрена
     if (reg.checked_in_at) {
       return {
         tone: "ok",
-        label: "Вы участвуете",
-        title: team?.name ?? "Участие",
-        status: [registrationStatus.approved, { label: "Check-in пройден", tone: "ok" }],
-        text: t.status === "live" ? "Турнир идёт — ваши матчи во вкладке «Матчи» и в «Моей игре»." : "Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен.",
-        cta: t.status === "live" ? { href: `${base}?tab=matches`, label: "Матчи турнира", variant: "secondary" } : undefined,
+        label: tx("Вы участвуете"),
+        title: team?.name ?? tx("Участие"),
+        status: [registrationStatus.approved, { label: tx("Check-in пройден"), tone: "ok" }],
+        text: t.status === "live" ? tx("Турнир идёт — ваши матчи во вкладке «Матчи» и в «Моей игре».") : tx("Сетку опубликуют после закрытия check-in — сообщим, когда соперник будет известен."),
+        cta: t.status === "live" ? { href: `${base}?tab=matches`, label: tx("Матчи турнира"), variant: "secondary" } : undefined,
       };
     }
     if (t.status === "checkin") {
       return {
         tone: "accent",
-        label: "Check-in открыт",
-        title: team?.name ?? "Участие",
-        status: [registrationStatus.approved, { label: "Check-in не пройден", tone: "warn" }],
-        text: canManage ? `Подтвердите участие${t.checkin_closes_at ? ` до ${formatDateTime(t.checkin_closes_at)}` : ""}, иначе место займёт другая команда.` : "Check-in проходит капитан команды.",
-        cta: canManage ? { href: `${base}/checkin`, label: "Пройти check-in" } : { href: `${base}/checkin`, label: "Статус check-in", variant: "secondary" },
+        label: tx("Check-in открыт"),
+        title: team?.name ?? tx("Участие"),
+        status: [registrationStatus.approved, { label: tx("Check-in не пройден"), tone: "warn" }],
+        text: canManage
+          ? t.checkin_closes_at
+            ? tx("Подтвердите участие до {date}, иначе место займёт другая команда.", { date: formatDateTime(t.checkin_closes_at, tx.lang) })
+            : tx("Подтвердите участие, иначе место займёт другая команда.")
+          : tx("Check-in проходит капитан команды."),
+        cta: canManage ? { href: `${base}/checkin`, label: tx("Пройти check-in") } : { href: `${base}/checkin`, label: tx("Статус check-in"), variant: "secondary" },
       };
     }
     if (t.status === "live") {
-      return { tone: "neutral", label: "Турнир идёт", title: team?.name ?? "Участие", status: [registrationStatus.approved], text: "Check-in не был пройден — если это ошибка, напишите администратору." };
+      return { tone: "neutral", label: tx("Турнир идёт"), title: team?.name ?? tx("Участие"), status: [registrationStatus.approved], text: tx("Check-in не был пройден — если это ошибка, напишите администратору.") };
     }
     return {
       tone: "ok",
-      label: "Вы участвуете",
-      title: team?.name ?? "Участие",
+      label: tx("Вы участвуете"),
+      title: team?.name ?? tx("Участие"),
       status: [registrationStatus.approved],
-      text: checkin ? `Дальше: check-in ${checkin}.` : "Дальше: check-in перед стартом — мы напомним.",
-      cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: "Управлять заявкой", variant: "secondary" } : undefined,
+      text: checkin ? tx("Дальше: check-in {when}.", { when: checkin }) : tx("Дальше: check-in перед стартом — мы напомним."),
+      cta: canManage && t.status === "registration" ? { href: `${base}/register`, label: tx("Управлять заявкой"), variant: "secondary" } : undefined,
     };
   }
 
@@ -156,57 +162,64 @@ function participation(t: TournamentLite, me: TournamentMe, approvedCount: numbe
     const open = t.status === "registration";
     return {
       tone: "danger",
-      label: "Заявка отклонена",
-      title: team?.name ?? "Заявка",
+      label: tx("Заявка отклонена"),
+      title: team?.name ?? tx("Заявка"),
       status: [registrationStatus.rejected],
       text: (
         <>
-          {reg.note ? `Причина: ${reg.note}` : "Администратор отклонил заявку."}
-          {open ? " Исправьте состав и подайте снова, пока открыта регистрация." : " Регистрация уже закрыта."}
+          {reg.note ? tx("Причина: {note}", { note: reg.note }) : tx("Администратор отклонил заявку.")}{" "}
+          {open ? tx("Исправьте состав и подайте снова, пока открыта регистрация.") : tx("Регистрация уже закрыта.")}
         </>
       ),
-      cta: open && canManage ? { href: `${base}/register`, label: "Подать заявку снова" } : undefined,
+      cta: open && canManage ? { href: `${base}/register`, label: tx("Подать заявку снова") } : undefined,
     };
   }
 
   if (t.status !== "registration") {
     return t.status === "live"
-      ? { tone: "neutral", label: "Турнир идёт", title: "Регистрация закрыта", text: "Следите за сеткой и матчами во вкладках турнира." }
-      : { tone: "neutral", label: "Регистрация закрыта", title: "Регистрация закрыта", text: checkin && t.status !== "checkin" ? `Check-in для участников: ${checkin}.` : "Новые заявки не принимаются." };
+      ? { tone: "neutral", label: tx("Турнир идёт"), title: tx("Регистрация закрыта"), text: tx("Следите за сеткой и матчами во вкладках турнира.") }
+      : { tone: "neutral", label: tx("Регистрация закрыта"), title: tx("Регистрация закрыта"), text: checkin && t.status !== "checkin" ? tx("Check-in для участников: {when}.", { when: checkin }) : tx("Новые заявки не принимаются.") };
   }
 
   // регистрация открыта, активной заявки нет (отклонённая обработана выше)
   // мест нет: backend всё равно принимает заявку на рассмотрение, одобрят, если место освободится
-  const seats = free > 0 ? `${free} из ${t.max_teams} мест свободно` : "Свободных мест сейчас нет";
-  const fullNote = "Заявку всё ещё можно отправить; её одобрение возможно, если место освободится.";
+  const seats = free > 0 ? tx("{free} из {max} мест свободно", { free, max: t.max_teams }) : tx("Свободных мест сейчас нет");
+  const fullNote = tx("Заявку всё ещё можно отправить; её одобрение возможно, если место освободится.");
   if (!loggedIn) {
-    return { tone: "accent", label: "Регистрация открыта", title: seats, text: free > 0 ? "Войдите через Steam, чтобы подать заявку." : `${fullNote} Войдите через Steam.`, cta: { href: `/login?next=${encodeURIComponent(`${base}/register`)}`, label: "Войти через Steam" } };
+    return { tone: "accent", label: tx("Регистрация открыта"), title: seats, text: free > 0 ? tx("Войдите через Steam, чтобы подать заявку.") : `${fullNote} ${tx("Войдите через Steam.")}`, cta: { href: `/login?next=${encodeURIComponent(`${base}/register`)}`, label: tx("Войти через Steam") } };
   }
   if (soloFormat) {
-    return { tone: "accent", label: "Регистрация открыта", title: seats, text: free > 0 ? "Участие — сами за себя, команда не нужна." : fullNote, cta: { href: `${base}/register`, label: "Участвовать" } };
+    return { tone: "accent", label: tx("Регистрация открыта"), title: seats, text: free > 0 ? tx("Участие — сами за себя, команда не нужна.") : fullNote, cta: { href: `${base}/register`, label: tx("Участвовать") } };
   }
   if (!team || team.solo) {
-    return { tone: "neutral", label: "Регистрация открыта", title: "Для участия нужна команда", text: `Соберите команду: в основе ${mode.size}${mode.subs ? `, до ${mode.subs} запасных` : ""}.`, cta: { href: "/team/create", label: "Создать команду" }, extra: { href: "/find", label: "Найти команду" } };
+    return {
+      tone: "neutral",
+      label: tx("Регистрация открыта"),
+      title: tx("Для участия нужна команда"),
+      text: (mode.subs as number) ? tx("Соберите команду: в основе {n}, до {subs} запасных.", { n: mode.size, subs: mode.subs as number }) : tx("Соберите команду: в основе {n}.", { n: mode.size }),
+      cta: { href: "/team/create", label: tx("Создать команду") },
+      extra: { href: "/find", label: tx("Найти команду") },
+    };
   }
   if (team.mains < mode.size) {
     return {
       tone: "warn",
-      label: "Состав неполный",
+      label: tx("Состав неполный"),
       title: team.name,
-      text: `Основа ${team.mains} из ${mode.size} — нужно ещё ${mode.size - team.mains}, чтобы подать заявку.`,
-      cta: { href: isCaptain ? "/team?tab=roster" : "/team", label: isCaptain ? "Пригласить игроков" : "Открыть команду", variant: "secondary" },
+      text: tx("Основа {a} из {b} — нужно ещё {c}, чтобы подать заявку.", { a: team.mains, b: mode.size, c: mode.size - team.mains }),
+      cta: { href: isCaptain ? "/team?tab=roster" : "/team", label: isCaptain ? tx("Пригласить игроков") : tx("Открыть команду"), variant: "secondary" },
     };
   }
   return isCaptain
     ? {
         tone: "accent",
-        label: "Команда готова",
+        label: tx("Команда готова"),
         title: team.name,
-        status: [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }],
-        text: free > 0 ? `${seats}${t.registration_closes_at ? ` · заявки до ${formatDateTime(t.registration_closes_at)}` : ""}.` : `${seats}. ${fullNote}`,
-        cta: { href: `${base}/register`, label: "Подать заявку" },
+        status: [{ label: tx("Основа {a}/{b}", { a: team.mains, b: mode.size }), tone: "ok" }],
+        text: free > 0 ? `${seats}${t.registration_closes_at ? ` · ${tx("заявки до {date}", { date: formatDateTime(t.registration_closes_at, tx.lang) })}` : ""}.` : `${seats}. ${fullNote}`,
+        cta: { href: `${base}/register`, label: tx("Подать заявку") },
       }
-    : { tone: "neutral", label: "Команда готова", title: team.name, status: [{ label: `Основа ${team.mains}/${mode.size}`, tone: "ok" }], text: "Заявку на турнир подаёт капитан команды." };
+    : { tone: "neutral", label: tx("Команда готова"), title: team.name, status: [{ label: tx("Основа {a}/{b}", { a: team.mains, b: mode.size }), tone: "ok" }], text: tx("Заявку на турнир подаёт капитан команды.") };
 }
 
 const BORDER: Record<Tone, string> = {
@@ -219,6 +232,7 @@ const BORDER: Record<Tone, string> = {
 
 /** Панель участия — главный блок боковой колонки «Обзора» */
 export function ParticipationPanel({ t, approvedCount, preview }: { t: TournamentLite; approvedCount: number; /** для витрины дизайн-системы: состояние без запроса */ preview?: TournamentMe }) {
+  const tx = useT();
   const live = useTournamentMe(preview ? "" : t.id);
   const me = preview ?? live;
   if (!me) {
@@ -230,10 +244,10 @@ export function ParticipationPanel({ t, approvedCount, preview }: { t: Tournamen
       </div>
     );
   }
-  const p = participation(t, me, approvedCount);
+  const p = participation(t, me, approvedCount, tx);
   const fill = Math.min(100, (approvedCount / Math.max(1, t.max_teams)) * 100);
   return (
-    <section aria-label="Моё участие" className={cn("rounded-surface border bg-surface p-5", BORDER[p.tone])}>
+    <section aria-label={tx("Моё участие")} className={cn("rounded-surface border bg-surface p-5", BORDER[p.tone])}>
       <div className="text-meta font-medium text-fg-3">{p.label}</div>
       <div className="mt-1 break-words text-title text-fg">{p.title}</div>
       {p.status && (
@@ -250,7 +264,7 @@ export function ParticipationPanel({ t, approvedCount, preview }: { t: Tournamen
             <div className="h-full rounded-full bg-accent/70" style={{ width: `${fill}%` }} />
           </div>
           <div className="num mt-1.5 text-micro text-fg-3">
-            {approvedCount} / {t.max_teams} {modeOf(t.format).size === 1 ? "участников" : "команд"}
+            {modeOf(t.format).size === 1 ? tx("{a} / {b} участников", { a: approvedCount, b: t.max_teams }) : tx("{a} / {b} команд", { a: approvedCount, b: t.max_teams })}
           </div>
         </div>
       )}
@@ -270,11 +284,12 @@ export function ParticipationPanel({ t, approvedCount, preview }: { t: Tournamen
 
 /** Главная кнопка в шапке турнира — то же главное действие, что в панели участия (только действия, не пассив) */
 export function HeroCta({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
+  const tx = useT();
   const me = useTournamentMe(t.id);
   if (!me) {
     return t.status === "registration" || t.status === "checkin" ? <span aria-hidden className="inline-block h-12 w-56 rounded-control bg-ink/[0.04]" /> : null;
   }
-  const p = participation(t, me, approvedCount);
+  const p = participation(t, me, approvedCount, tx);
   if (!p.cta || p.cta.variant === "secondary") return null;
   return (
     <Button href={p.cta.href} size="lg">
@@ -285,9 +300,10 @@ export function HeroCta({ t, approvedCount }: { t: TournamentLite; approvedCount
 
 /** На телефоне главное действие всегда под рукой — внизу экрана (только когда оно есть) */
 export function MobileCta({ t, approvedCount }: { t: TournamentLite; approvedCount: number }) {
+  const tx = useT();
   const me = useTournamentMe(t.id);
   if (!me) return null;
-  const p = participation(t, me, approvedCount);
+  const p = participation(t, me, approvedCount, tx);
   if (!p.cta || p.cta.variant === "secondary") return null;
   return (
     <MobileStickyCta note={p.title}>
@@ -310,24 +326,25 @@ export function AdminControlLink({ t }: { t: TournamentLite }) {
 
 /** Требования для вашей команды — только то, что сайт знает точно */
 export function MyRequirements({ t }: { t: TournamentLite }) {
+  const tx = useT();
   const me = useTournamentMe(t.id);
   const mode = modeOf(t.format);
   if (!me?.loggedIn || !me.team || me.team.solo || mode.size === 1) return null;
   const items: { ok: boolean | null; text: string }[] = [
-    { ok: true, text: "Вход через Steam" },
-    { ok: me.team.mains >= mode.size, text: `Основа: ${Math.min(me.team.mains, mode.size)} из ${mode.size}` },
+    { ok: true, text: tx("Вход через Steam") },
+    { ok: me.team.mains >= mode.size, text: tx("Основа: {a} из {b}", { a: Math.min(me.team.mains, mode.size), b: mode.size }) },
     {
       ok: me.reg?.checked_in_at ? true : null,
-      text: me.reg?.checked_in_at ? "Check-in пройден" : me.isCaptain ? "Check-in — вы, как капитан, в отведённое время" : "Check-in проходит капитан",
+      text: me.reg?.checked_in_at ? tx("Check-in пройден") : me.isCaptain ? tx("Check-in — вы, как капитан, в отведённое время") : tx("Check-in проходит капитан"),
     },
   ];
   return (
     <div className="mt-6 rounded-surface border border-line-subtle bg-surface p-4">
-      <div className="text-meta font-medium text-fg-2">Ваша команда · {me.team.name}</div>
+      <div className="text-meta font-medium text-fg-2">{tx("Ваша команда")} · {me.team.name}</div>
       <ul className="mt-3 space-y-2">
         {items.map((it) => (
           <li key={it.text} className="flex items-center gap-2.5 text-[14px] text-fg-2">
-            {it.ok === true ? <Check className="size-4 text-ok" aria-label="выполнено" /> : it.ok === false ? <CircleAlert className="size-4 text-warn" aria-label="не выполнено" /> : <Circle className="size-4 text-fg-4" aria-label="впереди" />}
+            {it.ok === true ? <Check className="size-4 text-ok" aria-label={tx("выполнено")} /> : it.ok === false ? <CircleAlert className="size-4 text-warn" aria-label={tx("не выполнено")} /> : <Circle className="size-4 text-fg-4" aria-label={tx("впереди")} />}
             {it.text}
           </li>
         ))}

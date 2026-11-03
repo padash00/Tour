@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { searchInvitees, sendInvite, type InviteCandidate } from "@/app/actions/invites";
 import { Button, Dialog, FaceitLevel, PlayerIdentity, SearchInput, type ButtonSize, type ButtonVariant } from "@/components/ds";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * «Пригласить по нику»: капитан ищет зарегистрированного игрока и зовёт его игроком или тренером.
@@ -22,6 +23,7 @@ export function InviteByNick({
   size?: ButtonSize;
   variant?: ButtonVariant;
 }) {
+  const t = useT();
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -35,14 +37,14 @@ export function InviteByNick({
   useEffect(() => {
     if (!open) return;
     const query = q.trim();
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (query.length < 2) {
         startSearch(() => setResults(null));
         return;
       }
       startSearch(async () => setResults(await searchInvitees(query)));
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [q, open]);
 
   const invite = (p: InviteCandidate) =>
@@ -64,27 +66,27 @@ export function InviteByNick({
   return (
     <>
       <Button size={size} variant={variant} icon={<UserPlus />} onClick={() => setOpen(true)}>
-        {label ?? (coach ? "Пригласить тренера" : "Пригласить по нику")}
+        {label ?? (coach ? t("Пригласить тренера") : t("Пригласить по нику"))}
       </Button>
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
-        title={coach ? "Пригласить тренера" : "Пригласить игрока по нику"}
+        title={coach ? t("Пригласить тренера") : t("Пригласить игрока по нику")}
         description={
           coach
-            ? "Тренер не играет и не входит в 5 + 2, но указывается в заявках на турниры. Он может тренировать и другие команды."
-            : "Игрок должен быть зарегистрирован на сайте (вход через Steam). Он получит уведомление и подтвердит вступление."
+            ? t("Тренер не играет и не входит в 5 + 2, но указывается в заявках на турниры. Он может тренировать и другие команды.")
+            : t("Игрок должен быть зарегистрирован на сайте (вход через Steam). Он получит уведомление и подтвердит вступление.")
         }
       >
-        <SearchInput value={q} onChange={setQ} loading={searching} placeholder="Ник или SteamID64" autoFocus />
+        <SearchInput value={q} onChange={setQ} loading={searching} placeholder={t("Ник или SteamID64")} autoFocus />
         <div className="mt-4 min-h-24">
           {results === null ? (
             <p className="flex items-center gap-2 text-meta text-fg-3">
-              <Search className="size-4" aria-hidden /> Введите хотя бы 2 символа ника.
+              <Search className="size-4" aria-hidden /> {t("Введите хотя бы 2 символа ника.")}
             </p>
           ) : results.length === 0 ? (
             <p className="text-meta text-fg-3">
-              Никого не нашли. Если игрок ещё не заходил на сайт — отправьте ему ссылку-приглашение.
+              {t("Никого не нашли. Если игрок ещё не заходил на сайт — отправьте ему ссылку-приглашение.")}
             </p>
           ) : (
             <ul className="divide-y divide-line-subtle">
@@ -98,12 +100,12 @@ export function InviteByNick({
                         name={p.nickname}
                         avatar={p.avatar_url}
                         size="md"
-                        meta={p.team ? `В команде ${p.team}` : "Без команды"}
+                        meta={p.team ? t("В команде {name}", { name: p.team }) : t("Без команды")}
                         trailing={<FaceitLevel level={p.faceit_level} />}
                       />
                     </div>
                     <Button size="sm" variant={done ? "ghost" : "primary"} disabled={busy || done || sending} onClick={() => invite(p)}>
-                      {done ? "Отправлено" : busy ? "Занят" : "Пригласить"}
+                      {done ? t("Отправлено") : busy ? t("Занят") : t("Пригласить")}
                     </Button>
                   </li>
                 );

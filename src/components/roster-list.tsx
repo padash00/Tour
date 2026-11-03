@@ -1,5 +1,7 @@
 import type { Player } from "@/lib/types";
 import { FaceitLevel, PlayerIdentity } from "@/components/ds";
+import { tr } from "@/lib/i18n/core";
+import { getT } from "@/lib/i18n/server";
 
 export type RosterItem = {
   key: string;
@@ -8,10 +10,11 @@ export type RosterItem = {
   extra?: React.ReactNode;
 };
 
-const roleLabel = { captain: "Капитан", main: "Основа", sub: "Запасной" };
+const roleLabel = { captain: tr("Капитан"), main: tr("Основа"), sub: tr("Запасной") };
 
 /** Состав матча: те же player primitives, что Team HQ и Lobby. */
-export function RosterList({ items, slots }: { items: RosterItem[]; slots?: number }) {
+export async function RosterList({ items, slots }: { items: RosterItem[]; slots?: number }) {
+  const t = await getT();
   const empty = Math.max(0, (slots ?? 0) - items.length);
   return (
     <div className="divide-y divide-line-subtle">
@@ -23,7 +26,7 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
             href={`/players/${it.player.steam_id}`}
             size="md"
             captain={it.role === "captain"}
-            meta={it.player.is_banned ? <span className="text-danger">Заблокирован</span> : roleLabel[it.role]}
+            meta={it.player.is_banned ? <span className="text-danger">{t("Заблокирован")}</span> : t(roleLabel[it.role])}
             trailing={
               <div className="flex items-center gap-3">
                 <FaceitLevel level={it.player.faceit_level} />
@@ -37,7 +40,7 @@ export function RosterList({ items, slots }: { items: RosterItem[]; slots?: numb
       {Array.from({ length: empty }, (_, i) => (
         <div key={`empty-${i}`} className="flex min-h-16 items-center gap-3 py-3 text-fg-3">
           <div className="size-10 shrink-0 rounded-full border border-dashed border-line" />
-          <span className="text-[14px]">Свободный слот</span>
+          <span className="text-[14px]">{t("Свободный слот")}</span>
         </div>
       ))}
     </div>

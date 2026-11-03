@@ -3,6 +3,8 @@ import { audit } from "./audit";
 import { dedupeOrganizations, SEED_ORGANIZATIONS } from "./organizations";
 import { isProfileComplete } from "./profile";
 import { db } from "./supabase";
+import { tr } from "./i18n/core";
+import { getT } from "./i18n/server";
 import type { Json } from "./database.types";
 import type { Player, PlayerProfile } from "./types";
 
@@ -35,12 +37,12 @@ export async function isProfileRequired(): Promise<boolean> {
   }
 }
 
-export const PROFILE_REQUIRED_ERROR = "Сначала заполните анкету игрока — это займёт минуту";
+export const PROFILE_REQUIRED_ERROR = tr("Сначала заполните анкету игрока — это займёт минуту");
 
 /** null — можно продолжать; иначе текст ошибки для формы (создать/вступить в команду, подать заявку) */
 export async function profileGateError(player: Pick<Player, "id">): Promise<string | null> {
   if (!(await isProfileRequired())) return null;
-  return isProfileComplete(await getProfile(player.id)) ? null : PROFILE_REQUIRED_ERROR;
+  return isProfileComplete(await getProfile(player.id)) ? null : (await getT())(PROFILE_REQUIRED_ERROR);
 }
 
 /** Нужно ли показать игроку стену «заполните анкету» на странице команды/заявки */

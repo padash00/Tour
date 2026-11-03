@@ -7,6 +7,7 @@ import { ClientFilter } from "@/components/public/client-filter";
 import { TeamCta } from "@/components/public/team-cta";
 import { TeamsNav } from "@/components/team/teams-nav";
 import { Container, EmptyState, PageTitle, TeamLogo } from "@/components/ds";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Команды",
@@ -17,11 +18,8 @@ export const metadata: Metadata = {
 // поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
 export const dynamic = "force-dynamic";
 
-const plural = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "команда" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "команды" : "команд");
-
-const playersWord = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? "игрок" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "игрока" : "игроков");
-
 export default async function TeamsPage(props: PageProps<"/teams">) {
+  const tx = await getT();
   const sort = parseTeamSort(await props.searchParams);
   const teams = sortTeams(await listTeams(), sort.key, sort.dir);
   const arrow = (k: TeamSortKey) => (sort.key === k ? (sort.dir === "asc" ? " ↑" : " ↓") : "");
@@ -36,8 +34,8 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
     <Container className="pt-8 sm:pt-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <PageTitle>Команды</PageTitle>
-          <p className="mt-1 text-meta text-fg-3">{teams.length ? `${teams.length} ${plural(teams.length)} на платформе` : "Пока ни одной команды"}</p>
+          <PageTitle>{tx("Команды")}</PageTitle>
+          <p className="mt-1 text-meta text-fg-3">{teams.length ? tx("{count} на платформе", { count: `${teams.length} ${tx.plural(teams.length, "команда", "команды", "команд")}` }) : tx("Пока ни одной команды")}</p>
         </div>
         <TeamCta />
       </header>
@@ -47,19 +45,19 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
 
       <div className="pt-8">
         {teams.length === 0 ? (
-          <EmptyState icon={<Users />} title="Команд пока нет" text="Станьте первой командой на платформе — создание займёт минуту." action={<TeamCta />} />
+          <EmptyState icon={<Users />} title={tx("Команд пока нет")} text={tx("Станьте первой командой на платформе — создание займёт минуту.")} action={<TeamCta />} />
         ) : (
           <>
-            <ClientFilter scope="teams" placeholder="Поиск по названию или тегу" className="mb-5" />
+            <ClientFilter scope="teams" placeholder={tx("Поиск по названию или тегу")} className="mb-5" />
             <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface" data-filter-scope="teams">
               <p data-filter-empty hidden className="px-5 py-8 text-[14px] text-fg-3">
-                Ничего не найдено — попробуйте другое название или тег.
+                {tx("Ничего не найдено — попробуйте другое название или тег.")}
               </p>
               <div className="hidden grid-cols-[minmax(0,1fr)_180px_90px_100px_20px] gap-4 border-b border-line-subtle px-5 py-3 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3 sm:grid">
-                {head("name", "Команда")}
-                {head("region", "Регион")}
-                {head("players", "Игроки", true)}
-                {head("elo", "ELO основы", true)}
+                {head("name", tx("Команда"))}
+                {head("region", tx("Регион"))}
+                {head("players", tx("Игроки"), true)}
+                {head("elo", tx("ELO основы"), true)}
                 <span />
               </div>
               <div className="divide-y divide-line-subtle">
@@ -80,7 +78,7 @@ export default async function TeamsPage(props: PageProps<"/teams">) {
                     <span className="hidden truncate text-[14px] text-fg-2 sm:block">{t.region ?? "—"}</span>
                     <span className="num text-right text-[14px] text-fg-2">
                       {t.member_count}
-                      <span className="text-fg-3 sm:hidden"> {playersWord(t.member_count)}</span>
+                      <span className="text-fg-3 sm:hidden"> {tx.plural(t.member_count, "игрок", "игрока", "игроков")}</span>
                     </span>
                     <span className="num hidden text-right text-[14px] text-fg-2 sm:block">{t.avg_elo ?? "—"}</span>
                     <ChevronRight className="hidden size-4 text-fg-4 group-hover:text-fg-2 sm:block" aria-hidden />

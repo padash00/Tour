@@ -7,6 +7,7 @@ import type { PlayerAgg, TeamStatRow } from "@/lib/stats";
 import { Avatar, TeamLogo, cn } from "@/components/ds";
 import { DATA_TABLE, NUM_CELL, RankBadge } from "./public/data-table";
 import { fmt, swingColor } from "./stats-format";
+import { useT } from "@/lib/i18n/client";
 
 type Row = PlayerAgg & {
   team?: { name: string; tag: string } | null;
@@ -46,13 +47,14 @@ function SortTh({
   left?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const active = sort.key === k;
   return (
     <th className={cn(!left && "!text-right", className)} aria-sort={active ? (sort.dir === -1 ? "descending" : "ascending") : undefined}>
       <button
         type="button"
         onClick={() => onSort(k)}
-        title={title ?? "Сортировать"}
+        title={title ?? t("Сортировать")}
         className={cn(
           "inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-fg",
           active && "text-fg-2",
@@ -130,6 +132,7 @@ export function PlayerStatsTable({
   /** лучший игрок (MVP) — звёздочка у ника */
   mvpSteamId?: string | null;
 }) {
+  const t = useT();
   // MatchZy присылает KAST и первые убийства не всегда — пустые колонки не показываем
   const showKast = rows.some((p) => p.kastRounds > 0);
   const showSwing = rows.some((p) => p.swing != null);
@@ -157,17 +160,17 @@ export function PlayerStatsTable({
         <thead>
           <tr>
             {rank && <th className="w-12">#</th>}
-            <th>Игрок</th>
-            {!compact && th("maps", "Карты")}
-            {th("diff", "У–С", "Убийства – смерти (сортировка по разнице)")}
-            {th("diff", "±", "Убийства минус смерти")}
-            {th("adr", "Урон/р", "Средний урон за раунд (ADR)")}
-            {showKast && th("kast", "KAST", "Доля раундов с убийством, ассистом, выживанием или разменом")}
-            {!compact && th("hs", "HS", "Доля убийств в голову", wide)}
-            {showEntry && th("entry", "Entry", "Первые убийства / первые смерти раунда", wide)}
-            {showClutch && th("clutch", "Клатчи", "Выигранные клатчи", wide)}
-            {showSwing && th("swing", "Swing", "Средний вклад в шанс победы раунда")}
-            {th("rating", "Рейтинг", "F16 Rating: больше — лучше, средний игрок ~1.00")}
+            <th>{t("Игрок")}</th>
+            {!compact && th("maps", t("Карты"))}
+            {th("diff", t("У–С"), t("Убийства – смерти (сортировка по разнице)"))}
+            {th("diff", "±", t("Убийства минус смерти"))}
+            {th("adr", t("Урон/р"), t("Средний урон за раунд (ADR)"))}
+            {showKast && th("kast", "KAST", t("Доля раундов с убийством, ассистом, выживанием или разменом"))}
+            {!compact && th("hs", "HS", t("Доля убийств в голову"), wide)}
+            {showEntry && th("entry", "Entry", t("Первые убийства / первые смерти раунда"), wide)}
+            {showClutch && th("clutch", t("Клатчи"), t("Выигранные клатчи"), wide)}
+            {showSwing && th("swing", "Swing", t("Средний вклад в шанс победы раунда"))}
+            {th("rating", t("Рейтинг"), t("F16 Rating: больше — лучше, средний игрок ~1.00"))}
           </tr>
         </thead>
         <tbody>
@@ -180,8 +183,8 @@ export function PlayerStatsTable({
                 <span className="min-w-0">
                   <span className="flex items-center gap-1.5">
                     <span className={cn("truncate font-semibold text-fg", compact ? "max-w-[110px] xl:max-w-[150px]" : "max-w-[180px]")}>{nick}</span>
-                    {mvpSteamId === p.steam_id && <Star className="size-3.5 shrink-0 fill-gold text-gold" aria-label="Лучший игрок команды" />}
-                    {me(p.steam_id) && <span className="shrink-0 rounded-full bg-accent-dim px-1.5 text-[11px] font-bold text-accent">это вы</span>}
+                    {mvpSteamId === p.steam_id && <Star className="size-3.5 shrink-0 fill-gold text-gold" aria-label={t("Лучший игрок команды")} />}
+                    {me(p.steam_id) && <span className="shrink-0 rounded-full bg-accent-dim px-1.5 text-[11px] font-bold text-accent">{t("это вы")}</span>}
                   </span>
                   {teamLine && p.team && <span className="block max-w-[200px] truncate text-[12.5px] leading-tight text-fg-3">{p.team.name}</span>}
                 </span>
@@ -204,7 +207,7 @@ export function PlayerStatsTable({
                   )}
                 </td>
                 {!compact && <td className={NUM_CELL}>{p.maps}</td>}
-                <td className={cn(NUM_CELL, "whitespace-nowrap text-fg")} title={`${p.assists} ассист.`}>
+                <td className={cn(NUM_CELL, "whitespace-nowrap text-fg")} title={t("{n} ассист.", { n: p.assists })}>
                   {p.kills}
                   <span className="text-fg-4">–</span>
                   {p.deaths}
@@ -248,6 +251,7 @@ const TEAM_COLS: Record<string, (t: TeamStatRow) => number> = {
 
 /** Статистика команд турнира: результаты серий и карт, раунды, и сумма по игрокам — K/D, ADR, HS */
 export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boolean }) {
+  const tx = useT();
   const pm = (n: number) => (n > 0 ? `+${n}` : String(n));
   // по умолчанию — порядок с сервера (победы → карты → раунды); сортировка стабильная, он сохраняется при равенстве
   const { sorted, sort, toggle } = useSort(rows, TEAM_COLS, "wins");
@@ -262,17 +266,17 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
         <thead>
           <tr>
             <th className="w-14">#</th>
-            <th>{solo ? "Участник" : "Команда"}</th>
-            {th("matches", "Матчи")}
-            {th("wins", "В–П", "Победы и поражения в матчах")}
-            {th("maps", "Карты", "Выигранные и проигранные карты")}
-            {th("rounds", "Раунды", "Выигранные и проигранные раунды")}
-            {th("roundPct", "% раундов", "Доля выигранных раундов")}
-            {th("kills", "K", "Убийства")}
-            {th("deaths", "D", "Смерти")}
+            <th>{solo ? tx("Участник") : tx("Команда")}</th>
+            {th("matches", tx("Матчи"))}
+            {th("wins", tx("В–П"), tx("Победы и поражения в матчах"))}
+            {th("maps", tx("Карты"), tx("Выигранные и проигранные карты"))}
+            {th("rounds", tx("Раунды"), tx("Выигранные и проигранные раунды"))}
+            {th("roundPct", tx("% раундов"), tx("Доля выигранных раундов"))}
+            {th("kills", "K", tx("Убийства"))}
+            {th("deaths", "D", tx("Смерти"))}
             {th("kd", "K/D")}
-            {th("adr", "ADR", "Средний урон за раунд на игрока")}
-            {th("hs", "HS", "Доля убийств в голову")}
+            {th("adr", "ADR", tx("Средний урон за раунд на игрока"))}
+            {th("hs", "HS", tx("Доля убийств в голову"))}
           </tr>
         </thead>
         <tbody>
@@ -317,39 +321,35 @@ export function TeamStatsTable({ rows, solo }: { rows: TeamStatRow[]; solo?: boo
 }
 
 export function RatingExplainer() {
+  const t = useT();
   return (
     <details className="group rounded-surface border border-line-subtle bg-surface px-6 lg:px-8">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-[15px] font-semibold text-fg-2 transition-colors hover:text-fg focus-visible:outline-none">
-        Как считаются F16 Rating, Swing и MVP
+        {t("Как считаются F16 Rating, Swing и MVP")}
         <span className="grid size-8 place-items-center rounded-full border border-line text-fg-3 transition-transform duration-200 group-open:rotate-45">
           +
         </span>
       </summary>
       <div className="max-w-[760px] space-y-3 pb-7 text-[14px] leading-relaxed text-fg-2">
         <p>
-          F16 Rating v1 зафиксирован до начала турниров. Основа — открытая формула в духе HLTV Rating 2.0, вклад
-          в раунды расширен входами, клатчами, мультикиллами и трейдами. Средний игрок — около 1.00.
+          {t("F16 Rating v1 зафиксирован до начала турниров. Основа — открытая формула в духе HLTV Rating 2.0, вклад в раунды расширен входами, клатчами, мультикиллами и трейдами. Средний игрок — около 1.00.")}
         </p>
         <pre className="num overflow-x-auto rounded-control border border-line-subtle bg-shell p-4 text-[12px] text-fg-2">
 {`Impact = 2.13·KPR + 0.42·APR − 0.41
-       + (первые убийства − первые смерти) / раунды
-       + 1.5 · выигранные клатчи / раунды
-       + (0.25·2K + 0.5·3K + 4K + 2·5K) / раунды
-       + 0.5 · трейды / раунды
+       + (${t("первые убийства")} − ${t("первые смерти")}) / ${t("раунды")}
+       + 1.5 · ${t("выигранные клатчи")} / ${t("раунды")}
+       + (0.25·2K + 0.5·3K + 4K + 2·5K) / ${t("раунды")}
+       + 0.5 · ${t("трейды")} / ${t("раунды")}
 
 Rating = 0.0073·KAST% + 0.3591·KPR − 0.5329·DPR
        + 0.2372·Impact + 0.0032·ADR + 0.1587`}
         </pre>
         <p className="pt-2 font-semibold text-fg">Swing</p>
         <p>
-          Swing — средний вклад игрока в шанс команды выиграть раунд, в процентных пунктах за раунд. Каждое событие
-          меняет вероятность победы: убийство (убийце +Δ, при ассисте 75/25), смерть (−Δ), плент, дефьюз. Остаток до
-          исхода раунда делится между выжившими. Шанс победы считается по числу живых с каждой стороны и состоянию
-          бомбы (модель v1; откалибруем на собственных раундах F16).
+          {t("Swing — средний вклад игрока в шанс команды выиграть раунд, в процентных пунктах за раунд. Каждое событие меняет вероятность победы: убийство (убийце +Δ, при ассисте 75/25), смерть (−Δ), плент, дефьюз. Остаток до исхода раунда делится между выжившими. Шанс победы считается по числу живых с каждой стороны и состоянию бомбы (модель v1; откалибруем на собственных раундах F16).")}
         </p>
         <p>
-          <span className="text-fg">MVP турнира</span> — лучший Swing среди игроков, сыгравших не меньше половины
-          карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.
+          {t.rich("<b>MVP турнира</b> — лучший Swing среди игроков, сыгравших не меньше половины карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.", { b: (c) => <span className="text-fg">{c}</span> })}
         </p>
       </div>
     </details>
