@@ -29,6 +29,7 @@ export type TgMessage = {
   sender_chat?: { id: number; type: string; title?: string };
   reply_to_message?: TgMessage;
   new_chat_members?: TgUser[];
+  left_chat_member?: TgUser;
   forward_origin?: { type: string; chat?: { type: string } };
   forward_from_chat?: { type: string };
   photo?: unknown[];
@@ -289,7 +290,12 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
 
 /** Сообщение (новое или изменённое) в общем чате. Ничего не бросает наружу. */
 export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null) {
-  if (msg.new_chat_members?.length) return onNewMembers(token, msg);
+  // служебные «X теперь в группе» / «X покинул группу» — убираем, чтобы не засоряли чат
+  if (msg.new_chat_members?.length || msg.left_chat_member) {
+    await del(token, msg.chat.id, msg.message_id);
+    if (msg.new_chat_members?.length) await onNewMembers(token, msg);
+    return;
+  }
   const text = msg.text ?? msg.caption ?? "";
   // анонимный админ пишет от имени группы (from — служебный бот) — команды выполняем, остальное не трогаем
   if (msg.sender_chat?.id === msg.chat.id) {
