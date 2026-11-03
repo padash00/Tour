@@ -81,7 +81,7 @@ export async function refreshPlayers(rows: Row[]): Promise<{ steam: number; face
   const faceit = new Map<string, Awaited<ReturnType<typeof fetchFaceitBySteamId>>>();
   for (let i = 0; i < rows.length; i += 3) {
     await Promise.all(
-      rows.slice(i, i + 3).map(async (r) => faceit.set(r.steam_id, await withTimeout(fetchFaceitBySteamId(r.steam_id), null))),
+      rows.slice(i, i + 3).map(async (r) => faceit.set(r.steam_id, await withTimeout(fetchFaceitBySteamId(r.steam_id), null, 2 * TIMEOUT_MS))),
     );
   }
 

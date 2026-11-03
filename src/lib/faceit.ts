@@ -20,12 +20,39 @@ export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfi
     if (!res.ok) return null;
     const p = await res.json();
     const cs2 = p?.games?.cs2;
-    return {
-      id: p.player_id,
-      nickname: p.nickname,
-      level: cs2?.skill_level ?? null,
-      elo: cs2?.faceit_elo ?? null,
-    };
+    let level: number | null = typeof cs2?.skill_level === "number" && cs2.skill_level > 0 ? cs2.skill_level : null;
+    let elo: number | null = typeof cs2?.faceit_elo === "number" && cs2.faceit_elo > 0 ? cs2.faceit_elo : null;
+    // Без калибровки FACEIT отдаёт стартовые 1000 ELO (4 уровень) — это не рейтинг игрока.
+    // Проверяем число сыгранных матчей CS2: 0 — ELO и уровень не показываем.
+    if (elo != null && p.player_id) {
+      const matches = await faceitMatchCount(p.player_id, key);
+      if (matches === 0 || (matches == null && elo === UNCALIBRATED_ELO)) {
+        elo = null;
+        level = null;
+      }
+    }
+    return { id: p.player_id, nickname: p.nickname, level, elo };
+  } catch {
+    return null;
+  }
+}
+
+/** Стартовый ELO FACEIT CS2 до калибровки */
+export const UNCALIBRATED_ELO = 1000;
+
+/** Сколько матчей CS2 сыграно на FACEIT; null — не удалось узнать */
+async function faceitMatchCount(playerId: string, key: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://open.faceit.com/data/v4/players/${playerId}/stats/cs2`, {
+      headers: { Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.status === 404) return 0; // статистики по CS2 нет — ни одного матча
+    if (!res.ok) return null;
+    const s = await res.json();
+    const n = Number(s?.lifetime?.Matches ?? s?.lifetime?.matches);
+    return Number.isFinite(n) ? n : null;
   } catch {
     return null;
   }
