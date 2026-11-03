@@ -235,3 +235,65 @@ export async function toggleMapEnabled(_prev: ActionResult, formData: FormData):
   revalidatePath("/admin/tournaments", "layout");
   return { success: enabled ? "Карта доступна в турнирах" : "Карта скрыта из выбора" };
 }
+
+// ── наблюдатели трансляции: список SteamID в OBSERVER_STEAM_IDS (через запятую)
+
+async function observerList(): Promise<string[]> {
+  const { data } = await db().from("app_settings").select("value").eq("key", "OBSERVER_STEAM_IDS").maybeSingle();
+  return String(data?.value ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^\d{17}$/.test(s));
+}
+
+async function saveObservers(ids: string[], adminId: string) {
+  if (!ids.length) return db().from("app_settings").delete().eq("key", "OBSERVER_STEAM_IDS");
+  return db().from("app_settings").upsert({ key: "OBSERVER_STEAM_IDS", value: ids.join(","), updated_by: adminId, updated_at: new Date().toISOString() });
+}
+
+/** SteamID64 из числа или ссылки: /profiles/7656…, /id/ник (через Steam API), steamid.io и т. п. */
+async function resolveSteamId(raw: string): Promise<string | null> {
+  const direct = /(7656119\d{10})/.exec(raw)?.[1];
+  if (direct) return direct;
+  const vanity = /steamcommunity\.com\/id\/([\w-]+)/i.exec(raw)?.[1] ?? (/^[\w-]{2,32}$/.test(raw.trim()) ? raw.trim() : null);
+  if (!vanity) return null;
+  const { data } = await db().from("app_settings").select("value").eq("key", "STEAM_API_KEY").maybeSingle();
+  const key = data?.value || process.env.STEAM_API_KEY;
+  if (!key) return null;
+  try {
+    const r = await fetch(`https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?key=${key}&vanityurl=${encodeURIComponent(vanity)}`, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    const j = (await r.json()) as { response?: { success?: number; steamid?: string } };
+    return j.response?.success === 1 && j.response.steamid ? j.response.steamid : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function addObserver(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const raw = String(formData.get("steam") ?? "").trim();
+  if (!raw) return { error: "Вставьте SteamID или ссылку на профиль Steam" };
+  const id = await resolveSteamId(raw);
+  if (!id) return { error: "Не нашёл аккаунт: нужен SteamID64 (17 цифр) или ссылка steamcommunity.com/profiles/… или /id/…" };
+  const list = await observerList();
+  if (list.includes(id)) return { error: "Этот аккаунт уже в наблюдателях" };
+  if (list.length >= 20) return { error: "Не больше 20 наблюдателей" };
+  const { error } = await saveObservers([...list, id], admin.id);
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.observer_add", undefined, { steam_id: id });
+  revalidatePath("/admin/settings");
+  return { success: `Наблюдатель добавлен: ${id}` };
+}
+
+export async function removeObserver(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("steamId") ?? "");
+  const list = await observerList();
+  if (!list.includes(id)) return { error: "Его уже нет в списке" };
+  const { error } = await saveObservers(list.filter((x) => x !== id), admin.id);
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, "settings.observer_remove", undefined, { steam_id: id });
+  revalidatePath("/admin/settings");
+  return { success: "Наблюдатель убран" };
+}
+

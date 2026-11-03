@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { editWorkshopMaps, saveSetting, saveSkinParts, saveSkinsMenu, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
+import { addObserver, editWorkshopMaps, removeObserver, saveSetting, saveSkinParts, saveSkinsMenu, setProfileRequired, setServerOpenJoin, setServerSkins } from "@/app/actions/admin-settings";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { isProfileRequired } from "@/lib/profiles";
 import { getServerState, workshopInfo } from "@/lib/server-control";
@@ -14,6 +14,7 @@ import { MapCard } from "@/components/admin/map-card";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ADMIN_CARD, AdminHeader, Dot, Panel } from "@/components/admin/control";
 import { requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/supabase";
 
 export const metadata: Metadata = { title: "Настройки — F16 Control" };
 
@@ -32,7 +33,6 @@ type TabKey = (typeof TABS)[number]["key"];
 const TAB_SETTING: Partial<Record<TabKey, SettingKey>> = {
   steam: "STEAM_API_KEY",
   faceit: "FACEIT_API_KEY",
-  broadcast: "OBSERVER_STEAM_IDS",
   servers: "PLAYER_IP",
 };
 
@@ -347,11 +347,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
 
       {tab === "servers" && <ServersInfo />}
 
-      {tab === "broadcast" && (
-        <p className="text-[14px] text-fg-3 max-w-2xl">
-          Аккаунты наблюдателей заходят на сервер любого матча как зрители — для трансляции с ПК 801–805.
-        </p>
-      )}
+      {tab === "broadcast" && <ObserversBlock />}
 
       {tab === "security" && (
         <div className="space-y-6 max-w-2xl">
@@ -416,3 +412,56 @@ async function ServersInfo() {
     </div>
   );
 }
+
+/** Наблюдатели трансляции: список с ником и кнопкой «Убрать», добавление по одному (SteamID или ссылка) */
+async function ObserversBlock() {
+  const { data } = await db().from("app_settings").select("value").eq("key", "OBSERVER_STEAM_IDS").maybeSingle();
+  const ids = String(data?.value ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => /^\d{17}$/.test(s));
+  const { data: known } = ids.length ? await db().from("players").select("steam_id, nickname, avatar_url").in("steam_id", ids) : { data: [] };
+  const byId = new Map((known ?? []).map((p) => [p.steam_id, p]));
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className={`${ADMIN_CARD} p-5`}>
+        <div className="text-[16px] font-bold text-fg">Наблюдатели ({ids.length})</div>
+        <p className="mt-1 text-[13.5px] text-fg-3">
+          Заходят на сервер любого матча и лобби зрителями — для трансляции с ПК 801–805. Один аккаунт — один ПК. Изменения действуют с
+          следующего матча.
+        </p>
+        {ids.length === 0 ? (
+          <p className="mt-4 text-[14px] text-fg-3">Пока никого.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-line-subtle">
+            {ids.map((id, i) => {
+              const p = byId.get(id);
+              return (
+                <li key={id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="font-semibold text-fg">F16 Observer {i + 1}</span>
+                    <span className="text-fg-3"> · {p?.nickname ?? "не входил на сайт"}</span>
+                    <a href={`https://steamcommunity.com/profiles/${id}`} target="_blank" rel="noreferrer" className="num ml-2 text-[13px] text-accent hover:underline">
+                      {id}
+                    </a>
+                  </span>
+                  <ActionForm action={removeObserver} inline>
+                    <input type="hidden" name="steamId" value={id} />
+                    <SubmitButton variant="secondary" size="sm" confirm={`Убрать наблюдателя ${p?.nickname ?? id}?`}>
+                      Убрать
+                    </SubmitButton>
+                  </ActionForm>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <ActionForm action={addObserver} className="mt-4 flex flex-wrap gap-2 border-t border-line-subtle pt-4">
+          <input name="steam" placeholder="SteamID или ссылка на профиль Steam" className="field min-w-[260px] flex-1" autoComplete="off" />
+          <SubmitButton>Добавить</SubmitButton>
+        </ActionForm>
+      </div>
+    </div>
+  );
+}
+
