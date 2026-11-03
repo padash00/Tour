@@ -13,6 +13,7 @@ import { fromLocalInput } from "@/lib/format";
 import { closeMatchesOfEndedTournaments, enqueueCommand, enqueuePrefetch } from "@/lib/server-control";
 import { slugify } from "@/lib/maps";
 import { db } from "@/lib/supabase";
+import type { TournamentKk } from "@/lib/tournament-kk";
 import type { PrizeRow, RegistrationStatus, TournamentStatus } from "@/lib/types";
 import type { ActionResult } from "@/components/forms";
 
@@ -69,6 +70,12 @@ const tournamentSchema = z.object({
   description: z.string().trim().max(4000).optional().default(""),
   requirements: z.string().trim().max(4000).optional().default(""),
   rules: z.string().trim().max(20000).optional().default(""),
+  // казахская версия текстов для страниц на казахском (блок «Қазақша»)
+  kk_description: z.string().trim().max(4000).optional().default(""),
+  kk_requirements: z.string().trim().max(4000).optional().default(""),
+  kk_rules: z.string().trim().max(20000).optional().default(""),
+  kk_prize_pool: z.string().trim().max(60).optional().default(""),
+  kk_prizes: z.string().max(2000).optional().default(""),
   third_place_match: z.string().optional(),
   // официальный турнир: возраст, город, тренер, запасные
   is_official: z.string().optional(),
@@ -169,6 +176,19 @@ function parseSponsors(raw: string) {
   }
 }
 
+/** Блок «Қазақша» → tournaments.kk: только заполненное; призы — по строке на место, в порядке мест */
+function kkTexts(data: z.infer<typeof tournamentSchema>): TournamentKk {
+  const prizes = data.kk_prizes.split("\n").map((line) => line.trim().slice(0, 200));
+  while (prizes.length && !prizes[prizes.length - 1]) prizes.pop();
+  return {
+    ...(data.kk_description && { description: data.kk_description }),
+    ...(data.kk_requirements && { requirements: data.kk_requirements }),
+    ...(data.kk_rules && { rules: data.kk_rules }),
+    ...(data.kk_prize_pool && { prize_pool: data.kk_prize_pool }),
+    ...(prizes.length && { prizes: prizes.slice(0, 20) }),
+  };
+}
+
 function tournamentRow(data: z.infer<typeof tournamentSchema>) {
   return {
     name: data.name,
@@ -209,6 +229,7 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     description: data.description || null,
     requirements: data.requirements || null,
     rules: syncFormatInRules(data.rules, data) || null,
+    kk: kkTexts(data),
     starts_at: fromLocalInput(data.starts_at),
     registration_opens_at: fromLocalInput(data.registration_opens_at),
     registration_closes_at: fromLocalInput(data.registration_closes_at),

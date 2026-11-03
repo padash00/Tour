@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getT } from "@/lib/i18n/server";
 import { notFound } from "next/navigation";
 import { getTournamentBySlug } from "@/lib/data";
 import { getMatchRosters, getStandings, getTournamentMatches } from "@/lib/matches";
@@ -16,7 +17,8 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]/tv">): Promise<Metadata> {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
-  return { title: t ? `${t.name} — режим ТВ` : "Режим ТВ", robots: { index: false } };
+  const tx = await getT();
+  return { title: t ? tx("{name} — режим ТВ", { name: t.name }) : tx("Режим ТВ"), robots: { index: false } };
 }
 
 /** Режим ТВ турнира: открыть на ПК у телевизора/проектора и нажать F11 */

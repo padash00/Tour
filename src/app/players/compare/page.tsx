@@ -13,7 +13,10 @@ import { getT } from "@/lib/i18n/server";
 const WRAP = "mx-auto w-full max-w-wide px-4 sm:px-6 lg:px-8";
 const CARD = "rounded-surface border border-line-subtle bg-surface";
 
-export const metadata: Metadata = { title: "Сравнение игроков", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Сравнение игроков"), robots: { index: false } };
+}
 
 /*
  * Два игрока рядом: рейтинг, K/D, ADR, KAST, HS, Swing, лучшие карты, оружие, личные встречи.

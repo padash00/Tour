@@ -42,12 +42,13 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/teams/[tag]">): Promise<Metadata> {
   const { tag } = await props.params;
   const team = await getTeamByTag(decodeURIComponent(tag));
-  if (!team) return { title: "Команда" };
+  const t = await getT();
+  if (!team) return { title: t("Команда") };
   const description = snippet(
     `${team.name} [${team.tag}] — команда по CS2${team.region ? ` из ${team.region}` : ""} на F16 Arena: состав, матчи, турниры и статистика игроков.${team.description ? ` ${team.description}` : ""}`,
   );
   return {
-    title: `${team.name} [${team.tag}] — команда CS2`,
+    title: t("{team} — команда CS2", { team: `${team.name} [${team.tag}]` }),
     description,
     alternates: { canonical: `/teams/${encodeURIComponent(team.tag)}` },
     openGraph: { title: team.name, description, ...(team.logo_url ? { images: [{ url: team.logo_url }] } : {}) },

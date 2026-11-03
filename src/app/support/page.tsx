@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
+import { getT } from "@/lib/i18n/server";
 import { redirect } from "next/navigation";
 import { requirePlayer } from "@/lib/auth";
 import { supportPlayerId } from "@/lib/support";
 
-export const metadata: Metadata = { title: "Поддержка", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Поддержка"), robots: { index: false } };
+}
 export const dynamic = "force-dynamic";
 
 /** «Поддержка» — личная переписка с администратором (аккаунт из настройки SUPPORT_PLAYER_ID) */

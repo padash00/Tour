@@ -12,7 +12,10 @@ import { HelpHint } from "@/components/help-hint";
 import { TeamOfferCard } from "@/components/team/team-offer";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Приглашение в команду", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Приглашение в команду"), robots: { index: false } };
+}
 
 export default async function JoinPage(props: PageProps<"/join/[code]">) {
   const t = await getT();

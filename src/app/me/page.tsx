@@ -41,7 +41,10 @@ import {
   type Tone,
 } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Моя игра", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Моя игра"), robots: { index: false } };
+}
 
 /** Блок «Текущее действие»: одно состояние, всегда с ответом «что дальше» */
 type Current = {

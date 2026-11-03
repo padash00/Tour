@@ -7,6 +7,7 @@ import type { MatchWithTeams } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
 import { tr, type T } from "@/lib/i18n/core";
 import { getT } from "@/lib/i18n/server";
+import { tournamentForLang } from "@/lib/tournament-kk";
 import type { Tournament } from "@/lib/types";
 import { Button, CARD_SECTION, Container, Status, cn, tournamentStatus } from "@/components/ds";
 import { HomeMyMatch } from "./home-my-match";
@@ -65,7 +66,7 @@ function MapThumb({ src, className }: { src?: string; className?: string }) {
 // ───────────────────────── ближайший турнир
 
 export function TournamentCard({ t: tour, approved, isFirst, tx }: { t: Tournament; approved: number; isFirst: boolean; tx: T }) {
-  const t = tour;
+  const t = tournamentForLang(tour, tx.lang);
   const mode = modeOf(t.format);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;
   const action =

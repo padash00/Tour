@@ -29,9 +29,14 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+// заголовок вкладки — на языке страницы; описания для поисковиков остаются русскими
+export async function generateMetadata(): Promise<Metadata> {
+  const t = makeT(await getLang());
+  return { ...BASE_METADATA, title: { default: t("Турниры по CS2 в Усть-Каменогорске — F16 Arena"), template: "%s · F16 Arena" } };
+}
+
+const BASE_METADATA: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: "Турниры по CS2 в Усть-Каменогорске — F16 Arena", template: "%s · F16 Arena" },
   description: SITE_DESCRIPTION,
   keywords: SITE_KEYWORDS,
   applicationName: SITE_NAME,

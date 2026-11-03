@@ -50,6 +50,7 @@ import {
 } from "@/components/ds";
 import { Check } from "lucide-react";
 import { groupSponsors } from "@/lib/sponsors";
+import { tournamentForLang } from "@/lib/tournament-kk";
 import { getT } from "@/lib/i18n/server";
 import { tr, type T } from "@/lib/i18n/core";
 
@@ -91,8 +92,10 @@ function Medal({ n }: { n: number }) {
  * «моё участие» (панель, кнопки, требования) — клиентские острова из tournament-viewer.
  * Структура: шапка турнира → липкие вкладки (ClientTabs, мгновенные) → содержимое.
  */
-export async function TournamentView({ t }: { t: Tournament }) {
+export async function TournamentView({ t: raw }: { t: Tournament }) {
   const tx = await getT();
+  // по-казахски — регламент, требования и призы из блока «Қазақша» пульта
+  const t = tournamentForLang(raw, tx.lang);
   const finished = t.status === "finished";
   // у завершённого турнира по умолчанию открываются итоги
   const defaultTab = finished ? "recap" : "overview";

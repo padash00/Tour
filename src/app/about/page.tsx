@@ -4,11 +4,14 @@ import { tr } from "@/lib/i18n/core";
 import { Button, Container, Facts, PageTitle, Panel, Region, Section, cn } from "@/components/ds";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "О платформе",
-  description: "F16 Arena — турнирная платформа компьютерного клуба F16 Arena в Усть-Каменогорске: турниры по CS2, лобби, рейтинг и статистика.",
-  alternates: { canonical: "/about" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("О платформе"),
+    description: "F16 Arena — турнирная платформа компьютерного клуба F16 Arena в Усть-Каменогорске: турниры по CS2, лобби, рейтинг и статистика.",
+    alternates: { canonical: "/about" },
+  };
+}
 
 const FACTS = [
   { label: tr("Игра"), value: tr("Counter-Strike 2") },

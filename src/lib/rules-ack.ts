@@ -1,6 +1,8 @@
 import "server-only";
 import { audit } from "./audit";
+import type { Lang } from "./i18n/core";
 import { db } from "./supabase";
+import { tournamentForLang } from "./tournament-kk";
 
 /**
  * Прочтение регламента турнира. Капитан подтверждает его при подаче заявки, остальные игроки поданной команды —
@@ -25,8 +27,8 @@ export async function ackRules(playerId: string, tournamentId: string) {
 
 export type PendingRules = { id: string; name: string; slug: string; rules: string };
 
-/** Первый турнир, где команда игрока подала заявку, а он ещё не подтвердил регламент */
-export async function pendingRulesAck(playerId: string): Promise<PendingRules | null> {
+/** Первый турнир, где команда игрока подала заявку, а он ещё не подтвердил регламент; текст — на языке страницы */
+export async function pendingRulesAck(playerId: string, lang: Lang = "ru"): Promise<PendingRules | null> {
   const { data: mem } = await db().from("team_members").select("team_id").eq("player_id", playerId).is("left_at", null);
   const teamIds = (mem ?? []).map((m) => m.team_id);
   if (!teamIds.length) return null;
@@ -39,7 +41,7 @@ export async function pendingRulesAck(playerId: string): Promise<PendingRules | 
   if (!ids.length) return null;
   const { data: ts } = await db()
     .from("tournaments")
-    .select("id, name, slug, rules, starts_at")
+    .select("id, name, slug, rules, starts_at, kk")
     .in("id", ids)
     .not("status", "in", "(finished,cancelled,draft)")
     .order("starts_at", { ascending: true });
@@ -53,5 +55,5 @@ export async function pendingRulesAck(playerId: string): Promise<PendingRules | 
     .in("entity_id", withRules.map((t) => t.id));
   const done = new Set((acks ?? []).map((a) => a.entity_id));
   const t = withRules.find((x) => !done.has(x.id));
-  return t ? { id: t.id, name: t.name, slug: t.slug, rules: t.rules! } : null;
+  return t ? { id: t.id, name: t.name, slug: t.slug, rules: tournamentForLang({ rules: t.rules, kk: t.kk }, lang).rules! } : null;
 }

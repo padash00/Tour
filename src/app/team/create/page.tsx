@@ -13,7 +13,10 @@ import { RosterStrip } from "@/components/team/roster-strip";
 import { Container, Eyebrow, PageTitle, Panel } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Создать команду", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Создать команду"), robots: { index: false } };
+}
 
 export default async function CreateTeamPage() {
   const t = await getT();

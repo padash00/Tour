@@ -8,6 +8,7 @@ import type { PrizeRow, Tournament } from "@/lib/types";
 import { ActionForm, SubmitButton, type FormAction } from "@/components/forms";
 import { ConfirmModal } from "@/components/modal";
 import { requirementsTemplate, rulesTemplate } from "@/lib/rules-templates";
+import { readKk } from "@/lib/tournament-kk";
 import { buttonClass, cn } from "@/components/ui";
 import { SPONSOR_ROLES, type Sponsor, type SponsorRole } from "@/lib/sponsors";
 import { ADMIN_CARD } from "@/components/admin/control";
@@ -201,6 +202,8 @@ export function TournamentForm({
   const [reqText, setReqText] = useState(t?.requirements ?? "");
   // вставка шаблона поверх своего текста — только после подтверждения
   const [pendingTemplate, setPendingTemplate] = useState<null | "rules" | "requirements">(null);
+  // казахская версия текстов (блок «Қазақша»): поля без состояния, уходят вместе с формой
+  const kkSaved = readKk(t?.kk);
   const [freeEntry, setFreeEntry] = useState(!t?.entry_fee || t.entry_fee === "Бесплатно");
   const [entryFee, setEntryFee] = useState(t?.entry_fee && t.entry_fee !== "Бесплатно" ? t.entry_fee : "");
   const [sponsors, setSponsors] = useState<Sponsor[]>(t?.sponsors ?? []);
@@ -690,6 +693,30 @@ export function TournamentForm({
                   <button type="button" onClick={() => ask("rules")} className={buttonClass("outline", "sm", "-mt-2 !h-11 !px-4 !text-[14.5px]")}>
                     Вставить шаблон регламента · {modeLabel}
                   </button>
+                  <details open={!!(kkSaved.rules || kkSaved.requirements || kkSaved.description)} className="rounded-control border border-line-strong p-5">
+                    <summary className="cursor-pointer text-[16px] font-semibold text-fg">Қазақша — тексты для сайта на казахском</summary>
+                    <Hint>
+                      Сайт по умолчанию открывается на казахском. Что заполнено здесь — игроки увидят вместо русского текста; пустое поле — покажем
+                      русский. «Бесплатно», «1 место» и формат матчей переводятся сами. Если поменяли формат или даты — поправьте и казахский регламент.
+                    </Hint>
+                    <div className="mt-5 space-y-6">
+                      <Field label="Описание (қазақша)">
+                        <textarea name="kk_description" rows={3} defaultValue={kkSaved.description ?? ""} className="field resize-y" />
+                      </Field>
+                      <Field label="Требования к участникам (қазақша)">
+                        <textarea name="kk_requirements" rows={4} defaultValue={kkSaved.requirements ?? ""} className="field resize-y" />
+                      </Field>
+                      <Field label="Регламент (қазақша)">
+                        <textarea name="kk_rules" rows={14} defaultValue={kkSaved.rules ?? ""} className="field resize-y" />
+                      </Field>
+                      <Field label="Призовой фонд (қазақша)" hint="Только если там слова, а не сумма: «Бағалы сыйлықтар».">
+                        <input name="kk_prize_pool" defaultValue={kkSaved.prize_pool ?? ""} className="field" />
+                      </Field>
+                      <Field label="Призы по местам (қазақша)" hint="По строке на место, в том же порядке, что и в разделе «Регистрация». Пустая строка — покажем русский приз.">
+                        <textarea name="kk_prizes" rows={3} defaultValue={(kkSaved.prizes ?? []).join("\n")} className="field resize-y" />
+                      </Field>
+                    </div>
+                  </details>
                   <ConfirmModal
                     open={pendingTemplate !== null}
                     message={

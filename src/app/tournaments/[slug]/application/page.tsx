@@ -12,7 +12,10 @@ import { loadOfficial } from "@/lib/official-data";
 import { auditPersonalView } from "@/lib/profiles";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Заявка — Приложение №1", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Заявка — Приложение №1"), robots: { index: false } };
+}
 export const dynamic = "force-dynamic";
 
 /*

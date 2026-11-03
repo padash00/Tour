@@ -5,6 +5,7 @@ import { computeRoundSwing, parseLogLine, toSteam64, winProbCT, type LogEvent, t
 import { aggregatePlayers, type MapStatRow } from "../src/lib/stats";
 import { seriesMaps, vetoPlan, vetoState, type VetoAction } from "../src/lib/veto";
 import { checkinWindowError, sniffImage } from "../src/lib/data";
+import { readKk, tournamentForLang } from "../src/lib/tournament-kk";
 
 let checks = 0;
 const test = (name: string, work: () => void) => { work(); checks++; console.log(`✓ ${name}`); };
@@ -138,6 +139,30 @@ test("Check-in window: closed before opening and after closing, open inside or w
   assert.notEqual(checkinWindowError({ checkin_opens_at: at(h), checkin_closes_at: null }, now), null);
   assert.notEqual(checkinWindowError({ checkin_opens_at: null, checkin_closes_at: at(-h) }, now), null);
   assert.equal(checkinWindowError({ checkin_opens_at: at(-h), checkin_closes_at: at(h) }, now), null);
+});
+
+test("Tournament texts in Kazakh: own texts from kk, stock values translated, Russian untouched", () => {
+  const t = {
+    kk: { rules: "Регламент қазақша", prizes: ["Монитор", ""], prize_pool: "", junk: 1 },
+    rules: "Регламент",
+    requirements: "Требования",
+    description: null,
+    prize_pool: "Ценные подарки",
+    entry_fee: "Бесплатно",
+    match_format: "BO1, финальная стадия — BO3",
+    prize_distribution: [{ place: "1 место", prize: "Монитор RU" }, { place: "III место", prize: "Мышь" }],
+  };
+  assert.equal(tournamentForLang(t, "ru"), t);
+  const kk = tournamentForLang(t, "kk");
+  assert.equal(kk.rules, "Регламент қазақша");
+  assert.equal(kk.requirements, "Требования"); // перевода нет — русский
+  assert.equal(kk.description, null);
+  assert.equal(kk.prize_pool, "Бағалы сыйлықтар");
+  assert.equal(kk.entry_fee, "Тегін");
+  assert.equal(kk.match_format, "BO1, финалдық кезең — BO3");
+  assert.deepEqual(kk.prize_distribution, [{ place: "1-орын", prize: "Монитор" }, { place: "III орын", prize: "Мышь" }]);
+  assert.deepEqual(readKk("x"), {});
+  assert.equal(tournamentForLang({ rules: "R", kk: null }, "kk").rules, "R");
 });
 
 console.log(`\n${checks} pure logic checks passed.`);

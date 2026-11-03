@@ -8,7 +8,10 @@ import { PRIVACY_VERSION, formatDay } from "@/lib/profile";
 // страница одинакова для всех — отдаётся из кэша CDN
 export const revalidate = 3600;
 
-export const metadata: Metadata = { title: "Обработка персональных данных" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Обработка персональных данных") };
+}
 
 const CONTACT = "f16arena@gmail.com";
 

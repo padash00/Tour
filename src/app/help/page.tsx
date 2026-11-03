@@ -5,11 +5,14 @@ import { HELP, HELP_GROUPS } from "@/lib/help";
 import { getT } from "@/lib/i18n/server";
 import { Container, PageTitle, Panel } from "@/components/ds";
 
-export const metadata: Metadata = {
-  title: "Как это работает",
-  description: "Как создать команду CS2, пригласить игроков и тренера, подать заявку на турнир и пройти check-in на F16 Arena — пошагово.",
-  alternates: { canonical: "/help" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Как это работает"),
+    description: "Как создать команду CS2, пригласить игроков и тренера, подать заявку на турнир и пройти check-in на F16 Arena — пошагово.",
+    alternates: { canonical: "/help" },
+  };
+}
 
 export default async function HelpPage() {
   const t = await getT();

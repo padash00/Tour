@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getT } from "@/lib/i18n/server";
 import { notFound } from "next/navigation";
 import { myTemplates } from "@/app/actions/lobby";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
@@ -11,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(props: PageProps<"/lobby/[code]">): Promise<Metadata> {
   const { code } = await props.params;
-  return { title: `Лобби #${code.toUpperCase()}` };
+  const t = await getT();
+  return { title: t("Лобби #{code}", { code: code.toUpperCase() }) };
 }
 
 export default async function LobbyPage(props: PageProps<"/lobby/[code]">) {

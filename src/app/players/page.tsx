@@ -10,11 +10,14 @@ import { ClientFilter } from "@/components/public/client-filter";
 import { isOnline } from "@/lib/online";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Игроки",
-  description: "Игроки CS2 на F16 Arena: ники, уровни FACEIT, F16 Rating и статистика матчей турниров в Усть-Каменогорске.",
-  alternates: { canonical: "/players" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Игроки"),
+    description: "Игроки CS2 на F16 Arena: ники, уровни FACEIT, F16 Rating и статистика матчей турниров в Усть-Каменогорске.",
+    alternates: { canonical: "/players" },
+  };
+}
 export const dynamic = "force-dynamic";
 
 export default async function PlayersPage(props: PageProps<"/players">) {

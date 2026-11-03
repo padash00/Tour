@@ -7,11 +7,14 @@ import { Container, PageTitle, Panel, cn } from "@/components/ds";
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Правила",
-  description: "Правила турниров по CS2 на F16 Arena: состав и регистрация, check-in, вето карт, матч, честная игра, споры и призы. Частые вопросы.",
-  alternates: { canonical: "/rules" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Правила"),
+    description: "Правила турниров по CS2 на F16 Arena: состав и регистрация, check-in, вето карт, матч, честная игра, споры и призы. Частые вопросы.",
+    alternates: { canonical: "/rules" },
+  };
+}
 
 const RULES: { title: string; items: string[] }[] = [
   {

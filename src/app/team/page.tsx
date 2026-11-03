@@ -38,7 +38,10 @@ import {
   tournamentStatus,
 } from "@/components/ds";
 
-export const metadata: Metadata = { title: "Моя команда", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Моя команда"), robots: { index: false } };
+}
 
 type Tab = "overview" | "roster" | "matches" | "tournaments" | "applications";
 

@@ -15,11 +15,14 @@ import { Button, Container, EmptyState, PageTitle, RowList, Section, Stack } fro
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Матчи",
-  description: "Матчи турниров по CS2 на F16 Arena: идут сейчас, ближайшие и сыгранные — счёт по картам и статистика.",
-  alternates: { canonical: "/matches" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Матчи"),
+    description: "Матчи турниров по CS2 на F16 Arena: идут сейчас, ближайшие и сыгранные — счёт по картам и статистика.",
+    alternates: { canonical: "/matches" },
+  };
+}
 
 type ListMatch = MatchWithTeams & { tournament: Pick<Tournament, "id" | "name" | "slug" | "status"> };
 

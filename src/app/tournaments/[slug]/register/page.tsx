@@ -20,9 +20,13 @@ import { ProfileRequired } from "@/components/profile/profile-required";
 import { HelpHint } from "@/components/help-hint";
 import { RulesGate } from "@/components/rules-gate";
 import { hasRules } from "@/lib/rules-ack";
+import { tournamentForLang } from "@/lib/tournament-kk";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Регистрация на турнир", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Регистрация на турнир"), robots: { index: false } };
+}
 
 type Reg = Registration & { roster: RosterEntry[] };
 const activeOf = (r: Reg | null) => (r && (r.status === "pending" || r.status === "approved") ? r : null);
@@ -31,8 +35,10 @@ export default async function RegisterPage(props: PageProps<"/tournaments/[slug]
   const { slug } = await props.params;
   const sp = await props.searchParams;
   const tx = await getT();
-  const t = await getTournamentBySlug(slug);
-  if (!t) notFound();
+  const found = await getTournamentBySlug(slug);
+  if (!found) notFound();
+  // по-казахски регламент перед заявкой — из блока «Қазақша» пульта
+  const t = tournamentForLang(found, tx.lang);
   const player = await requirePlayer(`/tournaments/${slug}/register`);
   const open = t.status === "registration" && (!t.registration_closes_at || serverNow() <= new Date(t.registration_closes_at).getTime());
   const fresh = sp.sent === "1";

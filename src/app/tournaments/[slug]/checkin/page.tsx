@@ -13,7 +13,10 @@ import { HelpHint } from "@/components/help-hint";
 import { getT } from "@/lib/i18n/server";
 import type { T } from "@/lib/i18n/core";
 
-export const metadata: Metadata = { title: "Check-in", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Check-in"), robots: { index: false } };
+}
 
 const STEAM_ID = /^\d{17}$/;
 

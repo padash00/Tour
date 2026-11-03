@@ -3,11 +3,14 @@ import { Container, PageTitle } from "@/components/ds";
 import { SiteChat } from "@/components/public/site-chat";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Чат",
-  description: "Общий чат игроков F16 Arena: найти тиммейтов, договориться об игре, спросить о турнире.",
-  alternates: { canonical: "/chat" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Чат"),
+    description: "Общий чат игроков F16 Arena: найти тиммейтов, договориться об игре, спросить о турнире.",
+    alternates: { canonical: "/chat" },
+  };
+}
 
 export const dynamic = "force-dynamic";
 

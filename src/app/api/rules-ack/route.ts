@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentPlayer } from "@/lib/auth";
+import { getLang } from "@/lib/i18n/server";
 import { ackRules, pendingRulesAck } from "@/lib/rules-ack";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ const noStore = { "Cache-Control": "private, no-store" };
 export async function GET() {
   const player = await getCurrentPlayer();
   if (!player) return NextResponse.json({ pending: null }, { headers: noStore });
-  const pending = await pendingRulesAck(player.id).catch(() => null);
+  const pending = await pendingRulesAck(player.id, await getLang()).catch(() => null);
   return NextResponse.json({ pending }, { headers: noStore });
 }
 

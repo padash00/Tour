@@ -2322,6 +2322,7 @@ export type Database = {
           id: string
           is_lan: boolean
           is_official: boolean
+          kk: Json
           knife_round: boolean
           location: string | null
           map_pool: string[]
@@ -2378,6 +2379,7 @@ export type Database = {
           id?: string
           is_lan?: boolean
           is_official?: boolean
+          kk?: Json
           knife_round?: boolean
           location?: string | null
           map_pool?: string[]
@@ -2434,6 +2436,7 @@ export type Database = {
           id?: string
           is_lan?: boolean
           is_official?: boolean
+          kk?: Json
           knife_round?: boolean
           location?: string | null
           map_pool?: string[]

@@ -4,15 +4,19 @@ import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/
 import { TournamentList, type TournamentItem } from "@/components/competition/tournament-list";
 import { Container, PageTitle } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
+import { tournamentForLang } from "@/lib/tournament-kk";
 
 // страница одинакова для всех — отдаётся из кэша CDN, обновляется раз в 30 с и сразу после изменений
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Турниры",
-  description: "Турниры по CS2 в Усть-Каменогорске: открытая регистрация, ближайшие и прошедшие турниры F16 Arena, сетки и результаты.",
-  alternates: { canonical: "/tournaments" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Турниры"),
+    description: "Турниры по CS2 в Усть-Каменогорске: открытая регистрация, ближайшие и прошедшие турниры F16 Arena, сетки и результаты.",
+    alternates: { canonical: "/tournaments" },
+  };
+}
 
 const ORDER: Record<string, number> = { live: 0, checkin: 1, registration: 2, registration_closed: 3, finished: 4, cancelled: 5, draft: 6 };
 
@@ -37,7 +41,7 @@ export default async function TournamentsPage() {
       registration_closes_at: t.registration_closes_at,
       max_teams: t.max_teams,
       approved: counts[t.id] ?? 0,
-      prize_pool: t.prize_pool,
+      prize_pool: tournamentForLang(t, tx.lang).prize_pool,
       cover_url: t.cover_url,
     }));
 

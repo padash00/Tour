@@ -18,12 +18,13 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/players/[steamId]">): Promise<Metadata> {
   const { steamId } = await props.params;
   const p = await getPlayerBySteamId(steamId);
-  if (!p) return { title: "Игрок" };
+  const t = await getT();
+  if (!p) return { title: t("Игрок") };
   const description = snippet(
     `${p.nickname} — игрок CS2 на F16 Arena${p.faceit_level ? `, FACEIT ${p.faceit_level} уровень${p.faceit_elo ? ` (${p.faceit_elo} ELO)` : ""}` : ""}: статистика, F16 Rating, матчи, команды и турниры.`,
   );
   return {
-    title: `${p.nickname} — статистика CS2`,
+    title: t("{name} — статистика CS2", { name: p.nickname }),
     description,
     alternates: { canonical: `/players/${p.steam_id}` },
     openGraph: { title: p.nickname, description, ...(p.avatar_url ? { images: [{ url: p.avatar_url }] } : {}) },

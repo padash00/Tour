@@ -16,7 +16,10 @@ import { Button, Callout, Container, Field, Textarea } from "@/components/ds";
 import { SteamMark } from "@/components/ds/icons";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Заявка в команду", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Заявка в команду"), robots: { index: false } };
+}
 
 export default async function ApplyPage(props: PageProps<"/teams/[tag]/apply">) {
   const t = await getT();

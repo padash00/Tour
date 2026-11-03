@@ -19,7 +19,8 @@ const UUID = /^[0-9a-f-]{36}$/i;
 export async function generateMetadata(props: PageProps<"/lobbies/games/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const game = UUID.test(id) ? await getGame(id) : null;
-  return { title: game ? `${game.team1.name} ${game.team1_score}:${game.team2_score} ${game.team2.name}` : "Матч лобби" };
+  const t = await getT();
+  return { title: game ? `${game.team1.name} ${game.team1_score}:${game.team2_score} ${game.team2.name}` : t("Матч лобби") };
 }
 
 type Stat = {

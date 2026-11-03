@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getT } from "@/lib/i18n/server";
 import { notFound } from "next/navigation";
 import { getTournamentBySlug } from "@/lib/data";
 import { formatDateTime, formatMoney } from "@/lib/format";
@@ -28,10 +29,11 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
-  if (!t) return { title: "Турнир" };
+  const tx = await getT();
+  if (!t) return { title: tx("Турнир") };
   const description = describe(t);
   return {
-    title: `${t.name} — турнир по CS2`,
+    title: tx("{name} — турнир по CS2", { name: t.name }),
     description,
     alternates: { canonical: `/tournaments/${t.slug}` },
     openGraph: { title: t.name, description, type: "website", ...(t.cover_url ? { images: [{ url: t.cover_url }] } : {}) },

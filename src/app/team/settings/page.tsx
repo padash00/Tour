@@ -13,7 +13,10 @@ import { HelpHint } from "@/components/help-hint";
 import { Container, Panel, Section, Stack } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Настройки команды", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Настройки команды"), robots: { index: false } };
+}
 
 export default async function TeamSettingsPage() {
   const t = await getT();

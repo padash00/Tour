@@ -10,7 +10,10 @@ import { Callout, Container, Eyebrow, PageTitle, Panel } from "@/components/ds";
 import { DeleteProfileButton, ProfileForm } from "@/components/profile/profile-form";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Анкета игрока", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Анкета игрока"), robots: { index: false } };
+}
 
 /** Анкета игрока: видит и меняет только сам игрок (и администраторы в F16 Control) */
 export default async function ProfilePage(props: PageProps<"/me/profile">) {

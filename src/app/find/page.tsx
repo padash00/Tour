@@ -9,11 +9,14 @@ import { TeamsNav } from "@/components/team/teams-nav";
 import { HelpHint } from "@/components/help-hint";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Поиск команды",
-  description: "Поиск команды и игроков CS2 в Усть-Каменогорске: объявления игроков и команд на F16 Arena, заявки и приглашения.",
-  alternates: { canonical: "/find" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Поиск команды"),
+    description: "Поиск команды и игроков CS2 в Усть-Каменогорске: объявления игроков и команд на F16 Arena, заявки и приглашения.",
+    alternates: { canonical: "/find" },
+  };
+}
 
 type Tab = "players" | "teams";
 

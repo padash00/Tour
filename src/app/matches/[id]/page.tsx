@@ -50,7 +50,8 @@ import {
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const m = await getMatch(id);
-  const title = m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : "Матч";
+  const t = await getT();
+  const title = m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : t("Матч");
   const description = m
     ? `${title} — матч турнира «${m.tournament.name}» по CS2 на F16 Arena${m.status === "finished" ? `, счёт ${m.team1_score}:${m.team2_score}` : ""}: карты, раунды и статистика игроков.`
     : undefined;

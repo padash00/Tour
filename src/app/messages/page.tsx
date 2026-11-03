@@ -5,7 +5,10 @@ import { requirePlayer } from "@/lib/auth";
 import { isUuid } from "@/lib/dm";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Сообщения", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Сообщения"), robots: { index: false } };
+}
 export const dynamic = "force-dynamic";
 
 export default async function MessagesPage(props: PageProps<"/messages">) {

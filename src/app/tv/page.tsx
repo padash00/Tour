@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getT } from "@/lib/i18n/server";
 import { redirect } from "next/navigation";
 import { getFeaturedTournament } from "@/lib/data";
 import { TvEmpty } from "@/components/tv/panels";
@@ -7,7 +8,10 @@ import { TvShell } from "@/components/tv/tv-shell";
 // редирект на текущий турнир — из кэша, раз в 10 с
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Режим ТВ", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Режим ТВ"), robots: { index: false } };
+}
 
 /** Короткий адрес для телевизора в клубе: открывает текущий турнир */
 export default async function TvPage() {

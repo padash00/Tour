@@ -9,11 +9,14 @@ import { TeamsNav } from "@/components/team/teams-nav";
 import { Container, EmptyState, PageTitle, TeamLogo } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Команды",
-  description: "Команды по CS2 на F16 Arena: составы, средний ELO, рейтинг и результаты. Создайте свою команду или найдите ту, которой нужен игрок.",
-  alternates: { canonical: "/teams" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("Команды"),
+    description: "Команды по CS2 на F16 Arena: составы, средний ELO, рейтинг и результаты. Создайте свою команду или найдите ту, которой нужен игрок.",
+    alternates: { canonical: "/teams" },
+  };
+}
 
 // поиск — в браузере (ClientFilter): страница одинакова для всех и отдаётся из кэша CDN
 export const dynamic = "force-dynamic";

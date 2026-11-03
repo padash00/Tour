@@ -6,6 +6,7 @@ import type { MatchWithTeams } from "@/lib/matches";
 import type { MatchStatus, Tournament, TournamentStatus } from "@/lib/types";
 import { getT } from "@/lib/i18n/server";
 import type { T } from "@/lib/i18n/core";
+import { tournamentForLang } from "@/lib/tournament-kk";
 import { Status, TeamLogo, cn, matchStatus, tournamentStatus } from "@/components/ds";
 
 export function TStatus({ status }: { status: TournamentStatus }) {
@@ -37,8 +38,9 @@ function CoverImage({ url, className }: { url: string | null; className?: string
   );
 }
 
-export async function TournamentLine({ t, approved }: { t: Tournament; approved: number }) {
+export async function TournamentLine({ t: raw, approved }: { t: Tournament; approved: number }) {
   const tx = await getT();
+  const t = tournamentForLang(raw, tx.lang);
   const solo = modeOf(t.format).size === 1;
   const fill = Math.min(100, (approved / Math.max(1, t.max_teams)) * 100);
   const prize = t.prize_pool && !/^\s*0+\s*$/.test(t.prize_pool) ? formatMoney(t.prize_pool) : null;

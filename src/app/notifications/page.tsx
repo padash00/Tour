@@ -9,7 +9,10 @@ import { NotificationFeed } from "@/components/public/notification-feed";
 import { Container, EmptyState, Meta, PageTitle, cn } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = { title: "Уведомления", robots: { index: false } };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("Уведомления"), robots: { index: false } };
+}
 
 const PAGE = 30;
 

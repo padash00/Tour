@@ -16,10 +16,11 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/tournaments/[slug]/recap">): Promise<Metadata> {
   const { slug } = await props.params;
   const t = await getTournamentBySlug(slug);
-  if (!t) return { title: "Итоги турнира" };
+  const tx = await getT();
+  if (!t) return { title: tx("Итоги турнира") };
   const recap = t.status === "finished" ? await getTournamentRecap(t) : null;
   const champ = recap?.placements.find((p) => p.place === "1")?.team.name;
-  const title = `Итоги — ${t.name}`;
+  const title = tx("Итоги — {name}", { name: t.name });
   const description = champ ? `Чемпион ${t.name} — ${champ}. Призёры, MVP и рекорды турнира на F16 Arena.` : `Итоги турнира ${t.name} на F16 Arena.`;
   return { title, description, openGraph: { title, description }, twitter: { card: "summary_large_image", title, description } };
 }
