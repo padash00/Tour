@@ -4,7 +4,7 @@ import { audit } from "./audit";
 import { isAdmin } from "./auth";
 import type { Player } from "./types";
 import { db } from "./supabase";
-import { SITE_URL, tgCall, tgEscape } from "./telegram";
+import { SITE_URL, setAppSettings, tgCall, tgEscape } from "./telegram";
 import { findViolation, formatDuration, parseDuration, punishmentFor, type Violation } from "./tg-moderation-core";
 
 /**
@@ -31,6 +31,9 @@ export type TgMessage = {
   new_chat_members?: TgUser[];
   forward_origin?: { type: string; chat?: { type: string } };
   forward_from_chat?: { type: string };
+  photo?: unknown[];
+  video?: unknown;
+  document?: { mime_type?: string };
 };
 export type TgCallback = { id: string; from: TgUser; data?: string; message?: TgMessage };
 
@@ -213,6 +216,22 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
   const [rawCmd, arg] = text.trim().split(/\s+/, 2);
   const cmd = rawCmd.split("@")[0].toLowerCase();
   const known = ["/warn", "/unwarn", "/mute", "/unmute", "/ban", "/unban", "/warns"];
+  if (cmd === "/market") {
+    await del(token, msg.chat.id, msg.message_id);
+    if (arg === "off") {
+      await setAppSettings({ TELEGRAM_MARKET_THREAD: "" });
+      await notice(token, msg, "Тема «Купля-продажа» отключена — здесь снова обычный чат.", 20_000);
+      return true;
+    }
+    if (!msg.is_topic_message || !msg.message_thread_id) {
+      await notice(token, msg, "Отправьте /market внутри темы «Купля-продажа».", 20_000);
+      return true;
+    }
+    await setAppSettings({ TELEGRAM_MARKET_THREAD: String(msg.message_thread_id) });
+    const id = await notice(token, msg, MARKET_RULES, 0);
+    if (id) await tgCall(token, "pinChatMessage", { chat_id: msg.chat.id, message_id: id, disable_notification: true });
+    return true;
+  }
   if (!known.includes(cmd)) return false;
   await del(token, msg.chat.id, msg.message_id);
   const target = msg.reply_to_message?.from;
@@ -269,7 +288,7 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
 // ── главное
 
 /** Сообщение (новое или изменённое) в общем чате. Ничего не бросает наружу. */
-export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false) {
+export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null) {
   if (msg.new_chat_members?.length) return onNewMembers(token, msg);
   const from = msg.from;
   if (!from || from.is_bot) return;
@@ -293,17 +312,63 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
     return;
   }
 
+  // «Купля-продажа»: только объявления по шаблону, без обсуждений
+  const inMarket = !!marketThread && msg.is_topic_message === true && msg.message_thread_id === marketThread;
+  if (inMarket && !edited) {
+    const problem = marketProblem(msg, text);
+    if (problem) {
+      await del(token, msg.chat.id, msg.message_id);
+      await notice(token, msg, `${mention(from)}, ${problem}\n\n${MARKET_TEMPLATE}`, 30_000);
+      return;
+    }
+    if (tooManyAds(from.id)) {
+      await del(token, msg.chat.id, msg.message_id);
+      await notice(token, msg, `${mention(from)}, не больше ${MARKET_PER_DAY} объявлений в сутки. Обновите старое объявление — отредактируйте его.`, 30_000);
+      return;
+    }
+  }
+
   // пересылка из чужого канала или сообщение от имени канала — реклама
   const fromChannel = msg.sender_chat?.type === "channel" || msg.forward_origin?.type === "channel" || msg.forward_from_chat?.type === "channel";
-  const v: Violation | null = findViolation(text) ?? (fromChannel ? { kind: "link", reason: "реклама и пересылки из каналов запрещены", match: "канал" } : null);
+  let v: Violation | null = findViolation(text) ?? (fromChannel ? { kind: "link", reason: "реклама и пересылки из каналов запрещены", match: "канал" } : null);
+  // в «Купля-продажа» ссылки на маркеты и трейд разрешены — нельзя только чужие Telegram-каналы
+  if (v && inMarket && v.kind === "link" && !/t\.me|telegram\.me/i.test(v.match)) v = null;
   if (!v) return;
   await del(token, msg.chat.id, msg.message_id);
   await warn(token, msg, from, v.reason, text, "бот", v.match);
 }
 
+// ── «Купля-продажа»
+
+const MARKET_PER_DAY = 3;
+const MARKET_TAG = /^\s*#(продаю|сатамын|куплю|аламын|обмен)(?![\p{L}\d_])/iu;
+const MARKET_TEMPLATE =
+  "<b>Шаблон объявления:</b>\n#продаю — фото + что продаёте + цена\n#куплю — что ищете + бюджет\n#обмен — фото + что меняете\n\nВопросы продавцу — в личку (нажмите на его имя).";
+export const MARKET_RULES = `🛒 <b>Купля-продажа</b>\nЗдесь только объявления, без обсуждений — бот удаляет всё остальное.\n\n${MARKET_TEMPLATE}\n\nНе больше ${MARKET_PER_DAY} объявлений в сутки. Мат и чужие Telegram-каналы запрещены.`;
+
+/** Что не так с объявлением; null — всё по шаблону */
+function marketProblem(msg: TgMessage, text: string): string | null {
+  const tag = MARKET_TAG.exec(text)?.[1]?.toLowerCase();
+  if (!tag) return msg.reply_to_message && msg.reply_to_message.message_id !== msg.message_thread_id ? "обсуждения здесь нельзя — пишите продавцу в личку." : "объявление должно начинаться с #продаю, #куплю или #обмен.";
+  const hasMedia = !!msg.photo?.length || !!msg.video || !!msg.document?.mime_type?.startsWith("image/");
+  if ((tag === "продаю" || tag === "сатамын" || tag === "обмен") && !hasMedia) return "к объявлению #продаю и #обмен нужно фото.";
+  if (text.replace(MARKET_TAG, "").trim().length < 5) return "добавьте описание и цену.";
+  return null;
+}
+
+const ads = new Map<number, number[]>();
+function tooManyAds(userId: number) {
+  const now = Date.now();
+  const list = (ads.get(userId) ?? []).filter((t) => now - t < 86_400_000);
+  if (list.length >= MARKET_PER_DAY) return true;
+  list.push(now);
+  ads.set(userId, list);
+  return false;
+}
+
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
-  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\nЖурнал — ${SITE_URL}/admin/telegram`;
+  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
 
 /** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */
 export async function pardonAll(token: string, groupId: number, by: string) {

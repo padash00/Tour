@@ -97,7 +97,7 @@ export async function POST(req: Request) {
   if (update.callback_query || (groupMsg && groupMsg.chat.type !== "private")) {
     const group = await telegramGroup();
     if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
-    else if (group.id && group.moderation && groupMsg && groupMsg.chat.id === group.id) await moderateGroupMessage(cfg.token, groupMsg, !update.message).catch((e) => console.error("tg moderation", e));
+    else if (group.id && group.moderation && groupMsg && groupMsg.chat.id === group.id) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread).catch((e) => console.error("tg moderation", e));
     return NextResponse.json({ ok: true });
   }
   const msg = update.message;

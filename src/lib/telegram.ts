@@ -72,7 +72,7 @@ export async function notifyTelegram(playerIds: string[], title: string, body?: 
 import { TG_GROUP_URL } from "./tg-group";
 export const PUBLIC_GROUP_URL = TG_GROUP_URL;
 
-export const GROUP_KEYS = ["TELEGRAM_GROUP_ID", "TELEGRAM_GROUP_TITLE", "TELEGRAM_GROUP_INVITE", "TELEGRAM_GROUP_CLOSED", "TELEGRAM_MODERATION"] as const;
+export const GROUP_KEYS = ["TELEGRAM_GROUP_ID", "TELEGRAM_GROUP_TITLE", "TELEGRAM_GROUP_INVITE", "TELEGRAM_GROUP_CLOSED", "TELEGRAM_MODERATION", "TELEGRAM_MARKET_THREAD"] as const;
 
 export async function telegramGroup() {
   const { data } = await db().from("app_settings").select("key, value").in("key", [...GROUP_KEYS]);
@@ -85,6 +85,8 @@ export async function telegramGroup() {
     closed: m.get("TELEGRAM_GROUP_CLOSED") === "1",
     /** модерация чата ботом — включается в пульте, по умолчанию выключена */
     moderation: m.get("TELEGRAM_MODERATION") === "1",
+    /** тема «Купля-продажа» (message_thread_id) — только объявления по шаблону */
+    marketThread: Number(m.get("TELEGRAM_MARKET_THREAD") || "") || null,
   };
 }
 
