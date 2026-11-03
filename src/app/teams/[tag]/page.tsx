@@ -105,7 +105,7 @@ export default async function TeamPage(props: PageProps<"/teams/[tag]">) {
       <Link
         key={m.id}
         href={`/players/${m.player.steam_id}`}
-        className="group relative flex flex-col items-center rounded-surface border border-line-subtle bg-surface px-3 pb-4 pt-5 text-center transition-colors hover:border-line-hover"
+        className={cn("group relative flex flex-col items-center rounded-surface border border-line-subtle bg-surface px-3 pb-4 text-center transition-colors hover:border-line-hover", badge ? "pt-9" : "pt-5")}
       >
         {badge && <span className="absolute left-3 top-3 text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{badge}</span>}
         <span className="relative">

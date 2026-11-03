@@ -49,10 +49,10 @@ function Legend({ t }: { t: T }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12.5px] text-fg-3">
       <span className="inline-flex items-center gap-1.5">
-        <span className="size-3 rounded-[4px] bg-ct/70" /> CT
+        <span className="size-3 rounded-[4px] bg-side-ct/70" /> CT
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <span className="size-3 rounded-[4px] bg-t/70" /> T
+        <span className="size-3 rounded-[4px] bg-side-t/70" /> T
       </span>
       {(Object.keys(HOW_LABEL) as RoundHow[]).map((h) => (
         <span key={h} className="inline-flex items-center gap-1.5">
@@ -122,7 +122,7 @@ function segments(rounds: MapRounds["rounds"], t: T): Segment[] {
   }));
 }
 
-const SIDE_CELL = { CT: "bg-ct/15 text-ct", T: "bg-t/15 text-t" } as const;
+const SIDE_CELL = { CT: "bg-side-ct/15 text-side-ct", T: "bg-side-t/15 text-side-t" } as const;
 
 /** История раундов как на HLTV: строка на команду, значок исхода — в строке победителя, цвет — сторона (CT/T) */
 function RoundHistory({ map, team1, team2, t }: { map: MapRounds; team1: string; team2: string; t: T }) {

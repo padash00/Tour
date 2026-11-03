@@ -61,8 +61,9 @@
   --color-danger-dim: #fde8eb;
   --color-live: #e0263c;
   /* стороны CS2 — только в истории раундов и ленте убийств */
-  --color-ct: #2f74c0;
-  --color-t: #c98a12;
+  /* не «t» / «ct»: Tailwind путал их с border-t (линия сверху) и to-t (градиент вверх) — линии становились оранжевыми */
+  --color-side-ct: #2f74c0;
+  --color-side-t: #c98a12;
   /* призовые места */
   --color-gold: #b8860b;
   --color-silver: #6b7380;
