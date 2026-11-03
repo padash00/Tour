@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { adminAddMember, adminDisbandTeam, adminKickMember, adminMakeCaptain, adminRenameTeam, adminSetRole } from "@/app/actions/admin-team";
+import { adminAddMember, adminDisbandTeam, adminKickMember, adminMakeCaptain, adminRenameTeam, adminSetRole, adminSetTeamLogo } from "@/app/actions/admin-team";
 import { MAX_MAIN, MAX_SUBS } from "@/lib/data";
 import { requireAdmin } from "@/lib/auth";
 import { getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
@@ -122,6 +122,27 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
             </div>
             <p className="mt-3 text-[13px] text-fg-3">Пока у команды есть заявка на официальный турнир, капитан название, тег и состав менять не может — только вы здесь.</p>
           </ActionForm>
+        </Panel>
+      )}
+
+      {!disbanded && (
+        <Panel title="Логотип" boxed>
+          <div className="flex flex-wrap items-center gap-5 p-5">
+            <TeamLogo src={team.logo_url} tag={team.tag} size={64} />
+            <ActionForm action={adminSetTeamLogo} className="flex flex-wrap items-center gap-3">
+              <input type="hidden" name="teamId" value={team.id} />
+              <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" required className="field max-w-xs py-2 text-[14px]" />
+              <SubmitButton variant="secondary">{team.logo_url ? "Заменить" : "Загрузить"}</SubmitButton>
+            </ActionForm>
+            {team.logo_url && (
+              <ActionForm action={adminSetTeamLogo}>
+                <input type="hidden" name="teamId" value={team.id} />
+                <input type="hidden" name="remove" value="1" />
+                <SubmitButton variant="secondary" confirm="Убрать логотип команды?">Убрать</SubmitButton>
+              </ActionForm>
+            )}
+            <p className="basis-full text-[13px] text-fg-3">PNG, JPG или WEBP до 1 МБ, лучше квадратный. Капитан тоже может сменить логотип в настройках команды — даже при заявке на турнир.</p>
+          </div>
         </Panel>
       )}
 

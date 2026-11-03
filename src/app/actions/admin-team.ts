@@ -9,6 +9,8 @@ import { MAX_MAIN, MAX_SUBS, getActiveMembership, getTeamById, getTeamMembers, g
 import { cancelPlayerInvites, cancelTeamInvites } from "@/lib/invites";
 import { registrationError } from "@/lib/registration-errors";
 import { db } from "@/lib/supabase";
+import { uploadTeamLogo } from "@/lib/team-logo";
+import { makeT } from "@/lib/i18n/core";
 import type { ActionResult } from "@/components/forms";
 
 /*
@@ -63,6 +65,27 @@ export async function adminRenameTeam(_prev: ActionResult, formData: FormData): 
   revalidateTeam(team.id, team.tag);
   revalidatePath(`/teams/${encodeURIComponent(tag)}`);
   return { success: `Сохранено: ${name} [${tag}]` };
+}
+
+/** Логотип команды из пульта — меняется в любое время, и при заявке на официальный турнир */
+export async function adminSetTeamLogo(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const team = await getTeamById(String(formData.get("teamId")));
+  if (!team || team.disbanded_at) return { error: "Команда не найдена" };
+  if (formData.get("remove") === "1") {
+    await db().from("teams").update({ logo_url: null }).eq("id", team.id);
+    await audit(admin.id, "admin.team.logo", { type: "team", id: team.id }, { removed: true });
+    revalidateTeam(team.id, team.tag);
+    return { success: "Логотип убран" };
+  }
+  const logo = await uploadTeamLogo(team.id, formData.get("logo") as File | null, makeT("ru"));
+  if (!logo) return { error: "Выберите файл логотипа" };
+  if (typeof logo === "object") return logo;
+  const { error } = await db().from("teams").update({ logo_url: logo }).eq("id", team.id);
+  if (error) return { error: "Не удалось сохранить логотип" };
+  await audit(admin.id, "admin.team.logo", { type: "team", id: team.id });
+  revalidateTeam(team.id, team.tag);
+  return { success: "Логотип обновлён" };
 }
 
 /** Игрок по нику, SteamID (17 цифр) или ссылке на профиль Steam */

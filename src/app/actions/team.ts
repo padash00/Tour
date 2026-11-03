@@ -17,13 +17,13 @@ import {
   getTeamRegistrations,
   isActiveRegistration,
   isRateLimited,
-  sniffImage,
   syncOpenRosters,
 } from "@/lib/data";
 import { cancelPlayerApplications, cancelTeamApplications } from "@/lib/applications";
 import { cancelPlayerInvites, cancelTeamInvites } from "@/lib/invites";
 import { profileGateError } from "@/lib/profiles";
 import { db } from "@/lib/supabase";
+import { uploadTeamLogo as uploadLogo } from "@/lib/team-logo";
 import type { ActionResult } from "@/components/forms";
 import { tr, type T } from "@/lib/i18n/core";
 import { getT } from "@/lib/i18n/server";
@@ -49,20 +49,6 @@ const teamSchema = (t: T) =>
     region: z.string().trim().max(48).optional().default(""),
     description: z.string().trim().max(400, t("Описание — максимум 400 символов")).optional().default(""),
   });
-
-async function uploadLogo(teamId: string, file: File | null, t: T): Promise<string | null | { error: string }> {
-  if (!file || file.size === 0) return null;
-  if (file.size > 1024 * 1024) return { error: t("Логотип — не больше 1 МБ") };
-  // тип определяем по содержимому файла, а не по заявленному браузером
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const type = sniffImage(bytes);
-  if (!type) return { error: t("Логотип — PNG, JPG или WEBP") };
-  const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
-  const path = `${teamId}/${Date.now()}.${ext}`;
-  const { error } = await db().storage.from("team-logos").upload(path, bytes, { contentType: type, upsert: true });
-  if (error) return { error: t("Не удалось загрузить логотип") };
-  return db().storage.from("team-logos").getPublicUrl(path).data.publicUrl;
-}
 
 function uniqueViolation(error: { code?: string; message?: string } | null, t: T) {
   if (error?.code !== "23505") return null;
@@ -146,11 +132,14 @@ export async function updateTeam(_prev: ActionResult, formData: FormData): Promi
   if (!ctx) return { error: t(NOT_CAPTAIN) };
   const { player, team } = ctx;
   if (await isRateLimited(player.id, "team.update", 5)) return { error: t("Слишком часто — попробуйте через несколько секунд") };
-  const lockedUpdate = await lockedError(team.id, t);
-  if (lockedUpdate) return { error: lockedUpdate };
   const parsed = teamSchema(t).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const { name, tag, region, description } = parsed.data;
+  // заявка на турнир фиксирует название и тег; логотип, регион и описание капитан меняет всегда
+  if (name !== team.name || tag.toUpperCase() !== team.tag) {
+    const lockedUpdate = await lockedError(team.id, t);
+    if (lockedUpdate) return { error: lockedUpdate };
+  }
 
   const logo = await uploadLogo(team.id, formData.get("logo") as File | null, t);
   if (logo && typeof logo === "object") return logo;
