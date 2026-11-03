@@ -46,6 +46,8 @@ const BASE_METADATA: Metadata = {
   category: "esports",
   openGraph: { type: "website", siteName: SITE_NAME, locale: "ru_RU", description: SITE_DESCRIPTION },
   twitter: { card: "summary_large_image" },
+  // автоперевод браузера ломает React-страницы (insertBefore/removeChild); у сайта свой переключатель ҚАЗ/РУС
+  other: { google: "notranslate" },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
   // коды подтверждения Google Search Console и Яндекс.Вебмастера — переменные окружения в Vercel
   verification: {
@@ -74,7 +76,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const lang = await getLang();
   const t = makeT(lang);
   return (
-    <html lang={lang} className={`${interTight.variable} ${jetbrains.variable} h-full`}>
+    <html lang={lang} translate="no" className={`notranslate ${interTight.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         {/* Очень старый браузер (iOS < 16.2): стили сайта ему не по силам — сразу говорим, что делать */}
         <script dangerouslySetInnerHTML={{ __html: OLD_BROWSER_NOTICE }} />

@@ -10,6 +10,7 @@ import { useToast } from "@/components/toast";
 import type { Team } from "@/lib/types";
 import { useT } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n/core";
+import { shrinkLogo } from "@/components/logo-file-input";
 
 /*
  * Форма команды (создание и настройки). Ошибки — под полями, не тостом.
@@ -152,11 +153,19 @@ export function TeamEditor({ action, team, mode }: { action: FormAction; team?: 
             name="logo"
             type="file"
             aria-label={t("Логотип команды")}
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
             className="sr-only"
-            onChange={(e) => {
-              const f = e.currentTarget.files?.[0];
-              if (!f) return;
+            onChange={async (e) => {
+              const input = e.currentTarget;
+              const picked = input.files?.[0];
+              if (!picked) return;
+              // большую картинку уменьшаем в браузере — лимит логотипа 1 МБ
+              const f = await shrinkLogo(picked);
+              if (f !== picked) {
+                const dt = new DataTransfer();
+                dt.items.add(f);
+                input.files = dt.files;
+              }
               setLogoName(`${f.name} · ${Math.max(1, Math.round(f.size / 1024))} ${t("КБ")}`);
               setLogo(URL.createObjectURL(f));
             }}

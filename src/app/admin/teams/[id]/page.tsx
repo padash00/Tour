@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getTeamById, getTeamMembers, getTeamRegistrations, isActiveRegistration } from "@/lib/data";
 import { formatDate, registrationStatusLabel } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/forms";
+import { LogoFileInput } from "@/components/logo-file-input";
 import { Avatar, TeamLogo } from "@/components/ui";
 import { AdminHeader, Panel, TableBox } from "@/components/admin/control";
 
@@ -131,7 +132,7 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
             <TeamLogo src={team.logo_url} tag={team.tag} size={64} />
             <ActionForm action={adminSetTeamLogo} className="flex flex-wrap items-center gap-3">
               <input type="hidden" name="teamId" value={team.id} />
-              <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" required className="field max-w-xs py-2 text-[14px]" />
+              <LogoFileInput required className="field max-w-xs py-2 text-[14px]" />
               <SubmitButton variant="secondary">{team.logo_url ? "Заменить" : "Загрузить"}</SubmitButton>
             </ActionForm>
             {team.logo_url && (
@@ -141,7 +142,7 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
                 <SubmitButton variant="secondary" confirm="Убрать логотип команды?">Убрать</SubmitButton>
               </ActionForm>
             )}
-            <p className="basis-full text-[13px] text-fg-3">PNG, JPG или WEBP до 1 МБ, лучше квадратный. Капитан тоже может сменить логотип в настройках команды — даже при заявке на турнир.</p>
+            <p className="basis-full text-[13px] text-fg-3">Любая картинка, лучше квадратная — большая уменьшится автоматически. Капитан тоже может сменить логотип в настройках команды — даже при заявке на турнир.</p>
           </div>
         </Panel>
       )}
