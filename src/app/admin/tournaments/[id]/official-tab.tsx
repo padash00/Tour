@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { decideRegistration } from "@/app/actions/admin";
-import { purgeApplicationData, remindCaptains, setDocuments } from "@/app/actions/official";
+import { adminSaveApplication, purgeApplicationData, remindCaptains, setDocuments } from "@/app/actions/official";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { BTN, BarCell, CARD } from "@/components/admin/tournament-kit";
 import { Panel, TableBox } from "@/components/admin/control";
@@ -142,6 +142,23 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
         </span>
         {team.applicationIssues.length > 0 && <span className="text-danger">Не заполнено: {team.applicationIssues.join(", ")}</span>}
       </div>
+      <details className="mb-4 rounded-control border border-line-subtle bg-surface-2/50 px-4 py-3">
+        <summary className="cursor-pointer text-[14.5px] font-semibold text-accent">Изменить данные заявки</summary>
+        <ActionForm action={adminSaveApplication} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <input type="hidden" name="registrationId" value={r.id} />
+          <AppField name="organization" label="Организация" value={a?.organization} hint="Если организации нет — «Инициативная группа»" wide />
+          <AppField name="responsible_name" label="Ответственное лицо (ФИО)" value={a?.responsible_name} />
+          <AppField name="responsible_phone" label="Телефон ответственного" value={a?.responsible_phone} />
+          <AppField name="captain_phone" label="Телефон капитана" value={a?.captain_phone} />
+          <AppField name="coach_name" label="Тренер (ФИО)" value={a?.coach_name} />
+          <AppField name="coach_birth_date" label="Дата рождения тренера" value={a?.coach_birth_date} type="date" />
+          <AppField name="coach_workplace" label="Место работы / учёбы тренера" value={a?.coach_workplace} />
+          <AppField name="coach_position" label="Должность / курс тренера" value={a?.coach_position} />
+          <div className="sm:col-span-2">
+            <SubmitButton size="md">Сохранить заявку</SubmitButton>
+          </div>
+        </ActionForm>
+      </details>
       <div className="[&_td]:!text-[14.5px] [&_td]:!px-3.5 [&_th]:!px-3.5">
       <TableBox minWidth={980}>
         <thead>
@@ -208,3 +225,14 @@ function TeamBlock({ t, team }: { t: Tournament; team: OfficialTeam }) {
     </Panel>
   );
 }
+
+function AppField({ name, label, value, hint, type = "text", wide }: { name: string; label: string; value?: string | null; hint?: string; type?: string; wide?: boolean }) {
+  return (
+    <label className={cn("flex flex-col gap-1 text-[13.5px] font-semibold text-fg-2", wide && "sm:col-span-2")}>
+      {label}
+      <input name={name} type={type} defaultValue={value ?? ""} className="field" autoComplete="off" />
+      {hint && <span className="text-[12.5px] font-normal text-fg-3">{hint}</span>}
+    </label>
+  );
+}
+

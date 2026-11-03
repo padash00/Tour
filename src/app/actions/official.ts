@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { audit, notify } from "@/lib/audit";
 import { getTournamentById } from "@/lib/data";
 import { loadOfficial } from "@/lib/official-data";
+import { parseApplication } from "@/lib/official";
 import { db } from "@/lib/supabase";
 import type { ActionResult } from "@/components/forms";
 
@@ -87,3 +88,25 @@ export async function purgeApplicationData(_prev: ActionResult, formData: FormDa
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   return { success: `Удалено заявок: ${counts.applications}, отметок о документах: ${counts.documents}` };
 }
+
+/** Админ правит данные заявки команды (организация, ответственное лицо, телефоны, тренер) — в любой момент */
+export async function adminSaveApplication(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const registrationId = String(formData.get("registrationId") ?? "");
+  if (!UUID.test(registrationId)) return { error: "Заявка не найдена" };
+  const { data: reg } = await db().from("tournament_registrations").select("id, tournament_id, team:teams(name)").eq("id", registrationId).maybeSingle();
+  if (!reg) return { error: "Заявка не найдена" };
+  const t = await getTournamentById(reg.tournament_id);
+  if (!t) return { error: "Турнир не найден" };
+  const { value } = parseApplication((k) => formData.get(k), false);
+  if (!value.organization) return { error: "Укажите организацию (или «Инициативная группа»)" };
+  const { error } = await db()
+    .from("tournament_applications")
+    .upsert({ registration_id: registrationId, tournament_id: reg.tournament_id, ...value, organization: value.organization, updated_at: new Date().toISOString() }, { onConflict: "registration_id" });
+  if (error) return { error: "Не удалось сохранить заявку" };
+  await audit(admin.id, "official.application.admin_edit", { type: "tournament", id: t.id }, { registration: registrationId, organization: value.organization });
+  revalidatePath(`/admin/tournaments/${t.id}`);
+  const team = (reg as unknown as { team: { name: string } | null }).team;
+  return { success: `Заявка ${team?.name ?? ""} сохранена` };
+}
+
