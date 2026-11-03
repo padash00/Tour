@@ -144,4 +144,5 @@ const MOD_LABEL: Record<string, string> = {
   "tg.unmute": "снят мут",
   "tg.ban": "бан",
   "tg.unban": "разбан",
+  "tg.captcha": "новичок: ждёт «Я не бот»",
 };

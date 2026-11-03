@@ -142,6 +142,7 @@ async function onNewMembers(token: string, msg: TgMessage) {
   for (const u of msg.new_chat_members ?? []) {
     if (u.is_bot) continue;
     await tgCall(token, "restrictChatMember", { chat_id: msg.chat.id, user_id: u.id, permissions: MUTED, use_independent_chat_permissions: true });
+    await audit(null, "tg.captcha", undefined, { user: String(u.id), name: nameOf(u), username: u.username ?? null, by: "бот" });
     await notice(
       token,
       msg,
@@ -268,7 +269,7 @@ export const MODERATION_HELP =
 
 /** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */
 export async function pardonAll(token: string, groupId: number, by: string) {
-  const { data } = await db().from("audit_logs").select("action, payload").in("action", ["tg.warn", "tg.mute", "tg.ban"]);
+  const { data } = await db().from("audit_logs").select("action, payload").in("action", ["tg.warn", "tg.mute", "tg.ban", "tg.captcha"]);
   const users = new Map<string, { name: string; username: string | null }>();
   for (const l of data ?? []) {
     const p = (l.payload ?? {}) as { user?: string; name?: string; username?: string | null };
