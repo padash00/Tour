@@ -324,3 +324,22 @@ export async function pardonAll(token: string, groupId: number, by: string) {
   }
   return done;
 }
+
+export type PardonOp = "unwarn" | "unmute" | "unban" | "all";
+
+/** Снять наказание одному участнику из пульта */
+export async function pardonUser(token: string, groupId: number, uid: number, op: PardonOp, by: string, name?: string) {
+  if (op === "unwarn") await audit(null, "tg.unwarn", undefined, { user: String(uid), name: name ?? null, by, reason: "снято в пульте" });
+  if (op === "all") {
+    const n = await warnCount(uid);
+    for (let i = 0; i < n; i++) await audit(null, "tg.unwarn", undefined, { user: String(uid), name: name ?? null, by, reason: "снято в пульте" });
+  }
+  if (op === "unban" || op === "all") {
+    await tgCall(token, "unbanChatMember", { chat_id: groupId, user_id: uid, only_if_banned: true });
+    await audit(null, "tg.unban", undefined, { user: String(uid), name: name ?? null, by });
+  }
+  if (op === "unmute" || op === "unban" || op === "all") {
+    await unmute(token, groupId, uid);
+    if (op === "unmute") await audit(null, "tg.unmute", undefined, { user: String(uid), name: name ?? null, by });
+  }
+}

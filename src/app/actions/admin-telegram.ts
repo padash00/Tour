@@ -86,6 +86,23 @@ export async function adminTelegramPardonAll(): Promise<ActionResult> {
   return { success: n ? `Наказания сняты: ${n} чел. — разбан, снят мут, предупреждения обнулены` : "Наказанных нет" };
 }
 
+/** Снять наказание одному участнику общего чата: предупреждение, мут, бан или всё сразу */
+export async function adminTelegramPardonUser(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  const uid = Number(formData.get("user"));
+  const op = String(formData.get("op")) as "unwarn" | "unmute" | "unban" | "all";
+  const name = String(formData.get("name") ?? "");
+  if (!Number.isFinite(uid) || !["unwarn", "unmute", "unban", "all"].includes(op)) return { error: "Неверные данные" };
+  const cfg = await telegramConfig();
+  const group = await telegramGroup();
+  if (!cfg.token || !group.id) return { error: "Бот или группа не подключены" };
+  const { pardonUser } = await import("@/lib/tg-moderation");
+  await pardonUser(cfg.token, group.id, uid, op, admin.nickname, name);
+  await audit(admin.id, "telegram.pardon_user", undefined, { user: String(uid), op });
+  const label = { unwarn: "одно предупреждение снято", unmute: "мут снят", unban: "разбанен — может вернуться в чат", all: "все наказания сняты" }[op];
+  return { success: `${name || uid}: ${label}` };
+}
+
 /** Telegram: не больше ~30 сообщений в секунду — шлём пачками по 20 с паузой. Возвращает, сколько дошло */
 async function sendBatched(token: string, chats: number[], html: string, button?: { text: string; url: string }) {
   let ok = 0;
