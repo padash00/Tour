@@ -80,7 +80,7 @@ const MAT: RegExp[] = [
 const MAT_TRANSLIT = /\b(?:pizd\w*|p1zd\w*|bly[ae]\w*|bl[iy]at\w*|suk[ai]\b|suchk\w*|x[uy][iy]\w*|h[uy][iy]\b|huy\w*|hu[ie]v\w*|nah[uy][iy]\w*|eba[tl]\w*|eban\w*|ebl[ao]\w*|zaeb\w*|pid[ao]?r\w*|mudak\w*|mudil\w*|zalup\w*|gand[oa]n\w*|sig[ei]y[ei]n\w*)/i;
 const MAT_EN = /\b(?:f+u+c+k+\w*|sh[i1]t\w*|b[i1]tch\w*|cunt\w*|n[i1]gg(?:er|a)\w*|wh[o0]re\w*)\b/i;
 
-const INSULT: RegExp[] = [/^дебил/, /^даун(?:ы|а|у|ом)?$/, /^идиот/, /^чмо/, /^лох(?:и|а|у|ом)?$/, /^ублюд/, /^мраз/, /^твар[ьи]$/, /^гнид/, /^конч(?:ен|ан)/, /^уеб/];
+const INSULT: RegExp[] = [/^дебил/, /^даун(?:ы|а|у|ом)?$/, /^идиот/, /^чмо/, /^лох(?:и|а|у|ом)?$/, /^ублюд/, /^мраз/, /^твар[ьи]$/, /^гнид/, /^конч[еа]нн?(?:ый|ая|ое|ые|ого|ому|ой|ым|ых|ую|ыми)$/, /^уеб/];
 
 const ALLOWED_HOSTS = ["f16-arena.kz", "steamcommunity.com", "store.steampowered.com", "faceit.com", "youtube.com", "youtu.be", "twitch.tv", "kick.com"];
 const OWN_TME = ["f16arena_cs2"];

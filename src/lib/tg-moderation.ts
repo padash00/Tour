@@ -1,6 +1,8 @@
 import "server-only";
 import { after } from "next/server";
 import { audit } from "./audit";
+import { isAdmin } from "./auth";
+import type { Player } from "./types";
 import { db } from "./supabase";
 import { SITE_URL, tgCall, tgEscape } from "./telegram";
 import { findViolation, formatDuration, parseDuration, punishmentFor, type Violation } from "./tg-moderation-core";
@@ -102,6 +104,7 @@ async function warn(token: string, msg: TgMessage, target: TgUser, reason: strin
   if (p.action === "mute") await mute(token, msg.chat.id, target.id, p.seconds!);
   if (p.action === "ban") await tgCall(token, "banChatMember", { chat_id: msg.chat.id, user_id: target.id });
   if (p.action !== "warn") await audit(null, p.action === "ban" ? "tg.ban" : "tg.mute", undefined, { user: String(target.id), name: nameOf(target), username: target.username ?? null, reason: `${n}-е предупреждение`, seconds: p.seconds ?? null, by });
+  await tellAdmins(token, target, `${p.label} (${n}/5): ${reason}`, text, match);
   const next = n < 5 ? punishmentFor(n + 1).label : null;
   await notice(
     token,
@@ -155,6 +158,20 @@ async function onNewMembers(token: string, msg: TgMessage) {
 
 export async function onCallback(token: string, groupId: number, cb: TgCallback) {
   const data = cb.data ?? "";
+  if (data.startsWith("pardon:")) {
+    if (!(await isSiteAdmin(cb.from.id))) {
+      await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Только для администраторов" });
+      return;
+    }
+    const uid = Number(data.slice(7));
+    const n = await warnCount(uid);
+    for (let i = 0; i < Math.max(1, n); i++) await audit(null, "tg.unwarn", undefined, { user: String(uid), by: nameOf(cb.from), reason: "снято из лички бота" });
+    await tgCall(token, "unbanChatMember", { chat_id: groupId, user_id: uid, only_if_banned: true });
+    await unmute(token, groupId, uid);
+    await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Наказание снято" });
+    if (cb.message) await tgCall(token, "editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [[{ text: "✅ Снято", callback_data: "noop" }]] } });
+    return;
+  }
   if (!data.startsWith("cap:") || cb.message?.chat.id !== groupId) {
     await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id });
     return;
@@ -167,6 +184,27 @@ export async function onCallback(token: string, groupId: number, cb: TgCallback)
   await unmute(token, groupId, uid);
   await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Готово, можно писать! Удачной игры 🎯" });
   if (cb.message) await del(token, groupId, cb.message.message_id);
+}
+
+// ── уведомление админам сайта (с подтверждённым Telegram) о каждом наказании — с кнопкой отмены
+
+async function siteAdminChats(): Promise<number[]> {
+  const { data } = await db().from("player_profiles").select("telegram_chat_id, player:players!player_profiles_player_id_fkey(*)").not("telegram_chat_id", "is", null);
+  return ((data ?? []) as unknown as { telegram_chat_id: number; player: Player | null }[]).filter((r) => isAdmin(r.player)).map((r) => r.telegram_chat_id);
+}
+
+async function isSiteAdmin(tgUserId: number) {
+  return (await siteAdminChats()).includes(tgUserId);
+}
+
+async function tellAdmins(token: string, target: TgUser, what: string, text: string, match?: string) {
+  const chats = await siteAdminChats().catch(() => []);
+  const html = `🛡 <b>Модерация чата</b>
+${mention(target)}${target.username ? ` (@${tgEscape(target.username)})` : ""} — ${tgEscape(what)}${match ? `
+Слово: «${tgEscape(match)}»` : ""}${text ? `
+
+<i>${tgEscape(text.slice(0, 900))}</i>` : ""}`;
+  await Promise.allSettled(chats.map((c) => tgCall(token, "sendMessage", { chat_id: c, text: html, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[{ text: "↩️ Снять наказание", callback_data: `pardon:${target.id}` }]] } })));
 }
 
 // ── команды админа
