@@ -61,3 +61,30 @@ export async function notifyTelegram(playerIds: string[], title: string, body?: 
     console.error("telegram notify failed", e);
   }
 }
+
+/*
+ * Общий чат игроков в Telegram. Админ создаёт группу и добавляет туда бота администратором —
+ * бот сам запоминает группу (my_chat_member). Ссылку-приглашение создаёт бот (createChatInviteLink).
+ * «Только для игроков сайта» — ссылка с заявкой: бот принимает тех, кто подтвердил Telegram на сайте.
+ * Всё хранится в app_settings: TELEGRAM_GROUP_ID, TELEGRAM_GROUP_TITLE, TELEGRAM_GROUP_INVITE, TELEGRAM_GROUP_CLOSED.
+ */
+export const GROUP_KEYS = ["TELEGRAM_GROUP_ID", "TELEGRAM_GROUP_TITLE", "TELEGRAM_GROUP_INVITE", "TELEGRAM_GROUP_CLOSED"] as const;
+
+export async function telegramGroup() {
+  const { data } = await db().from("app_settings").select("key, value").in("key", [...GROUP_KEYS]);
+  const m = new Map((data ?? []).map((r) => [r.key, String(r.value ?? "")]));
+  const id = Number(m.get("TELEGRAM_GROUP_ID") || "");
+  return {
+    id: Number.isFinite(id) && id !== 0 ? id : null,
+    title: m.get("TELEGRAM_GROUP_TITLE") || "",
+    invite: m.get("TELEGRAM_GROUP_INVITE") || "",
+    closed: m.get("TELEGRAM_GROUP_CLOSED") === "1",
+  };
+}
+
+export async function setAppSettings(values: Record<string, string>) {
+  await db().from("app_settings").upsert(Object.entries(values).map(([key, value]) => ({ key, value })));
+}
+
+/** Какие обновления бот получает от Telegram (вебхук) */
+export const TG_ALLOWED_UPDATES = ["message", "my_chat_member", "chat_join_request"];

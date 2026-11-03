@@ -1,11 +1,77 @@
 import { NextResponse } from "next/server";
 import { audit } from "@/lib/audit";
+import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { SITE_URL, telegramConfig, tgEscape, tgSend } from "@/lib/telegram";
+import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
+import type { Player } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type Update = { message?: { text?: string; chat: { id: number; type: string }; from?: { id: number; username?: string; first_name?: string } } };
+type TgUser = { id: number; username?: string; first_name?: string };
+type Update = {
+  message?: { text?: string; chat: { id: number; type: string }; from?: TgUser };
+  /** бота добавили в группу / изменили права / удалили */
+  my_chat_member?: { chat: { id: number; type: string; title?: string }; from: TgUser; new_chat_member: { status: string } };
+  /** заявка на вступление в группу по ссылке «с одобрением» */
+  chat_join_request?: { chat: { id: number; title?: string }; from: TgUser; user_chat_id?: number };
+};
+
+/** Игрок сайта, к которому привязан этот Telegram (id пользователя = id личного чата с ботом) */
+async function playerByTelegram(userId: number) {
+  const { data } = await db().from("player_profiles").select("player:players(*)").eq("telegram_chat_id", userId).maybeSingle();
+  return ((data as { player: Player | null } | null)?.player ?? null) as Player | null;
+}
+
+/** Бота добавили в группу или убрали. Запоминаем группу, только если добавил админ сайта (с подтверждённым Telegram) */
+async function onMyChatMember(token: string, u: NonNullable<Update["my_chat_member"]>) {
+  const { chat, from, new_chat_member } = u;
+  if (chat.type !== "group" && chat.type !== "supergroup") return;
+  const group = await telegramGroup();
+  const status = new_chat_member.status;
+  if (status === "left" || status === "kicked") {
+    if (group.id === chat.id) await setAppSettings({ TELEGRAM_GROUP_ID: "", TELEGRAM_GROUP_INVITE: "" });
+    return;
+  }
+  if (group.id === chat.id) {
+    await setAppSettings({ TELEGRAM_GROUP_TITLE: chat.title ?? group.title });
+    return;
+  }
+  const admin = await playerByTelegram(from.id);
+  if (!isAdmin(admin)) {
+    // чужая группа: бот не участвует
+    await tgSend(token, chat.id, "Этот бот работает только в общем чате игроков F16 Arena. Ухожу.");
+    await tgCall(token, "leaveChat", { chat_id: chat.id });
+    return;
+  }
+  await setAppSettings({ TELEGRAM_GROUP_ID: String(chat.id), TELEGRAM_GROUP_TITLE: chat.title ?? "", TELEGRAM_GROUP_INVITE: "" });
+  await audit(admin!.id, "telegram.group", undefined, { chat: chat.id, title: chat.title });
+  await tgSend(
+    token,
+    from.id,
+    status === "administrator"
+      ? `✅ Группа <b>${tgEscape(chat.title ?? "")}</b> подключена как общий чат игроков. Дальше — F16 Control → Telegram: создать ссылку и пригласить всех.`
+      : `Группа <b>${tgEscape(chat.title ?? "")}</b> запомнена, но бот там не администратор. Сделайте его администратором с правом «Приглашать по ссылке» — иначе он не сможет создать ссылку.`,
+    { text: "Открыть пульт", url: `${SITE_URL}/admin/telegram` },
+  );
+}
+
+/** Заявка в закрытый чат: игроков сайта принимаем, остальным объясняем, как подтвердить Telegram */
+async function onJoinRequest(token: string, r: NonNullable<Update["chat_join_request"]>) {
+  const group = await telegramGroup();
+  if (group.id !== r.chat.id) return;
+  const player = await playerByTelegram(r.from.id);
+  if (player && !player.is_banned) {
+    await tgCall(token, "approveChatJoinRequest", { chat_id: r.chat.id, user_id: r.from.id });
+    return;
+  }
+  // написать в личку тому, кто подал заявку, бот может, даже если тот не запускал бота
+  await tgSend(
+    token,
+    r.user_chat_id ?? r.from.id,
+    `Чат <b>${tgEscape(group.title || "игроков F16 Arena")}</b> — для игроков сайта.\n\nВойдите на сайт через Steam → Анкета → «Подтвердить Telegram». После подтверждения бот сам примет вашу заявку.`,
+    { text: "Открыть анкету", url: `${SITE_URL}/me/profile` },
+  );
+}
 
 const LINK_TTL_MS = 30 * 60_000;
 
@@ -16,6 +82,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   const update = (await req.json().catch(() => ({}))) as Update;
+  if (update.my_chat_member) {
+    await onMyChatMember(cfg.token, update.my_chat_member).catch((e) => console.error("tg my_chat_member", e));
+    return NextResponse.json({ ok: true });
+  }
+  if (update.chat_join_request) {
+    await onJoinRequest(cfg.token, update.chat_join_request).catch((e) => console.error("tg join request", e));
+    return NextResponse.json({ ok: true });
+  }
   const msg = update.message;
   if (!msg?.text || msg.chat.type !== "private") return NextResponse.json({ ok: true });
   const chat = msg.chat.id;
@@ -43,9 +117,12 @@ export async function POST(req: Request) {
     await db().from("telegram_link_tokens").delete().eq("player_id", tok.player_id);
     const { data: p } = await db().from("players").select("nickname").eq("id", tok.player_id).maybeSingle();
     await audit(tok.player_id, "telegram.link", { type: "player", id: tok.player_id }, { username });
+    // если игрок уже подал заявку в закрытый чат — принимаем; ошибку «заявки нет» глотаем
+    const group = await telegramGroup();
+    if (group.id) await tgCall(cfg.token, "approveChatJoinRequest", { chat_id: group.id, user_id: msg.from?.id ?? chat });
     await reply(
-      `✅ Telegram подтверждён для <b>${tgEscape(p?.nickname ?? "игрока")}</b>.\n\nСюда будут приходить уведомления F16 Arena: приглашения в команду, решения по заявкам, матчи и объявления турниров.\n\nОтключить — /stop`,
-      { text: "Открыть сайт", url: SITE_URL },
+      `✅ Telegram подтверждён для <b>${tgEscape(p?.nickname ?? "игрока")}</b>.\n\nСюда будут приходить уведомления F16 Arena: приглашения в команду, решения по заявкам, матчи и объявления турниров.${group.invite ? "\n\nВступайте в общий чат игроков — там новости, поиск тиммейтов и объявления турниров." : ""}\n\nОтключить — /stop`,
+      group.invite ? { text: "💬 Вступить в чат игроков", url: group.invite } : { text: "Открыть сайт", url: SITE_URL },
     );
     return NextResponse.json({ ok: true });
   }
