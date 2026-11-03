@@ -65,6 +65,15 @@ export async function adminTelegramBroadcast(_prev: ActionResult, formData: Form
   return { success: `Отправлено: ${ok} из ${chats.length}` };
 }
 
+/** Включить / выключить модерацию общего чата ботом */
+export async function adminTelegramModeration(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  const on = formData.get("on") === "1";
+  await setAppSettings({ TELEGRAM_MODERATION: on ? "1" : "" });
+  await audit(admin.id, "telegram.moderation", undefined, { on });
+  return { success: on ? "Модерация чата включена" : "Модерация чата выключена — бот ничего не удаляет и никого не наказывает" };
+}
+
 /** Telegram: не больше ~30 сообщений в секунду — шлём пачками по 20 с паузой. Возвращает, сколько дошло */
 async function sendBatched(token: string, chats: number[], html: string, button?: { text: string; url: string }) {
   let ok = 0;

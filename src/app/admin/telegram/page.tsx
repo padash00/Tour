@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone } from "@/app/actions/admin-telegram";
+import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration } from "@/app/actions/admin-telegram";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
@@ -45,7 +45,19 @@ export default async function AdminTelegramPage() {
             {info?.result?.last_error_message ? <span className="text-danger"> · последняя ошибка: {info.result.last_error_message}</span> : null}
           </p>
           {needsReconnect ? <p className="font-medium text-warn">Нажмите «Переподключить бота» — иначе модерация чата работает не полностью (кнопка «Я не бот», изменённые сообщения).</p> : null}
-          {group.id ? <p>Общий чат: <b>{group.title || group.id}</b> — бот модерирует: мат, оскорбления, реклама, флуд, проверка новичков.</p> : null}
+          {group.id ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p>
+                Общий чат: <b>{group.title || group.id}</b> — модерация{" "}
+                {group.moderation ? <b className="text-ok">включена</b> : <b className="text-fg-3">выключена</b>}
+                <span className="text-fg-3"> (мат, оскорбления, реклама, флуд, проверка новичков)</span>
+              </p>
+              <ActionForm action={adminTelegramModeration}>
+                <input type="hidden" name="on" value={group.moderation ? "0" : "1"} />
+                <SubmitButton variant="secondary" size="sm">{group.moderation ? "Выключить модерацию" : "Включить модерацию"}</SubmitButton>
+              </ActionForm>
+            </div>
+          ) : null}
           <ActionForm action={adminTelegramConnect}>
             <SubmitButton variant={hooked ? "secondary" : "primary"}>{hooked ? "Переподключить бота" : "Подключить бота"}</SubmitButton>
           </ActionForm>
