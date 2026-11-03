@@ -290,11 +290,14 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
 /** Сообщение (новое или изменённое) в общем чате. Ничего не бросает наружу. */
 export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null) {
   if (msg.new_chat_members?.length) return onNewMembers(token, msg);
+  const text = msg.text ?? msg.caption ?? "";
+  // анонимный админ пишет от имени группы (from — служебный бот) — команды выполняем, остальное не трогаем
+  if (msg.sender_chat?.id === msg.chat.id) {
+    if (!edited && text.startsWith("/")) await onCommand(token, msg, text);
+    return;
+  }
   const from = msg.from;
   if (!from || from.is_bot) return;
-  // анонимный админ пишет от имени группы
-  if (msg.sender_chat?.id === msg.chat.id) return;
-  const text = msg.text ?? msg.caption ?? "";
   const admin = await isChatAdmin(token, msg.chat.id, from.id);
   if (admin) {
     if (!edited && text.startsWith("/")) await onCommand(token, msg, text);
