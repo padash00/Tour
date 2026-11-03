@@ -31,7 +31,7 @@ export async function StatsView({ slug }: { slug: string | null }) {
         <div>
           <PageTitle>{t("Статистика")}</PageTitle>
           <p className="mt-1 max-w-read text-meta text-fg-3">
-            {t("F16 Rating, Swing, команды и карты — только данные матчей с серверов F16 Arena.")}
+            {t("Рейтинг игроков и статистика карт — только данные матчей с серверов F16 Arena.")}
           </p>
         </div>
 
@@ -76,7 +76,7 @@ const emptyStats = (t: T) => (
   <EmptyState
     icon={<BarChart3 />}
     title={t("Статистика появится после первого матча")}
-    text={t("Рейтинги игроков, команд и карт считаются автоматически с игровых серверов F16 Arena.")}
+    text={t("Рейтинг игроков и статистика карт считаются автоматически с игровых серверов F16 Arena.")}
   />
 );
 
