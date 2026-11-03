@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration } from "@/app/actions/admin-telegram";
+import { adminTelegramBroadcast, adminTelegramConnect, adminChatInviteEveryone, adminTelegramModeration, adminTelegramPardonAll } from "@/app/actions/admin-telegram";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
@@ -103,6 +103,9 @@ export default async function AdminTelegramPage() {
       </Panel>
 
       <Panel title="Нарушения в чате" boxed>
+        <ActionForm action={adminTelegramPardonAll} className="border-b border-line-subtle p-5">
+          <SubmitButton variant="secondary" confirm="Снять все наказания бота: разбанить, снять муты и обнулить предупреждения у всех?">Снять все наказания</SubmitButton>
+        </ActionForm>
         {(modLog ?? []).length === 0 ? (
           <p className="p-5 text-[14px] text-fg-3">Пока нарушений нет. Команды ответом на сообщение в группе: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban.</p>
         ) : (

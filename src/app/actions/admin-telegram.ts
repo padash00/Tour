@@ -74,6 +74,18 @@ export async function adminTelegramModeration(_prev: ActionResult, formData: For
   return { success: on ? "Модерация чата включена" : "Модерация чата выключена — бот ничего не удаляет и никого не наказывает" };
 }
 
+/** Снять все наказания бота в общем чате: разбан, снятие мута, обнуление предупреждений */
+export async function adminTelegramPardonAll(): Promise<ActionResult> {
+  const admin = await requireAdmin("/admin/telegram");
+  const cfg = await telegramConfig();
+  const group = await telegramGroup();
+  if (!cfg.token || !group.id) return { error: "Бот или группа не подключены" };
+  const { pardonAll } = await import("@/lib/tg-moderation");
+  const n = await pardonAll(cfg.token, group.id, admin.nickname);
+  await audit(admin.id, "telegram.pardon_all", undefined, { users: n });
+  return { success: n ? `Наказания сняты: ${n} чел. — разбан, снят мут, предупреждения обнулены` : "Наказанных нет" };
+}
+
 /** Telegram: не больше ~30 сообщений в секунду — шлём пачками по 20 с паузой. Возвращает, сколько дошло */
 async function sendBatched(token: string, chats: number[], html: string, button?: { text: string; url: string }) {
   let ok = 0;

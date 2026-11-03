@@ -265,3 +265,23 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
   `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\nЖурнал — ${SITE_URL}/admin/telegram`;
+
+/** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */
+export async function pardonAll(token: string, groupId: number, by: string) {
+  const { data } = await db().from("audit_logs").select("action, payload").in("action", ["tg.warn", "tg.mute", "tg.ban"]);
+  const users = new Map<string, { name: string; username: string | null }>();
+  for (const l of data ?? []) {
+    const p = (l.payload ?? {}) as { user?: string; name?: string; username?: string | null };
+    if (p.user) users.set(p.user, { name: p.name ?? p.user, username: p.username ?? null });
+  }
+  let done = 0;
+  for (const [user, u] of users) {
+    const id = Number(user);
+    await tgCall(token, "unbanChatMember", { chat_id: groupId, user_id: id, only_if_banned: true });
+    await unmute(token, groupId, id);
+    const n = await warnCount(id);
+    for (let i = 0; i < n; i++) await audit(null, "tg.unwarn", undefined, { user, name: u.name, username: u.username, by, reason: "амнистия" });
+    done++;
+  }
+  return done;
+}
