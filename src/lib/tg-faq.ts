@@ -141,51 +141,85 @@ function looksLikeQuestion(text: string) {
   return /\?/.test(t) || /^(как|когда|где|что|кто|сколько|можно|нужно|надо|почему|зачем|какой|какая|какие|куда|есть ли|подскажите|скажите|а если|қашан|қалай|қайда|не\b|неше|кім|бола ма|керек пе)/i.test(t);
 }
 
+/** Ответ помощника без отправки в Telegram (проверка из пульта / скрипта) */
+export async function previewAnswer(question: string, tgUserId?: number) {
+  const apiKey = await getSetting("ANTHROPIC_API_KEY");
+  if (!apiKey) return { error: "нет ключа ANTHROPIC_API_KEY" };
+  const tours = await tournamentsContext();
+  const asker = tgUserId ? await askerContext(tgUserId, tours.ids) : "Спрашивающий не подтвердил Telegram на сайте.";
+  const answer = await askClaude(apiKey, tours.text, asker, "", question);
+  return { answer };
+}
+
+async function askClaude(apiKey: string, toursText: string, asker: string, replied: string, text: string) {
+  const client = new Anthropic({ apiKey });
+  const res = await client.beta.messages.create({
+    model: MODEL,
+    max_tokens: 4000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort: "low" },
+    system: [
+      { type: "text", text: INSTRUCTIONS, cache_control: { type: "ephemeral" } },
+      { type: "text", text: `Данные с сайта на ${when(new Date().toISOString())}:
+
+${toursText}` },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: `${asker}
+${replied ? `Игрок отвечает на сообщение: «${replied.slice(0, 1000)}»
+` : ""}
+Вопрос игрока:
+${text.slice(0, 2000)}`,
+      },
+    ],
+  });
+  if (res.stop_reason === "refusal") return "";
+  return res.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
 /** Ответить на вопрос в теме с помощником (вызывать после модерации; сообщения админов не трогаем) */
 export async function answerQuestion(token: string, msg: TgMessage, faqThreads: number[], isAdmin: boolean) {
-  const text = (msg.text ?? msg.caption ?? "").trim();
-  if (!msg.from || msg.from.is_bot || isAdmin) return;
+  let text = (msg.text ?? msg.caption ?? "").trim();
+  if (!msg.from || msg.from.is_bot) return;
   if (!msg.is_topic_message || !msg.message_thread_id || !faqThreads.includes(msg.message_thread_id)) return;
-  if (!looksLikeQuestion(text) || findViolation(text)) return;
+  // админам помощник не отвечает, кроме проверки: /ask вопрос
+  const ask = /^\/ask(?:@\w+)?\s+([\s\S]+)/i.exec(text);
+  if (isAdmin && !ask) return;
+  if (ask) text = ask[1].trim();
+  else if (!looksLikeQuestion(text) || findViolation(text)) return;
   const apiKey = await getSetting("ANTHROPIC_API_KEY");
-  if (!apiKey || !allowed(msg.from.id)) return;
+  if (!apiKey) {
+    await audit(null, "telegram.faq_error", undefined, { reason: "нет ключа ANTHROPIC_API_KEY" });
+    return;
+  }
+  if (!ask && !allowed(msg.from.id)) return;
 
   const tours = await tournamentsContext();
   const asker = await askerContext(msg.from.id, tours.ids);
   // ответ, на который реагирует игрок, — для контекста «а это как?»
   const replied = msg.reply_to_message && msg.reply_to_message.message_id !== msg.message_thread_id ? (msg.reply_to_message.text ?? msg.reply_to_message.caption ?? "") : "";
 
-  const client = new Anthropic({ apiKey });
   let answer = "";
   try {
-    const res = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 4000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "low" },
-      system: [
-        { type: "text", text: INSTRUCTIONS, cache_control: { type: "ephemeral" } },
-        { type: "text", text: `Данные с сайта на ${when(new Date().toISOString())}:\n\n${tours.text}` },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `${asker}\n${replied ? `Игрок отвечает на сообщение: «${replied.slice(0, 1000)}»\n` : ""}\nВопрос игрока:\n${text.slice(0, 2000)}`,
-        },
-      ],
-    });
-    if (res.stop_reason === "refusal") return;
-    answer = res.content
-      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
+    answer = await askClaude(apiKey, tours.text, asker, replied, text);
   } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) console.error("tg faq: неверный ANTHROPIC_API_KEY");
-    else if (e instanceof Anthropic.RateLimitError) console.error("tg faq: лимит Claude API");
-    else if (e instanceof Anthropic.APIError) console.error("tg faq: Claude API", e.status, e.message);
-    else console.error("tg faq", e);
+    const reason =
+      e instanceof Anthropic.AuthenticationError
+        ? "неверный ключ ANTHROPIC_API_KEY"
+        : e instanceof Anthropic.RateLimitError
+          ? "лимит Claude API"
+          : e instanceof Anthropic.APIError
+            ? `Claude API ${e.status}: ${e.message}`
+            : String(e instanceof Error ? e.message : e);
+    console.error("tg faq", reason);
+    await audit(null, "telegram.faq_error", undefined, { reason: reason.slice(0, 500), question: text.slice(0, 300) }).catch(() => {});
     return;
   }
   if (!answer || /^SKIP\b/i.test(answer)) return;
