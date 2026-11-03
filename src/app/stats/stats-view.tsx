@@ -2,10 +2,10 @@ import { notFound } from "next/navigation";
 import { BarChart3 } from "lucide-react";
 import { listPublicTournaments } from "@/lib/data";
 import { mapName } from "@/lib/format";
-import { getMapTable, getPlayerLeaderboard, getTeamStats, type MapAgg } from "@/lib/stats";
+import { getMapTable, getPlayerLeaderboard, type MapAgg } from "@/lib/stats";
 import { getMapImages } from "@/lib/settings";
 import { tint } from "@/components/competition/map-tile";
-import { PlayerStatsTable, RatingExplainer, TeamStatsTable } from "@/components/stats-table";
+import { PlayerStatsTable, RatingExplainer } from "@/components/stats-table";
 import { StatLeaders } from "@/components/stat-leaders";
 import { SelectNav } from "@/components/public/select-nav";
 import { ClientTabs, TabPanel } from "@/components/public/client-tabs";
@@ -15,7 +15,6 @@ import { tr, type T } from "@/lib/i18n/core";
 
 const TABS = [
   { key: "players", label: tr("Игроки") },
-  { key: "teams", label: tr("Команды") },
   { key: "maps", label: tr("Карты") },
 ];
 
@@ -61,9 +60,6 @@ export async function StatsView({ slug }: { slug: string | null }) {
         <TabPanel tab="players" defaultKey="players">
           <PlayersTab tournamentId={tournament?.id} />
         </TabPanel>
-        <TabPanel tab="teams" defaultKey="players">
-          <TeamsTab tournamentId={tournament?.id} />
-        </TabPanel>
         <TabPanel tab="maps" defaultKey="players">
           <MapsTab tournamentId={tournament?.id} />
         </TabPanel>
@@ -96,17 +92,6 @@ async function PlayersTab({ tournamentId }: { tournamentId?: string }) {
     </div>
   ) : (
     emptyStats(t)
-  );
-}
-
-async function TeamsTab({ tournamentId }: { tournamentId?: string }) {
-  const t = await getT();
-  const rows = await getTeamStats(tournamentId);
-  if (!rows.length) return emptyStats(t);
-  return (
-    <Panel padded={false} className="overflow-hidden">
-      <TeamStatsTable rows={rows} />
-    </Panel>
   );
 }
 
