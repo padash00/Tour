@@ -119,13 +119,13 @@ test("Profile completeness follows occupation: position for workers, course and 
 
 test("parseProfileForm normalizes values and reports field errors", () => {
   const form = (values: Record<string, string>) => parseProfileForm((k) => values[k] ?? "", "2026-10-09");
-  const good = form({ last_name: "  Иванова-Петрова ", first_name: "Анна", birth_date: "2005-03-14", phone: "8 705 123 45 67", city: "Усть-Каменогорск", occupation: "works", organization: "Казцинк", position: "Инженер" });
+  const good = form({ last_name: "  Иванова-Петрова ", first_name: "Анна", birth_date: "2005-03-14", phone: "8 705 123 45 67", city: "Усть-Каменогорск", occupation: "works", organization: "Казцинк", position: "Инженер", telegram: "@ivanova_anna" });
   assert.deepEqual(good.errors, {});
   assert.equal(good.value.last_name, "Иванова-Петрова");
   assert.equal(good.value.phone, "+77051234567");
   assert.equal(good.value.course, null, "course is dropped for workers");
   const bad = form({ last_name: "Ivanov1", first_name: "", birth_date: "2030-01-01", phone: "123", city: "", occupation: "studies" });
-  assert.deepEqual(Object.keys(bad.errors).sort(), ["birth_date", "city", "course", "first_name", "last_name", "organization", "phone", "study_group"]);
+  assert.deepEqual(Object.keys(bad.errors).sort(), ["birth_date", "city", "course", "first_name", "last_name", "organization", "phone", "study_group", "telegram"]);
 });
 
 test("Organization suggestions dedupe case-insensitively, ignoring quotes, dots, spacing and ё", () => {
