@@ -321,6 +321,13 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
     return;
   }
 
+  // General — только для бота и админов: сообщения игроков удаляем и подсказываем, куда писать
+  if (!msg.is_topic_message && !edited) {
+    await del(token, msg.chat.id, msg.message_id);
+    await notice(token, msg, `${mention(from)}, в General писать нельзя — выберите тему: 💬 Общение, 🔍 Поиск тиммейтов, 🏆 Турниры, 🛠 Помощь.`, 15_000);
+    return;
+  }
+
   // «Купля-продажа»: только объявления по шаблону, без обсуждений
   const inMarket = !!marketThread && msg.is_topic_message === true && msg.message_thread_id === marketThread;
   if (inMarket && !edited) {
