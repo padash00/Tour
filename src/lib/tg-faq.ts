@@ -57,7 +57,16 @@ const INSTRUCTIONS = `Ты — помощник организаторов ту�
 
 // ── данные турниров с сайта
 
+let toursCache: { at: number; value: { text: string; ids: string[] } } | null = null;
+/** Данные турниров — кэш на минуту: вопросы идут пачками, база не дёргается на каждый */
 async function tournamentsContext() {
+  if (toursCache && Date.now() - toursCache.at < 60_000) return toursCache.value;
+  const value = await loadTournamentsContext();
+  toursCache = { at: Date.now(), value };
+  return value;
+}
+
+async function loadTournamentsContext() {
   const { data } = await db()
     .from("tournaments")
     .select("id, name, slug, status, format, is_lan, is_official, starts_at, checkin_opens_at, checkin_closes_at, registration_closes_at, location, city, max_teams, entry_fee, prize_pool, description, requirements, rules")
@@ -204,6 +213,8 @@ export async function answerQuestion(token: string, msg: TgMessage, faqThreads: 
   }
   if (!ask && !allowed(msg.from.id)) return;
 
+  // «печатает…» сразу — игрок видит, что ответ идёт
+  void tgCall(token, "sendChatAction", { chat_id: msg.chat.id, message_thread_id: msg.message_thread_id, action: "typing" });
   const tours = await tournamentsContext();
   const asker = await askerContext(msg.from.id, tours.ids);
   // ответ, на который реагирует игрок, — для контекста «а это как?»
