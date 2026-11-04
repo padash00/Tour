@@ -29,13 +29,31 @@ export function TelegramChatGate() {
   const [pending, start] = useTransition();
   const toast = useToast();
   const playerId = player?.id ?? null;
+  // страницы, где окна не показываем: служебные экраны, правила, вход, профиль (там своя кнопка подтверждения Telegram)
+  const skip = noChrome(pathname) || ["/tg", "/privacy", "/rules", "/login", "/me/profile"].some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const [tick, setTick] = useState(0);
+
+  // пока висит «Подтвердите Telegram» — перепроверяем, когда игрок вернулся во вкладку из Telegram
+  useEffect(() => {
+    if (!link) return;
+    const again = () => {
+      if (document.visibilityState === "visible") setTick((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", again);
+    window.addEventListener("focus", again);
+    return () => {
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("focus", again);
+    };
+  }, [link]);
 
   useEffect(() => {
-    if (!playerId || noChrome(pathname) || pathname === "/tg") return;
+    if (!playerId || skip) return;
     let alive = true;
     try {
       const c = JSON.parse(sessionStorage.getItem(CACHE(playerId)) ?? "null") as { show: boolean; link?: string | null; at: number } | null;
-      if (c && Date.now() - c.at < (c.link ? 60_000 : TTL)) {
+      // «нужно подтвердить Telegram» не кэшируем — всегда спрашиваем сервер, иначе окно висит после подтверждения
+      if (c && !c.link && Date.now() - c.at < TTL) {
         const id = setTimeout(() => {
           setShow(c.show);
           setLink(c.link ?? null);
@@ -57,9 +75,9 @@ export function TelegramChatGate() {
     return () => {
       alive = false;
     };
-  }, [playerId, pathname]);
+  }, [playerId, pathname, skip, tick]);
 
-  if (!playerId) return null;
+  if (!playerId || skip) return null;
   if (link) {
     const recheck = () => {
       try {
@@ -93,11 +111,9 @@ export function TelegramChatGate() {
               <Send className="size-4" aria-hidden />
               {t("Подтвердить через бота")}
             </button>
-            {opened && (
-              <button type="button" className={buttonClass("secondary", "lg", "w-full sm:w-auto")} onClick={recheck}>
-                {t("Я нажал «Старт» — проверить")}
-              </button>
-            )}
+            <button type="button" className={buttonClass("secondary", "lg", "w-full sm:w-auto")} onClick={recheck}>
+              {t("Я нажал «Старт» — проверить")}
+            </button>
           </div>
         }
       >

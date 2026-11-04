@@ -122,6 +122,16 @@ export async function startTelegramLink(): Promise<{ url?: string; error?: strin
   const { telegramConfig } = await import("@/lib/telegram");
   const cfg = await telegramConfig();
   if (!cfg.username || !cfg.token) return { error: t("Бот пока не подключён — напишите организатору") };
+  // свежая ссылка уже есть — отдаём её же: повторный клик не должен «ломать» уже открытый в Telegram старт
+  const { data: fresh } = await db()
+    .from("telegram_link_tokens")
+    .select("token, created_at")
+    .eq("player_id", player.id)
+    .gte("created_at", new Date(Date.now() - 20 * 60_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fresh?.token) return { url: `https://t.me/${cfg.username}?start=${fresh.token}` };
   const { randomBytes } = await import("node:crypto");
   const token = randomBytes(12).toString("base64url");
   await db().from("telegram_link_tokens").delete().eq("player_id", player.id);

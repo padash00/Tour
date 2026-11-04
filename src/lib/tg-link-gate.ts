@@ -13,19 +13,21 @@ type RosterRow = {
   player_id: string;
   role: string;
   registration: { status: string; team: { id: string; name: string; tag: string; captain_id: string | null } | null; tournament: { name: string; status: string } | null } | null;
-  player: { nickname: string } | null;
+  player: { nickname: string; is_banned: boolean } | null;
 };
 
 async function approvedRosters(playerId?: string) {
   let q = db()
     .from("tournament_roster_players")
     .select(
-      "player_id, role, player:players(nickname), registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(status, team:teams(id, name, tag, captain_id), tournament:tournaments!inner(name, status))",
+      "player_id, role, player:players!inner(nickname, is_banned), registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(status, team:teams(id, name, tag, captain_id), tournament:tournaments!inner(name, status))",
     )
     .eq("registration.status", "approved")
-    .in("registration.tournament.status", OPEN);
+    .in("registration.tournament.status", OPEN)
+    .eq("player.is_banned", false);
   if (playerId) q = q.eq("player_id", playerId);
-  const { data } = await q.limit(2000);
+  const { data, error } = await q.range(0, 999);
+  if (error) throw error;
   return (data ?? []) as unknown as RosterRow[];
 }
 
@@ -34,7 +36,8 @@ export async function telegramLinkRequired(playerId: string): Promise<string | n
   const rows = await approvedRosters(playerId);
   const row = rows.find((r) => r.registration?.tournament);
   if (!row) return null;
-  const { data: prof } = await db().from("player_profiles").select("telegram_chat_id").eq("player_id", playerId).maybeSingle();
+  const { data: prof, error } = await db().from("player_profiles").select("telegram_chat_id").eq("player_id", playerId).maybeSingle();
+  if (error) return null; // база не ответила — лучше не показать окно, чем заблокировать подтвердившего игрока
   return prof?.telegram_chat_id ? null : row.registration!.tournament!.name;
 }
 
@@ -44,11 +47,14 @@ export type UnlinkedTeam = { team: string; tag: string; tournament: string; tota
 export async function unlinkedParticipants(): Promise<UnlinkedTeam[]> {
   const rows = await approvedRosters();
   if (!rows.length) return [];
-  const { data: profs } = await db()
-    .from("player_profiles")
-    .select("player_id, telegram_chat_id")
-    .in("player_id", [...new Set(rows.map((r) => r.player_id))]);
-  const linked = new Set((profs ?? []).filter((p) => p.telegram_chat_id).map((p) => p.player_id));
+  // кусками по 100 — длинный список id не влезает в адрес запроса
+  const ids = [...new Set(rows.map((r) => r.player_id))];
+  const linked = new Set<string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: profs, error } = await db().from("player_profiles").select("player_id").in("player_id", ids.slice(i, i + 100)).not("telegram_chat_id", "is", null);
+    if (error) throw error;
+    for (const p of profs ?? []) linked.add(p.player_id);
+  }
   const byTeam = new Map<string, UnlinkedTeam>();
   for (const r of rows) {
     const team = r.registration?.team;
