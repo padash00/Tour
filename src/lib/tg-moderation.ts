@@ -30,6 +30,7 @@ export type TgMessage = {
   reply_to_message?: TgMessage;
   new_chat_members?: TgUser[];
   left_chat_member?: TgUser;
+  pinned_message?: unknown;
   forward_origin?: { type: string; chat?: { type: string } };
   forward_from_chat?: { type: string };
   photo?: unknown[];
@@ -324,6 +325,11 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
 /** Сообщение (новое или изменённое) в общем чате. Ничего не бросает наружу. */
 export async function moderateGroupMessage(token: string, msg: TgMessage, edited = false, marketThread: number | null = null, ideasThread: number | null = null) {
   // служебные «X теперь в группе» / «X покинул группу» — убираем, чтобы не засоряли чат
+  // служебное «… закрепил(а) …» — тоже убираем, закреп и так виден сверху
+  if (msg.pinned_message) {
+    await del(token, msg.chat.id, msg.message_id);
+    return;
+  }
   if (msg.new_chat_members?.length || msg.left_chat_member) {
     await del(token, msg.chat.id, msg.message_id);
     if (msg.new_chat_members?.length) await onNewMembers(token, msg);
