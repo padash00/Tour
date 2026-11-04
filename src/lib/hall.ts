@@ -16,7 +16,7 @@ import { HALL_BLOCKS, blockById, blockLabel, chooseSeats, parseForbidden, type S
  */
 
 export const READY_MS = 10 * 60_000; // на «Готов» после вызова
-export const REST_MS = 10 * 60_000; // перерыв команды между матчами
+export const REST_MS = 20 * 60_000; // перерыв команды между матчами
 export const RELEASE_MS = 5 * 60_000; // блок проигравших освобождается после матча
 
 const ACTIVE = ["upcoming", "veto", "ready", "live"];
