@@ -7,7 +7,7 @@ import { applyDueVetoTimeouts } from "../matches";
 import { hallTick } from "../hall";
 import { postMatchResults } from "../tg-match-result";
 import { captchaSweepTick } from "../tg-moderation";
-import { captainLinkRemindTick } from "../tg-link-gate";
+import { captainLinkRemindTick, groupLinkRemindTick } from "../tg-link-gate";
 import { lobbyTick } from "../lobby";
 import { refreshStaleProfilesTick } from "../profile-sync";
 import { checkCs2UpToDate, pruneIngest } from "./ops";
@@ -41,4 +41,5 @@ export async function runAgentJobs(lane: AgentJobLane, safely: SafeJob, cs2Patch
   await safely("auto maintenance", autoMaintenanceTick);
   // капитанам раз в день — кто из состава ещё не подтвердил Telegram
   await safely("tg captain remind", captainLinkRemindTick);
+  await safely("tg link remind", () => groupLinkRemindTick());
 }

@@ -131,3 +131,68 @@ export async function captainLinkRemindTick() {
     await tgSend(cfg.token, chat, html, { text: "Открыть сайт", url: SITE_URL });
   }
 }
+
+/*
+ * Каждый час (11:00–21:00 по Алматы) бот публикует в теме «Матчи турнира» список участников без подтверждённого
+ * Telegram, с отметками @ник (ник из анкеты), и удаляет прошлое такое сообщение — в теме всегда одно, свежее.
+ * Когда подтвердят все — прошлое сообщение удаляется и напоминания прекращаются.
+ */
+export async function groupLinkRemindTick(force = false) {
+  const { day, hour } = almatyNow();
+  if (!force && (hour < REMIND_FROM_HOUR || hour >= REMIND_TO_HOUR)) return;
+  const { telegramConfig, telegramGroup, tgCall, tgEscape, setAppSettings, SITE_URL } = await import("./telegram");
+  const [cfg, group, { data: st }] = await Promise.all([
+    telegramConfig(),
+    telegramGroup(),
+    db().from("app_settings").select("key, value").in("key", ["TELEGRAM_MATCHES_THREAD", "TG_LINK_REMIND_MSG", "TG_LINK_REMIND_AT"]),
+  ]);
+  const s = new Map((st ?? []).map((r) => [r.key, String(r.value ?? "")]));
+  const thread = Number(s.get("TELEGRAM_MATCHES_THREAD") || "") || null;
+  if (!cfg.token || !group.id || !thread) return;
+  const slot = `${day}T${hour}`;
+  if (!force && s.get("TG_LINK_REMIND_AT") === slot) return; // в этот час уже публиковали
+
+  const rows = await approvedRosters();
+  const ids = [...new Set(rows.map((r) => r.player_id))];
+  const prof = new Map<string, { chat: number | null; tg: string | null }>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await db().from("player_profiles").select("player_id, telegram_chat_id, telegram").in("player_id", ids.slice(i, i + 100));
+    if (error) throw error;
+    for (const p of data ?? []) prof.set(p.player_id, { chat: p.telegram_chat_id as number | null, tg: p.telegram });
+  }
+  const byTeam = new Map<string, string[]>();
+  for (const r of rows) {
+    const team = r.registration?.team?.name;
+    const p = prof.get(r.player_id);
+    if (!team || p?.chat) continue;
+    const u = (p?.tg ?? "").trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^@/, "");
+    const who = /^[A-Za-z0-9_]{5,32}$/.test(u) ? `@${u}` : tgEscape(r.player?.nickname ?? "?");
+    byTeam.set(team, [...(byTeam.get(team) ?? []), who]);
+  }
+
+  const prev = Number(s.get("TG_LINK_REMIND_MSG") || "") || null;
+  if (prev) await tgCall(cfg.token, "deleteMessage", { chat_id: group.id, message_id: prev });
+  if (!byTeam.size) {
+    await setAppSettings({ TG_LINK_REMIND_MSG: "", TG_LINK_REMIND_AT: slot });
+    return;
+  }
+  const total = [...byTeam.values()].reduce((n, l) => n + l.length, 0);
+  const list = [...byTeam.entries()]
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .map(([team, who]) => `<b>${tgEscape(team)}</b>: ${who.join(", ")}`)
+    .join("\n");
+  const html =
+    `⚠️ <b>Подтвердите Telegram — ${total} ${total % 10 === 1 && total % 100 !== 11 ? "игрок" : total % 10 >= 2 && total % 10 <= 4 && (total % 100 < 12 || total % 100 > 14) ? "игрока" : "игроков"} ещё без него</b>\n\n` +
+    `В день турнира бот пишет каждому игроку, за какие ПК садиться и когда его матч. Этим игрокам сообщения не придут:\n\n${list}\n\n` +
+    `Как подтвердить (1 минута): зайдите на сайт со своего аккаунта → окно «Подтвердите Telegram» → «Подтвердить через бота» → в боте «Старт». Нет Telegram на компьютере — в окне QR-код для телефона.\n\n` +
+    `<i>Список обновляется каждый час.</i>`;
+  const r = await tgCall<{ message_id: number }>(cfg.token, "sendMessage", {
+    chat_id: group.id,
+    message_thread_id: thread,
+    text: html,
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+    reply_markup: { inline_keyboard: [[{ text: "Открыть сайт", url: SITE_URL }]] },
+  });
+  await setAppSettings({ TG_LINK_REMIND_MSG: r.result?.message_id ? String(r.result.message_id) : "", TG_LINK_REMIND_AT: slot });
+}
