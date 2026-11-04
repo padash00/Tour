@@ -34,6 +34,7 @@ export type TgMessage = {
   forward_origin?: { type: string; chat?: { type: string } };
   forward_from_chat?: { type: string };
   photo?: unknown[];
+  media_group_id?: string;
   video?: unknown;
   document?: { mime_type?: string };
 };
@@ -353,6 +354,35 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
     await updateBoard().catch(() => {});
     return true;
   }
+  if (cmd === "/announce" || cmd === "/chat") {
+    // дубль «Объявлений» в «Общение»: /announce — в теме «Объявления», /chat — в теме «Общение»
+    await del(token, msg.chat.id, msg.message_id);
+    const key = cmd === "/announce" ? "TELEGRAM_ANNOUNCE_THREAD" : "TELEGRAM_CHAT_THREAD";
+    if (arg === "off") {
+      await setAppSettings({ [key]: "" });
+      await notice(token, msg, "Дубль объявлений в «Общение» выключен.", 20_000);
+      return true;
+    }
+    if (!msg.is_topic_message || !msg.message_thread_id) {
+      await notice(token, msg, cmd === "/announce" ? "Отправьте /announce внутри темы «Объявления»." : "Отправьте /chat внутри темы «Общение».", 20_000);
+      return true;
+    }
+    await setAppSettings({ [key]: String(msg.message_thread_id) });
+    const { mirrorThreads } = await import("./tg-mirror");
+    const t = await mirrorThreads();
+    const done = t.from && t.to;
+    await notice(
+      token,
+      msg,
+      done
+        ? "✅ Готово: всё, что публикуется в «Объявлениях», бот копирует в «Общение»."
+        : cmd === "/announce"
+          ? "Тема «Объявления» запомнена. Теперь отправьте /chat в теме «Общение»."
+          : "Тема «Общение» запомнена. Теперь отправьте /announce в теме «Объявления».",
+      20_000,
+    );
+    return true;
+  }
   if (cmd === "/market") {
     await del(token, msg.chat.id, msg.message_id);
     if (arg === "off") {
@@ -565,6 +595,7 @@ const MATCHES_RULES =
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
   `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)
+/announce — в теме «Объявления» и /chat — в теме «Общение»: бот копирует объявления в «Общение» (/announce off — выключить)
 /matches — в теме «Матчи турнира»: бот пишет туда рассадку и табло зала (/matches off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
 
 /** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */

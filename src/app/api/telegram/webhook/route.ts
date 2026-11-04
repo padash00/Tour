@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
 import type { Player } from "@/lib/types";
+import { mirrorAnnouncement, mirrorThreads, shouldMirror } from "@/lib/tg-mirror";
 import { MODERATION_HELP, captchaSweep, handleFaqCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
 import { answerQuestion } from "@/lib/tg-faq";
 import { after } from "next/server";
@@ -105,6 +106,15 @@ export async function POST(req: Request) {
     }
     if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
     else if (group.id && groupMsg && groupMsg.chat.id === group.id) {
+      // дубль «Объявлений» в «Общение» — работает и без модерации; копирование альбома ждёт остальные части, поэтому в after()
+      if (update.message) {
+        const m = groupMsg;
+        const mt = await mirrorThreads().catch(() => ({ from: null, to: null }));
+        if (mt.to && shouldMirror(m, mt.from)) {
+          const to = mt.to;
+          after(() => mirrorAnnouncement(cfg.token, m, to).catch((e) => console.error("tg mirror", e)));
+        }
+      }
       const faqCmd = !!update.message && (await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false));
       if (!faqCmd) {
         if (group.moderation) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread, group.ideasThread).catch((e) => console.error("tg moderation", e));
