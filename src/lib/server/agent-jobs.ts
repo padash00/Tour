@@ -5,6 +5,7 @@ import { expireStaleWork, resyncLiveBrackets } from "./watchdog";
 import { verifyWorkshopLibrary } from "./workshop";
 import { applyDueVetoTimeouts } from "../matches";
 import { hallTick } from "../hall";
+import { postMatchResults } from "../tg-match-result";
 import { lobbyTick } from "../lobby";
 import { refreshStaleProfilesTick } from "../profile-sync";
 import { checkCs2UpToDate, pruneIngest } from "./ops";
@@ -21,6 +22,7 @@ export async function runAgentJobs(lane: AgentJobLane, safely: SafeJob, cs2Patch
     await safely("veto timeouts", applyDueVetoTimeouts);
     await safely("autopilot", autopilotTick);
     await safely("hall seating", hallTick);
+    await safely("tg match results", postMatchResults);
     await safely("lobby", lobbyTick);
     await safely("lobby servers", lobbyServersTick);
     return;
