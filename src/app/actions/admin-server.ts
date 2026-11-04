@@ -21,7 +21,7 @@ export async function sendMatchToServer(_prev: ActionResult, formData: FormData)
   const { online, instances } = await getServerState();
   if (!online) return { error: "Server Agent не на связи — проверьте серверный ПК" };
 
-  const target = wanted ? instances.find((i) => i.name === wanted) : await pickFreeInstance();
+  const target = wanted ? instances.find((i) => i.name === wanted) : await pickFreeInstance("active", { waitFreeing: false }); // админ назначает вручную — без ожидания
   if (!target) return { error: "Нет свободного запущенного сервера" };
   if (!target.running) return { error: `${target.name} не запущен` };
   if ((target.gamestate ?? "none") !== "none") return { error: `На ${target.name} уже загружен матч` };

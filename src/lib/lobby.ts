@@ -1,4 +1,5 @@
 import "server-only";
+import { recentlyFreed } from "./server/freeing";
 import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { db } from "./supabase";
@@ -574,6 +575,12 @@ export async function pickLobbyInstance() {
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));
   const list = insts.filter((i) => !taken.has(i.name));
   const free = list.find((i) => i.running && (i.gamestate ?? "none") === "none") ?? null;
+  // сервер с меньшим номером только что отпустили (лобби закрыли — команда «закончить матч» ещё выполняется):
+  // ждём его до 90 секунд, а не занимаем следующий — лобби остаются на первых серверах
+  const busyRunning = list.filter((i) => i.running && (i.gamestate ?? "none") !== "none" && (!free || i.name < free.name));
+  if (busyRunning.length && (await recentlyFreed(busyRunning.map((i) => i.name))).size) {
+    return { inst: null, stopped: [] as string[], reason: tr("сервер освобождается — несколько секунд…") };
+  }
   return { inst: free?.name ?? null, stopped: list.filter((i) => !i.running).map((i) => i.name), reason: null };
 }
 

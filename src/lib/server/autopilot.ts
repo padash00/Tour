@@ -5,13 +5,14 @@ import { getMaxParallelMatches } from "../settings";
 import { db } from "../supabase";
 import type { Match } from "../types";
 import { enqueueCommand, getServerState, hostBusy } from "./state";
+import { recentlyFreed } from "./freeing";
 import { enqueueAutoPrefetch, workshopInfo } from "./workshop";
 import { announceCalls, callMatch, hallConfig, hallSnapshot, rested } from "../hall";
 
 // ───────────────────────── назначение сервера
 
 /** Свободный инстанс: агент его видит запущенным, MatchZy без матча, и он не закреплён за другим матчем */
-export async function pickFreeInstance(preferRole: "active" | "reserve" = "active") {
+export async function pickFreeInstance(preferRole: "active" | "reserve" = "active", opts: { waitFreeing?: boolean } = {}) {
   const { online, instances, host } = await getServerState();
   if (!online) return null;
   // агент занят обслуживанием всего хоста (обновление) — серверы могут перезапускаться, не назначаем.
@@ -25,7 +26,11 @@ export async function pickFreeInstance(preferRole: "active" | "reserve" = "activ
   const taken = new Set([...(busy ?? []), ...(lobbyBusy ?? [])].map((b) => b.server_instance));
   // серверы лобби турнирам не отдаём
   const free = instances.filter((i) => !i.for_lobby && i.running && (i.gamestate ?? "none") === "none" && !taken.has(i.name) && !busyNow.instances.has(i.name));
-  return free.find((i) => i.role === preferRole) ?? free[0] ?? null;
+  const pick = free.find((i) => i.role === preferRole) ?? free[0] ?? null;
+  // сервер с меньшим номером только что отпустили — ждём его (до 90 с), а не занимаем следующий
+  const freeing = instances.filter((i) => !i.for_lobby && i.running && (i.gamestate ?? "none") !== "none" && !taken.has(i.name) && (!pick || i.name < pick.name));
+  if (opts.waitFreeing !== false && freeing.length && (await recentlyFreed(freeing.map((i) => i.name))).size) return null;
+  return pick;
 }
 
 export async function assignServer(match: Match, instanceName: string, actorId?: string) {
