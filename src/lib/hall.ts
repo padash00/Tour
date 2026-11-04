@@ -330,15 +330,63 @@ export async function hallTick() {
   const { data: ts } = await db().from("tournaments").select("id").eq("is_lan", true).in("status", ["checkin", "live"]);
   for (const t of ts ?? []) {
     const calls = await tournamentCalls(t.id);
-    if (!calls.size) continue;
-    const { data: waiting } = await db().from("matches").select("id").eq("tournament_id", t.id).eq("status", "upcoming").in("id", [...calls.keys()]);
-    const now = Date.now();
-    for (const w of waiting ?? []) {
-      const c = calls.get(w.id)!;
-      if (new Date(c.at).getTime() + READY_MS <= now) await applyReadyTimeout(w.id);
+    if (calls.size) {
+      const { data: waiting } = await db().from("matches").select("id").eq("tournament_id", t.id).eq("status", "upcoming").in("id", [...calls.keys()]);
+      const now = Date.now();
+      for (const w of waiting ?? []) {
+        const c = calls.get(w.id)!;
+        if (new Date(c.at).getTime() + READY_MS <= now) await applyReadyTimeout(w.id);
+      }
     }
+    await warnNextInQueue(t.id, cfg).catch((e) => console.error("hall prepare", e));
   }
   await updateBoard().catch(() => {});
+}
+
+/** Сколько матчей из очереди предупреждать «готовьтесь» */
+const PREPARE_AHEAD = 2;
+
+/**
+ * «Готовьтесь — вы следующие»: первым матчам очереди (соперники известны, на места ещё не вызваны) бот один раз
+ * пишет в тему «Матчи турнира» с отметками игроков и в личку — чтобы команда была рядом с залом к вызову.
+ */
+async function warnNextInQueue(tournamentId: string, cfg: HallConfig) {
+  if (!cfg.thread) return;
+  const snap = await hallSnapshot(tournamentId, cfg);
+  const next = snap.matches
+    .filter((m) => m.status === "upcoming" && m.team1_id && m.team2_id && !snap.calls.has(m.id))
+    .sort((a, b) => a.number - b.number)
+    .slice(0, PREPARE_AHEAD);
+  if (!next.length) return;
+  const { data: done } = await db().from("audit_logs").select("entity_id").eq("action", "hall.prepare").in("entity_id", next.map((m) => m.id));
+  const warned = new Set((done ?? []).map((d) => d.entity_id));
+  const [group, tg] = await Promise.all([telegramGroup(), telegramConfig()]);
+  if (!tg.token || !group.id) return;
+  for (const m of next.filter((x) => !warned.has(x.id))) {
+    await audit(null, "hall.prepare", { type: "match", id: m.id }, { tournament: tournamentId });
+    const [team1, team2] = await Promise.all([teamInfo(tournamentId, m.team1_id!), teamInfo(tournamentId, m.team2_id!)]);
+    const lastEnd = (team: string) =>
+      snap.matches
+        .filter((x) => x.status === "finished" && x.finished_at && (x.team1_id === team || x.team2_id === team))
+        .reduce((a, x) => Math.max(a, new Date(x.finished_at!).getTime()), 0);
+    const restUntil = Math.max(lastEnd(m.team1_id!), lastEnd(m.team2_id!)) + REST_MS;
+    const rest = restUntil > Date.now() ? `\nПерерыв до ${new Date(restUntil).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" })}.` : "";
+    await tgCall(tg.token, "sendMessage", {
+      chat_id: group.id,
+      message_thread_id: cfg.thread,
+      text: `⚠️ <b>Готовьтесь — вы следующие</b>\n⚔️ <b>Матч #${m.number}</b>: ${tgEscape(team1.name)} vs ${tgEscape(team2.name)}\n${mentionList(team1)}\n${mentionList(team2)}${rest}\n\nБудьте рядом с залом: как только освободятся места, бот напишет, за какие ПК садиться.`,
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+    });
+    for (const [me, rival] of [[team1, team2], [team2, team1]] as const) {
+      await notify(
+        me.players.map((p) => p.id),
+        `Готовьтесь: матч #${m.number} против ${rival.name} — вы следующие`,
+        "Будьте рядом с залом. Как только освободятся места, бот напишет, за какие ПК садиться.",
+        `/matches/${m.id}`,
+      ).catch(() => {});
+    }
+  }
 }
 
 const STATUS_TEXT: Record<string, string> = { upcoming: "садятся", veto: "бан-пик", ready: "сервер", live: "игра", finished: "закончили" };
