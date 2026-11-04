@@ -10,6 +10,7 @@ import { ActionForm, SubmitButton } from "@/components/forms";
 import { AdminHeader, Panel } from "@/components/admin/control";
 import { LiveRefresh } from "@/components/live-refresh";
 import { cn } from "@/components/ui";
+import { HallMap } from "@/components/hall-map";
 
 export const metadata: Metadata = { title: "Рассадка в зале — F16 Control" };
 export const dynamic = "force-dynamic";
@@ -118,14 +119,30 @@ export default async function AdminHallPage() {
 
       <Panel title="Зал сейчас" boxed>
         <div className="space-y-5 p-5">
-          <div>
-            <div className="mb-2 text-[14px] font-semibold text-fg-2">Standart Premium · ПК 1–30</div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">{HALL_BLOCKS.filter((b) => b.zone === "premium").map((b) => block(b.id))}</div>
+          <HallMap
+            marks={Object.fromEntries(
+              [...seats].map(([id, st]) => [
+                id,
+                { tone: st.match ? ("busy" as const) : ("wait" as const), label: `${name(st.team)}${st.match ? ` · матч #${st.match.number}` : " · ждёт матч"}` },
+              ]),
+            )}
+          />
+          <div className="flex flex-wrap gap-4 text-[13px] text-fg-3">
+            <span>
+              <span className="mr-1.5 inline-block size-3 rounded-sm border border-accent/45 bg-accent/15 align-middle" />
+              играют / садятся
+            </span>
+            <span>
+              <span className="mr-1.5 inline-block size-3 rounded-sm border border-warn/50 bg-warn/20 align-middle" />
+              ждут следующий матч
+            </span>
+            <span>
+              <span className="mr-1.5 inline-block size-3 rounded-sm border border-line bg-surface-4 align-middle" />
+              свободно
+            </span>
+            <span>Пунктир — запасные ПК {HALL_SPARE_PCS.join(", ")}</span>
           </div>
-          <div>
-            <div className="mb-2 text-[14px] font-semibold text-fg-2">Standart · ПК 31–55 (запасные: {HALL_SPARE_PCS.join(", ")})</div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{HALL_BLOCKS.filter((b) => b.zone === "standart").map((b) => block(b.id))}</div>
-          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">{HALL_BLOCKS.map((b) => block(b.id))}</div>
         </div>
       </Panel>
 

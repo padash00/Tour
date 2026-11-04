@@ -25,6 +25,7 @@ import { Countdown, LiveRefresh } from "@/components/live-refresh";
 import { hallReady } from "@/app/actions/match";
 import { matchHall } from "@/lib/hall";
 import { blockById } from "@/lib/hall-core";
+import { HallMap } from "@/components/hall-map";
 import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
@@ -330,6 +331,16 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             );
           })}
         </div>
+        <HallMap
+          className="mt-5"
+          marks={(() => {
+            const side = rosters.team1.some((r) => r.player.id === player?.id) ? 1 : rosters.team2.some((r) => r.player.id === player?.id) ? 2 : 0;
+            return {
+              [hall.seat1]: { tone: side === 1 ? "mine" : side === 2 ? "rival" : "busy", label: m.team1.name },
+              [hall.seat2]: { tone: side === 2 ? "mine" : side === 1 ? "rival" : "busy", label: m.team2.name },
+            } as const;
+          })()}
+        />
       </FeatureSurface>
     ) : m.status === "pending" || m.status === "upcoming" ? (
       <FeatureSurface>

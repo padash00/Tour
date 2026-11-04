@@ -127,3 +127,39 @@ export function chooseSeats(input: SeatInput): SeatPlan | null {
   void _c;
   return plan;
 }
+
+/**
+ * Схема зала как в программе клуба: номер ПК → клетка сетки [столбец, строка].
+ * Standart (слева) — сетка 6×9, Premium (справа) — 5×9 (пустые строки — проходы).
+ */
+export const HALL_MAP: { zone: HallZone; cols: number; rows: number; pcs: Record<number, [number, number]>; desk?: [number, number] }[] = [
+  {
+    zone: "standart",
+    cols: 6,
+    rows: 9,
+    desk: [1, 0],
+    pcs: {
+      34: [4, 0], 31: [5, 0], 35: [4, 1], 32: [5, 1], 36: [4, 2], 33: [5, 2],
+      48: [2, 3], 47: [3, 3], 49: [2, 4], 46: [3, 4], 37: [5, 4], 50: [2, 5], 45: [3, 5], 38: [5, 5],
+      51: [2, 6], 44: [3, 6], 39: [5, 6], 55: [0, 7], 52: [2, 7], 43: [3, 7], 40: [5, 7], 54: [0, 8], 53: [2, 8], 42: [3, 8], 41: [5, 8],
+    },
+  },
+  {
+    zone: "premium",
+    cols: 5,
+    rows: 9,
+    pcs: Object.fromEntries(
+      [
+        [0, 1],
+        [1, 6],
+        [4, 11],
+        [5, 16],
+        [7, 21],
+        [8, 26],
+      ].flatMap(([row, first]) => [0, 1, 2, 3, 4].map((k) => [first + k, [4 - k, row] as [number, number]])),
+    ),
+  },
+];
+
+/** В каком блоке ПК */
+export const blockOfPc = (pc: number) => HALL_BLOCKS.find((b) => pc >= b.from && pc <= b.to)?.id ?? null;
