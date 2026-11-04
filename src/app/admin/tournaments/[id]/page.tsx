@@ -919,7 +919,7 @@ async function RegistrationTab({
             <div className="rounded-surface border border-line-subtle bg-surface shadow-[var(--shadow-soft)] divide-y divide-ink/[0.06] overflow-hidden">
               <RegistrationHead />
               {g.items.map((r) => (
-                <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} players={players} approveWarning={approveWarning.get(r.id)} />
+                <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} official={t.is_official} players={players} approveWarning={approveWarning.get(r.id)} />
               ))}
             </div>
           </Panel>
@@ -947,11 +947,14 @@ function RegistrationHead() {
 function RegistrationRow({
   r,
   tournamentStatus,
+  official,
   players,
   approveWarning,
 }: {
   r: RegistrationWithTeam;
   tournamentStatus: TournamentStatus;
+  /** официальный турнир: состав заявки после подачи меняет только организатор */
+  official: boolean;
   players: PickPlayer[];
   /** официальный турнир: чего не хватает команде — одобрение спросит подтверждение */
   approveWarning?: string;
@@ -1067,7 +1070,7 @@ function RegistrationRow({
               </div>
             ))}
         </div>
-        {tournamentStatus !== "registration" ? (
+        {tournamentStatus !== "registration" || official ? (
           <ActionForm action={adminAddRosterPlayer} className="mt-3 flex flex-wrap gap-2">
             <input type="hidden" name="registrationId" value={r.id} />
             <div className="w-full sm:w-72">
