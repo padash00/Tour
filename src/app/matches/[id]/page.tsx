@@ -300,12 +300,16 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     hall && m.team1 && m.team2 ? (
       <FeatureSurface>
         <h2 className="text-heading text-fg">{t("Рассадка: садитесь за ПК")}</h2>
-        <p className="mt-1 text-[15px] text-fg-2">
-          {t("Команды садятся, входят в свой Steam, и капитаны нажимают «Готов». Бан-пик начнётся, когда готовы оба — или сам через")}{" "}
-          <b className="num">
-            <Countdown deadline={hall.deadline} long />
-          </b>
-        </p>
+        {hall.vetoStarted ? (
+          <p className="mt-1 text-[15px] font-semibold text-warn">{t("Бан-пик сброшен администратором — он запустит его снова. Оставайтесь на своих местах.")}</p>
+        ) : (
+          <p className="mt-1 text-[15px] text-fg-2">
+            {t("Команды садятся, входят в свой Steam, и капитаны нажимают «Готов». Бан-пик начнётся, когда готовы оба — или сам через")}{" "}
+            <b className="num">
+              <Countdown deadline={hall.deadline} long />
+            </b>
+          </p>
+        )}
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {([
             [m.team1, hall.seat1, hall.ready1],
@@ -321,7 +325,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                 <div className="mt-3 text-[28px] font-extrabold leading-none text-fg num">{b ? t("ПК {from}–{to}", { from: b.from, to: b.to }) : "—"}</div>
                 <div className="mt-1 text-[14px] text-fg-3">{b?.zone === "premium" ? t("Зона Standart Premium") : t("Зона Standart")}</div>
                 <div className={cn("mt-3 text-[14.5px] font-semibold", ready ? "text-ok" : "text-fg-2")}>{ready ? t("✅ Готовы") : t("⏳ Садятся…")}</div>
-                {myTeam?.id === team.id && !ready && (
+                {myTeam?.id === team.id && !ready && !hall.vetoStarted && (
                   <ActionForm action={hallReady} className="mt-3">
                     <input type="hidden" name="matchId" value={m.id} />
                     <SubmitButton size="lg">{t("Команда села — Готов")}</SubmitButton>

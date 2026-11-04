@@ -55,6 +55,7 @@ type HallMatch = {
   finished_at: string | null;
   team1_score: number;
   team2_score: number;
+  is_walkover: boolean;
 };
 
 /** Действующие вызовы матчей турнира (последний вызов каждого матча) */
@@ -64,10 +65,10 @@ async function tournamentCalls(tournamentId: string): Promise<Map<string, HallCa
     .select("entity_id, payload, created_at")
     .eq("action", "hall.call")
     .eq("payload->>tournament", tournamentId)
-    .order("created_at", { ascending: true })
-    .limit(2000);
+    .order("created_at", { ascending: false })
+    .limit(1000);
   const out = new Map<string, HallCall>();
-  for (const r of data ?? []) {
+  for (const r of [...(data ?? [])].reverse()) {
     const p = (r.payload ?? {}) as Record<string, string>;
     if (!r.entity_id || !p.seat1 || !p.seat2) continue;
     out.set(r.entity_id, { matchId: r.entity_id, seat1: p.seat1, seat2: p.seat2, team1: p.team1, team2: p.team2, at: r.created_at });
@@ -79,12 +80,18 @@ const freedAfter = (cfg: HallConfig, seat: string, since: string) => !!cfg.freed
 
 /** Кто где сидит: занятые блоки, последнее место каждой команды, места ждущих команд */
 export async function hallSnapshot(tournamentId: string, cfg: HallConfig, exceptMatch?: string) {
-  const [calls, { data: ms }] = await Promise.all([
+  const [allCalls, { data: ms }] = await Promise.all([
     tournamentCalls(tournamentId),
-    db().from("matches").select("id, number, status, team1_id, team2_id, winner_id, finished_at, team1_score, team2_score").eq("tournament_id", tournamentId),
+    db().from("matches").select("id, number, status, team1_id, team2_id, winner_id, finished_at, team1_score, team2_score, is_walkover").eq("tournament_id", tournamentId),
   ]);
   const matches = (ms ?? []) as HallMatch[];
   const byId = new Map(matches.map((m) => [m.id, m]));
+  // вызов действует, только пока в матче те же команды (после отмены результата сетка могла поменять соперника —
+  // тогда матч вызывается заново)
+  const calls = new Map([...allCalls].filter(([id, c]) => {
+    const m = byId.get(id);
+    return !!m && m.team1_id === c.team1 && m.team2_id === c.team2;
+  }));
   const now = Date.now();
   const occupied = new Map<string, string>();
   const occupiedBy = new Map<string, { team: string; match: HallMatch }>();
@@ -98,7 +105,7 @@ export async function hallSnapshot(tournamentId: string, cfg: HallConfig, except
       lastAt.set(team, c.at);
     }
     const active = ACTIVE.includes(m.status) && m.team1_id === c.team1 && m.team2_id === c.team2;
-    const justFinished = m.status === "finished" && !!m.finished_at && now - new Date(m.finished_at).getTime() < RELEASE_MS;
+    const justFinished = m.status === "finished" && !m.is_walkover && !!m.finished_at && now - new Date(m.finished_at).getTime() < RELEASE_MS;
     if (!active && !justFinished) continue;
     for (const [seat, team] of [[c.seat1, c.team1], [c.seat2, c.team2]] as const) {
       // «Блок свободен» в пульте снимает только места закончившихся матчей
@@ -126,7 +133,7 @@ export async function hallSnapshot(tournamentId: string, cfg: HallConfig, except
 /** Команда отдохнула после прошлого матча турнира */
 export function rested(matches: HallMatch[], teamId: string, now = Date.now()) {
   const lastEnd = matches
-    .filter((m) => m.status === "finished" && m.finished_at && (m.team1_id === teamId || m.team2_id === teamId))
+    .filter((m) => m.status === "finished" && !m.is_walkover && m.finished_at && (m.team1_id === teamId || m.team2_id === teamId))
     .reduce((acc, m) => Math.max(acc, new Date(m.finished_at!).getTime()), 0);
   return now - lastEnd >= REST_MS;
 }
@@ -224,13 +231,16 @@ export async function announceCalls(calls: CallResult[]) {
   });
   const head = calls.length > 1 ? "📢 <b>Садитесь за ПК</b>\n\n" : "📢 <b>Вызов на матч</b>\n\n";
   const tail = "\n\nВойдите в свой Steam. Капитаны: как команда села — нажмите <b>«Готов»</b> на странице матча. На это 10 минут, потом бан-пик начнётся сам.";
-  await tgCall(tg.token, "sendMessage", {
+  const r = await tgCall(tg.token, "sendMessage", {
     chat_id: group.id,
     message_thread_id: cfg.thread,
     text: head + parts.join("\n\n") + tail,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
   });
+  // отметка «объявлено» — если Telegram не ответил, hallTick пошлёт вызов ещё раз
+  if (r.ok) await db().from("audit_logs").insert(calls.map((c) => ({ action: "hall.announced", entity_type: "match", entity_id: c.matchId, payload: {} })));
+  else console.error("hall announce", r.description);
   await updateBoard().catch(() => {});
 }
 
@@ -248,6 +258,8 @@ export async function matchHall(matchId: string) {
     .maybeSingle();
   if (!call) return null;
   const p = (call.payload ?? {}) as Record<string, string>;
+  const { data: cur } = await db().from("matches").select("team1_id, team2_id").eq("id", matchId).maybeSingle();
+  if (!cur || cur.team1_id !== p.team1 || cur.team2_id !== p.team2) return null; // соперники поменялись — вызов недействителен
   const { data: readies } = await db()
     .from("audit_logs")
     .select("payload")
@@ -305,13 +317,15 @@ export async function markReady(matchId: string, playerId: string): Promise<stri
   if (m.status !== "upcoming") return "Бан-пик уже начался";
   const hall = await matchHall(matchId);
   if (!hall) return "Матч ещё не вызван — ждите сообщения, где садиться";
+  if (hall.vetoStarted) return "Бан-пик сброшен администратором — он запустит его снова";
   const { data: teams } = await db().from("teams").select("id, captain_id").in("id", [hall.team1, hall.team2]);
   const team = (teams ?? []).find((t) => t.captain_id === playerId);
   if (!team) return "«Готов» нажимает капитан команды";
   if ((team.id === hall.team1 && hall.ready1) || (team.id === hall.team2 && hall.ready2)) return null;
   await audit(playerId, "hall.ready", { type: "match", id: matchId }, { team: team.id });
-  const both = (team.id === hall.team1 || hall.ready1) && (team.id === hall.team2 || hall.ready2);
-  if (both) await startHallVeto(matchId, "ready");
+  // перечитываем после своей записи: если капитаны нажали одновременно, бан-пик всё равно начнётся
+  const after = await matchHall(matchId);
+  if (after && after.ready1 && after.ready2) await startHallVeto(matchId, "ready");
   return null;
 }
 
@@ -329,18 +343,34 @@ export async function hallTick() {
   if (!cfg.enabled) return;
   const { data: ts } = await db().from("tournaments").select("id").eq("is_lan", true).in("status", ["checkin", "live"]);
   for (const t of ts ?? []) {
-    const calls = await tournamentCalls(t.id);
-    if (calls.size) {
-      const { data: waiting } = await db().from("matches").select("id").eq("tournament_id", t.id).eq("status", "upcoming").in("id", [...calls.keys()]);
-      const now = Date.now();
-      for (const w of waiting ?? []) {
-        const c = calls.get(w.id)!;
-        if (new Date(c.at).getTime() + READY_MS <= now) await applyReadyTimeout(w.id);
-      }
+    const snap = await hallSnapshot(t.id, cfg);
+    const now = Date.now();
+    const waiting = snap.matches.filter((m) => m.status === "upcoming" && snap.calls.has(m.id));
+    for (const w of waiting) {
+      const c = snap.calls.get(w.id)!;
+      if (new Date(c.at).getTime() + READY_MS <= now) await applyReadyTimeout(w.id);
     }
+    await reannounce(t.id, waiting.map((w) => w.id), snap.calls).catch((e) => console.error("hall reannounce", e));
     await warnNextInQueue(t.id, cfg).catch((e) => console.error("hall prepare", e));
   }
   await updateBoard().catch(() => {});
+}
+
+/** Вызовы, которые не дошли до Telegram (сбой отправки), — шлём ещё раз */
+async function reannounce(tournamentId: string, matchIds: string[], calls: Map<string, HallCall>) {
+  if (!matchIds.length) return;
+  const { data: done } = await db().from("audit_logs").select("entity_id").eq("action", "hall.announced").in("entity_id", matchIds);
+  const ok = new Set((done ?? []).map((d) => d.entity_id));
+  const todo = matchIds.filter((id) => !ok.has(id) && Date.now() - new Date(calls.get(id)!.at).getTime() > 30_000).slice(0, 4);
+  if (!todo.length) return;
+  const { data: ms } = await db().from("matches").select("id, number").in("id", todo);
+  const out: CallResult[] = [];
+  for (const m of ms ?? []) {
+    const c = calls.get(m.id)!;
+    const [team1, team2] = await Promise.all([teamInfo(tournamentId, c.team1), teamInfo(tournamentId, c.team2)]);
+    out.push({ matchId: m.id, number: m.number, plan: { seat1: c.seat1, seat2: c.seat2, moved1: false, moved2: false }, team1, team2 });
+  }
+  await announceCalls(out);
 }
 
 /** Сколько матчей из очереди предупреждать «готовьтесь» */
@@ -457,6 +487,8 @@ export async function updateBoard() {
       await setAppSettings({ HALL_BOARD_TEXT: text });
       return;
     }
+    // сбой связи / лимит Telegram — попробуем в следующий тик; новое табло — только если старое удалено
+    if (!/not found|can't be edited|message to edit/i.test(r.description ?? "")) return;
   }
   const sent = await tgCall<{ message_id: number }>(tg.token, "sendMessage", { chat_id: group.id, message_thread_id: cfg.thread, text, parse_mode: "HTML", disable_notification: true });
   if (sent.ok && sent.result) {

@@ -120,7 +120,10 @@ export async function autopilotTick() {
           if (limit != null && inHall >= limit) break;
           if (!rested(snap.matches, m.team1_id!) || !rested(snap.matches, m.team2_id!)) continue; // перерыв между матчами
           const r = await callMatch(m.id, { announce: false });
-          if (typeof r === "string") break; // мест нет — следующий матч тоже не сядет
+          if (typeof r === "string") {
+            if (r.startsWith("Свободных мест нет")) break; // мест нет — следующий матч тоже не сядет
+            continue;
+          }
           called.push(r);
           inHall++;
         }

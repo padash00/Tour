@@ -112,7 +112,7 @@ export default async function AdminHallPage() {
           </p>
           <p>
             Матчей одновременно: <b>{limit ?? "без ограничения"}</b>
-            {limit !== 5 && <span className="text-fg-3"> — для зала нужно 5 (Настройки → Серверы → «Турнирных матчей одновременно»)</span>}
+            {(limit == null || limit > 5) && <span className="text-fg-3"> — рекомендуем 4 (Настройки → Серверы → «Турнирных матчей одновременно»)</span>}
           </p>
         </div>
       </Panel>

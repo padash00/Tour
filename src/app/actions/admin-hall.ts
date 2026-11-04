@@ -5,7 +5,8 @@ import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import type { ActionResult } from "@/components/forms";
 import { blockById, blockLabel, pairKey, serializeForbidden } from "@/lib/hall-core";
-import { callMatch, hallConfig, startHallVeto, updateBoard } from "@/lib/hall";
+import { callMatch, hallConfig, hallSnapshot, startHallVeto, updateBoard } from "@/lib/hall";
+import { db } from "@/lib/supabase";
 import { setAppSettings } from "@/lib/telegram";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,6 +18,7 @@ export async function adminCallMatch(_prev: ActionResult, formData: FormData): P
   if (!UUID.test(matchId)) return { error: "Матч не найден" };
   const s1 = String(formData.get("seat1") ?? "");
   const s2 = String(formData.get("seat2") ?? "");
+  if (!!s1 !== !!s2) return { error: "Выберите оба блока — или оставьте «авто» у обоих" };
   const seats = s1 && s2 ? ([s1, s2] as [string, string]) : undefined;
   const r = await callMatch(matchId, { actorId: admin.id, seats });
   if (typeof r === "string") return { error: r };
@@ -79,6 +81,12 @@ export async function adminHallFree(_prev: ActionResult, formData: FormData): Pr
   const block = String(formData.get("block") ?? "");
   if (!blockById(block)) return { error: "Нет такого блока" };
   const cfg = await hallConfig();
+  const { data: ts } = await db().from("tournaments").select("id").eq("is_lan", true).in("status", ["checkin", "live"]);
+  for (const t of ts ?? []) {
+    const snap = await hallSnapshot(t.id, cfg);
+    const busy = snap.occupiedBy.get(block);
+    if (busy && busy.match.status !== "finished") return { error: `${blockLabel(block)} занят идущим матчем #${busy.match.number} — освободится после матча` };
+  }
   await setAppSettings({ HALL_FREED: JSON.stringify({ ...cfg.freed, [block]: new Date().toISOString() }) });
   await audit(admin.id, "hall.free", undefined, { block });
   await updateBoard().catch(() => {});
