@@ -41,6 +41,12 @@ export function blockLabel(id: string | null | undefined, withZone = true) {
 
 export const pairKey = (a: string, b: string) => (a < b ? `${a}-${b}` : `${b}-${a}`);
 
+/** Отдельные запреты по залу (кроме правил «Standart против Standart» и «в Premium ближе двух рядов») */
+const EXTRA_FORBIDDEN: [string, string][] = [
+  ["S2", "P2"],
+  ["S2", "P3"],
+];
+
 /** Запрещённые пары соперников по умолчанию */
 export function defaultForbidden(): Set<string> {
   const out = new Set<string>();
@@ -51,6 +57,8 @@ export function defaultForbidden(): Set<string> {
       const closeRows = a.zone === "premium" && b.zone === "premium" && Math.abs((a.row ?? 0) - (b.row ?? 0)) < 3;
       if (bothStandart || closeRows) out.add(pairKey(a.id, b.id));
     }
+  // 37–41 стоит у стены рядом с рядами 6–10 и 11–15 Premium — слышно через проход
+  for (const [a, b] of EXTRA_FORBIDDEN) out.add(pairKey(a, b));
   return out;
 }
 

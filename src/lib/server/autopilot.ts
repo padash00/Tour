@@ -113,12 +113,16 @@ export async function autopilotTick() {
       if (waiting.length) {
         const snap = await hallSnapshot(t.id, hall);
         const called: Exclude<Awaited<ReturnType<typeof callMatch>>, string>[] = [];
+        // «Турнирных матчей одновременно» — считаем и вызванные на места, не только идущие на серверах
+        let inHall = snap.matches.filter((x) => ["veto", "ready", "live"].includes(x.status) || (x.status === "upcoming" && snap.calls.has(x.id))).length;
         for (const m of waiting) {
           if (snap.calls.has(m.id)) continue; // уже вызван — ждём «Готов»
+          if (limit != null && inHall >= limit) break;
           if (!rested(snap.matches, m.team1_id!) || !rested(snap.matches, m.team2_id!)) continue; // перерыв между матчами
           const r = await callMatch(m.id, { announce: false });
           if (typeof r === "string") break; // мест нет — следующий матч тоже не сядет
           called.push(r);
+          inHall++;
         }
         await announceCalls(called);
       }

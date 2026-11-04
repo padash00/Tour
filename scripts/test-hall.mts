@@ -14,7 +14,8 @@ check(F.has(pairKey("P1", "P3")), "1–5 против 11–15 — нельзя (
 check(!F.has(pairKey("P1", "P4")), "1–5 против 16–20 — можно");
 check(F.has(pairKey("P4", "P5")), "16–20 и 21–25 спиной к спине — нельзя");
 check(F.has(pairKey("S2", "S3")) && F.has(pairKey("S1", "S4")), "Standart против Standart — нельзя");
-check(!F.has(pairKey("P3", "S2")), "Premium против Standart — можно");
+check(!F.has(pairKey("P1", "S2")), "Premium против Standart — можно");
+check(F.has(pairKey("S2", "P2")) && F.has(pairKey("S2", "P3")), "37–41 против 6–10 и 11–15 — нельзя");
 check(serializeForbidden(parseForbidden(serializeForbidden(F))) === serializeForbidden(F), "запреты сохраняются и читаются без потерь");
 check(parseForbidden("").size === F.size, "пустая настройка — запреты по умолчанию");
 
