@@ -67,3 +67,67 @@ export async function unlinkedParticipants(): Promise<UnlinkedTeam[]> {
   }
   return [...byTeam.values()].sort((a, b) => b.missing.length - a.missing.length || a.team.localeCompare(b.team));
 }
+
+/*
+ * Раз в день бот пишет капитану в Telegram, кто из его состава ещё не подтвердил Telegram.
+ * Только днём (11:00–21:00 по Алматы), только капитанам с подтверждённым Telegram, один раз в сутки на команду.
+ */
+const REMIND_FROM_HOUR = 11;
+const REMIND_TO_HOUR = 21;
+
+function almatyNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return { day: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
+}
+
+export async function captainLinkRemindTick() {
+  const { day, hour } = almatyNow();
+  if (hour < REMIND_FROM_HOUR || hour >= REMIND_TO_HOUR) return;
+  const { telegramConfig, tgSend, tgEscape, SITE_URL } = await import("./telegram");
+  const cfg = await telegramConfig();
+  if (!cfg.token) return;
+  const rows = await approvedRosters();
+  if (!rows.length) return;
+
+  // команды → кто из состава без Telegram
+  const ids = [...new Set(rows.map((r) => r.player_id))];
+  const chatOf = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await db().from("player_profiles").select("player_id, telegram_chat_id").in("player_id", ids.slice(i, i + 100)).not("telegram_chat_id", "is", null);
+    if (error) throw error;
+    for (const p of data ?? []) chatOf.set(p.player_id, p.telegram_chat_id as number);
+  }
+  type T = { teamId: string; team: string; tournament: string; captain: string | null; missing: string[] };
+  const teams = new Map<string, T>();
+  for (const r of rows) {
+    const team = r.registration?.team;
+    const tournament = r.registration?.tournament?.name;
+    if (!team || !tournament) continue;
+    const key = `${team.id}:${tournament}`;
+    const t = teams.get(key) ?? { teamId: team.id, team: team.name, tournament, captain: team.captain_id, missing: [] };
+    if (!chatOf.has(r.player_id)) t.missing.push(r.player?.nickname ?? "?");
+    teams.set(key, t);
+  }
+
+  // уже написали сегодня
+  const { data: sent } = await db().from("audit_logs").select("payload").eq("action", "tg.captain_link_remind").eq("payload->>day", day).limit(1000);
+  const done = new Set((sent ?? []).map((s) => `${(s.payload as { team?: string }).team}:${(s.payload as { tournament?: string }).tournament}`));
+
+  for (const t of teams.values()) {
+    if (!t.missing.length || !t.captain) continue;
+    const chat = chatOf.get(t.captain);
+    if (!chat) continue; // капитан сам без Telegram — написать некому
+    if (done.has(`${t.teamId}:${t.tournament}`)) continue;
+    // отметка до отправки — второй проход в тот же день не продублирует
+    const { error } = await db().from("audit_logs").insert({ action: "tg.captain_link_remind", entity_type: "team", entity_id: t.teamId, payload: { day, team: t.teamId, tournament: t.tournament, missing: t.missing } });
+    if (error) continue;
+    const list = t.missing.map((n) => `• ${tgEscape(n)}`).join("\n");
+    const html =
+      `👋 <b>${tgEscape(t.team)}</b> · «${tgEscape(t.tournament)}»\n\n` +
+      `Ещё не подтвердили Telegram:\n${list}\n\n` +
+      `В день турнира бот пишет каждому игроку, за какие ПК садиться и когда его матч. Без подтверждения эти игроки сообщений не получат.\n\n` +
+      `Попросите их зайти на сайт со своего аккаунта — появится окно «Подтвердите Telegram». Если на компьютере нет Telegram, там же будет QR-код для телефона.`;
+    await tgSend(cfg.token, chat, html, { text: "Открыть сайт", url: SITE_URL });
+  }
+}
