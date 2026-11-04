@@ -1,5 +1,4 @@
 import "server-only";
-import { audit } from "./audit";
 import { mapName } from "./format";
 import { ogKey } from "./og-image";
 import { aggregatePlayers, getStatRows } from "./stats";
@@ -41,7 +40,8 @@ export async function postMatchResults() {
     .in("entity_id", ms.map((m) => m.id));
   const posted = new Set((done ?? []).map((d) => d.entity_id));
 
-  for (const m of ms.filter((x) => !posted.has(x.id)).slice(0, 3)) {
+  // по одному матчу за тик — тик агента не должен надолго зависать на Telegram
+  for (const m of ms.filter((x) => !posted.has(x.id)).slice(0, 1)) {
     if (!m.team1_id || !m.team2_id) continue;
     const [{ data: teams }, { data: maps }, rows] = await Promise.all([
       db().from("teams").select("id, name").in("id", [m.team1_id, m.team2_id]),
@@ -51,7 +51,8 @@ export async function postMatchResults() {
     const age = now - new Date(m.finished_at!).getTime();
     if (!m.is_walkover && !rows.length && age < STATS_GIVE_UP_MS) continue; // ждём статистику
     // помечаем сразу — чтобы два тика подряд не опубликовали дважды
-    await audit(null, "tg.match_result", { type: "match", id: m.id }, {});
+    const { error: markErr } = await db().from("audit_logs").insert({ action: "tg.match_result", entity_type: "match", entity_id: m.id, payload: {} });
+    if (markErr) continue; // не смогли пометить — не публикуем, иначе пост повторялся бы каждый тик
 
     const name = (id: string | null) => (teams ?? []).find((t) => t.id === id)?.name ?? "?";
     const t1 = name(m.team1_id);
@@ -77,7 +78,7 @@ export async function postMatchResults() {
     const path = `/matches/${m.id}/image`;
     const k = ogKey(path);
     const url = rows.length && played.length ? `${SITE_URL}${path}?f=stats&map=${played.length > 1 ? "all" : played[0].map_number}&k=${k}` : `${SITE_URL}${path}?f=post&k=${k}`;
-    const pic = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(40_000) })
+    const pic = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000) })
       .then((r) => (r.ok ? r.blob() : null))
       .catch(() => null);
 
@@ -93,7 +94,7 @@ export async function postMatchResults() {
     form.set("caption", caption);
     form.set("parse_mode", "HTML");
     const method = "sendPhoto";
-    const res = await fetch(`https://api.telegram.org/bot${tg.token}/${method}`, { method: "POST", body: form, signal: AbortSignal.timeout(60_000) })
+    const res = await fetch(`https://api.telegram.org/bot${tg.token}/${method}`, { method: "POST", body: form, signal: AbortSignal.timeout(30_000) })
       .then((r) => r.json() as Promise<{ ok: boolean; description?: string }>)
       .catch((e) => ({ ok: false, description: String(e) }));
     if (!res.ok) {

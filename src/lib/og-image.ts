@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Картинка для next/og (satori понимает только PNG/JPEG/GIF/SVG — обложки карт у нас бывают webp).
@@ -48,12 +48,15 @@ export const ogFormat = (f: string | null): OgFormat => (f === "story" || f === 
  */
 /** Ключ доступа к картинке без входа на сайт — для бота (итоги матча в Telegram). Свой на каждый путь */
 export function ogKey(path: string) {
-  return createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY ?? "f16").update(path).digest("hex").slice(0, 24);
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) return null; // без секрета ключей нет вовсе — подделать нельзя
+  return createHmac("sha256", secret).update(path).digest("hex").slice(0, 24);
 }
 
 export async function ogAccess(req: { nextUrl: URL }, format: OgFormat) {
   const k = req.nextUrl.searchParams.get("k");
-  if (k && k === ogKey(req.nextUrl.pathname)) return { allowed: true, scale: 1, private: true };
+  const want = ogKey(req.nextUrl.pathname);
+  if (k && want && k.length === want.length && timingSafeEqual(Buffer.from(k), Buffer.from(want))) return { allowed: true, scale: 1, private: true };
   const download = !!req.nextUrl.searchParams.get("download");
   const publicPreview = format === "wide" && !download;
   if (publicPreview) return { allowed: true, scale: 1, private: false };
