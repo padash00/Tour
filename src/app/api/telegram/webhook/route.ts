@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
 import type { Player } from "@/lib/types";
-import { MODERATION_HELP, handleFaqCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
+import { MODERATION_HELP, captchaSweep, handleFaqCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
 import { answerQuestion } from "@/lib/tg-faq";
 import { after } from "next/server";
 
@@ -98,6 +98,11 @@ export async function POST(req: Request) {
   const groupMsg = update.message ?? update.edited_message;
   if (update.callback_query || (groupMsg && groupMsg.chat.type !== "private")) {
     const group = await telegramGroup();
+    // новички, не нажавшие «Я не бот»: напоминание и выпуск (не чаще раза в минуту)
+    if (group.id && group.moderation) {
+      const gid = group.id;
+      after(() => captchaSweep(cfg.token, gid).catch((e) => console.error("tg captcha sweep", e)));
+    }
     if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
     else if (group.id && groupMsg && groupMsg.chat.id === group.id) {
       const faqCmd = !!update.message && (await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false));

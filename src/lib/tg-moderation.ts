@@ -150,14 +150,15 @@ async function onNewMembers(token: string, msg: TgMessage) {
   for (const u of msg.new_chat_members ?? []) {
     if (u.is_bot) continue;
     await tgCall(token, "restrictChatMember", { chat_id: msg.chat.id, user_id: u.id, permissions: MUTED, use_independent_chat_permissions: true });
-    await audit(null, "tg.captcha", undefined, { user: String(u.id), name: nameOf(u), username: u.username ?? null, by: "бот" });
-    await notice(
+    // приветствие с кнопкой висит, пока новичок не нажмёт (через 3 мин — напоминание, через 15 — пускаем сами, см. captchaSweep)
+    const id = await notice(
       token,
       msg,
-      `👋 ${mention(u)}, добро пожаловать в чат игроков F16 Arena!\nНажмите кнопку, чтобы писать в чат. Правила: без мата, оскорблений и рекламы.`,
-      5 * 60_000,
+      `👋 ${mention(u)}, добро пожаловать в чат игроков F16 Arena!\nНажмите кнопку <b>«✅ Я не бот»</b> ниже — без этого писать в чат нельзя. Правила: без мата, оскорблений и рекламы.`,
+      0,
       { inline_keyboard: [[{ text: "✅ Я не бот", callback_data: `cap:${u.id}` }]] },
     );
+    await audit(null, "tg.captcha", undefined, { user: String(u.id), name: nameOf(u), username: u.username ?? null, by: "бот", msg: id ?? null });
   }
 }
 
@@ -188,7 +189,78 @@ export async function onCallback(token: string, groupId: number, cb: TgCallback)
   }
   await unmute(token, groupId, uid);
   await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Готово, можно писать! Удачной игры 🎯" });
-  if (cb.message) await del(token, groupId, cb.message.message_id);
+  await audit(null, "tg.captcha_ok", undefined, { user: String(uid) });
+  await deleteCaptchaMessages(token, groupId, uid, cb.message?.message_id);
+}
+
+/** Убрать приветствие и напоминания новичку */
+async function deleteCaptchaMessages(token: string, groupId: number, uid: number, extra?: number) {
+  const { data } = await db()
+    .from("audit_logs")
+    .select("payload")
+    .in("action", ["tg.captcha", "tg.captcha_remind"])
+    .eq("payload->>user", String(uid))
+    .gte("created_at", new Date(Date.now() - 2 * 86_400_000).toISOString());
+  const ids = new Set<number>((data ?? []).map((r) => Number((r.payload as { msg?: number })?.msg)).filter((n) => n > 0));
+  if (extra) ids.add(extra);
+  await Promise.allSettled([...ids].map((id) => del(token, groupId, id)));
+}
+
+const CAPTCHA_REMIND_MS = 3 * 60_000;
+const CAPTCHA_RELEASE_MS = 15 * 60_000;
+let captchaSweepAt = 0;
+
+/**
+ * Новички, не нажавшие «Я не бот»: через 3 минуты — напоминание с упоминанием (придёт уведомление),
+ * через 15 минут — пускаем сами в «мягком» режиме на сутки: текст можно, ссылки, фото и пересылки — нет
+ * (реклама всё равно ловится фильтром). Вызывается из вебхука не чаще раза в минуту.
+ */
+export async function captchaSweep(token: string, groupId: number) {
+  if (Date.now() - captchaSweepAt < 60_000) return;
+  captchaSweepAt = Date.now();
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const { data } = await db()
+    .from("audit_logs")
+    .select("action, payload, created_at")
+    .in("action", ["tg.captcha", "tg.captcha_ok", "tg.captcha_remind", "tg.captcha_release", "tg.unmute", "tg.unban"])
+    .gte("created_at", since)
+    .order("created_at", { ascending: true })
+    .limit(3000);
+  type P = { user?: string; name?: string };
+  const state = new Map<string, { at: number; name: string; reminded: boolean; done: boolean }>();
+  for (const r of data ?? []) {
+    const p = (r.payload ?? {}) as P;
+    if (!p.user) continue;
+    const at = new Date(r.created_at).getTime();
+    if (r.action === "tg.captcha") state.set(p.user, { at, name: p.name ?? "новичок", reminded: false, done: false });
+    else {
+      const st = state.get(p.user);
+      if (!st) continue;
+      if (r.action === "tg.captcha_remind") st.reminded = true;
+      else st.done = true; // нажал, отпустили сами или админ снял мут
+    }
+  }
+  const now = Date.now();
+  for (const [user, st] of state) {
+    if (st.done) continue;
+    const uid = Number(user);
+    if (now - st.at >= CAPTCHA_RELEASE_MS) {
+      const chat = await tgCall<{ permissions?: Record<string, boolean> }>(token, "getChat", { chat_id: groupId });
+      const base = chat.result?.permissions ?? Object.fromEntries(Object.keys(MUTED).map((k) => [k, true]));
+      const soft = { ...base, can_send_photos: false, can_send_videos: false, can_send_documents: false, can_send_other_messages: false, can_add_web_page_previews: false, can_send_audios: false, can_send_video_notes: false };
+      await tgCall(token, "restrictChatMember", { chat_id: groupId, user_id: uid, permissions: soft, use_independent_chat_permissions: true, until_date: Math.floor(now / 1000) + 86_400 });
+      await audit(null, "tg.captcha_release", undefined, { user, name: st.name, by: "бот: не нажал «Я не бот» за 15 минут — пущен без ссылок и фото на сутки" });
+      await deleteCaptchaMessages(token, groupId, uid);
+    } else if (!st.reminded && now - st.at >= CAPTCHA_REMIND_MS) {
+      const r = await tgCall<{ message_id: number }>(token, "sendMessage", {
+        chat_id: groupId,
+        text: `⏰ <a href="tg://user?id=${uid}">${tgEscape(st.name)}</a>, вы ещё не можете писать в чат — нажмите кнопку <b>«✅ Я не бот»</b> 👇`,
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [[{ text: "✅ Я не бот", callback_data: `cap:${uid}` }]] },
+      });
+      await audit(null, "tg.captcha_remind", undefined, { user, name: st.name, msg: r.result?.message_id ?? null });
+    }
+  }
 }
 
 // ── уведомление админам сайта (с подтверждённым Telegram) о каждом наказании — с кнопкой отмены
