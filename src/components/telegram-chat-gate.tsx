@@ -10,6 +10,7 @@ import { useViewer } from "@/components/viewer";
 import { noChrome } from "@/components/shell/nav";
 import { useT } from "@/lib/i18n/client";
 import { TG_GROUP_URL } from "@/lib/tg-group";
+import QRCode from "qrcode";
 
 /*
  * Обязательное окно для вошедших игроков: «Вступите в Telegram-чат игроков».
@@ -26,6 +27,9 @@ export function TelegramChatGate() {
   const [show, setShow] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
+  // ссылка на бота и её QR — если на этом компьютере нет Telegram, игрок сканирует QR телефоном
+  const [botUrl, setBotUrl] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const toast = useToast();
   const playerId = player?.id ?? null;
@@ -103,6 +107,8 @@ export function TelegramChatGate() {
                   const r = await startTelegramLink();
                   if (r.error || !r.url) return void toast.error(r.error ?? t("Не удалось открыть бота"));
                   // после await браузер может заблокировать новое окно — тогда открываем бота в этой вкладке
+                  setBotUrl(r.url);
+                  QRCode.toDataURL(r.url, { margin: 1, width: 220 }).then(setQr, () => setQr(null));
                   if (!window.open(r.url, "_blank")) window.location.href = r.url;
                   setOpened(true);
                 })
@@ -120,6 +126,16 @@ export function TelegramChatGate() {
         <p className="text-[15px] text-fg-2">
           {opened ? t("В Telegram откроется бот @f16_tournament_bot — нажмите «Старт», затем вернитесь сюда и нажмите «Проверить».") : t("Нажмите кнопку — откроется бот @f16_tournament_bot, там нажмите «Старт». Это занимает 10 секунд.")}
         </p>
+        {opened && botUrl && (
+          <div className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-line p-4 sm:flex-row sm:items-start">
+            {/* eslint-disable-next-line @next/next/no-img-element -- QR из data: URL, оптимизировать нечего */}
+            {qr && <img src={qr} alt="" width={160} height={160} className="shrink-0 rounded bg-white p-1" />}
+            <div className="text-[14.5px] text-fg-2">
+              <p className="font-semibold text-fg">{t("Telegram не открылся на этом компьютере?")}</p>
+              <p className="mt-1">{t("Наведите камеру телефона на QR-код — откроется бот, нажмите «Старт». Потом здесь нажмите «Проверить».")}</p>
+            </div>
+          </div>
+        )}
       </Dialog>
     );
   }
