@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readSession } from "@/lib/session";
 import { markJoinClick, shouldAskToJoin } from "@/lib/tg-chat-join";
+import { telegramLinkRequired } from "@/lib/tg-link-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const s = await readSession();
   if (!s) return NextResponse.json({ show: false });
-  const show = await shouldAskToJoin(s.playerId).catch(() => false);
-  return NextResponse.json({ show }, { headers: { "Cache-Control": "private, no-store" } });
+  // участник турнира без подтверждённого Telegram — сначала просим подтвердить (окно про чат подождёт)
+  const link = await telegramLinkRequired(s.playerId).catch(() => null);
+  const show = link ? false : await shouldAskToJoin(s.playerId).catch(() => false);
+  return NextResponse.json({ show, link }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /** Игрок нажал «Вступить в чат» */

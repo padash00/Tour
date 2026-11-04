@@ -5,6 +5,7 @@ import { db } from "@/lib/supabase";
 import { TG_ALLOWED_UPDATES, telegramConfig, telegramGroup, tgCall } from "@/lib/telegram";
 import { formatShortDateTime } from "@/lib/format";
 import { joinStats } from "@/lib/tg-chat-join";
+import { unlinkedParticipants } from "@/lib/tg-link-gate";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { AdminHeader, Panel } from "@/components/admin/control";
 
@@ -27,6 +28,7 @@ export default async function AdminTelegramPage() {
   const hooked = !!info?.ok && !!info.result?.url;
   const punished = punishedUsers(modLog ?? []);
   const join = await joinStats().catch(() => null);
+  const unlinked = await unlinkedParticipants().catch(() => []);
   const violations = (modLog ?? []).filter((l) => l.action !== "tg.captcha").slice(0, 60);
   // новые события (кнопка «Я не бот», изменённые сообщения) приходят только после переподключения
   const needsReconnect = hooked && !TG_ALLOWED_UPDATES.every((u) => (info?.result?.allowed_updates ?? ["message"]).includes(u));
@@ -37,6 +39,33 @@ export default async function AdminTelegramPage() {
         title="Telegram"
         description={cfg.username ? `Бот @${cfg.username}. Игроки подтверждают Telegram в анкете — бот дублирует им уведомления сайта.` : "Бот не настроен: впишите токен и имя бота в «Настройки»."}
       />
+
+      {unlinked.length > 0 && (
+        <Panel title={`Участники турниров без Telegram: ${unlinked.reduce((a, t) => a + t.missing.length, 0)} из ${unlinked.reduce((a, t) => a + t.total, 0)}`} boxed>
+          <p className="px-5 pt-4 text-[14px] text-fg-3">
+            Игроки одобренных команд. Пока не подтвердят Telegram, на сайте у них висит окно «Подтвердите Telegram». Без этого бот не отметит их в рассадке и не позовёт на матч — напомните капитанам.
+          </p>
+          <ul className="divide-y divide-line-subtle">
+            {unlinked.map((t) => (
+              <li key={`${t.team}-${t.tournament}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 py-3 text-[14.5px]">
+                <span className="w-44 shrink-0 font-semibold">
+                  {t.team} <span className="text-fg-3">[{t.tag}]</span>
+                </span>
+                {t.missing.length === 0 ? (
+                  <span className="font-semibold text-ok">✓ все {t.total} подтвердили</span>
+                ) : (
+                  <span>
+                    <span className={t.missing.length > 2 ? "font-semibold text-danger" : "font-semibold text-warn"}>
+                      нет у {t.missing.length} из {t.total}:
+                    </span>{" "}
+                    {t.missing.map((p) => `${p.nickname}${p.captain ? " (капитан)" : ""}${p.sub ? " (запас)" : ""}`).join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel title="Состояние" boxed>
         <div className="space-y-3 p-5 text-[15px]">
