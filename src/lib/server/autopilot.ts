@@ -6,6 +6,7 @@ import { db } from "../supabase";
 import type { Match } from "../types";
 import { enqueueCommand, getServerState, hostBusy } from "./state";
 import { enqueueAutoPrefetch, workshopInfo } from "./workshop";
+import { announceCalls, callMatch, hallConfig, hallSnapshot, rested } from "../hall";
 
 // ───────────────────────── назначение сервера
 
@@ -68,6 +69,7 @@ export async function autopilotTick() {
   // Онлайн-турниры игроки играют из дома — их матчи мест не занимают, их ограничивает только число серверов
   const limit = await getMaxParallelMatches();
   let seats = limit == null ? Infinity : limit - (await matchesOnServers());
+  const hall = ts.some((t) => t.is_lan) ? await hallConfig() : null;
 
   for (const t of ts) {
     const { data: list } = await db()
@@ -104,8 +106,26 @@ export async function autopilotTick() {
       !busy.has(m.team2_id) &&
       (currentRound == null || !stageIds.has(m.id) || m.round === currentRound);
 
-    // 1. вето — как только соперники известны
-    for (const m of matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x) && free(x))) {
+    // 1а. LAN с рассадкой: матч не начинает вето сам — его вызывают на места (бот пишет в Telegram, где садиться),
+    // а бан-пик начинается после «Готов» обоих капитанов или через 10 минут (hallTick)
+    if (t.is_lan && hall?.enabled) {
+      const waiting = matches.filter((x) => x.status === "upcoming" && x.team1_id && x.team2_id && due(x) && free(x));
+      if (waiting.length) {
+        const snap = await hallSnapshot(t.id, hall);
+        const called: Exclude<Awaited<ReturnType<typeof callMatch>>, string>[] = [];
+        for (const m of waiting) {
+          if (snap.calls.has(m.id)) continue; // уже вызван — ждём «Готов»
+          if (!rested(snap.matches, m.team1_id!) || !rested(snap.matches, m.team2_id!)) continue; // перерыв между матчами
+          const r = await callMatch(m.id, { announce: false });
+          if (typeof r === "string") break; // мест нет — следующий матч тоже не сядет
+          called.push(r);
+        }
+        await announceCalls(called);
+      }
+    }
+
+    // 1. вето — как только соперники известны (без рассадки)
+    for (const m of matches.filter((x) => !(t.is_lan && hall?.enabled) && x.status === "upcoming" && x.team1_id && x.team2_id && due(x) && free(x))) {
       const { data: updated } = await db()
         .from("matches")
         .update({ status: "veto", veto_deadline: new Date(now + 60_000).toISOString() })

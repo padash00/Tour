@@ -1,3 +1,4 @@
+import { applyReadyTimeout, matchHall } from "@/lib/hall";
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
@@ -30,6 +31,12 @@ export async function GET(request: NextRequest) {
       // время хода вышло — авто-бан/пик сразу, не дожидаясь перезагрузки страницы
       if (head.veto_deadline && new Date(head.veto_deadline).getTime() <= Date.now()) await applyVetoTimeouts(id);
     }
+    // рассадка: вызван ли матч, кто нажал «Готов»; 10 минут прошли — бан-пик начинается сам
+    let hall: Awaited<ReturnType<typeof matchHall>> = null;
+    if (head?.status === "upcoming") {
+      hall = await matchHall(id);
+      if (hall && new Date(hall.deadline).getTime() <= Date.now()) await applyReadyTimeout(id);
+    }
     const [m, maps, veto, stats, rounds] = await Promise.all([
       db()
         .from("matches")
@@ -48,7 +55,7 @@ export async function GET(request: NextRequest) {
         .order("round_number", { ascending: false })
         .limit(1),
     ]);
-    parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0, rounds.count ?? 0, rounds.data?.[0] ?? null];
+    parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0, rounds.count ?? 0, rounds.data?.[0] ?? null, hall && [hall.calledAt, hall.seat1, hall.seat2, hall.ready1, hall.ready2]];
   } else if (k.startsWith("tournament:") && UUID.test(k.slice(11))) {
     // режим ТВ: всё, что видно на экране турнира — статусы, счёт серий и карт идущих матчей, этап турнира
     const id = k.slice(11);

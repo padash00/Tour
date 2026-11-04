@@ -31,6 +31,9 @@ import { MatchStatusChip } from "@/components/primitives";
 import { ADMIN_CARD, AdminHeader, Dot } from "@/components/admin/control";
 import { FactRow, Quiet, RailGroup, Section, SectionLink, Timeline, serverNow, type TimelineItem } from "@/components/admin/kit";
 import { requireAdmin } from "@/lib/auth";
+import { adminCallMatch } from "@/app/actions/admin-hall";
+import { hallConfig, matchHall } from "@/lib/hall";
+import { HALL_BLOCKS, blockLabel } from "@/lib/hall-core";
 
 export const metadata: Metadata = { title: "Матч — F16 Control" };
 
@@ -182,6 +185,8 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
   await applyVetoTimeouts(id);
   const m = await getMatch(id);
   if (!m) notFound();
+  const hallOn = m.tournament.is_lan !== false && (await hallConfig()).enabled;
+  const hall = hallOn && m.status === "upcoming" ? await matchHall(m.id) : null;
   const [servers, rosters, disputesRes] = await Promise.all([
     getServerState(),
     getMatchRosters(m),
@@ -668,6 +673,41 @@ export default async function AdminMatchPage(props: PageProps<"/admin/matches/[i
               </div>
             )}
             {m.status === "pending" && <p className="text-[13px] text-fg-3">Ждём, пока определятся обе команды.</p>}
+            {m.status === "upcoming" && hallOn && (
+              <div className="space-y-2 rounded-control border border-line-subtle p-3">
+                <div className="text-[14px] font-semibold">Рассадка</div>
+                {hall ? (
+                  <p className="text-[13.5px] text-fg-2">
+                    {m.team1?.name}: {blockLabel(hall.seat1)} {hall.ready1 ? "✅" : "⏳"}
+                    <br />
+                    {m.team2?.name}: {blockLabel(hall.seat2)} {hall.ready2 ? "✅" : "⏳"}
+                  </p>
+                ) : (
+                  <p className="text-[13px] text-fg-3">Матч ещё не вызван на места.</p>
+                )}
+                {m.team1_id && m.team2_id && (
+                  <ActionForm action={adminCallMatch} className="space-y-2">
+                    <input type="hidden" name="matchId" value={m.id} />
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["seat1", "seat2"] as const).map((f, i) => (
+                        <select key={f} name={f} defaultValue={hall?.[f] ?? ""} className="field text-[13px]" aria-label={i === 0 ? m.team1?.name : m.team2?.name}>
+                          <option value="">{i === 0 ? m.team1?.tag : m.team2?.tag}: авто</option>
+                          {HALL_BLOCKS.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {blockLabel(b.id)}
+                            </option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                    <SubmitButton size="md" variant={hall ? "secondary" : "primary"}>
+                      {hall ? "Пересадить" : "Вызвать на места"}
+                    </SubmitButton>
+                    <p className="text-[12.5px] text-fg-3">«Авто» в обоих — сайт выберет места сам. Бот напишет в Telegram, где садиться.</p>
+                  </ActionForm>
+                )}
+              </div>
+            )}
             {m.status === "upcoming" && (
               <ActionForm action={startVeto}>
                 <input type="hidden" name="matchId" value={m.id} />

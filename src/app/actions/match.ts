@@ -37,3 +37,16 @@ export async function vetoAct(_prev: ActionResult, formData: FormData): Promise<
   revalidatePath(`/matches/${matchId}`);
   return null;
 }
+
+/** Капитан: «Команда села — Готов». Когда готовы оба — начинается бан-пик */
+export async function hallReady(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const matchId = String(formData.get("matchId"));
+  const t = await getT();
+  const player = await requirePlayer(`/matches/${matchId}`);
+  if (player.is_banned) return { error: BANNED_ERROR };
+  const { markReady } = await import("@/lib/hall");
+  const error = await markReady(matchId, player.id);
+  if (error) return { error: t(error) };
+  revalidatePath(`/matches/${matchId}`);
+  return null;
+}

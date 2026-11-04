@@ -21,7 +21,10 @@ import { PlayerStatsTable } from "@/components/stats-table";
 import { ClientTabs } from "@/components/public/client-tabs";
 import { MatchMvp } from "@/components/competition/match-mvp";
 import { ActionForm, SubmitButton } from "@/components/forms";
-import { LiveRefresh } from "@/components/live-refresh";
+import { Countdown, LiveRefresh } from "@/components/live-refresh";
+import { hallReady } from "@/app/actions/match";
+import { matchHall } from "@/lib/hall";
+import { blockById } from "@/lib/hall-core";
 import { matchStage } from "@/components/match-bits";
 import { RosterList } from "@/components/roster-list";
 import { MatchHero } from "@/components/competition/match-hero";
@@ -99,6 +102,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const { data: disputeRows } = await db().from("disputes").select("*").eq("match_id", m.id).order("created_at");
   const disputes = (disputeRows ?? []) as Dispute[];
 
+  const hall = m.status === "upcoming" && m.tournament.is_lan !== false ? await matchHall(m.id) : null;
   const myTeam = player ? (m.team1?.captain_id === player.id ? m.team1 : m.team2?.captain_id === player.id ? m.team2 : null) : null;
   const isCaptain = !!myTeam;
   const inRoster = [...rosters.team1, ...rosters.team2].some((r) => r.player.id === player?.id);
@@ -292,7 +296,42 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   // главный блок под плашкой: до вето — когда и как, во время вето — доска вето; дальше всё говорят плашка и колонка «Сервер»
   const currentState =
-    m.status === "pending" || m.status === "upcoming" ? (
+    hall && m.team1 && m.team2 ? (
+      <FeatureSurface>
+        <h2 className="text-heading text-fg">{t("Рассадка: садитесь за ПК")}</h2>
+        <p className="mt-1 text-[15px] text-fg-2">
+          {t("Команды садятся, входят в свой Steam, и капитаны нажимают «Готов». Бан-пик начнётся, когда готовы оба — или сам через")}{" "}
+          <b className="num">
+            <Countdown deadline={hall.deadline} long />
+          </b>
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {([
+            [m.team1, hall.seat1, hall.ready1],
+            [m.team2, hall.seat2, hall.ready2],
+          ] as const).map(([team, seat, ready]) => {
+            const b = blockById(seat);
+            return (
+              <div key={team.id} className={cn("rounded-control border p-4", ready ? "border-ok/40 bg-ok/10" : "border-line bg-surface-4")}>
+                <div className="flex items-center gap-2.5">
+                  <TeamLogo src={team.logo_url} tag={team.tag} size="sm" />
+                  <span className="min-w-0 truncate text-[16px] font-bold text-fg">{team.name}</span>
+                </div>
+                <div className="mt-3 text-[28px] font-extrabold leading-none text-fg num">{b ? t("ПК {from}–{to}", { from: b.from, to: b.to }) : "—"}</div>
+                <div className="mt-1 text-[14px] text-fg-3">{b?.zone === "premium" ? t("Зона Standart Premium") : t("Зона Standart")}</div>
+                <div className={cn("mt-3 text-[14.5px] font-semibold", ready ? "text-ok" : "text-fg-2")}>{ready ? t("✅ Готовы") : t("⏳ Садятся…")}</div>
+                {myTeam?.id === team.id && !ready && (
+                  <ActionForm action={hallReady} className="mt-3">
+                    <input type="hidden" name="matchId" value={m.id} />
+                    <SubmitButton size="lg">{t("Команда села — Готов")}</SubmitButton>
+                  </ActionForm>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </FeatureSurface>
+    ) : m.status === "pending" || m.status === "upcoming" ? (
       <FeatureSurface>
         <h2 className="text-heading text-fg">{t("Когда и как играется")}</h2>
         <Facts

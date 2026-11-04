@@ -1,0 +1,396 @@
+import "server-only";
+import { audit, notify } from "./audit";
+import { db } from "./supabase";
+import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape } from "./telegram";
+import { VETO_STEP_SECONDS } from "./veto";
+import { HALL_BLOCKS, blockById, blockLabel, chooseSeats, parseForbidden, type SeatPlan } from "./hall-core";
+
+/*
+ * Рассадка в зале (LAN-турниры). Всё хранится событиями в audit_logs — схема базы не меняется:
+ *  - hall.call  {tournament, seat1, seat2, team1, team2} — матч вызван, командам назначены блоки ПК
+ *                (последний вызов матча — действующий; пересадка = новый вызов);
+ *  - hall.ready {team} — капитан нажал «Команда села — Готов».
+ * Бан-пик начинается, когда готовы оба капитана или через 10 минут после вызова.
+ * Настройки (app_settings): HALL_SEATING=1 — включено; HALL_FORBIDDEN — запрещённые пары соперников;
+ * HALL_FREED — {блок: время}, «блок свободен» вручную; TELEGRAM_MATCHES_THREAD — тема «Матчи турнира»; HALL_BOARD_MSG — табло зала.
+ */
+
+export const READY_MS = 10 * 60_000; // на «Готов» после вызова
+export const REST_MS = 10 * 60_000; // перерыв команды между матчами
+export const RELEASE_MS = 5 * 60_000; // блок проигравших освобождается после матча
+
+const ACTIVE = ["upcoming", "veto", "ready", "live"];
+
+export async function hallConfig() {
+  const { data } = await db()
+    .from("app_settings")
+    .select("key, value")
+    .in("key", ["HALL_SEATING", "HALL_FORBIDDEN", "HALL_FREED", "TELEGRAM_MATCHES_THREAD", "HALL_BOARD_MSG", "HALL_BOARD_TEXT"]);
+  const m = new Map((data ?? []).map((r) => [r.key, String(r.value ?? "")]));
+  let freed: Record<string, string> = {};
+  try {
+    freed = JSON.parse(m.get("HALL_FREED") || "{}");
+  } catch {}
+  return {
+    enabled: m.get("HALL_SEATING") === "1",
+    forbiddenRaw: m.get("HALL_FORBIDDEN") ?? "",
+    forbidden: parseForbidden(m.get("HALL_FORBIDDEN")),
+    freed,
+    thread: Number(m.get("TELEGRAM_MATCHES_THREAD") || "") || null,
+    boardMsg: Number(m.get("HALL_BOARD_MSG") || "") || null,
+    boardText: m.get("HALL_BOARD_TEXT") ?? "",
+  };
+}
+export type HallConfig = Awaited<ReturnType<typeof hallConfig>>;
+
+export type HallCall = { matchId: string; seat1: string; seat2: string; team1: string; team2: string; at: string };
+
+type HallMatch = {
+  id: string;
+  number: number;
+  status: string;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_id: string | null;
+  finished_at: string | null;
+  team1_score: number;
+  team2_score: number;
+};
+
+/** Действующие вызовы матчей турнира (последний вызов каждого матча) */
+async function tournamentCalls(tournamentId: string): Promise<Map<string, HallCall>> {
+  const { data } = await db()
+    .from("audit_logs")
+    .select("entity_id, payload, created_at")
+    .eq("action", "hall.call")
+    .eq("payload->>tournament", tournamentId)
+    .order("created_at", { ascending: true })
+    .limit(2000);
+  const out = new Map<string, HallCall>();
+  for (const r of data ?? []) {
+    const p = (r.payload ?? {}) as Record<string, string>;
+    if (!r.entity_id || !p.seat1 || !p.seat2) continue;
+    out.set(r.entity_id, { matchId: r.entity_id, seat1: p.seat1, seat2: p.seat2, team1: p.team1, team2: p.team2, at: r.created_at });
+  }
+  return out;
+}
+
+const freedAfter = (cfg: HallConfig, seat: string, since: string) => !!cfg.freed[seat] && Date.parse(cfg.freed[seat]) > Date.parse(since);
+
+/** Кто где сидит: занятые блоки, последнее место каждой команды, места ждущих команд */
+export async function hallSnapshot(tournamentId: string, cfg: HallConfig, exceptMatch?: string) {
+  const [calls, { data: ms }] = await Promise.all([
+    tournamentCalls(tournamentId),
+    db().from("matches").select("id, number, status, team1_id, team2_id, winner_id, finished_at, team1_score, team2_score").eq("tournament_id", tournamentId),
+  ]);
+  const matches = (ms ?? []) as HallMatch[];
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const now = Date.now();
+  const occupied = new Map<string, string>();
+  const occupiedBy = new Map<string, { team: string; match: HallMatch }>();
+  const last = new Map<string, string>();
+  const lastAt = new Map<string, string>();
+  for (const c of [...calls.values()].sort((a, b) => a.at.localeCompare(b.at))) {
+    const m = byId.get(c.matchId);
+    if (!m || m.id === exceptMatch) continue;
+    for (const [seat, team] of [[c.seat1, c.team1], [c.seat2, c.team2]] as const) {
+      last.set(team, seat);
+      lastAt.set(team, c.at);
+    }
+    const active = ACTIVE.includes(m.status) && m.team1_id === c.team1 && m.team2_id === c.team2;
+    const justFinished = m.status === "finished" && !!m.finished_at && now - new Date(m.finished_at).getTime() < RELEASE_MS;
+    if (!active && !justFinished) continue;
+    for (const [seat, team] of [[c.seat1, c.team1], [c.seat2, c.team2]] as const) {
+      // «Блок свободен» в пульте снимает только места закончившихся матчей
+      if (!active && freedAfter(cfg, seat, m.finished_at ?? c.at)) continue;
+      occupied.set(seat, team);
+      occupiedBy.set(seat, { team, match: m });
+    }
+  }
+  // команда, у которой есть следующий матч, «держит» своё последнее место
+  const waiting = new Set<string>();
+  for (const m of matches)
+    if (["pending", "upcoming"].includes(m.status)) {
+      if (m.team1_id) waiting.add(m.team1_id);
+      if (m.team2_id) waiting.add(m.team2_id);
+    }
+  const reserved = new Map<string, string>();
+  for (const [team, seat] of last) {
+    if (!waiting.has(team) || occupied.has(seat)) continue;
+    if (freedAfter(cfg, seat, lastAt.get(team) ?? "1970-01-01")) continue;
+    reserved.set(seat, team);
+  }
+  return { calls, matches, occupied, occupiedBy, last, reserved };
+}
+
+/** Команда отдохнула после прошлого матча турнира */
+export function rested(matches: HallMatch[], teamId: string, now = Date.now()) {
+  const lastEnd = matches
+    .filter((m) => m.status === "finished" && m.finished_at && (m.team1_id === teamId || m.team2_id === teamId))
+    .reduce((acc, m) => Math.max(acc, new Date(m.finished_at!).getTime()), 0);
+  return now - lastEnd >= REST_MS;
+}
+
+type CallResult = { matchId: string; number: number; plan: SeatPlan; team1: TeamInfo; team2: TeamInfo };
+type TeamInfo = { id: string; name: string; captain_id: string | null; players: { id: string; nickname: string; tg: number | null }[] };
+
+async function teamInfo(tournamentId: string, teamId: string): Promise<TeamInfo> {
+  const [{ data: team }, { data: roster }] = await Promise.all([
+    db().from("teams").select("id, name, captain_id").eq("id", teamId).maybeSingle(),
+    db()
+      .from("tournament_roster_players")
+      .select("player:players(id, nickname), registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(team_id)")
+      .eq("tournament_id", tournamentId)
+      .eq("registration.team_id", teamId),
+  ]);
+  const players = ((roster ?? []) as unknown as { player: { id: string; nickname: string } | null }[]).map((r) => r.player).filter(Boolean) as { id: string; nickname: string }[];
+  const { data: profs } = players.length
+    ? await db().from("player_profiles").select("player_id, telegram_chat_id").in("player_id", players.map((p) => p.id))
+    : { data: [] };
+  const tg = new Map((profs ?? []).map((p) => [p.player_id, p.telegram_chat_id as number | null]));
+  return {
+    id: teamId,
+    name: team?.name ?? "Команда",
+    captain_id: team?.captain_id ?? null,
+    players: players.map((p) => ({ ...p, tg: tg.get(p.id) ?? null })),
+  };
+}
+
+/**
+ * Вызвать матч: назначить блоки ПК (или взять указанные админом) и сообщить игрокам.
+ * Возвращает ошибку текстом, если вызвать нельзя.
+ */
+export async function callMatch(matchId: string, opts: { actorId?: string | null; seats?: [string, string]; announce?: boolean } = {}): Promise<CallResult | string> {
+  const { data: m } = await db()
+    .from("matches")
+    .select("id, number, status, tournament_id, team1_id, team2_id")
+    .eq("id", matchId)
+    .maybeSingle();
+  if (!m) return "Матч не найден";
+  if (m.status !== "upcoming" || !m.team1_id || !m.team2_id) return "Вызвать можно матч, где известны обе команды и бан-пик ещё не начался";
+  const cfg = await hallConfig();
+  const snap = await hallSnapshot(m.tournament_id, cfg, m.id);
+  let plan: SeatPlan | null;
+  if (opts.seats) {
+    const [s1, s2] = opts.seats;
+    if (!blockById(s1) || !blockById(s2) || s1 === s2) return "Выберите два разных блока";
+    for (const [s, team] of [[s1, m.team1_id], [s2, m.team2_id]] as const) {
+      const who = snap.occupied.get(s);
+      if (who && who !== team) return `${blockLabel(s)} сейчас занят другой командой`;
+    }
+    plan = { seat1: s1, seat2: s2, moved1: !!snap.last.get(m.team1_id) && snap.last.get(m.team1_id) !== s1, moved2: !!snap.last.get(m.team2_id) && snap.last.get(m.team2_id) !== s2 };
+  } else {
+    plan = chooseSeats({ team1: m.team1_id, team2: m.team2_id, last: snap.last, occupied: snap.occupied, reserved: snap.reserved, forbidden: cfg.forbidden });
+  }
+  if (!plan) return "Свободных мест нет — матч подождёт, пока освободится блок";
+
+  await audit(opts.actorId ?? null, "hall.call", { type: "match", id: m.id }, {
+    tournament: m.tournament_id,
+    seat1: plan.seat1,
+    seat2: plan.seat2,
+    team1: m.team1_id,
+    team2: m.team2_id,
+    moved1: plan.moved1,
+    moved2: plan.moved2,
+    manual: !!opts.seats,
+  });
+  const [team1, team2] = await Promise.all([teamInfo(m.tournament_id, m.team1_id), teamInfo(m.tournament_id, m.team2_id)]);
+  const link = `/matches/${m.id}`;
+  for (const [me, rival, seat] of [[team1, team2, plan.seat1], [team2, team1, plan.seat2]] as const) {
+    await notify(
+      me.players.map((p) => p.id),
+      `Матч #${m.number}: садитесь за ${blockLabel(seat)}`,
+      `Против ${rival.name}. Войдите в свой Steam. Капитан — нажмите «Готов» на странице матча, на это 10 минут.`,
+      link,
+    ).catch(() => {});
+  }
+  const result = { matchId: m.id, number: m.number, plan, team1, team2 };
+  if (opts.announce !== false) await announceCalls([result]);
+  return result;
+}
+
+const mentionList = (t: TeamInfo) =>
+  t.players.map((p) => (p.tg ? `<a href="tg://user?id=${p.tg}">${tgEscape(p.nickname)}</a>` : tgEscape(p.nickname))).join(", ");
+
+/** Сообщение в тему «Матчи турнира»: кто куда садится */
+export async function announceCalls(calls: CallResult[]) {
+  if (!calls.length) return;
+  const [cfg, group, tg] = await Promise.all([hallConfig(), telegramGroup(), telegramConfig()]);
+  if (!tg.token || !group.id || !cfg.thread) return;
+  const parts = calls.map((c) => {
+    const line = (t: TeamInfo, seat: string, moved: boolean) =>
+      `${moved ? "🔁" : "🖥"} <b>${tgEscape(t.name)}</b> — <b>${blockLabel(seat)}</b>${moved ? " · пересаживаетесь" : ""}\n${mentionList(t)}`;
+    return `⚔️ <b>Матч #${c.number}</b>: ${tgEscape(c.team1.name)} vs ${tgEscape(c.team2.name)}\n${line(c.team1, c.plan.seat1, c.plan.moved1)}\n${line(c.team2, c.plan.seat2, c.plan.moved2)}\n<a href="${SITE_URL}/matches/${c.matchId}">Страница матча</a>`;
+  });
+  const head = calls.length > 1 ? "📢 <b>Садитесь за ПК</b>\n\n" : "📢 <b>Вызов на матч</b>\n\n";
+  const tail = "\n\nВойдите в свой Steam. Капитаны: как команда села — нажмите <b>«Готов»</b> на странице матча. На это 10 минут, потом бан-пик начнётся сам.";
+  await tgCall(tg.token, "sendMessage", {
+    chat_id: group.id,
+    message_thread_id: cfg.thread,
+    text: head + parts.join("\n\n") + tail,
+    parse_mode: "HTML",
+    link_preview_options: { is_disabled: true },
+  });
+  await updateBoard().catch(() => {});
+}
+
+// ───────────────────────── «Готов» и старт бан-пика
+
+export async function matchHall(matchId: string) {
+  const { data: call } = await db()
+    .from("audit_logs")
+    .select("payload, created_at")
+    .eq("action", "hall.call")
+    .eq("entity_type", "match")
+    .eq("entity_id", matchId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!call) return null;
+  const p = (call.payload ?? {}) as Record<string, string>;
+  const { data: readies } = await db()
+    .from("audit_logs")
+    .select("payload")
+    .eq("action", "hall.ready")
+    .eq("entity_type", "match")
+    .eq("entity_id", matchId)
+    .gte("created_at", call.created_at);
+  const ready = new Set((readies ?? []).map((r) => (r.payload as Record<string, string>)?.team));
+  // бан-пик после этого вызова уже начинался (а потом админ его сбросил) — сам больше не запускаем
+  const { count: vetoStarts } = await db()
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .in("action", ["hall.veto_start", "match.veto_start"])
+    .eq("entity_type", "match")
+    .eq("entity_id", matchId)
+    .gte("created_at", call.created_at);
+  return {
+    seat1: p.seat1,
+    seat2: p.seat2,
+    team1: p.team1,
+    team2: p.team2,
+    calledAt: call.created_at,
+    deadline: new Date(new Date(call.created_at).getTime() + READY_MS).toISOString(),
+    ready1: ready.has(p.team1),
+    ready2: ready.has(p.team2),
+    vetoStarted: (vetoStarts ?? 0) > 0,
+  };
+}
+
+/** Бан-пик матча после рассадки: оба готовы или вышло время */
+export async function startHallVeto(matchId: string, reason: "ready" | "timeout" | "admin") {
+  const { data: updated } = await db()
+    .from("matches")
+    .update({ status: "veto", veto_deadline: new Date(Date.now() + VETO_STEP_SECONDS * 1000).toISOString() })
+    .eq("id", matchId)
+    .eq("status", "upcoming")
+    .select("id, number, team1_id, team2_id");
+  const m = updated?.[0];
+  if (!m) return false;
+  await audit(null, "hall.veto_start", { type: "match", id: m.id }, { reason });
+  const { data: teams } = await db().from("teams").select("captain_id").in("id", [m.team1_id, m.team2_id].filter((x): x is string => !!x));
+  await notify(
+    (teams ?? []).map((x) => x.captain_id),
+    `Бан-пик матча #${m.number} начался`,
+    reason === "timeout" ? `10 минут на «Готов» прошли. На каждый шаг — ${VETO_STEP_SECONDS} секунд.` : `На каждый шаг — ${VETO_STEP_SECONDS} секунд.`,
+    `/matches/${m.id}`,
+  ).catch(() => {});
+  return true;
+}
+
+/** Капитан нажал «Команда села — Готов». Ошибка — текстом */
+export async function markReady(matchId: string, playerId: string): Promise<string | null> {
+  const { data: m } = await db().from("matches").select("id, status, team1_id, team2_id").eq("id", matchId).maybeSingle();
+  if (!m) return "Матч не найден";
+  if (m.status !== "upcoming") return "Бан-пик уже начался";
+  const hall = await matchHall(matchId);
+  if (!hall) return "Матч ещё не вызван — ждите сообщения, где садиться";
+  const { data: teams } = await db().from("teams").select("id, captain_id").in("id", [hall.team1, hall.team2]);
+  const team = (teams ?? []).find((t) => t.captain_id === playerId);
+  if (!team) return "«Готов» нажимает капитан команды";
+  if ((team.id === hall.team1 && hall.ready1) || (team.id === hall.team2 && hall.ready2)) return null;
+  await audit(playerId, "hall.ready", { type: "match", id: matchId }, { team: team.id });
+  const both = (team.id === hall.team1 || hall.ready1) && (team.id === hall.team2 || hall.ready2);
+  if (both) await startHallVeto(matchId, "ready");
+  return null;
+}
+
+/** 10 минут на «Готов» прошли — бан-пик начинается сам */
+export async function applyReadyTimeout(matchId: string) {
+  const hall = await matchHall(matchId);
+  if (hall && !hall.vetoStarted && new Date(hall.deadline).getTime() <= Date.now()) await startHallVeto(matchId, "timeout");
+}
+
+// ───────────────────────── тик: таймауты, табло
+
+/** Вызывается на каждой синхронизации агента: таймауты «Готов», табло зала */
+export async function hallTick() {
+  const cfg = await hallConfig();
+  if (!cfg.enabled) return;
+  const { data: ts } = await db().from("tournaments").select("id").eq("is_lan", true).in("status", ["checkin", "live"]);
+  for (const t of ts ?? []) {
+    const calls = await tournamentCalls(t.id);
+    if (!calls.size) continue;
+    const { data: waiting } = await db().from("matches").select("id").eq("tournament_id", t.id).eq("status", "upcoming").in("id", [...calls.keys()]);
+    const now = Date.now();
+    for (const w of waiting ?? []) {
+      const c = calls.get(w.id)!;
+      if (new Date(c.at).getTime() + READY_MS <= now) await applyReadyTimeout(w.id);
+    }
+  }
+  await updateBoard().catch(() => {});
+}
+
+const STATUS_TEXT: Record<string, string> = { upcoming: "садятся", veto: "бан-пик", ready: "сервер", live: "игра", finished: "закончили" };
+
+/** Текст табло «Зал сейчас» */
+export async function boardText() {
+  const cfg = await hallConfig();
+  const { data: ts } = await db().from("tournaments").select("id, name").eq("is_lan", true).in("status", ["checkin", "live"]);
+  const teamIds = new Set<string>();
+  const seats: { block: string; team: string; match: HallMatch | null }[] = [];
+  for (const t of ts ?? []) {
+    const snap = await hallSnapshot(t.id, cfg);
+    for (const [block, v] of snap.occupiedBy) {
+      seats.push({ block, team: v.team, match: v.match });
+      teamIds.add(v.team);
+    }
+    for (const [block, team] of snap.reserved) {
+      if (snap.occupiedBy.has(block)) continue;
+      seats.push({ block, team, match: null });
+      teamIds.add(team);
+    }
+  }
+  const { data: teams } = teamIds.size ? await db().from("teams").select("id, name").in("id", [...teamIds]) : { data: [] };
+  const name = new Map((teams ?? []).map((t) => [t.id, t.name]));
+  const lines = HALL_BLOCKS.map((b) => {
+    const s = seats.find((x) => x.block === b.id);
+    if (!s) return `▫️ ${blockLabel(b.id, false)} — свободно`;
+    if (!s.match) return `⏸ ${blockLabel(b.id, false)} — <b>${tgEscape(name.get(s.team) ?? "?")}</b> · ждёт следующий матч`;
+    const score = s.match.status === "live" || s.match.status === "finished" ? ` · ${s.match.team1_score}:${s.match.team2_score}` : "";
+    return `${s.match.status === "live" ? "🔴" : "🟢"} ${blockLabel(b.id, false)} — <b>${tgEscape(name.get(s.team) ?? "?")}</b> · матч #${s.match.number} · ${STATUS_TEXT[s.match.status] ?? s.match.status}${score}`;
+  });
+  return `🖥 <b>Зал сейчас</b>\n\n<b>Premium</b>\n${lines.slice(0, 6).join("\n")}\n\n<b>Standart</b>\n${lines.slice(6).join("\n")}`;
+}
+
+/** Закреплённое табло в теме «Матчи турнира»: создать или обновить, если поменялось */
+export async function updateBoard() {
+  const cfg = await hallConfig();
+  if (!cfg.enabled || !cfg.thread) return;
+  const [group, tg] = await Promise.all([telegramGroup(), telegramConfig()]);
+  if (!tg.token || !group.id) return;
+  const text = await boardText();
+  if (text === cfg.boardText && cfg.boardMsg) return;
+  if (cfg.boardMsg) {
+    const r = await tgCall(tg.token, "editMessageText", { chat_id: group.id, message_id: cfg.boardMsg, text, parse_mode: "HTML" });
+    if (r.ok || /not modified/i.test(r.description ?? "")) {
+      await setAppSettings({ HALL_BOARD_TEXT: text });
+      return;
+    }
+  }
+  const sent = await tgCall<{ message_id: number }>(tg.token, "sendMessage", { chat_id: group.id, message_thread_id: cfg.thread, text, parse_mode: "HTML", disable_notification: true });
+  if (sent.ok && sent.result) {
+    await tgCall(tg.token, "pinChatMessage", { chat_id: group.id, message_id: sent.result.message_id, disable_notification: true });
+    await setAppSettings({ HALL_BOARD_MSG: String(sent.result.message_id), HALL_BOARD_TEXT: text });
+  }
+}

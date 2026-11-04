@@ -233,6 +233,23 @@ async function onCommand(token: string, msg: TgMessage, text: string) {
     if (id) await tgCall(token, "pinChatMessage", { chat_id: msg.chat.id, message_id: id, disable_notification: true });
     return true;
   }
+  if (cmd === "/matches") {
+    await del(token, msg.chat.id, msg.message_id);
+    if (arg === "off") {
+      await setAppSettings({ TELEGRAM_MATCHES_THREAD: "", HALL_BOARD_MSG: "", HALL_BOARD_TEXT: "" });
+      await notice(token, msg, "Тема «Матчи турнира» отключена — бот больше не пишет сюда рассадку.", 20_000);
+      return true;
+    }
+    if (!msg.is_topic_message || !msg.message_thread_id) {
+      await notice(token, msg, "Отправьте /matches внутри темы «Матчи турнира».", 20_000);
+      return true;
+    }
+    await setAppSettings({ TELEGRAM_MATCHES_THREAD: String(msg.message_thread_id), HALL_BOARD_MSG: "", HALL_BOARD_TEXT: "" });
+    await notice(token, msg, MATCHES_RULES, 0);
+    const { updateBoard } = await import("./hall");
+    await updateBoard().catch(() => {});
+    return true;
+  }
   if (cmd === "/market") {
     await del(token, msg.chat.id, msg.message_id);
     if (arg === "off") {
@@ -425,9 +442,21 @@ function tooManyAds(userId: number) {
   return false;
 }
 
+const MATCHES_RULES =
+  `🎮 <b>Матчи турнира</b>
+
+Здесь бот пишет, какая команда за какими ПК садится, и держит в закрепе табло «Зал сейчас».
+
+1. Пришло сообщение с вашей командой — садитесь за свои ПК и входите в свой Steam.
+2. Капитан нажимает «Команда села — Готов» на странице матча на сайте.
+3. Бан-пик начинается, когда готовы оба капитана, или сам через 10 минут.
+
+Соперники всегда сидят далеко друг от друга. Не пересаживайтесь сами — только по сообщению бота.`;
+
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
-  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
+  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)
+/matches — в теме «Матчи турнира»: бот пишет туда рассадку и табло зала (/matches off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
 
 /** Амнистия: всем, кого бот наказывал, — разбан, снятие мута и обнуление предупреждений */
 export async function pardonAll(token: string, groupId: number, by: string) {
