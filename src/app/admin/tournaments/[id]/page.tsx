@@ -957,7 +957,7 @@ function RegistrationRow({
   approveWarning?: string;
 }) {
   const mains = r.roster.filter((p) => p.role === "main");
-  const elo = averageElo(r.roster);
+  const elo = averageElo(r.roster.filter((p) => p.role === "main"));
   const tone =
     r.status === "approved" ? "text-ok" : r.status === "pending" ? "text-warn" : r.status === "rejected" ? "text-danger" : "text-fg-3";
 
