@@ -349,8 +349,21 @@ export async function boardText() {
   const { data: ts } = await db().from("tournaments").select("id, name").eq("is_lan", true).in("status", ["checkin", "live"]);
   const teamIds = new Set<string>();
   const seats: { block: string; team: string; match: HallMatch | null }[] = [];
+  const queue: { m: HallMatch; restUntil: number }[] = [];
+  const now = Date.now();
   for (const t of ts ?? []) {
     const snap = await hallSnapshot(t.id, cfg);
+    // очередь: соперники известны, на места ещё не вызваны
+    for (const m of snap.matches) {
+      if (m.status !== "upcoming" || !m.team1_id || !m.team2_id || snap.calls.has(m.id)) continue;
+      const lastEnd = (team: string) =>
+        snap.matches
+          .filter((x) => x.status === "finished" && x.finished_at && (x.team1_id === team || x.team2_id === team))
+          .reduce((a, x) => Math.max(a, new Date(x.finished_at!).getTime()), 0);
+      queue.push({ m, restUntil: Math.max(lastEnd(m.team1_id), lastEnd(m.team2_id)) + REST_MS });
+      teamIds.add(m.team1_id);
+      teamIds.add(m.team2_id);
+    }
     for (const [block, v] of snap.occupiedBy) {
       seats.push({ block, team: v.team, match: v.match });
       teamIds.add(v.team);
@@ -370,7 +383,16 @@ export async function boardText() {
     const score = s.match.status === "live" || s.match.status === "finished" ? ` · ${s.match.team1_score}:${s.match.team2_score}` : "";
     return `${s.match.status === "live" ? "🔴" : "🟢"} ${blockLabel(b.id, false)} — <b>${tgEscape(name.get(s.team) ?? "?")}</b> · матч #${s.match.number} · ${STATUS_TEXT[s.match.status] ?? s.match.status}${score}`;
   });
-  return `🖥 <b>Зал сейчас</b>\n\n<b>Premium</b>\n${lines.slice(0, 6).join("\n")}\n\n<b>Standart</b>\n${lines.slice(6).join("\n")}`;
+  const hhmm = (ms: number) => new Date(ms).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" });
+  const q = queue
+    .sort((a, b) => a.m.number - b.m.number)
+    .slice(0, 8)
+    .map(({ m, restUntil }, i) => {
+      const why = restUntil > now ? `перерыв до ${hhmm(restUntil)}` : i === 0 ? "следующий — как освободятся места" : "ждёт места";
+      return `${i + 1}. Матч #${m.number}: <b>${tgEscape(name.get(m.team1_id!) ?? "?")}</b> — <b>${tgEscape(name.get(m.team2_id!) ?? "?")}</b> · ${why}`;
+    });
+  const queueText = q.length ? `\n\n⏳ <b>Очередь</b> — бот позовёт, когда ваш матч вызовут:\n${q.join("\n")}` : "";
+  return `🖥 <b>Зал сейчас</b>\n\n<b>Premium</b>\n${lines.slice(0, 6).join("\n")}\n\n<b>Standart</b>\n${lines.slice(6).join("\n")}${queueText}`;
 }
 
 /** Закреплённое табло в теме «Матчи турнира»: создать или обновить, если поменялось */
