@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useRef, useState, useTransition } from "react";
 import { saveContact, startTelegramLink, type ProfileActionResult } from "@/app/actions/player-profile";
 import type { ActionResult } from "@/components/forms";
@@ -408,6 +409,22 @@ function TelegramVerify({ verifiedAt }: { verifiedAt: string | null }) {
   const toast = useToast();
   const [pending, start] = useTransition();
   const [opened, setOpened] = useState(false);
+  const router = useRouter();
+  // вернулся из Telegram — перепроверяем сами, чтобы кнопка не висела (иначе игроки жмут её снова и снова)
+  useEffect(() => {
+    if (!opened || verifiedAt) return;
+    const again = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", again);
+    window.addEventListener("focus", again);
+    const timer = setInterval(again, 5000);
+    return () => {
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("focus", again);
+      clearInterval(timer);
+    };
+  }, [opened, verifiedAt, router]);
   if (verifiedAt) {
     return <p className="mt-3 text-meta font-semibold text-ok">✓ {t("Telegram подтверждён — уведомления приходят в бот @f16_tournament_bot")}</p>;
   }
@@ -430,7 +447,7 @@ function TelegramVerify({ verifiedAt }: { verifiedAt: string | null }) {
         {t("Подтвердить через Telegram-бота")}
       </Button>
       <span className="text-meta text-fg-3">
-        {opened ? t("В боте нажмите «Старт», затем обновите эту страницу.") : t("Бот пришлёт уведомления о команде, заявках и матчах.")}
+        {opened ? t("В боте нажмите «Старт» — страница обновится сама.") : t("Бот пришлёт уведомления о команде, заявках и матчах.")}
       </span>
     </div>
   );
