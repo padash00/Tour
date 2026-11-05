@@ -393,7 +393,8 @@ export async function onBuddyCallback(token: string, cb: TgCallback) {
 
 // ── входящее сообщение в теме с ботом
 
-const ADDRESS = /^\s*(бот|ботик|ботяра|f16|ф16)\b[\s,!:]*/i;
+// «бот», «ботик», «ф16» отдельным словом в любом месте ( в JS не работает с кириллицей)
+const ADDRESS = /(^|[^а-яёa-z0-9])(бот|ботик|ботяра|ботэ|f16|ф16)(?=$|[^а-яёa-z0-9])/i;
 
 export async function onTalkMessage(token: string, msg: TgMessage, t: TalkThread, admin: boolean, wasDeleted: boolean) {
   // анонимный админ пишет от имени группы: from — служебный бот Telegram
