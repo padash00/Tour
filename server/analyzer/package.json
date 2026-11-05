@@ -1,0 +1,10 @@
+{
+  "name": "f16-analyzer",
+  "private": true,
+  "type": "module",
+  "description": "Разбор демок CS2 для F16 Arena: позиции, убийства, гранаты, экономика → JSON для страницы «Разбор»",
+  "dependencies": {
+    "@laihoe/demoparser2": "0.42.0",
+    "node-unrar-js": "2.0.2"
+  }
+}

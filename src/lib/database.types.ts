@@ -159,6 +159,71 @@ export type Database = {
           },
         ]
       }
+      demo_analyses: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          map: string
+          map_number: number | null
+          match_id: string | null
+          players: Json
+          rounds: number
+          score_a: number | null
+          score_b: number | null
+          size_bytes: number | null
+          source: string | null
+          storage_path: string
+          team_a: string | null
+          team_b: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          map: string
+          map_number?: number | null
+          match_id?: string | null
+          players?: Json
+          rounds?: number
+          score_a?: number | null
+          score_b?: number | null
+          size_bytes?: number | null
+          source?: string | null
+          storage_path: string
+          team_a?: string | null
+          team_b?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          map?: string
+          map_number?: number | null
+          match_id?: string | null
+          players?: Json
+          rounds?: number
+          score_a?: number | null
+          score_b?: number | null
+          size_bytes?: number | null
+          source?: string | null
+          storage_path?: string
+          team_a?: string | null
+          team_b?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_analyses_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disputes: {
         Row: {
           created_at: string

@@ -1,0 +1,140 @@
+{
+  "de_mirage": {
+    "pos_x": -3230,
+    "pos_y": 1713,
+    "scale": 5,
+    "size": 1024,
+    "bombA": [
+      0.54,
+      0.76
+    ],
+    "bombB": [
+      0.23,
+      0.28
+    ]
+  },
+  "de_inferno": {
+    "pos_x": -2087,
+    "pos_y": 3870,
+    "scale": 4.9,
+    "size": 1024,
+    "bombA": [
+      0.81,
+      0.69
+    ],
+    "bombB": [
+      0.49,
+      0.22
+    ]
+  },
+  "de_dust2": {
+    "pos_x": -2476,
+    "pos_y": 3239,
+    "scale": 4.4,
+    "size": 1024,
+    "bombA": [
+      0.8,
+      0.16
+    ],
+    "bombB": [
+      0.21,
+      0.12
+    ]
+  },
+  "de_nuke": {
+    "pos_x": -3453,
+    "pos_y": 2887,
+    "scale": 7,
+    "size": 1024,
+    "bombA": [
+      0.58,
+      0.48
+    ],
+    "bombB": [
+      0.58,
+      0.58
+    ],
+    "lower": {
+      "image": "de_nuke_lower.png",
+      "below_z": -495
+    }
+  },
+  "de_ancient": {
+    "pos_x": -2953,
+    "pos_y": 2164,
+    "scale": 5,
+    "size": 1024,
+    "bombA": [
+      0.31,
+      0.25
+    ],
+    "bombB": [
+      0.8,
+      0.4
+    ]
+  },
+  "de_anubis": {
+    "pos_x": -2796,
+    "pos_y": 3328,
+    "scale": 5.22,
+    "size": 1024,
+    "bombA": [
+      null,
+      null
+    ],
+    "bombB": [
+      null,
+      null
+    ]
+  },
+  "de_train": {
+    "pos_x": -2308,
+    "pos_y": 2078,
+    "scale": 4.082077,
+    "size": 1024,
+    "bombA": [
+      0.63,
+      0.49
+    ],
+    "bombB": [
+      0.52,
+      0.76
+    ],
+    "lower": {
+      "image": "de_train_lower.png",
+      "below_z": -50
+    }
+  },
+  "de_overpass": {
+    "pos_x": -4831,
+    "pos_y": 1781,
+    "scale": 5.2,
+    "size": 1024,
+    "bombA": [
+      0.55,
+      0.23
+    ],
+    "bombB": [
+      0.7,
+      0.31
+    ]
+  },
+  "de_vertigo": {
+    "pos_x": -3168,
+    "pos_y": 1762,
+    "scale": 4,
+    "size": 1024,
+    "bombA": [
+      0.705,
+      0.585
+    ],
+    "bombB": [
+      0.222,
+      0.223
+    ],
+    "lower": {
+      "image": "de_vertigo_lower.png",
+      "below_z": 11700
+    }
+  }
+}
