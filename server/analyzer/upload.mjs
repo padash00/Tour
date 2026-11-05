@@ -1,5 +1,5 @@
 // Разобрать демки и загрузить разборы на сайт (страница «Разбор»).
-//   node upload.mjs <файл.dem | архив.rar/.zip | папка> [--kind pro|match] [--match <uuid> --map-number N] [--dry]
+//   node upload.mjs <файл.dem | архив .rar/.zip/.gz/.zst | папка> [--kind pro|match] [--match <uuid> --map-number N] [--dry]
 // Архивы HLTV распаковываются во временную папку. Токен и адрес сайта — из агента (D:/cs2server/f16/agent.json).
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -48,6 +48,12 @@ async function demosOf(p, tmp) {
     return readdirSync(dir, { recursive: true })
       .filter((f) => String(f).toLowerCase().endsWith(".dem"))
       .map((f) => ({ file: path.join(dir, String(f)), source: `${path.basename(p)}/${path.basename(String(f))}` }));
+  }
+  if (ext === ".zst") {
+    // FACEIT отдаёт демки в .dem.zst — Node 22.15+ распаковывает сам
+    const dst = path.join(tmp, path.basename(p, ".zst"));
+    writeFileSync(dst, zlib.zstdDecompressSync(readFileSync(p)));
+    return [{ file: dst, source: path.basename(p) }];
   }
   if (ext === ".gz") {
     const dst = path.join(tmp, path.basename(p, ".gz"));
