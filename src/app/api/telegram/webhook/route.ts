@@ -7,7 +7,7 @@ import type { Player } from "@/lib/types";
 import { mirrorAnnouncement, mirrorThreads, shouldMirror } from "@/lib/tg-mirror";
 import { MODERATION_HELP, captchaSweep, handleFaqCommand, handleTalkCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
 import { answerQuestion } from "@/lib/tg-faq";
-import { onTalkMessage, parseTalkThreads } from "@/lib/tg-buddy";
+import { onBuddyCallback, onPollAnswer, onTalkMessage, parseTalkThreads } from "@/lib/tg-buddy";
 import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,8 @@ type Update = {
   my_chat_member?: { chat: { id: number; type: string; title?: string }; from: TgUser; new_chat_member: { status: string } };
   /** заявка на вступление в группу по ссылке «с одобрением» */
   chat_join_request?: { chat: { id: number; title?: string }; from: TgUser; user_chat_id?: number };
+  /** голос в неанонимном опросе (прогнозы бота) */
+  poll_answer?: { poll_id: string; user?: TgUser; option_ids: number[] };
 };
 
 /** Игрок сайта, к которому привязан этот Telegram (id пользователя = id личного чата с ботом) */
@@ -92,6 +94,10 @@ export async function POST(req: Request) {
     await onMyChatMember(cfg.token, update.my_chat_member).catch((e) => console.error("tg my_chat_member", e));
     return NextResponse.json({ ok: true });
   }
+  if (update.poll_answer) {
+    await onPollAnswer(update.poll_answer).catch((e) => console.error("tg poll answer", e));
+    return NextResponse.json({ ok: true });
+  }
   if (update.chat_join_request) {
     await onJoinRequest(cfg.token, update.chat_join_request).catch((e) => console.error("tg join request", e));
     return NextResponse.json({ ok: true });
@@ -121,7 +127,12 @@ export async function POST(req: Request) {
       const gid = group.id;
       after(() => captchaSweep(cfg.token, gid).catch((e) => console.error("tg captcha sweep", e)));
     }
-    if (group.id && update.callback_query) await onCallback(cfg.token, group.id, update.callback_query).catch((e) => console.error("tg callback", e));
+    if (group.id && update.callback_query) {
+      const cb = update.callback_query;
+      // кнопки бота-участника (сбор лобби) — его; остальное — модерация
+      const mine = await onBuddyCallback(cfg.token, cb).catch((e) => (console.error("tg buddy callback", e), false));
+      if (!mine) await onCallback(cfg.token, group.id, cb).catch((e) => console.error("tg callback", e));
+    }
     else if (group.id && groupMsg && groupMsg.chat.id === group.id) {
       // дубль «Объявлений» в «Общение» — работает и без модерации; копирование альбома ждёт остальные части, поэтому в after()
       if (update.message) {

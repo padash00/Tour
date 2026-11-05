@@ -592,7 +592,7 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
 const VOICE_MAX_S = 180;
 
 /** Голосовое/кружок → текст. null — ключа нет или не получилось */
-async function transcribe(token: string, fileId: string, name: string): Promise<string | null> {
+export async function transcribe(token: string, fileId: string, name: string): Promise<string | null> {
   const { getSetting } = await import("./settings");
   const key = await getSetting("STT_API_KEY");
   if (!key) return null;

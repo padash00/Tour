@@ -51,6 +51,12 @@ export async function matchzyIdAccepted(matchzyId: unknown) {
  * Его сбой не отменяет уже записанный счёт и не заставляет буфер агента досылать событие заново —
  * ошибка уходит в журнал ошибок сайта.
  */
+/** Живые события турнира в чат игроков (бот-участник) */
+async function buddyEvent(e: import("../tg-buddy").TourEvent) {
+  const { tournamentEvent } = await import("../tg-buddy");
+  await tournamentEvent(e);
+}
+
 async function bestEffort(name: string, ev: MatchzyEvent, job: () => Promise<unknown>) {
   try {
     await job();
@@ -193,6 +199,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
         if (match.status === "finished" || match.status === "cancelled") break;
         await setMap({ status: "live" }, true);
         await bestEffort("Swing: начало карты", ev, () => startMapLogging(match.id, mapNumber));
+        await bestEffort("бот в чате: начало карты", ev, () => buddyEvent({ kind: "map_start", matchId: match.id, mapNumber, map: null }));
       }
       break;
     }
@@ -203,6 +210,7 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       await setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "live" }, true);
       // статистика накопительная: следующий round_end или map_result перезапишет её целиком
       await bestEffort("статистика игроков", ev, () => upsertPlayerStats(match, mapNumber, ev));
+      await bestEffort("бот в чате: раунд", ev, () => buddyEvent({ kind: "round", matchId: match.id, mapNumber, s1: ev.team1?.score ?? 0, s2: ev.team2?.score ?? 0 }));
       break;
     }
     case "map_result": {
@@ -219,6 +227,9 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
       await bestEffort("Swing: конец карты", ev, () => stopMapLogging(match.id));
       if (series?.winner) await bestEffort("сетка турнира", ev, () => syncBracket(series.tournament_id));
       await bestEffort("итог карты в чат", ev, () => announceMapResult(match.id, mapNumber));
+      await bestEffort("бот в чате: итог карты", ev, () =>
+        buddyEvent({ kind: "map_end", matchId: match.id, mapNumber, map: null, s1: ev.team1?.score ?? 0, s2: ev.team2?.score ?? 0, winner: ev.winner?.team === "team1" ? 1 : ev.winner?.team === "team2" ? 2 : null }),
+      );
       break;
     }
     case "series_end": {
@@ -237,6 +248,9 @@ export async function handleMatchzyEvent(ev: MatchzyEvent) {
             })
             .eq("id", match.id).in("status", ["ready", "live"]).throwOnError();
           await bestEffort("сетка турнира", ev, () => syncBracket(match.tournament_id));
+          await bestEffort("бот в чате: итог матча", ev, () =>
+            buddyEvent({ kind: "series_end", matchId: match.id, winner: ev.winner?.team === "team1" ? 1 : 2, s1: ev.team1_series_score ?? fresh.team1_score, s2: ev.team2_series_score ?? fresh.team2_score }),
+          );
         }
       }
       break;
