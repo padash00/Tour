@@ -71,6 +71,8 @@ export async function buildMatchzyConfig(matchId: string) {
 export function modeCvars(format: string, maps: string[] = []): Record<string, number> {
   const size = modeOf(format).size;
   const base: Record<string, number> = {
+    // в журнале сервера — урон («attacked»): по нему Платформа решает переигровку раунда при вылете (п. 5.8.1)
+    mp_logdetail: 3,
     ...(size === 1 ? { mp_maxrounds: 24, mp_halftime_duration: 5 } : size === 2 ? { mp_maxrounds: 16 } : { mp_maxrounds: 24 }),
     // MatchZy включает это только для турнирных de-карт после перехода в live.
     sv_auto_full_alltalk_during_warmup_half_end: 0,

@@ -38,7 +38,7 @@ import { createHud } from "./hud.mjs";
 import { a2sInfo, parseGet5, rcon } from "./lib.mjs";
 import { cs2Build, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 import { createMatchLoader } from "./match-load.mjs";
-import { createRecovery } from "./recovery.mjs";
+import { createRecovery, latestBackup } from "./recovery.mjs";
 import { createRelay } from "./relay.mjs";
 import { createSkins } from "./skins.mjs";
 import { ensureUpnp } from "./upnp.mjs";
@@ -468,6 +468,20 @@ async function execute(cmd) {
     }
     case "rcon":
       return { ok: true, result: (await rc(inst, String(cmd.payload.command))).trim() };
+    case "restore_round": {
+      // переигровка текущего раунда (вылет игрока до первого урона, п. 5.8.1): последняя копия MatchZy = начало раунда
+      const a = recovery.assignments[inst.name];
+      if (!a) return { ok: false, result: "на сервере нет матча" };
+      const dir = path.join(SERVER_DIR, "game", "csgo", "MatchZyDataBackup");
+      const b = latestBackup(dir, a.matchid, a.map_number ?? 0);
+      if (!b) return { ok: false, result: "копия раунда не найдена" };
+      let out = "";
+      for (const arg of [b.file, path.join(dir, b.file)]) {
+        out = String(await rc(inst, `matchzy_loadbackup ${arg}`).catch((e) => e.message));
+        if (!/does not exist|error|invalid|usage|not found|failed/i.test(out)) return { ok: true, result: `раунд ${b.round} восстановлен (${cmd.payload?.reason ?? ""})` };
+      }
+      return { ok: false, result: `не удалось: ${out.trim().slice(0, 160)}` };
+    }
     default:
       return { ok: false, result: `unknown command ${cmd.type}` };
   }

@@ -10,7 +10,7 @@ const STATUS = {
 };
 const TITLE: Record<AgentCommand["type"], string> = {
   start: "Запуск сервера", stop: "Остановка сервера", restart: "Перезапуск сервера",
-  load_match: "Загрузка матча", end_match: "Завершение матча", rcon: "Команда консоли",
+  load_match: "Загрузка матча", end_match: "Завершение матча", rcon: "Команда консоли", restore_round: "Переигровка раунда",
   update_cs2: "Обновление CS2", update_plugins: "Обновление плагинов", restart_all: "Перезапуск всех серверов",
   prefetch_maps: "Подготовка карт", self_check: "Проверка перед турниром",
   replay_failed_events: "Повтор отложенных событий",

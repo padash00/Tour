@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifyLogSignature } from "@/lib/server/ingest-signature";
 import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
 import { ingestLog } from "@/lib/swing-ingest";
+import { scanDisconnects } from "@/lib/server/disconnect-guard";
 
 /**
  * HTTP-лог CS2 (logaddress_add_http). Заголовки задать нельзя, поэтому подпись — в query:
@@ -26,6 +27,8 @@ export async function POST(request: NextRequest) {
   try {
     const result = await ingestLog(matchzyId, body, { key, token: claim.token });
     await completeIngest(key, claim.token);
+    // вылеты игроков: переигровка раунда по п. 5.8.1 (своя ошибка не ломает приём журнала)
+    await scanDisconnects(matchzyId, body).catch((e) => console.error("disconnect guard", e));
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     await releaseIngest(key, claim.token).catch(() => {});

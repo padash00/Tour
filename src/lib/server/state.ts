@@ -45,7 +45,8 @@ export type AgentCommand = Narrow<
     | "restart_all"
     | "prefetch_maps"
     | "self_check"
-    | "replay_failed_events";
+    | "replay_failed_events"
+    | "restore_round";
     payload: Record<string, unknown>;
     status: "pending" | "sent" | "done" | "error";
   }
