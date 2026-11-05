@@ -1,7 +1,7 @@
 // Проверка чистой логики наград без базы: места 1–3 (Double / Single Elimination / таблица),
 // лучший по показателю с порогом карт, тренды прогресса.
 // Запуск: npx tsx scripts/test-awards.mts
-import { bestBy, computePlacements, trend, type PlacementMatch } from "../src/lib/awards-core";
+import { bestBy, computePlacements, rankQuarterLosers, trend, type PlacementMatch } from "../src/lib/awards-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -54,6 +54,23 @@ check(bestBy([{ key: "x", maps: 3, clutches: 0, adr: 0, teamMaps: 3 }], (l) => l
 
 // Тренды
 check(trend(1.1, 1.0) === "up" && trend(0.9, 1.0) === "down" && trend(1.01, 1.0) === "flat" && trend(1.2, null) === "flat", "тренд: ±3% порог, без прошлого — без стрелки");
+
+// Места V–VIII (п. 4.6.1): разница раундов в 1/4 финала, затем выигранные раунды, затем — жеребьёвка
+{
+  const r = rankQuarterLosers([
+    { teamId: "B", won: 10, lost: 13, walkover: false },
+    { teamId: "A", won: 11, lost: 13, walkover: false },
+    { teamId: "D", won: 0, lost: 13, walkover: true },
+    { teamId: "C", won: 13, lost: 16, walkover: false },
+  ]);
+  check(r.map((x) => `${x.teamId}:${x.place}`).join(",") === "A:5,C:6,B:7,D:8", "V–VIII: разница раундов, при равенстве — больше выигранных; тех. поражение — последнее");
+  const tie = rankQuarterLosers([
+    { teamId: "A", won: 8, lost: 13, walkover: false },
+    { teamId: "B", won: 8, lost: 13, walkover: false },
+    { teamId: "C", won: 12, lost: 13, walkover: false },
+  ]);
+  check(tie.map((x) => `${x.teamId}:${x.place}:${x.tie}`).join(",") === "C:5:false,A:6–7:true,B:6–7:true", "полное равенство — общее место «6–7» и пометка для жеребьёвки");
+}
 
 console.log(failed ? `\nПРОВАЛЕНО: ${failed}` : "\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ");
 process.exit(failed ? 1 : 0);

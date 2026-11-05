@@ -85,3 +85,28 @@ export function trend(cur: number, prev: number | null | undefined): Trend {
   const d = (cur - prev) / Math.abs(prev);
   return d > 0.03 ? "up" : d < -0.03 ? "down" : "flat";
 }
+
+/** Проигравший в 1/4 финала: раунды в его матче (тех. поражение — 0:13) */
+export type QuarterLoser = { teamId: string; won: number; lost: number; walkover: boolean };
+export type QuarterPlace = QuarterLoser & { place: string; tie: boolean };
+
+/** Раунды, которые засчитываются за техническое поражение в 1/4 финала */
+export const WALKOVER_ROUNDS = { won: 0, lost: 13 } as const;
+
+/**
+ * Места V–VIII среди выбывших в 1/4 финала (регламент OSKEMEN 2026, п. 4.6.1): по разнице выигранных и проигранных
+ * раундов в матче 1/4 финала, при равенстве — по выигранным раундам. Если совпало и это — места делятся («5–6»)
+ * и помечаются tie: судьи разыгрывают их жеребьёвкой при капитанах.
+ */
+export function rankQuarterLosers(list: QuarterLoser[], firstPlace = 5): QuarterPlace[] {
+  const sorted = [...list].sort((a, b) => b.won - b.lost - (a.won - a.lost) || b.won - a.won);
+  const out: QuarterPlace[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1].won - sorted[j + 1].lost === sorted[i].won - sorted[i].lost && sorted[j + 1].won === sorted[i].won) j++;
+    const from = firstPlace + i, to = firstPlace + j;
+    for (let k = i; k <= j; k++) out.push({ ...sorted[k], place: from === to ? String(from) : `${from}–${to}`, tie: from !== to });
+    i = j + 1;
+  }
+  return out;
+}

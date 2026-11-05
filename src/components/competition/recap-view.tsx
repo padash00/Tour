@@ -111,7 +111,7 @@ function cardGrid(n: number) {
 
 export async function RecapView({ recap, solo, imageBase }: { recap: TournamentRecap; solo?: boolean; imageBase?: string }) {
   const tx = await getT();
-  const { placements, nominations, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
+  const { placements, quarterPlaces, nominations, championPath, mvp, leaders, longestMap, closestMap, totals } = recap;
   const champion = placements.find((p) => p.place === "1");
   // на пьедестале — места 1–3; 4-е (проигравший матча за 3-е место) — строкой под ним
   const rest = placements.filter((p) => p.place !== "1" && p.place !== "4");
@@ -156,6 +156,26 @@ export async function RecapView({ recap, solo, imageBase }: { recap: TournamentR
         <p className="-mt-10 text-[14px] text-fg-3">
           {tx.rich("4 место — <b>{name}</b> (проиграли матч за 3-е место)", { b: (c) => <span className="text-fg-2">{c}</span> }, { name: fourth.team.name })}
         </p>
+      )}
+
+      {/* места V–VIII: выбывшие в 1/4 финала по разнице раундов (регламент п. 4.6.1) */}
+      {quarterPlaces.length > 0 && (
+        <section className="-mt-6">
+          <Eyebrow className="mb-3">{tx("Места V–VIII")}</Eyebrow>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {quarterPlaces.map((q) => (
+              <div key={q.team.id} className="flex items-center gap-3 rounded-[10px] border border-line px-4 py-2.5">
+                <span className="num w-10 text-[17px] font-bold">{q.place}</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{q.team.name}</span>
+                <span className="num text-[13px] text-fg-3">{q.walkover ? tx("тех. поражение") : tx("1/4 финала: {won}:{lost} ({diff})", { won: q.won, lost: q.lost, diff: `${q.won - q.lost >= 0 ? "+" : ""}${q.won - q.lost}` })}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[13px] text-fg-3">
+            {tx("По разнице выигранных и проигранных раундов в матче 1/4 финала, при равенстве — по выигранным раундам.")}
+            {quarterPlaces.some((q) => q.tie) ? ` ${tx("Общее место — полное равенство: судьи разыгрывают его жеребьёвкой при капитанах.")}` : ""}
+          </p>
+        </section>
       )}
 
       {/* номинации: решение судей или кандидат по статистике */}

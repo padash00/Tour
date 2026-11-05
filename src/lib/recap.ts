@@ -1,5 +1,6 @@
 import "server-only";
 import { roundTitle } from "./bracket";
+import { rankQuarterLosers, WALKOVER_ROUNDS } from "./awards-core";
 import { makeT, type T } from "./i18n/core";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
@@ -49,6 +50,8 @@ export type RecapNomination = {
 
 export type TournamentRecap = {
   placements: Placement[];
+  /** места V–VIII среди выбывших в 1/4 финала (п. 4.6.1): по разнице раундов; tie — равенство, жеребьёвка судей */
+  quarterPlaces: { place: string; team: Team; won: number; lost: number; walkover: boolean; tie: boolean; record: Placement["record"] }[];
   nominations: RecapNomination[];
   championPath: PathStep[];
   mvp: ReturnType<typeof mvpOf>;
@@ -131,6 +134,22 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
   const mvp = judgedMvp ? (judgedRow ? { ...judgedRow, by: "rating" as const } : null) : mvpOf(board);
   const played = matches.filter((m) => m.status === "finished" && m.team1_id && m.team2_id);
 
+  // серии и карты команды (счёт серии = выигранные карты; тех. победы — без карт)
+  const recordOf = (teamId: string) => {
+    const record = { wins: 0, losses: 0, mapWins: 0, mapLosses: 0 };
+    for (const m of played) {
+      if (m.team1_id !== teamId && m.team2_id !== teamId) continue;
+      const isT1 = m.team1_id === teamId;
+      if (m.winner_id === teamId) record.wins++;
+      else if (m.winner_id) record.losses++;
+      if (!m.is_walkover) {
+        record.mapWins += isT1 ? m.team1_score : m.team2_score;
+        record.mapLosses += isT1 ? m.team2_score : m.team1_score;
+      }
+    }
+    return record;
+  };
+
   // ── призёры с составами на турнир
   const places = await placementsOf(t, matches);
   const placements: Placement[] = places.map(({ place, team }) => {
@@ -139,19 +158,7 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
       .filter((r) => r.player)
       .sort((a, b) => (a.role === b.role ? 0 : a.role === "main" ? -1 : 1))
       .map((r) => ({ id: r.player!.id, nickname: r.player!.nickname, avatar_url: r.player!.avatar_url, steam_id: r.player!.steam_id, role: r.role }));
-    // серии и карты (счёт серии = выигранные карты; тех. победы — без карт)
-    const record = { wins: 0, losses: 0, mapWins: 0, mapLosses: 0 };
-    for (const m of played) {
-      if (m.team1_id !== team.id && m.team2_id !== team.id) continue;
-      const isT1 = m.team1_id === team.id;
-      if (m.winner_id === team.id) record.wins++;
-      else if (m.winner_id) record.losses++;
-      if (!m.is_walkover) {
-        record.mapWins += isT1 ? m.team1_score : m.team2_score;
-        record.mapLosses += isT1 ? m.team2_score : m.team1_score;
-      }
-    }
-    return { place, team, roster, record };
+    return { place, team, roster, record: recordOf(team.id) };
   });
 
   // ── путь чемпиона
@@ -221,10 +228,33 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
     .filter((x) => byMatch.has(x.match_id) && x.team1_score + x.team2_score > 0)
     .map((x) => ({ match: byMatch.get(x.match_id)!, map: x, rounds: x.team1_score + x.team2_score, diff: Math.abs(x.team1_score - x.team2_score) }));
   const longestMap = [...highlights].sort((a, b) => b.rounds - a.rounds)[0] ?? null;
+
+  // ── места V–VIII (олимпийская система): выбывшие в 1/4 финала — по разнице раундов в этом матче,
+  // при равенстве — по выигранным раундам; тех. поражение — 0:13. Показываем, когда сыграны все 1/4.
+  let quarterPlaces: TournamentRecap["quarterPlaces"] = [];
+  const upperRounds = matches.filter((m) => m.bracket === "upper").map((m) => m.round);
+  const topRound = upperRounds.length ? Math.max(...upperRounds) : 0;
+  const quarters = matches.filter((m) => m.bracket === "upper" && m.round === topRound - 2 && m.team1_id && m.team2_id);
+  if (topRound >= 3 && !matches.some((m) => m.bracket === "grand_final") && quarters.length && quarters.every((m) => m.status === "finished" && m.winner_id)) {
+    const losers = quarters.map((m) => {
+      const loserIsT1 = m.winner_id === m.team2_id;
+      const team = loserIsT1 ? m.team1 : m.team2;
+      if (m.is_walkover) return { team, teamId: team?.id ?? "", ...WALKOVER_ROUNDS, walkover: true };
+      const ms = maps.filter((x) => x.match_id === m.id);
+      const won = ms.reduce((n, x) => n + (loserIsT1 ? x.team1_score : x.team2_score), 0);
+      const lost = ms.reduce((n, x) => n + (loserIsT1 ? x.team2_score : x.team1_score), 0);
+      return { team, teamId: team?.id ?? "", won, lost, walkover: false };
+    }).filter((x): x is typeof x & { team: Team } => !!x.team);
+    const teamOf = new Map(losers.map((l) => [l.teamId, l.team]));
+    quarterPlaces = rankQuarterLosers(losers.map(({ teamId, won, lost, walkover }) => ({ teamId, won, lost, walkover }))).map((q) => ({
+      place: q.place, team: teamOf.get(q.teamId)!, won: q.won, lost: q.lost, walkover: q.walkover, tie: q.tie, record: recordOf(q.teamId),
+    }));
+  }
   const closestMap = [...highlights].sort((a, b) => a.diff - b.diff || b.rounds - a.rounds)[0] ?? null;
 
   return {
     placements,
+    quarterPlaces,
     nominations,
     championPath,
     mvp,
