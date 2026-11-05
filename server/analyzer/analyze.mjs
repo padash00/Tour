@@ -8,7 +8,7 @@ import path from "node:path";
 const require = createRequire(import.meta.url);
 const P = require("@laihoe/demoparser2");
 
-const EVERY = 16; // шаг выборки позиций, тиков (64 тика/с → 4 кадра в секунду; на странице — плавная интерполяция)
+const EVERY = 8; // шаг выборки позиций, тиков (64 тика/с → 8 кадров в секунду; на странице — плавная интерполяция)
 const TAIL = 3 * 64; // показываем ещё 3 секунды после конца раунда
 const r1 = (v) => (v == null || Number.isNaN(v) ? null : Math.round(v));
 const sideOf = (team) => (team === 2 ? "T" : team === 3 ? "CT" : null);
@@ -40,7 +40,7 @@ export function analyze(file) {
   const ticks = [];
   for (const r of rounds) for (let t = r.start; t <= r.end + TAIL; t += EVERY) ticks.push(t);
   const rows = ticks.length
-    ? P.parseTicks(file, ["X", "Y", "Z", "yaw", "is_alive", "health", "armor_value", "team_num", "active_weapon_name", "balance", "current_equip_value", "has_defuser", "has_helmet", "team_clan_name"], ticks)
+    ? P.parseTicks(file, ["X", "Y", "Z", "yaw", "is_alive", "health", "armor_value", "team_num", "active_weapon_name", "balance", "current_equip_value", "has_defuser", "has_helmet", "team_clan_name", "last_place_name", "is_scoped", "is_defusing"], ticks)
     : [];
 
   // игроки: steamid, у ботов его нет — тогда по имени
@@ -56,6 +56,24 @@ export function analyze(file) {
   };
   const teamNames = { T: new Map(), CT: new Map() };
 
+  // названия мест на карте (Palace, BombsiteA…) — список, в кадрах только номер; центр места — для подписей на радаре
+  const places = [];
+  const placeIdx = new Map();
+  const placeSum = new Map();
+  const place = (name, x, y, z) => {
+    if (!name) return -1;
+    if (!placeIdx.has(name)) {
+      placeIdx.set(name, places.length);
+      places.push(name);
+    }
+    if (x != null && y != null) {
+      const s = placeSum.get(name) ?? { x: 0, y: 0, z: 0, n: 0 };
+      s.x += x; s.y += y; s.z += z ?? 0; s.n++;
+      placeSum.set(name, s);
+    }
+    return placeIdx.get(name);
+  };
+
   const frameMap = new Map(); // tick → [player rows]
   for (const row of rows) {
     if (row.team_num !== 2 && row.team_num !== 3) continue;
@@ -63,7 +81,10 @@ export function analyze(file) {
     const side = sideOf(row.team_num);
     if (row.team_clan_name) teamNames[side].set(row.team_clan_name, (teamNames[side].get(row.team_clan_name) ?? 0) + 1);
     if (!frameMap.has(row.tick)) frameMap.set(row.tick, []);
-    frameMap.get(row.tick).push([i, side === "T" ? 0 : 1, r1(row.X), r1(row.Y), r1(row.Z), r1(row.yaw), row.is_alive ? r1(row.health) : 0, r1(row.armor_value), row.active_weapon_name ?? null]);
+    // флаги: 1 — шлем, 2 — дефузер, 4 — в прицеле, 8 — разминирует
+    const flags = (row.has_helmet ? 1 : 0) | (row.has_defuser ? 2 : 0) | (row.is_scoped ? 4 : 0) | (row.is_defusing ? 8 : 0);
+    const pl = row.is_alive ? place(row.last_place_name, row.X, row.Y, row.Z) : -1;
+    frameMap.get(row.tick).push([i, side === "T" ? 0 : 1, r1(row.X), r1(row.Y), r1(row.Z), r1(row.yaw), row.is_alive ? r1(row.health) : 0, r1(row.armor_value), row.active_weapon_name ?? null, pl, row.balance ?? null, flags]);
   }
   for (const [tick, list] of [...frameMap.entries()].sort((a, b) => a[0] - b[0])) {
     const k = roundAt(tick);
@@ -100,6 +121,20 @@ export function analyze(file) {
       vs: sideOf(k.user_team_num),
       smoke: !!k.thrusmoke, blind: !!k.attackerblind, wall: (k.penetrated ?? 0) > 0, flash: !!k.assistedflash,
     });
+  }
+
+  // ── выстрелы (огнестрел) и попадания
+  const NOT_GUN = /knife|bayonet|grenade|flashbang|smoke|molotov|incendiary|decoy|c4|taser/;
+  for (const r of rounds) { r.shots = []; r.hurts = []; }
+  for (const f of P.parseEvent(file, "weapon_fire", [], [])) {
+    const ri = roundAt(f.tick);
+    if (ri < 0 || !f.user_name || NOT_GUN.test(String(f.weapon ?? ""))) continue;
+    rounds[ri].shots.push([f.tick, pid(f.user_steamid, f.user_name)]);
+  }
+  for (const h of P.parseEvent(file, "player_hurt", [], [])) {
+    const ri = roundAt(h.tick);
+    if (ri < 0 || !h.user_name) continue;
+    rounds[ri].hurts.push([h.tick, h.attacker_name ? pid(h.attacker_steamid, h.attacker_name) : null, pid(h.user_steamid, h.user_name), h.dmg_health ?? 0, h.hitgroup ?? null, h.weapon ?? null]);
   }
 
   // ── бомба
@@ -156,10 +191,12 @@ export function analyze(file) {
   }
 
   return {
-    v: 1,
+    v: 2,
     map,
     server: header.server_name ?? null,
     tickrate: 64,
+    places,
+    callouts: [...placeSum.entries()].filter(([, v]) => v.n >= 40).map(([name, v]) => ({ name, x: r1(v.x / v.n), y: r1(v.y / v.n), z: r1(v.z / v.n) })),
     every: EVERY,
     teams: { A: top(aNames) ?? top(teamNames.T) ?? "Команда A", B: top(bNames) ?? top(teamNames.CT) ?? "Команда B" },
     score: { A: scoreA, B: scoreB },
