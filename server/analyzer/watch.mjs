@@ -2,6 +2,7 @@
 // разбирает её, загружает на сайт (повтор карты) и делает разбор каждого игрока против топов.
 //   node watch.mjs           — проход раз в 2 минуты, работает постоянно
 //   node watch.mjs --once    — один проход и выход
+// Игрок получает уведомление на сайте и в Telegram с итогом карты (только для карт за последние 6 часов).
 // Запускается на серверном ПК отдельно от агента; на серверы и матчи не влияет (только читает готовые файлы).
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -47,7 +48,9 @@ function pass() {
       // 3) разбор каждого игрока против топов
       for (const p of a.players.filter((x) => x.steamid)) {
         try {
-          const r = node(["coach.mjs", id, p.steamid, "--upload"]);
+          // уведомление игроку (сайт + Telegram) — только о свежих картах; старые демки при первом запуске — молча
+          const fresh = Date.now() - statSync(path.join(DEMOS, f)).mtimeMs < 6 * 3600_000;
+          const r = node(["coach.mjs", id, p.steamid, "--upload", ...(fresh ? [] : ["--no-notify"])]);
           log(`  ${r.includes("✓") ? "✓" : "✗"} разбор игрока ${p.name}`);
         } catch (e) {
           log(`  ✗ разбор игрока ${p.name}: ${String(e.stderr ?? e.message).split("\n").find(Boolean)}`);

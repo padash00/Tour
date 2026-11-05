@@ -542,7 +542,7 @@ if (process.argv[1]?.endsWith("coach.mjs")) {
   if (process.argv.includes("--upload")) {
     const cfg = JSON.parse(readFileSync(process.env.F16_AGENT_JSON ?? "D:/cs2server/f16/agent.json", "utf8").replace(/^\uFEFF/, ""));
     const site = (process.env.F16_SITE_URL ?? cfg.siteUrl ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
-    const r = await fetch(`${site}/api/agent/analysis/coach?analysis=${id}&steamid=${steamid}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: zlib.gzipSync(JSON.stringify(out)) });
+    const r = await fetch(`${site}/api/agent/analysis/coach?analysis=${id}&steamid=${steamid}${process.argv.includes("--no-notify") ? "&notify=0" : ""}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: zlib.gzipSync(JSON.stringify(out)) });
     console.log(r.ok ? "✓ разбор игрока загружен на сайт" : `✗ загрузка: HTTP ${r.status} ${await r.text()}`);
   }
   const j = process.argv.indexOf("--json");
