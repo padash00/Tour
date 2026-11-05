@@ -15,14 +15,13 @@ const PLACE_TONE: Record<1 | 2 | 3, string> = {
 };
 
 const title = (a: Award, tx: T) =>
-  a.kind === "place" ? (a.place === 1 ? tx("Чемпион") : tx("{n} место", { n: a.place })) : a.kind === "mvp" ? tx("MVP турнира") : a.kind === "clutch" ? tx("Лучший клатч") : tx("Лучший ADR");
+  a.kind === "place" ? (a.place === 1 ? tx("Чемпион") : tx("{n} место", { n: a.place })) : a.kind === "mvp" ? tx("MVP турнира") : a.kind === "sniper" ? tx("Лучший снайпер") : tx("Лучший рифлер");
 
-/** Подпись значения: у клатчей число хранится вместе с русским словом — склеиваем заново на нужном языке */
-const valueText = (a: Award, tx: T) => (a.kind === "clutch" && a.value ? tx("{n} клатч.", { n: parseInt(a.value, 10) || 0 }) : a.value);
+const valueText = (a: Award) => a.value;
 
 function Medal({ a, tx }: { a: Award; tx: T }) {
   const tone = a.kind === "place" ? PLACE_TONE[a.place!] : a.kind === "mvp" ? "border-accent/45 bg-accent/[0.08] text-accent" : "border-ink/[0.14] bg-ink/[0.03] text-fg-2";
-  const icon = a.kind === "place" ? (a.place === 1 ? "🏆" : a.place === 2 ? "🥈" : "🥉") : a.kind === "mvp" ? "★" : a.kind === "clutch" ? "◆" : "◎";
+  const icon = a.kind === "place" ? (a.place === 1 ? "🏆" : a.place === 2 ? "🥈" : "🥉") : a.kind === "mvp" ? "★" : a.kind === "sniper" ? "◎" : "◆";
   return (
     <Link
       href={`/tournaments/${a.tournament.slug}`}
@@ -35,18 +34,18 @@ function Medal({ a, tx }: { a: Award; tx: T }) {
         <span className="block text-[14px] font-semibold">{title(a, tx)}</span>
         <span className="block truncate text-[12px] text-fg-3 group-hover:text-fg-2">
           {a.tournament.name}
-          {a.value ? ` · ${valueText(a, tx)}` : ""}
+          {a.value ? ` · ${valueText(a)}` : ""}
         </span>
       </span>
     </Link>
   );
 }
 
-/** Ряд наград: места, MVP, лучший клатч и ADR. Пусто — честное пустое состояние */
+/** Ряд наград: места и номинации (MVP, снайпер, рифлер). Пусто — честное пустое состояние */
 export async function AwardsRow({ awards, empty }: { awards: Award[]; empty?: string }) {
   const tx = await getT();
   if (awards.length === 0) return <p className="text-[14px] text-fg-3">{empty ?? tx("Первые трофеи впереди.")}</p>;
-  const order = (a: Award) => (a.kind === "place" ? a.place! : a.kind === "mvp" ? 4 : 5);
+  const order = (a: Award) => (a.kind === "place" ? a.place! : a.kind === "mvp" ? 4 : a.kind === "sniper" ? 5 : 6);
   const sorted = [...awards].sort((a, b) => order(a) - order(b));
   return (
     <div className="grid gap-2.5">

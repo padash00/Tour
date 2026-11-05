@@ -3,18 +3,18 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
 import { getStandings } from "./matches";
-import { getPlayerLeaderboard, mvpOf } from "./stats";
-import { bestBy, computePlacements, isPlayoffSide, type PlacementMatch } from "./awards-core";
+import { computePlacements, isPlayoffSide, type PlacementMatch } from "./awards-core";
+import { getTournamentNominations } from "./nominations";
 import type { Tournament } from "./types";
 import { tr } from "./i18n/core";
 
 /**
  * Награды считаются из результатов завершённых турниров (никаких выдуманных данных):
- * места 1–3, MVP турнира, лучший клатч, лучший ADR. Хранить отдельно не нужно — пересчёт дешёвый,
+ * места 1–3 и номинации регламента — MVP, лучший снайпер, лучший рифлер (с решением судей). Хранить отдельно не нужно — пересчёт дешёвый,
  * завершённых турниров единицы; результат кэшируется (см. getAllAwards).
  */
 
-export type AwardKind = "place" | "mvp" | "clutch" | "adr";
+export type AwardKind = "place" | "mvp" | "sniper" | "rifler";
 export type Award = {
   kind: AwardKind;
   place?: 1 | 2 | 3;
@@ -26,7 +26,7 @@ export type Award = {
 };
 
 export const awardTitle = (a: Award) =>
-  a.kind === "place" ? (a.place === 1 ? tr("Чемпион") : a.place === 2 ? tr("2 место") : tr("3 место")) : a.kind === "mvp" ? tr("MVP турнира") : a.kind === "clutch" ? tr("Лучший клатч") : tr("Лучший ADR");
+  a.kind === "place" ? (a.place === 1 ? tr("Чемпион") : a.place === 2 ? tr("2 место") : tr("3 место")) : a.kind === "mvp" ? tr("MVP турнира") : a.kind === "sniper" ? tr("Лучший снайпер") : tr("Лучший рифлер");
 
 async function tournamentAwards(t: Tournament): Promise<Award[]> {
   const meta = { id: t.id, name: t.name, slug: t.slug, starts_at: t.starts_at };
@@ -56,29 +56,12 @@ async function tournamentAwards(t: Tournament): Promise<Award[]> {
 
   const awards: Award[] = placements.map((p) => ({ kind: "place", place: p.place, tournament: meta, teamId: p.teamId, playerIds: playersOf(p.teamId) }));
 
-  const board = await getPlayerLeaderboard(t.id);
-  const mvp = mvpOf(board);
-  if (mvp?.player_id) {
-    awards.push({
-      kind: "mvp",
-      tournament: meta,
-      teamId: mvp.team_id,
-      playerIds: [mvp.player_id],
-      value: mvp.by === "swing" && mvp.swing != null ? `Swing ${mvp.swing >= 0 ? "+" : ""}${mvp.swing.toFixed(1)}` : `Rating ${mvp.rating.toFixed(2)}`,
-    });
-  }
-  const teamMaps = new Map<string, number>();
-  for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));
-  const lines = board
-    .filter((p) => p.player_id)
-    .map((p) => ({ key: p.player_id!, maps: p.maps, clutches: p.clutches, adr: p.adr, teamMaps: teamMaps.get(p.team_id ?? "") ?? p.maps, team: p.team_id }));
-  const clutch = bestBy(lines, (l) => l.clutches);
-  if (clutch) {
-    awards.push({ kind: "clutch", tournament: meta, teamId: lines.find((l) => l.key === clutch.key)?.team ?? null, playerIds: [clutch.key], value: `${clutch.clutches} клатч.` });
-  }
-  const adr = bestBy(lines, (l) => l.adr);
-  if (adr) {
-    awards.push({ kind: "adr", tournament: meta, teamId: lines.find((l) => l.key === adr.key)?.team ?? null, playerIds: [adr.key], value: `ADR ${adr.adr.toFixed(1)}` });
+  // личные награды — номинации регламента (MVP, снайпер, рифлер): решение судей, без него — кандидат по статистике
+  for (const n of await getTournamentNominations(t.id)) {
+    if (n.key !== "mvp" && n.key !== "sniper" && n.key !== "rifler") continue;
+    const w = n.winner;
+    if (!w?.playerId) continue;
+    awards.push({ kind: n.key, tournament: meta, teamId: w.team?.id ?? null, playerIds: [w.playerId], value: w.value ?? undefined });
   }
   return awards;
 }
@@ -98,7 +81,7 @@ export const getAllAwards = cache(
       const all = await Promise.all(((data ?? []) as Tournament[]).map(tournamentAwards));
       return all.flat();
     },
-    ["awards", "v1"],
+    ["awards", "v2"],
     { tags: [AWARDS_TAG], revalidate: 3600 },
   ),
 );

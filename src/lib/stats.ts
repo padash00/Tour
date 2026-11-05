@@ -317,7 +317,8 @@ export function mvpOf(board: LeaderboardRow[]) {
   if (board.length === 0) return null;
   const teamMaps = new Map<string, number>();
   for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));
-  const eligible = board.filter((p) => p.maps >= Math.max(2, Math.ceil((teamMaps.get(p.team_id ?? "") ?? 0) / 2)));
+  // регламент: не меньше половины карт своей команды (минимум одна)
+  const eligible = board.filter((p) => p.maps >= Math.max(1, Math.ceil((teamMaps.get(p.team_id ?? "") ?? 0) / 2)));
   const withSwing = eligible.filter((p) => p.swing != null);
   if (withSwing.length) return { ...withSwing.sort((a, b) => b.swing! - a.swing!)[0], by: "swing" as const };
   return eligible[0] ? { ...eligible[0], by: "rating" as const } : null;

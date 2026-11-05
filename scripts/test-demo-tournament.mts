@@ -99,7 +99,8 @@ try {
   const placesSeen = result.placements.map((p) => p.place);
   assert.deepEqual(placesSeen, ["1", "2", "3", "4"]);
   assert.equal(new Set(result.placements.map((p) => p.team)).size, 4);
-  for (const key of ["mvp", "sniper", "rifler", "support"]) assert.ok(result.nominations.some((n) => n.key === key), `nomination ${key}`);
+  // номинации по регламенту — MVP, снайпер, рифлер
+  for (const key of ["mvp", "sniper", "rifler"]) assert.ok(result.nominations.some((n) => n.key === key), `nomination ${key}`);
   assert.equal((await sql.query<{ status: string }>("select status from tournaments where id = $1", [t.id])).rows[0].status, "finished");
   assert.equal(await count("select count(*) from matches where tournament_id = $1", [t.id]), 16);
   assert.equal(await count("select count(*) from matches where tournament_id = $1 and status <> 'finished'", [t.id]), 0);

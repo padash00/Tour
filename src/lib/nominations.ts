@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { bestClutch, bestEntry, bestMultikill, bestRifler, bestSniper, bestStable, bestSupport, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
+import { bestRifler, bestSniper, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
 import { makeT, type T } from "./i18n/core";
 import { displayFullNames } from "./person-name";
 import { getPlayerLeaderboard, getTournamentWeaponKills, mvpOf } from "./stats";
@@ -82,11 +82,6 @@ export const getTournamentNominations = cache(async (tournamentId: string, tx: T
   for (const [key, pick] of [
     ["sniper", bestSniper(lines, tx)],
     ["rifler", bestRifler(lines)],
-    ["support", bestSupport(lines, tx)],
-    ["entry", bestEntry(lines, tx)],
-    ["clutch", bestClutch(lines, tx)],
-    ["stable", bestStable(lines)],
-    ["multikill", bestMultikill(lines, tx)],
   ] as const) {
     if (pick) computed.set(key, { playerId: pick.line.key, teamId: pick.line.teamId, value: pick.value });
   }
