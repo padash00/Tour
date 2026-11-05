@@ -37,6 +37,8 @@ export type TgMessage = {
   media_group_id?: string;
   video?: unknown;
   document?: { mime_type?: string };
+  voice?: { file_id: string; duration: number };
+  video_note?: { file_id: string; duration: number };
 };
 export type TgCallback = { id: string; from: TgUser; data?: string; message?: TgMessage };
 
@@ -555,11 +557,61 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
   // пересылка из чужого канала или сообщение от имени канала — реклама
   const fromChannel = msg.sender_chat?.type === "channel" || msg.forward_origin?.type === "channel" || msg.forward_from_chat?.type === "channel";
   let v: Violation | null = findViolation(text) ?? (fromChannel ? { kind: "link", reason: "реклама и пересылки из каналов запрещены", match: "канал" } : null);
+  // голосовое или кружок: переводим в текст (после ответа Telegram, чтобы вебхук не ждал) и проверяем на мат
+  const media = msg.voice ?? msg.video_note;
+  if (!v && media && !edited && media.duration <= VOICE_MAX_S) {
+    after(async () => {
+      const heard = await transcribe(token, media.file_id, msg.voice ? "voice.ogg" : "note.mp4");
+      const hv = heard ? findViolation(heard) : null;
+      if (!hv || hv.kind === "link") return;
+      await del(token, msg.chat.id, msg.message_id);
+      await warn(token, msg, from, msg.voice ? "мат в голосовом сообщении" : "мат в видеосообщении", `🎤 ${heard}`, "бот", hv.match);
+    });
+    return;
+  }
   // в «Купля-продажа» ссылки на маркеты и трейд разрешены — нельзя только чужие Telegram-каналы
   if (v && inMarket && v.kind === "link" && !/t\.me|telegram\.me/i.test(v.match)) v = null;
   if (!v) return;
   await del(token, msg.chat.id, msg.message_id);
   await warn(token, msg, from, v.reason, text, "бот", v.match);
+}
+
+// ── голосовые: распознавание речи (Groq или OpenAI — по ключу в настройках)
+
+const VOICE_MAX_S = 180;
+
+/** Голосовое/кружок → текст. null — ключа нет или не получилось */
+async function transcribe(token: string, fileId: string, name: string): Promise<string | null> {
+  const { getSetting } = await import("./settings");
+  const key = await getSetting("STT_API_KEY");
+  if (!key) return null;
+  try {
+    const f = await tgCall<{ file_path?: string }>(token, "getFile", { file_id: fileId });
+    if (!f.ok || !f.result?.file_path) return null;
+    const audio = await fetch(`https://api.telegram.org/file/bot${token}/${f.result.file_path}`, { signal: AbortSignal.timeout(15_000) });
+    if (!audio.ok) return null;
+    const groq = key.startsWith("gsk_");
+    const form = new FormData();
+    form.append("file", new Blob([await audio.arrayBuffer()]), name);
+    // whisper пишет мат как есть (новые модели OpenAI могут его «вежливо» пропускать)
+    form.append("model", groq ? "whisper-large-v3-turbo" : "whisper-1");
+    form.append("response_format", "json");
+    const r = await fetch(groq ? "https://api.groq.com/openai/v1/audio/transcriptions" : "https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!r.ok) {
+      console.error("stt", r.status, (await r.text()).slice(0, 200));
+      return null;
+    }
+    const j = (await r.json()) as { text?: string };
+    return j.text?.trim() || null;
+  } catch (e) {
+    console.error("stt", e);
+    return null;
+  }
 }
 
 // ── «Идеи и предложения»
