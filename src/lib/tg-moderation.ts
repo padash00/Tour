@@ -185,15 +185,30 @@ export async function onCallback(token: string, groupId: number, cb: TgCallback)
     await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id });
     return;
   }
-  const uid = Number(data.slice(4));
+  let uid = Number(data.slice(4));
   if (uid !== cb.from.id) {
-    await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Эта кнопка — для нового участника", show_alert: false });
-    return;
+    // нажал кнопку из чужого приветствия: если он сам новичок и висит на капче — выпускаем и его (нажатие = человек)
+    const me = await tgCall<{ status: string; can_send_messages?: boolean; until_date?: number }>(token, "getChatMember", { chat_id: groupId, user_id: cb.from.id });
+    const stuck = me.result?.status === "restricted" && me.result.can_send_messages === false && !me.result.until_date;
+    // и ограничен именно капчей, а не мутом админа: последнее событие по нему в журнале — tg.captcha
+    const { data: last } = await db()
+      .from("audit_logs")
+      .select("action")
+      .in("action", ["tg.captcha", "tg.captcha_ok", "tg.captcha_release", "tg.captcha_skip", "tg.mute", "tg.ban", "tg.unmute", "tg.unban"])
+      .eq("payload->>user", String(cb.from.id))
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (!stuck || last?.[0]?.action !== "tg.captcha") {
+      await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Эта кнопка — для нового участника", show_alert: false });
+      return;
+    }
+    uid = cb.from.id;
   }
   await unmute(token, groupId, uid);
   await tgCall(token, "answerCallbackQuery", { callback_query_id: cb.id, text: "Готово, можно писать! Удачной игры 🎯" });
   await audit(null, "tg.captcha_ok", undefined, { user: String(uid) });
-  await deleteCaptchaMessages(token, groupId, uid, cb.message?.message_id);
+  // чужое приветствие не трогаем — удаляем только свои (по журналу) и сообщение с кнопкой, если оно было его
+  await deleteCaptchaMessages(token, groupId, uid, Number(data.slice(4)) === uid ? cb.message?.message_id : undefined);
 }
 
 /** Убрать приветствие и напоминания новичку */
