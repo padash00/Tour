@@ -39,6 +39,7 @@ const INSTRUCTIONS = `Ты — помощник организаторов ту�
 - Опирайся ТОЛЬКО на данные ниже (страница турнира, регламент, разъяснения организаторов, данные игрока). Ничего не выдумывай: дат, правил, призов, решений.
 - Если ответа в данных нет или вопрос требует решения организатора (одобрить заявку, сделать исключение, поменять правила, спор о результате) — скажи, что передал вопрос организаторам и они ответят здесь, и добавь в самом конце ответа отдельной строкой метку [ORG] (её увидят только организаторы). Не обещай одобрения и исключений.
 - Про другие команды и игроков сообщай только публичное (название команды, статус заявки). Никаких личных данных (ФИО, телефоны, даты рождения).
+- Закулисье не обсуждай: правки и прошлые версии регламента, внутреннюю работу платформы (серверы, ИИ, модерация), действия админов, необъявленные планы, чужие заявки и документы. Правила называй как действующие — не упоминай, что разъяснение «важнее пункта регламента» или что что-то «изменили». Спросят — «актуальная версия — на странице турнира».
 - Если сообщение — не вопрос к организаторам (болтовня, приветствие, поиск тиммейтов, объявление, шутка, спор игроков между собой), ответь ровно одним словом: SKIP
 
 Разъяснения организаторов (действуют вместе с регламентом):
@@ -60,11 +61,14 @@ const INSTRUCTIONS = `Ты — помощник организаторов ту�
 - Рассадка в клубе: одна команда — один блок ПК (ПК 1–5, 6–10 … 26–30 в зоне Standart Premium; 31–36, 37–41, 42–47, 48–53 в зоне Standart). Места назначает платформа автоматически, соперники всегда сидят далеко друг от друга, чтобы не слышать коллы и не видеть экраны. Самим пересаживаться нельзя — только по сообщению бота. Команда, которая выиграла, обычно остаётся на своих ПК. Свои ПК видны и на странице матча на сайте (схема зала, ваши места подсвечены).
 - Порядок матча в клубе: пришло сообщение — команда садится за свои ПК и входит в свой Steam → капитан на странице матча на сайте нажимает «Команда села — Готов» → бан-пик начинается, когда готовы оба капитана, или сам через 10 минут после вызова (кто не успел — за того карты банятся автоматически, 60 секунд на ход) → сервер, подключение, игра. Между матчами у команды не меньше 20 минут перерыва.`;
 
+/** Разъяснения организаторов — общие для помощника и «своего в чате» */
+export const ORGANIZER_NOTES = INSTRUCTIONS.slice(INSTRUCTIONS.indexOf("Разъяснения организаторов"));
+
 // ── данные турниров с сайта
 
 let toursCache: { at: number; value: { text: string; ids: string[] } } | null = null;
 /** Данные турниров — кэш на минуту: вопросы идут пачками, база не дёргается на каждый */
-async function tournamentsContext() {
+export async function tournamentsContext() {
   if (toursCache && Date.now() - toursCache.at < 60_000) return toursCache.value;
   const value = await loadTournamentsContext();
   toursCache = { at: Date.now(), value };
@@ -74,7 +78,7 @@ async function tournamentsContext() {
 async function loadTournamentsContext() {
   const { data } = await db()
     .from("tournaments")
-    .select("id, name, slug, status, format, is_lan, is_official, starts_at, checkin_opens_at, checkin_closes_at, registration_closes_at, location, city, max_teams, entry_fee, prize_pool, description, requirements, rules")
+    .select("id, name, slug, status, format, is_lan, is_official, starts_at, checkin_opens_at, checkin_closes_at, registration_closes_at, location, city, max_teams, entry_fee, prize_pool, description, requirements, rules, bracket_type, default_best_of, final_best_of, final_bo_scope, map_pool, prize_distribution, third_place_match, overtime, knife_round, match_format, timeouts_per_team, tech_pauses")
     .in("status", ["registration", "registration_closed", "checkin", "live"])
     .order("starts_at", { ascending: true })
     .limit(3);
@@ -93,6 +97,10 @@ async function loadTournamentsContext() {
         `Регистрация у судей (check-in): ${when(t.checkin_opens_at)} — ${when(t.checkin_closes_at)}`,
         `Начало матчей: ${when(t.starts_at)}`,
         `Мест: ${t.max_teams}; заявок одобрено ${count("approved")}, на рассмотрении ${count("pending")}`,
+        `Сетка: ${t.bracket_type === "single_elimination" ? "на выбывание (проиграл — выбыл)" : t.bracket_type ?? "—"}; матчи до ${t.default_best_of === 1 ? "1 победы (BO1)" : `BO${t.default_best_of}`}${t.final_best_of && t.final_best_of !== t.default_best_of ? `, ${t.final_bo_scope === "final" || !t.final_bo_scope ? "финал" : t.final_bo_scope} — BO${t.final_best_of}` : ""}${t.third_place_match ? ", есть матч за 3-е место" : ""}; режим ${t.match_format ?? "5x5"}${t.overtime ? ", овертайм MR3" : ""}${t.knife_round ? ", ножевой раунд за выбор стороны" : ""}`,
+        Array.isArray(t.map_pool) && t.map_pool.length ? `Пул карт: ${(t.map_pool as string[]).map((m) => String(m).replace(/^de_/, "")).join(", ")}` : "",
+        t.timeouts_per_team != null ? `Тактических пауз на команду: ${t.timeouts_per_team}; технических: ${t.tech_pauses ?? "—"}` : "",
+        Array.isArray(t.prize_distribution) && t.prize_distribution.length ? `Призы и номинации: ${(t.prize_distribution as { place?: string | number; label?: string; amount?: string | number; prize?: string }[]).map((p) => `${p.label ?? p.place ?? "?"} — ${p.prize ?? p.amount ?? ""}`).join("; ")}` : "",
         t.entry_fee ? `Взнос: ${t.entry_fee}` : "",
         t.prize_pool ? `Призовой фонд: ${t.prize_pool}` : "",
         t.description ? `Описание:\n${t.description}` : "",
@@ -107,7 +115,7 @@ async function loadTournamentsContext() {
 }
 
 /** Кто спрашивает: если Telegram подтверждён на сайте — ник, команда, заявки */
-async function askerContext(tgUserId: number, tournamentIds: string[]) {
+export async function askerContext(tgUserId: number, tournamentIds: string[]) {
   const { data: prof } = await db().from("player_profiles").select("player_id, player:players!player_profiles_player_id_fkey(nickname, faceit_elo)").eq("telegram_chat_id", tgUserId).maybeSingle();
   const p = prof as { player_id: string; player: { nickname: string; faceit_elo: number | null } | null } | null;
   if (!p) return "Спрашивающий не подтвердил Telegram на сайте — его команду и заявку не видно. Если нужен статус заявки, пусть посмотрит на странице турнира или подтвердит Telegram в анкете.";

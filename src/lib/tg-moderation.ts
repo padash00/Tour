@@ -729,7 +729,8 @@ const MATCHES_RULES =
 
 /** Подсказка в личке боту для админа: как модерировать */
 export const MODERATION_HELP =
-  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)
+  `Модерация чата игроков:\n• мат, оскорбления, реклама — сообщение удаляется, предупреждение (3-е — мут 1 ч, 4-е — 24 ч, 5-е — бан)\n• флуд — мут 10 минут\n• новички нажимают «Я не бот»\n\nКоманды ответом на сообщение: /warn [причина], /unwarn, /warns, /mute 1h, /unmute, /ban, /unban\n/market — в теме «Купля-продажа»: бот пускает туда только объявления #продаю / #куплю / #обмен (/market off — выключить)\n/talk — в теме: бот общается как участник чата, понимает, что это за тема (/talk off — выключить)
+/ideas — в теме «Идеи»: новые сообщения только с #идея, бот ставит 👍 (/ideas off — выключить)
 /announce — в теме «Объявления» и /chat — в теме «Общение»: бот копирует объявления в «Общение» (/announce off — выключить)
 /matches — в теме «Матчи турнира»: бот пишет туда рассадку и табло зала (/matches off — выключить)\nЖурнал — ${SITE_URL}/admin/telegram`;
 
@@ -770,6 +771,34 @@ export async function pardonUser(token: string, groupId: number, uid: number, op
     await unmute(token, groupId, uid);
     if (op === "unmute") await audit(null, "tg.unmute", undefined, { user: String(uid), name: name ?? null, by });
   }
+}
+
+/** /talk в теме — бот становится участником чата в этой теме, /talk off — выключить. true — команда обработана */
+export async function handleTalkCommand(token: string, msg: TgMessage, raw: string) {
+  const text = (msg.text ?? "").trim();
+  const m = /^\/talk(?:@\w+)?(?:\s+([\s\S]*))?$/i.exec(text);
+  if (!m) return false;
+  const byAdmin = msg.sender_chat?.id === msg.chat.id || (!!msg.from && (await isChatAdmin(token, msg.chat.id, msg.from.id)));
+  if (!byAdmin) return false;
+  await del(token, msg.chat.id, msg.message_id);
+  const thread = msg.is_topic_message ? msg.message_thread_id : undefined;
+  if (!thread) {
+    await notice(token, msg, "Отправьте /talk внутри темы, где бот должен общаться (например, «Общение»).", 20_000);
+    return true;
+  }
+  const { parseTalkThreads, roleOf, saveTalkThreads, topicName } = await import("./tg-buddy");
+  const list = parseTalkThreads(raw);
+  const arg = (m[1] ?? "").trim();
+  if (/^off$/i.test(arg)) {
+    await saveTalkThreads(list.filter((t) => t.id !== thread));
+    await notice(token, msg, "🤖 В этой теме бот больше не общается.", 20_000);
+    return true;
+  }
+  const name = arg || topicName(msg) || list.find((t) => t.id === thread)?.name || "Тема";
+  await saveTalkThreads([...list.filter((t) => t.id !== thread), { id: thread, name, role: roleOf(name) }]);
+  const ROLE_RU = { banter: "болтаю, шучу и сам начинаю разговоры", teammates: "помогаю найти тиммейтов", tournaments: "отвечаю по регламенту турниров", help: "помогаю с сайтом и документами", lobby: "подсказываю про лобби", quiet: "отвечаю, только когда ко мне обращаются" } as const;
+  await notice(token, msg, `🤖 Тема «${tgEscape(name)}»: здесь я ${ROLE_RU[roleOf(name)]}. Позвать меня — ответьте на моё сообщение или начните с «бот, …».`, 30_000);
+  return true;
 }
 
 /** /faq в теме — включить ИИ-помощника здесь, /faq off — выключить. true — команда обработана */

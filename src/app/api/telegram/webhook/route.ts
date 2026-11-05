@@ -5,8 +5,9 @@ import { db } from "@/lib/supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape, tgSend } from "@/lib/telegram";
 import type { Player } from "@/lib/types";
 import { mirrorAnnouncement, mirrorThreads, shouldMirror } from "@/lib/tg-mirror";
-import { MODERATION_HELP, captchaSweep, handleFaqCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
+import { MODERATION_HELP, captchaSweep, handleFaqCommand, handleTalkCommand, isChatAdmin, moderateGroupMessage, onCallback, type TgCallback, type TgMessage } from "@/lib/tg-moderation";
 import { answerQuestion } from "@/lib/tg-faq";
+import { onTalkMessage, parseTalkThreads } from "@/lib/tg-buddy";
 import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -131,11 +132,22 @@ export async function POST(req: Request) {
           after(() => mirrorAnnouncement(cfg.token, m, to).catch((e) => console.error("tg mirror", e)));
         }
       }
-      const faqCmd = !!update.message && (await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false));
+      const faqCmd =
+        !!update.message &&
+        ((await handleFaqCommand(cfg.token, groupMsg, group.faqThreads).catch(() => false)) || (await handleTalkCommand(cfg.token, groupMsg, group.talkThreadsRaw).catch(() => false)));
       if (!faqCmd) {
         if (group.moderation) await moderateGroupMessage(cfg.token, groupMsg, !update.message, group.marketThread, group.ideasThread).catch((e) => console.error("tg moderation", e));
         // помощник отвечает после ответа Telegram — вызов модели занимает секунды
-        if (update.message && group.faqThreads.length && groupMsg.from) {
+        // тема с ботом-участником (/talk) — он сам решает, отвечать ли; иначе — помощник по вопросам (/faq)
+        const talk = parseTalkThreads(group.talkThreadsRaw).find((t) => t.id === groupMsg.message_thread_id);
+        if (update.message && groupMsg.from && talk) {
+          const m = groupMsg;
+          const from = groupMsg.from;
+          after(async () => {
+            const admin = await isChatAdmin(cfg.token, m.chat.id, from.id).catch(() => false);
+            await onTalkMessage(cfg.token, m, talk, admin, false).catch((e) => console.error("tg talk", e));
+          });
+        } else if (update.message && group.faqThreads.length && groupMsg.from) {
           const m = groupMsg;
           const from = groupMsg.from;
           after(async () => {

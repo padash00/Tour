@@ -8,6 +8,7 @@ import { hallTick } from "../hall";
 import { postMatchResults } from "../tg-match-result";
 import { captchaSweepTick } from "../tg-moderation";
 import { captainLinkRemindTick, groupLinkRemindTick } from "../tg-link-gate";
+import { talkOpenTick } from "../tg-buddy";
 import { lobbyTick } from "../lobby";
 import { refreshStaleProfilesTick } from "../profile-sync";
 import { checkCs2UpToDate, pruneIngest } from "./ops";
@@ -42,4 +43,6 @@ export async function runAgentJobs(lane: AgentJobLane, safely: SafeJob, cs2Patch
   // капитанам раз в день — кто из состава ещё не подтвердил Telegram
   await safely("tg captain remind", captainLinkRemindTick);
   await safely("tg link remind", () => groupLinkRemindTick());
+  // бот-участник сам начинает разговор, если в «болтательных» темах давно тихо
+  await safely("tg talk open", talkOpenTick);
 }
