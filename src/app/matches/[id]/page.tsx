@@ -469,8 +469,23 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     ) : null;
 
   // во время игры сначала раунды и статистика, после — итоги серии
+  // разведка соперника: игрокам состава — на соперника, админам — на обе команды (до конца матча)
+  const mySide = rosters.team1.some((r) => r.player.id === player?.id) ? 1 : rosters.team2.some((r) => r.player.id === player?.id) ? 2 : 0;
+  const scoutTeams = !["finished", "cancelled"].includes(m.status) && m.team1 && m.team2 ? (admin ? [m.team1, m.team2] : mySide === 1 ? [m.team2] : mySide === 2 ? [m.team1] : []) : [];
+  const scoutBlock = scoutTeams.length > 0 && (
+    <Section title={t("Разведка соперника")}>
+      <p className="text-[14px] text-fg-3">{t("Как команда играет по разборам её карт в клубе: где стоят, куда закладывают, какие гранаты, кто идёт первым и кто с AWP.")}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {scoutTeams.map((tm) => (
+          <a key={tm.id} href={`/teams/${encodeURIComponent(tm.tag)}/scout`} className="rounded-lg bg-accent-dim px-3 py-2 text-[14px] font-semibold text-accent hover:opacity-90">
+            {tm.name} →
+          </a>
+        ))}
+      </div>
+    </Section>
+  );
   const detailBlocks = m.status === "live" ? [mvpBlock, roundsBlock, scoreboard, seriesMaps] : [mvpBlock, seriesMaps, roundsBlock, scoreboard];
-  const mainBlocks = [...detailBlocks, rostersBlock, disputeBlock].filter(Boolean);
+  const mainBlocks = [scoutBlock, ...detailBlocks, rostersBlock, disputeBlock].filter(Boolean);
 
   return (
     <>

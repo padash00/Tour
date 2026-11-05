@@ -9,6 +9,7 @@ import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { createExtractorFromFile } from "node-unrar-js";
 import { analyze } from "./analyze.mjs";
+import { scout } from "./situations.mjs";
 
 const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
@@ -89,6 +90,11 @@ async function upload(res, source) {
   if (gz.length > 4_000_000) throw new Error(`разбор ${(gz.length / 1e6).toFixed(1)} МБ — больше предела 4 МБ`);
   const put = await fetch(`${site}/api/agent/analysis?id=${id}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: gz });
   if (!put.ok) throw new Error(`хранилище: HTTP ${put.status} ${await put.text()}`);
+  // выжимка для разведки соперника — только карты наших игроков (не про)
+  if (kind === "match") {
+    const sc = await fetch(`${site}/api/agent/analysis/scout?id=${id}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: zlib.gzipSync(JSON.stringify(scout(res))) });
+    if (!sc.ok) console.error(`  разведка: HTTP ${sc.status}`);
+  }
   // копия для «обучения» (learn.mjs): библиотека раскидок и позиций собирается из всех разборов
   mkdirSync(CACHE, { recursive: true });
   writeFileSync(path.join(CACHE, `${id}.json.gz`), gz);

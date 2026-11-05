@@ -137,3 +137,32 @@ export function situations(a) {
   }
   return out;
 }
+
+/**
+ * Выжимка карты для разведки соперника (сайт собирает по составу команды):
+ * rows — [игрок, раунд, сторона, раунд выигран 0/1, место на 0:20, место на 0:40, AWP на 0:20 0/1, убийств, первое убийство 0/1, первая смерть 0/1]
+ * nades — [игрок, раунд, сторона, тип, куда легла, секунда раунда]; openings — [раунд, убийца, жертва, место убийцы, место жертвы, секунда];
+ * plants — [раунд, сторона закладчика T, место закладки, секунда, игрок]
+ */
+export function scout(a) {
+  const sit = situations(a);
+  const rows = [], nades = [], openings = [], plants = [];
+  for (const r of a.rounds) {
+    if (!r.frames.length) continue;
+    const start = frameAt(r, r.freezeEnd) ?? r.frames[0];
+    const op = sit.openings.find((o) => o.round === r.n);
+    for (const p of start[1]) {
+      const i = p[0];
+      const side = sideOfP(p);
+      const s20 = sit.setups.find((x) => x.round === r.n && x.player === i && x.at === 20);
+      const s40 = sit.setups.find((x) => x.round === r.n && x.player === i && x.at === 40);
+      const p20 = posOf(r, r.freezeEnd + 20 * TR, i);
+      rows.push([i, r.n, side, r.winner === side ? 1 : 0, s20?.place ?? null, s40?.place ?? null, p20 && /awp/i.test(String(p20[8] ?? "")) ? 1 : 0, r.kills.filter((k) => k.a === i && k.v !== i).length, op?.killer === i ? 1 : 0, op?.victim === i ? 1 : 0]);
+    }
+    for (const n of r.nades) if (n.p != null && ["smoke", "flash", "molotov", "he"].includes(n.type)) nades.push([n.p, r.n, n.side, n.type, n.to ?? null, n.rt]);
+    if (op) openings.push([r.n, op.killer, op.victim, op.killerPlace, op.victimPlace, op.rt]);
+    const pl = r.bomb?.planted;
+    if (pl) plants.push([r.n, "T", placeName(a, posOf(r, pl.t, pl.p)) ?? null, sec(r, pl.t), pl.p ?? null]);
+  }
+  return { v: 1, map: a.map, players: a.players.map((p) => ({ name: p.name, steamid: p.steamid })), rounds: a.rounds.length, rows, nades, openings, plants };
+}
