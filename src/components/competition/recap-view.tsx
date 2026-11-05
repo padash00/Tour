@@ -117,6 +117,7 @@ export async function RecapView({ recap, solo, imageBase }: { recap: TournamentR
   const rest = placements.filter((p) => p.place !== "1" && p.place !== "4");
   const fourth = placements.find((p) => p.place === "4");
   // автоматическая номинация MVP повторяет блок «MVP турнира» ниже — показываем её только как решение судей
+  const mvpBonus = nominations.find((n) => n.key === "mvp")?.bonus ?? null;
   const shownNominations = nominations.filter((n) => !(mvp && n.key === "mvp" && n.source !== "judges"));
 
   if (!champion) {
@@ -198,6 +199,7 @@ export async function RecapView({ recap, solo, imageBase }: { recap: TournamentR
                   </div>
                 </div>
                 <div className="mt-3 text-[12px] text-fg-3">{n.source === "judges" ? `${tx("решение судей")}${n.value ? ` · ${n.value}` : ""}` : n.value}</div>
+                {n.bonus && <div className="mt-2 text-[13px] font-semibold text-accent">🎁 {n.bonus}</div>}
               </div>
             ))}
           </div>
@@ -222,6 +224,7 @@ export async function RecapView({ recap, solo, imageBase }: { recap: TournamentR
                   )}
                 </div>
                 <div className="text-[14px] text-fg-3">{mvp.team && mvp.team.name !== (mvp.player?.nickname ?? mvp.name) ? mvp.team.name : ""}</div>
+                {mvpBonus && <div className="mt-1.5 text-[14px] font-semibold text-accent">🎁 {mvpBonus}</div>}
               </div>
             </div>
             <div className="flex flex-wrap gap-x-10 gap-y-4">

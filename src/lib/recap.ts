@@ -48,6 +48,8 @@ export type RecapNomination = {
   team: Pick<Team, "id" | "name" | "tag" | "logo_url"> | null;
   value: string | null;
   source: "judges" | "stats";
+  /** приз за номинацию (бонус клуба из блока «Призы») */
+  bonus: string | null;
 };
 
 export type TournamentRecap = {
@@ -129,7 +131,7 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
   ]);
   const nominations: RecapNomination[] = allNominations
     .filter((n) => n.winner)
-    .map((n) => ({ key: n.key, title: n.title, name: n.winner!.name, team: n.winner!.team, value: n.winner!.value, source: n.winner!.source }));
+    .map((n) => ({ key: n.key, title: n.title, name: n.winner!.name, team: n.winner!.team, value: n.winner!.value, source: n.winner!.source, bonus: n.bonus }));
   // MVP решением судей (Положение 5.5) главнее расчёта: блок MVP показывает выбранного игрока
   const judgedMvp = allNominations.find((n) => n.key === "mvp")?.decision;
   const judgedRow = judgedMvp?.playerId ? board.find((p) => p.player_id === judgedMvp.playerId) : null;

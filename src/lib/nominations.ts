@@ -21,7 +21,30 @@ export type NominationPerson = {
   team: NominationTeam | null;
 };
 
+/** Строки блока «Призы» турнира, которые относятся к номинации (бонусы клуба — не в регламенте) */
+const PRIZE_LABELS: Record<string, string[]> = {
+  mvp: ["MVP турнира", "Лучший игрок (MVP)", "MVP"],
+  sniper: ["Лучший снайпер"],
+  rifler: ["Лучший рифлер"],
+};
+
+/** Приз за номинацию из блока «Призы» турнира (на языке страницы); null — приза нет */
+async function nominationBonuses(tournamentId: string, lang: string): Promise<Map<string, string>> {
+  const { data } = await db().from("tournaments").select("prize_distribution, kk").eq("id", tournamentId).maybeSingle();
+  const rows = (data?.prize_distribution ?? []) as { place: string; prize: string }[];
+  const kkPrizes = ((data?.kk ?? {}) as { prizes?: string[] }).prizes ?? [];
+  const out = new Map<string, string>();
+  for (const [key, labels] of Object.entries(PRIZE_LABELS)) {
+    const i = rows.findIndex((r) => labels.some((l) => l.toLowerCase() === r.place.trim().toLowerCase()));
+    if (i < 0 || !rows[i].prize?.trim()) continue;
+    out.set(key, (lang === "kk" && kkPrizes[i]?.trim()) || rows[i].prize.trim());
+  }
+  return out;
+}
+
 export type Nomination = NominationDef & {
+  /** приз за номинацию из блока «Призы» (бонус клуба) */
+  bonus: string | null;
   computed: (NominationPerson & { value: string }) | null;
   decision: (NominationPerson & { note: string | null; decidedAt: string }) | null;
   /** итог: решение судей или кандидат по статистике */
@@ -65,9 +88,10 @@ async function nominationLines(tournamentId: string) {
 
 /** tx — язык подписей значений (на публичной странице турнира); без него — по-русски (пульт, дипломы) */
 export const getTournamentNominations = cache(async (tournamentId: string, tx: T = makeT("ru")): Promise<Nomination[]> => {
-  const [{ board, lines }, { data: rows }] = await Promise.all([
+  const [{ board, lines }, { data: rows }, bonuses] = await Promise.all([
     nominationLines(tournamentId),
     db().from("tournament_nominations").select("*").eq("tournament_id", tournamentId),
+    nominationBonuses(tournamentId, tx.lang),
   ]);
 
   const computed = new Map<NominationKey, { playerId: string; teamId: string | null; value: string }>();
@@ -114,6 +138,6 @@ export const getTournamentNominations = cache(async (tournamentId: string, tx: T
       : computedPerson
         ? { ...computedPerson, source: "stats" as const }
         : null;
-    return { ...def, computed: computedPerson, decision, winner };
+    return { ...def, bonus: bonuses.get(def.key) ?? null, computed: computedPerson, decision, winner };
   });
 });

@@ -70,6 +70,7 @@ export async function TournamentAwards({ nominations, rows, finished }: { nomina
                   <div className="text-[12.5px] leading-snug text-fg-3">{tx(HOW[n.key])}</div>
                 </div>
               </div>
+              {n.bonus && <div className="-mt-1 text-[13px] font-semibold text-accent">🎁 {n.bonus}</div>}
               {w && nick ? (
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar src={row?.player?.avatar_url} name={nick} size="md" />
