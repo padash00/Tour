@@ -95,6 +95,22 @@ export async function POST(req: Request) {
     await onJoinRequest(cfg.token, update.chat_join_request).catch((e) => console.error("tg join request", e));
     return NextResponse.json({ ok: true });
   }
+  // личка: подтверждение отключения уведомлений
+  const cbq = update.callback_query;
+  if (cbq?.data?.startsWith("unlink:") && cbq.message?.chat.type === "private") {
+    const chat = cbq.message.chat.id;
+    const done = (text: string) => tgCall(cfg.token, "editMessageText", { chat_id: chat, message_id: cbq.message!.message_id, text });
+    if (cbq.data === "unlink:yes") {
+      const { data: l } = await db().from("player_profiles").select("player_id").eq("telegram_chat_id", chat).maybeSingle();
+      if (l) {
+        await db().from("player_profiles").update({ telegram_chat_id: null, telegram_verified_at: null }).eq("player_id", l.player_id);
+        await audit(l.player_id, "telegram.unlink", { type: "player", id: l.player_id });
+      }
+      await done("Уведомления отключены. Подключить снова — кнопка «Подтвердить Telegram» в анкете на сайте.");
+    } else await done("Хорошо, уведомления остаются включены ✅");
+    await tgCall(cfg.token, "answerCallbackQuery", { callback_query_id: cbq.id });
+    return NextResponse.json({ ok: true });
+  }
   // общий чат игроков — модерация
   const groupMsg = update.message ?? update.edited_message;
   if (update.callback_query || (groupMsg && groupMsg.chat.type !== "private")) {
@@ -162,7 +178,7 @@ export async function POST(req: Request) {
     const group = await telegramGroup();
     if (group.id) await tgCall(cfg.token, "approveChatJoinRequest", { chat_id: group.id, user_id: msg.from?.id ?? chat });
     await reply(
-      `✅ Telegram подтверждён для <b>${tgEscape(p?.nickname ?? "игрока")}</b>.\n\nСюда будут приходить уведомления F16 Arena: приглашения в команду, решения по заявкам, матчи и объявления турниров.${group.invite ? "\n\nВступайте в общий чат игроков — там новости, поиск тиммейтов и объявления турниров." : ""}\n\nОтключить — /stop`,
+      `✅ Telegram подтверждён для <b>${tgEscape(p?.nickname ?? "игрока")}</b>.\n\nСюда будут приходить уведомления F16 Arena: приглашения в команду, решения по заявкам, матчи и объявления турниров.${group.invite ? "\n\nВступайте в общий чат игроков — там новости, поиск тиммейтов и объявления турниров." : ""}\n\nОтключить — /stop (бот переспросит)`,
       group.invite ? { text: "💬 Вступить в чат игроков", url: group.invite } : { text: "Открыть сайт", url: SITE_URL },
     );
     return NextResponse.json({ ok: true });
@@ -182,12 +198,17 @@ export async function POST(req: Request) {
   }
 
   if (cmd === "/stop") {
+    // сначала спрашиваем: /stop легко нажать случайно, а без Telegram игрок не получит вызов на матч
     const l = await linked();
-    if (l) {
-      await db().from("player_profiles").update({ telegram_chat_id: null, telegram_verified_at: null }).eq("player_id", l.player_id);
-      await audit(l.player_id, "telegram.unlink", { type: "player", id: l.player_id });
+    if (!l) {
+      await reply("Telegram и так не привязан к аккаунту на сайте.");
+      return NextResponse.json({ ok: true });
     }
-    await reply("Уведомления отключены. Подключить снова — кнопка «Подтвердить Telegram» в анкете на сайте.");
+    await tgCall(cfg.token, "sendMessage", {
+      chat_id: chat,
+      text: "Точно отключить уведомления?\n\nБез них бот не сможет написать вам в день турнира, за какие ПК садиться и когда ваш матч.",
+      reply_markup: { inline_keyboard: [[{ text: "Да, отключить", callback_data: "unlink:yes" }, { text: "Нет, оставить", callback_data: "unlink:no" }]] },
+    });
     return NextResponse.json({ ok: true });
   }
 
