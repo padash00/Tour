@@ -34,8 +34,15 @@ export function readKk(v: unknown): TournamentKk {
 const STOCK = new Set<string>([tr("Бесплатно"), tr("Ценные подарки")]);
 
 /** «1 место» → «1-орын», «III место» → «III орын» */
+/** Строки призов, которые не места, а номинации (бонусы клуба) */
+const PRIZE_LABEL_KK: Record<string, string> = {
+  "MVP турнира": "Турнирдің MVP-і",
+  "Лучший игрок (MVP)": "Үздік ойыншы (MVP)",
+  "Лучший снайпер": "Үздік снайпер",
+  "Лучший рифлер": "Үздік рифлер",
+};
 const placeKk = (p: string) =>
-  p.replace(/^\s*(\d+)(?:-?е)?\s+место\s*$/i, "$1-орын").replace(/^\s*([IVX]+)\s+место\s*$/, "$1 орын");
+  PRIZE_LABEL_KK[p.trim()] ?? p.replace(/^\s*(\d+)(?:-?е)?\s+место\s*$/i, "$1-орын").replace(/^\s*([IVX]+)\s+место\s*$/, "$1 орын");
 
 type Localizable = {
   kk?: unknown;
