@@ -557,15 +557,26 @@ export async function moderateGroupMessage(token: string, msg: TgMessage, edited
   // пересылка из чужого канала или сообщение от имени канала — реклама
   const fromChannel = msg.sender_chat?.type === "channel" || msg.forward_origin?.type === "channel" || msg.forward_from_chat?.type === "channel";
   let v: Violation | null = findViolation(text) ?? (fromChannel ? { kind: "link", reason: "реклама и пересылки из каналов запрещены", match: "канал" } : null);
+  // обычный фильтр ничего не нашёл — проверка через ИИ (намеренные опечатки, замены букв, оскорбления)
+  if (!v && !edited && text.trim().length >= 3 && !text.startsWith("/")) {
+    after(async () => {
+      const ai = await aiCheck(text);
+      if (!ai) return;
+      await del(token, msg.chat.id, msg.message_id);
+      await warn(token, msg, from, ai.kind === "mat" ? "мат в чате запрещён" : "оскорбления запрещены", text, "ИИ", ai.word);
+    });
+  }
   // голосовое или кружок: переводим в текст (после ответа Telegram, чтобы вебхук не ждал) и проверяем на мат
   const media = msg.voice ?? msg.video_note;
   if (!v && media && !edited && media.duration <= VOICE_MAX_S) {
     after(async () => {
       const heard = await transcribe(token, media.file_id, msg.voice ? "voice.ogg" : "note.mp4");
-      const hv = heard ? findViolation(heard) : null;
-      if (!hv || hv.kind === "link") return;
+      if (!heard) return;
+      const hv = findViolation(heard);
+      const found = hv && hv.kind !== "link" ? { word: hv.match, by: "бот" } : await aiCheck(heard).then((a) => (a ? { word: a.word, by: "ИИ" } : null));
+      if (!found) return;
       await del(token, msg.chat.id, msg.message_id);
-      await warn(token, msg, from, msg.voice ? "мат в голосовом сообщении" : "мат в видеосообщении", `🎤 ${heard}`, "бот", hv.match);
+      await warn(token, msg, from, msg.voice ? "мат в голосовом сообщении" : "мат в видеосообщении", `🎤 ${heard}`, found.by, found.word);
     });
     return;
   }
@@ -612,6 +623,63 @@ async function transcribe(token: string, fileId: string, name: string): Promise<
     console.error("stt", e);
     return null;
   }
+}
+
+// ── ИИ-проверка: то, что обычный фильтр пропустил
+
+const AI_MODELS = ["gpt-4.1-mini", "gpt-4o-mini", "gpt-5-mini"]; // первая доступная у ключа
+let aiModel: string | null = null;
+const AI_RULES = `Ты модератор чата игроков компьютерного клуба F16 Arena (Counter-Strike 2, Казахстан). Пишут по-русски и по-казахски, часто со сленгом.
+Определи, есть ли в сообщении:
+- "mat" — русский или казахский мат, в том числе замаскированный: намеренные опечатки, замена букв (Ь вместо Б, Э вместо Е, цифры, латиница), лишние буквы, пробелы и знаки внутри слова, сокращения мата (бл, пздц, хз не считается).
+- "insult" — прямое оскорбление человека (дебил, урод, даун, чмо, тупой и т. п. в адрес собеседника или игрока).
+НЕ нарушение: игровой сленг (изи, нуб, раш, тильт, гг, рак — как оценка игры), мягкие слова (блин, капец, жесть, хрен, хер, нафиг, фиг, чёрт, офигеть), эмоции без мата, шутки про игру, названия команд и ники.
+Отмечай нарушение только если уверен. Ответ — только JSON: {"kind": "mat" | "insult" | null, "word": "слово как в сообщении или null"}`;
+
+/** null — нарушения нет, ключа нет или ИИ недоступен (тогда ничего не делаем) */
+async function aiCheck(text: string): Promise<{ kind: "mat" | "insult"; word: string } | null> {
+  const { getSetting } = await import("./settings");
+  const key = await getSetting("STT_API_KEY");
+  if (!key || !key.startsWith("sk-")) return null;
+  for (const model of aiModel ? [aiModel] : AI_MODELS) {
+    try {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_tokens: 60,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: AI_RULES },
+            { role: "user", content: text.slice(0, 600) },
+          ],
+        }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (r.status === 404 || r.status === 400) {
+        const err = await r.text();
+        // модели нет у ключа — пробуем следующую
+        if (/model/i.test(err)) continue;
+        console.error("ai mod", r.status, err.slice(0, 200));
+        return null;
+      }
+      if (!r.ok) {
+        console.error("ai mod", r.status, (await r.text()).slice(0, 200));
+        return null;
+      }
+      aiModel = model;
+      const j = (await r.json()) as { choices?: { message?: { content?: string } }[] };
+      const out = JSON.parse(j.choices?.[0]?.message?.content ?? "{}") as { kind?: string | null; word?: string | null };
+      if (out.kind !== "mat" && out.kind !== "insult") return null;
+      return { kind: out.kind, word: String(out.word ?? "").slice(0, 60) || "?" };
+    } catch (e) {
+      console.error("ai mod", e);
+      return null;
+    }
+  }
+  return null;
 }
 
 // ── «Идеи и предложения»

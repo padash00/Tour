@@ -10,9 +10,9 @@ export const SETTINGS = {
   TELEGRAM_BOT_USERNAME: { label: "Имя Telegram-бота", secret: false, hint: "Без @, например f16_tournament_bot — для ссылки «Подтвердить Telegram»." },
   ANTHROPIC_API_KEY: { label: "Ключ Claude API (помощник в Telegram)", secret: true, hint: "console.anthropic.com → API Keys. Бот отвечает на вопросы игроков в темах чата, где админ написал /faq. Пусто — помощник выключен." },
   STT_API_KEY: {
-    label: "Ключ распознавания речи (голосовые в Telegram)",
+    label: "Ключ OpenAI (ИИ-проверка мата и голосовых в Telegram)",
     secret: true,
-    hint: "Бот переводит голосовые и кружки в чате игроков в текст и проверяет на мат. Groq (бесплатно): console.groq.com → API Keys, ключ gsk_…; или OpenAI: platform.openai.com → API keys, ключ sk-…. Пусто — голосовые не проверяются.",
+    hint: "OpenAI: platform.openai.com → API keys, ключ sk-… — бот переводит голосовые и кружки в текст и проверяет через ИИ сообщения, которые обычный фильтр мата пропустил (намеренные опечатки, замены букв, оскорбления). Можно ключ Groq (gsk_…, бесплатно) — тогда только голосовые, без ИИ-проверки. Пусто — выключено.",
   },
   SUPPORT_PLAYER_ID: { label: "Аккаунт поддержки", secret: false, hint: "id игрока-админа, которому приходят сообщения «Поддержка». Пусто — первый администратор сайта." },
   PLAYER_IP: {
