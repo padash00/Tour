@@ -173,7 +173,26 @@ export function coach(myId, steamid) {
     }),
   });
 
-  return { v: 1, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings };
+  // 8. хайлайты: мультикиллы, выигранные клатчи, первые убийства, хедшоты — лучшие моменты игрока
+  const highlights = [];
+  for (const r of me.rounds) {
+    const ks = r.kills.filter((k) => k.a === i && k.v !== i).sort((x, y) => x.t - y.t);
+    if (ks.length >= 3) {
+      const hs = ks.filter((k) => k.hs).length;
+      highlights.push({ kind: ks.length >= 5 ? "ace" : `${ks.length}k`, score: ks.length * 10 + hs * 2, round: r.n, t: ks[0].t, end: ks[ks.length - 1].t, kills: ks.length, hs, weapons: [...new Set(ks.map((k) => k.w))], title: `${ks.length >= 5 ? "ЭЙС" : `${ks.length}K`} в раунде ${r.n}${hs ? ` · ${hs} в голову` : ""}` });
+    }
+  }
+  for (const c of sit.clutches.filter((c) => c.hero === i && c.won && c.vs >= 1)) {
+    highlights.push({ kind: "clutch", score: 15 + c.vs * 8, round: c.round, t: c.t, end: c.end, kills: c.kills, title: `Клатч 1 против ${c.vs} — вытащил (раунд ${c.round})` });
+  }
+  for (const o of sit.openings.filter((o) => o.killer === i)) {
+    if (highlights.some((h) => h.round === o.round)) continue;
+    highlights.push({ kind: "entry", score: 6 + (o.hs ? 2 : 0), round: o.round, t: o.t, end: o.t, kills: 1, title: `Первое убийство раунда ${o.round}: ${o.victimPlace ? o.victimPlace : ""} ${o.hs ? "· в голову" : ""}`.trim() });
+  }
+  highlights.sort((x, y) => y.score - x.score);
+  const top = highlights.slice(0, 8).map((h) => ({ ...h, ...ref(h.round, h.t) }));
+
+  return { v: 1, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings, highlights: top };
 }
 
 if (process.argv[1]?.endsWith("coach.mjs")) {

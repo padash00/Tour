@@ -18,10 +18,12 @@ type Moment = ClipRef & {
   pro?: (ClipRef & { from?: string; to?: string; route?: string[]; nades?: string[] }) | null;
 };
 type Finding = { topic: string; title: string; moments: Moment[]; perRound?: Record<string, [number, number]> };
+type Highlight = ClipRef & { kind: string; title: string; kills: number; hs?: number; weapons?: string[] };
 type Report = {
   v: number; map: string; player: { name: string; steamid: string }; analysis: string; proMaps: number;
   stats: { rounds: number; kpr: [number, number]; dpr: [number, number]; adr: [number, number]; openingDeathRate: [number, number]; openingKillRate: [number, number]; traded: [number, number]; nadesPerRound: Record<string, [number, number]> };
   findings: Finding[];
+  highlights?: Highlight[];
 };
 
 const TR = 64;
@@ -146,6 +148,31 @@ function CoachText({ analysisId, steamid }: { analysisId: string; steamid: strin
   );
 }
 
+const HL_ICON: Record<string, string> = { ace: "💥", "4k": "🔥", "3k": "🔥", clutch: "🧊", entry: "⚡" };
+
+function Highlights({ list, me }: { list: Highlight[]; me: string }) {
+  const [cur, setCur] = useState(0);
+  const h = list[cur];
+  return (
+    <div className="rounded-2xl bg-[#0f120c] p-4 text-white sm:p-5">
+      <div className="text-[13px] font-bold uppercase tracking-wide text-[#d4ff1f]">Хайлайты</div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {list.map((x, i) => (
+          <button key={i} type="button" onClick={() => setCur(i)} className={`rounded-lg px-3 py-1.5 text-[13.5px] font-bold ${i === cur ? "bg-[#d4ff1f] text-[#0b0d09]" : "bg-white/10 text-white/85 hover:bg-white/15"}`}>
+            {HL_ICON[x.kind] ?? "★"} {x.title}
+          </button>
+        ))}
+      </div>
+      {h && (
+        <div className="mt-3 max-w-[760px]">
+          <ClipView key={cur} analysisId={h.analysis} clip={{ round: h.round, from: h.t - 4 * TR, to: (h.end ?? h.t) + 3 * TR }} focusName={me} />
+          {h.weapons?.length ? <p className="mt-1.5 text-[12.5px] text-white/45">Оружие: {h.weapons.join(", ")}</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CoachReport({ analysisId, steamid }: { analysisId: string; steamid: string }) {
   const { data, error } = useGzJson<Report>(`/api/analysis/coach/${analysisId}/${steamid}`);
   const [open, setOpen] = useState<string | null>(null);
@@ -176,6 +203,8 @@ export function CoachReport({ analysisId, steamid }: { analysisId: string; steam
         </div>
         <p className="mt-3 text-[12.5px] text-white/40">Цифры топов — против топов, твои — против твоих соперников. Важнее не «больше/меньше», а то, как ты играешь в каждой ситуации ниже.</p>
       </div>
+
+      {(data.highlights?.length ?? 0) > 0 && <Highlights list={data.highlights!} me={data.player.name} />}
 
       <CoachText analysisId={analysisId} steamid={steamid} />
 
