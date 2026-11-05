@@ -40,62 +40,143 @@ function playerNumbers(a, i, sit) {
 }
 
 const GUN = (w) => !!w && !/knife|bayonet|hegrenade|inferno|molotov|incgrenade|flashbang|smokegrenade|decoy|world|c4|taser/i.test(String(w));
-const BLIND_S = 1; // ослепление от секунды — засчитываем
+// Определения — как у Leetify (leetify.com/blog/leetify-stats-glossary)
+const BLIND_S = 1.1; // ослеплён дольше 1.1 с — засчитываем (полуослеплённых не считаем)
+const RIFLE_MAX = { ak47: 215, m4a1: 225, m4a1_silencer: 225, galilar: 215, famas: 220, aug: 220, sg556: 210 }; // макс. скорость, ед/с
+const COMBAT = 96; // выстрел «в бою»: видел врага или в пределах 1.5 с наносил/получал урон от огнестрела
+const TRADE_WIN = 5 * 64; // окно размена — 5 с
+const TRADE_DIST = 1000; // мог разменять: был в 1000 ед. от убийцы (или видел его)
+const SMOKE_DIST = 800; // CT-смок остановил выход: враг подходил ближе 800 ед. к месту смока
+const median = (xs) => { if (!xs.length) return null; const v = [...xs].sort((a, b) => a - b); const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
 
-/** Стрельба, флешки, урон гранатами, экономика одного игрока в разборе */
+function frameAt(r, tick) {
+  let lo = 0, hi = r.frames.length - 1;
+  if (hi < 0) return null;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (r.frames[mid][0] <= tick) lo = mid; else hi = mid - 1; }
+  return r.frames[lo];
+}
+const posAt = (r, tick, i) => frameAt(r, tick)?.[1].find((q) => q[0] === i) ?? null;
+
+/** Стрельба, флешки, урон гранатами, экономика, размены одного игрока в разборе */
 function skillNumbers(a, i) {
-  const o = { shots: 0, hits: 0, headHits: 0, gunKills: 0, firstShots: 0, firstHits: 0, sprayShots: 0, sprayHits: 0,
-    flashes: 0, flashEnemies: 0, flashEnemySec: 0, flashTeam: 0, flashSelf: 0, flashKills: 0,
-    he: 0, heDmg: 0, molly: 0, mollyDmg: 0, missDeaths: [], badFlashes: [], econ: [] };
+  const o = { shots: 0, hits: 0, headHits: 0, bodyHits: 0, gunKills: 0, firstShots: 0, firstHits: 0, sprayShots: 0, sprayHits: 0,
+    strafeShots: 0, strafeGood: 0, ttd: [], xhair: [],
+    flashes: 0, flashEnemies: 0, flashEnemySec: 0, flashBlinding: 0, flashTeam: 0, flashSelf: 0, flashKills: 0,
+    he: 0, heDmg: 0, molly: 0, mollyDmg: 0, deaths: 0, utilOnDeath: 0, ctSmokes: 0, ctSmokesGood: 0,
+    tradeOpp: 0, tradeTry: 0, tradeWin: 0, tradedOpp: 0, tradedTry: 0, tradedWin: 0,
+    missDeaths: [], badFlashes: [], econ: [], missedTrades: [] };
   for (const r of a.rounds) {
-    const shots = (r.shots ?? []).filter(([, p]) => p === i).map(([t]) => t).sort((x, y) => x - y);
-    const hits = (r.hurts ?? []).filter((h) => h[1] === i && h[2] !== i && GUN(h[5]));
-    o.shots += shots.length;
-    o.hits += hits.length;
-    o.headHits += hits.filter((h) => h[4] === "head").length;
+    const mine = (r.shots ?? []).filter((s) => s[1] === i).sort((x, y) => x[0] - y[0]);
+    const hurtsOut = (r.hurts ?? []).filter((h) => h[1] === i && h[2] !== i && GUN(h[5]));
+    const hurtsIn = (r.hurts ?? []).filter((h) => h[2] === i && h[1] != null && h[1] !== i && GUN(h[5]));
+    const fighting = (t) => hurtsOut.some((h) => Math.abs(h[0] - t) <= COMBAT) || hurtsIn.some((h) => Math.abs(h[0] - t) <= COMBAT);
+    const hitAt = (t) => hurtsOut.some((h) => h[0] >= t && h[0] - t <= 10);
+    const combat = mine.filter((s) => s[3] === 1 || fighting(s[0]));
+    // точность — по выстрелам в бою (не по прострелам наугад и не по стрельбе «в никуда»)
+    o.shots += combat.length;
+    o.hits += combat.filter((s) => hitAt(s[0])).length;
+    // хедшоты — от попаданий, без AWP
+    const noAwp = hurtsOut.filter((h) => !/awp/i.test(String(h[5])));
+    o.headHits += noAwp.filter((h) => h[4] === "head").length;
+    o.bodyHits += noAwp.length;
     o.gunKills += r.kills.filter((k) => k.a === i && k.v !== i && GUN(k.w)).length;
-    // очереди: разрыв больше 0.4 с — новая очередь. Первая пуля и спрей (5-я пуля и дальше)
+    // очереди: разрыв больше 0.4 с — новая очередь. Первая пуля; спрей — очередь из винтовки от 3 выстрелов
     const bursts = [];
-    for (const t of shots) {
+    for (const s of combat) {
       const b = bursts[bursts.length - 1];
-      if (b && t - b[b.length - 1] <= 26) b.push(t);
-      else bursts.push([t]);
+      if (b && s[0] - b[b.length - 1][0] <= 26) b.push(s);
+      else bursts.push([s]);
     }
-    const hitAt = (t) => hits.some((h) => h[0] >= t && h[0] - t <= 10);
     for (const b of bursts) {
       o.firstShots++;
-      if (hitAt(b[0])) o.firstHits++;
-      for (const t of b.slice(4)) { o.sprayShots++; if (hitAt(t)) o.sprayHits++; }
+      if (hitAt(b[0][0])) o.firstHits++;
+      const rifle = b.every((s) => s[5] == null || RIFLE_MAX[s[5]]);
+      if (b.length >= 3 && rifle) for (const s of b) { o.sprayShots++; if (hitAt(s[0])) o.sprayHits++; }
+    }
+    // контрстрейф: выстрел из винтовки в бою, не в приседе, скорость ниже 34% от максимальной для оружия
+    for (const s of combat) {
+      const max = RIFLE_MAX[s[5]];
+      if (!max || s[2] == null || s[4]) continue;
+      o.strafeShots++;
+      if (s[2] < max * 0.34) o.strafeGood++;
+    }
+    // время до урона и довод прицела (дуэли, где игра записала, что видел врага; дольше 1 с — не считаем)
+    for (const d of r.duels ?? []) {
+      if (d[0] !== i || d[3] == null) continue;
+      o.ttd.push(((d[2] - d[3]) / 64) * 1000);
+      if (d[4] != null) o.xhair.push(d[4]);
     }
     // смерть после очереди мимо: стрелял 4+ раза за 3 с до смерти и ни разу не попал
     const death = r.kills.find((k) => k.v === i);
     if (death) {
-      const before = shots.filter((t) => t <= death.t && death.t - t <= 3 * 64);
-      const hitBefore = hits.some((h) => h[0] <= death.t && death.t - h[0] <= 3 * 64);
+      o.deaths++;
+      if (death.util != null) o.utilOnDeath += death.util;
+      const before = mine.filter((s) => s[0] <= death.t && death.t - s[0] <= 3 * 64);
+      const hitBefore = hurtsOut.some((h) => h[0] <= death.t && death.t - h[0] <= 3 * 64);
       if (before.length >= 4 && !hitBefore) o.missDeaths.push({ round: r.n, t: death.t, shots: before.length, by: death.a });
     }
     for (const n of r.nades) {
       if (n.p !== i) continue;
       if (n.type === "flash") {
         o.flashes++;
-        const bl = (n.blind ?? []).filter(([, d]) => d >= BLIND_S);
+        const bl = (n.blind ?? []).filter(([, d]) => d > BLIND_S);
         const enemies = bl.filter(([p, , own]) => !own && p !== i);
-        o.flashEnemies += enemies.length;
-        o.flashEnemySec += enemies.reduce((x, [, d]) => x + d, 0);
+        o.flashEnemies += Math.min(5, enemies.length);
+        // длительность — по самому ослеплённому врагу, среди флешек, ослепивших хоть кого-то
+        if (enemies.length) { o.flashBlinding++; o.flashEnemySec += Math.max(...enemies.map(([, d]) => d)); }
         const team = bl.filter(([p, , own]) => own && p !== i).length;
         o.flashTeam += team;
         if (bl.some(([p]) => p === i)) o.flashSelf++;
-        // флешка привела к убийству: ослеплённого врага убили за 3 с
+        // флешка привела к убийству: ослеплённого врага убили (ты или напарник) за 3 с
         if (enemies.some(([p]) => r.kills.some((k) => k.v === p && k.t >= n.t1 && k.t - n.t1 <= 3 * 64))) o.flashKills++;
         if (n.blind && (team > 0 || enemies.length === 0)) o.badFlashes.push({ round: r.n, t: n.t0, t1: n.t1, from: n.from, to: n.to, side: n.side, team, self: bl.some(([p]) => p === i), enemies: enemies.length });
       }
       if (n.type === "he") o.he++;
       if (n.type === "molotov") o.molly++;
+      // смок защиты остановил выход: враг подходил к месту смока ближе 800 ед. в первые 15 с
+      if (n.type === "smoke" && n.side === "CT" && n.x != null) {
+        o.ctSmokes++;
+        const near = r.frames.some(([t, l]) => t >= n.t1 && t - n.t1 <= 15 * 64 && l.some((q) => q[1] === 0 && q[6] > 0 && Math.hypot(q[2] - n.x, q[3] - n.y) < SMOKE_DIST));
+        if (near) o.ctSmokesGood++;
+      }
     }
     for (const h of r.hurts ?? []) {
       if (h[1] !== i || h[2] === i) continue;
       if (/hegrenade/i.test(String(h[5]))) o.heDmg += Math.min(100, h[3]);
       if (/inferno|molotov|incgrenade/i.test(String(h[5]))) o.mollyDmg += Math.min(100, h[3]);
+    }
+    // размены (как у Leetify): мог ли разменять, пытался ли, разменял ли
+    const kills = [...r.kills].sort((x, y) => x.t - y.t);
+    const fought = (p, k, t) => (r.hurts ?? []).some((h) => h[0] >= t && h[0] - t <= TRADE_WIN && ((h[1] === p && h[2] === k) || (h[1] === k && h[2] === p)));
+    const avenged = (p, k, t) => kills.some((x) => x.t > t && x.t - t <= TRADE_WIN && x.a === p && x.v === k);
+    const couldTrade = (p, k, t) => {
+      const me = posAt(r, t, p), killer = posAt(r, t, k);
+      if (!me || me[6] <= 0 || kills.some((x) => x.v === p && x.t <= t)) return false;
+      return (k != null && (r.kills.find((x) => x.t === t && x.a === k)?.seen ?? []).includes(p)) || (!!killer && Math.hypot(me[2] - killer[2], me[3] - killer[3]) < TRADE_DIST);
+    };
+    for (const k of kills) {
+      if (k.a == null || k.a === k.v) continue;
+      const vp = posAt(r, k.t - 8, k.v), ip = posAt(r, k.t - 8, i);
+      if (!vp || !ip) continue;
+      const mate = vp[1] === ip[1];
+      if (k.v !== i && mate && couldTrade(i, k.a, k.t)) {
+        // напарника убили рядом с тобой
+        o.tradeOpp++;
+        const tried = fought(i, k.a, k.t);
+        if (tried) o.tradeTry++;
+        if (avenged(i, k.a, k.t)) o.tradeWin++;
+        else if (!tried) o.missedTrades.push({ round: r.n, t: k.t, mate: k.v, killer: k.a, dist: Math.round(Math.hypot(ip[2] - (posAt(r, k.t, k.a)?.[2] ?? ip[2]), ip[3] - (posAt(r, k.t, k.a)?.[3] ?? ip[3]))) });
+      }
+      if (k.v === i) {
+        // тебя убили: был ли рядом напарник, пытался ли, разменял ли
+        const mates = (frameAt(r, k.t)?.[1] ?? []).filter((q) => q[0] !== i && q[1] === ip[1] && q[6] > 0).map((q) => q[0]);
+        const could = mates.filter((m) => couldTrade(m, k.a, k.t));
+        if (could.length) {
+          o.tradedOpp++;
+          if (could.some((m) => fought(m, k.a, k.t))) o.tradedTry++;
+          if (could.some((m) => avenged(m, k.a, k.t))) o.tradedWin++;
+        }
+      }
     }
     // экономика: закупка игрока против команды на начало раунда
     const me = r.econ.find((e) => e.p === i);
@@ -123,7 +204,7 @@ export function coach(myId, steamid) {
   const knowledge = existsSync(kfile) ? JSON.parse(readFileSync(kfile, "utf8")) : null;
 
   // ── база топов «на игрока за раунд»
-  const proSkill = { shots: 0, hits: 0, headHits: 0, gunKills: 0, firstShots: 0, firstHits: 0, sprayShots: 0, sprayHits: 0, flashes: 0, flashEnemies: 0, flashEnemySec: 0, flashTeam: 0, flashSelf: 0, flashKills: 0, he: 0, heDmg: 0, molly: 0, mollyDmg: 0, econ: 0 };
+  const proSkill = { econ: 0, ttd: [], xhair: [] };
   const base = { rounds: 0, kills: 0, deaths: 0, damage: 0, openingDeaths: 0, openingKills: 0, nades: Object.fromEntries(NADES.map((t) => [t, 0])), traded: { T: [0, 0], CT: [0, 0] } };
   const proRepeek = new Map(); // место → [выходов, смертей]
   const proClutch = new Map(); // vs → [клатчей, побед]
@@ -133,7 +214,11 @@ export function coach(myId, steamid) {
     const s = situations(a);
     for (let p = 0; p < a.players.length; p++) {
       const k = skillNumbers(a, p);
-      for (const key of Object.keys(proSkill)) proSkill[key] += key === "econ" ? k.econ.length : k[key];
+      for (const [key, v] of Object.entries(k)) {
+        if (key === "econ") proSkill.econ += v.length;
+        else if (key === "ttd" || key === "xhair") proSkill[key].push(...v);
+        else if (typeof v === "number") proSkill[key] = (proSkill[key] ?? 0) + v;
+      }
       const n = playerNumbers(a, p, s);
       base.rounds += n.rounds; base.kills += n.kills; base.deaths += n.deaths; base.damage += n.damage;
       base.openingDeaths += n.openingDeaths; base.openingKills += n.openingKills;
@@ -182,10 +267,19 @@ export function coach(myId, steamid) {
 
   // 3. неразменянные смерти
   const untraded = sit.trades.filter((t) => t.victim === i && !t.traded);
+  const skMe = skillNumbers(me, i);
   findings.push({
     topic: "trades",
     title: `Твои смерти разменяли в ${stats.traded[0]}% случаев, у топов — ${stats.traded[1]}%`,
-    moments: untraded.slice(0, 8).map((t) => ({ ...ref(t.round, t.t), place: t.victimPlace, rt: t.rt })),
+    moments: [
+      ...untraded.slice(0, 8).map((t) => ({ ...ref(t.round, t.t), place: t.victimPlace, rt: t.rt })),
+      // напарника убили рядом с тобой, а ты не вступил в бой с убийцей
+      ...skMe.missedTrades.slice(0, 6).map((m) => {
+        const r = me.rounds.find((x) => x.n === m.round);
+        const p = r ? posAt(r, m.t, m.mate) : null;
+        return { ...ref(m.round, m.t), kind: "missed", mate: me.players[m.mate]?.name, by: me.players[m.killer]?.name, dist: m.dist, place: p && p[9] >= 0 ? me.places[p[9]] : null, rt: r ? Math.round(((m.t - r.freezeEnd) / TR) * 10) / 10 : null };
+      }),
+    ],
   });
 
   // 4. гранаты: сколько и насколько «стандартно» (совпадает с раскидками топов)
@@ -249,24 +343,36 @@ export function coach(myId, steamid) {
   });
 
   // 9. стрельба, флешки, гранаты, экономика
-  const sk = skillNumbers(me, i);
+  const sk = skMe;
   const acc = (h, s) => pct(h, s);
+  const both = (f) => [f(sk), f(proSkill)];
+  const div = (n, d, k = 100) => (d ? Math.round((n / d) * k * 10) / 10 : null);
   const skill = {
-    accuracy: [acc(sk.hits, sk.shots), acc(proSkill.hits, proSkill.shots)],
-    hs: [acc(sk.headHits, sk.hits), acc(proSkill.headHits, proSkill.hits)],
-    firstBullet: [acc(sk.firstHits, sk.firstShots), acc(proSkill.firstHits, proSkill.firstShots)],
-    spray: [acc(sk.sprayHits, sk.sprayShots), acc(proSkill.sprayHits, proSkill.sprayShots)],
-    shotsPerKill: [sk.gunKills ? r2(sk.shots / sk.gunKills) : null, proSkill.gunKills ? r2(proSkill.shots / proSkill.gunKills) : null],
-    enemiesPerFlash: [sk.flashes ? r2(sk.flashEnemies / sk.flashes) : null, proSkill.flashes ? r2(proSkill.flashEnemies / proSkill.flashes) : null],
-    blindSecPerFlash: [sk.flashes ? r2(sk.flashEnemySec / sk.flashes) : null, proSkill.flashes ? r2(proSkill.flashEnemySec / proSkill.flashes) : null],
-    teamFlashPct: [acc(sk.flashTeam, sk.flashes), acc(proSkill.flashTeam, proSkill.flashes)],
-    flashKillPct: [acc(sk.flashKills, sk.flashes), acc(proSkill.flashKills, proSkill.flashes)],
-    heDmg: [sk.he ? Math.round(sk.heDmg / sk.he) : null, proSkill.he ? Math.round(proSkill.heDmg / proSkill.he) : null],
-    mollyDmg: [sk.molly ? Math.round(sk.mollyDmg / sk.molly) : null, proSkill.molly ? Math.round(proSkill.mollyDmg / proSkill.molly) : null],
+    accuracy: both((x) => div(x.hits, x.shots)),
+    hs: both((x) => div(x.headHits, x.bodyHits)),
+    firstBullet: both((x) => div(x.firstHits, x.firstShots)),
+    spray: both((x) => div(x.sprayHits, x.sprayShots)),
+    counterStrafe: both((x) => div(x.strafeGood, x.strafeShots)),
+    ttd: both((x) => (x.ttd.length >= 3 ? Math.round(median(x.ttd)) : null)),
+    crosshair: both((x) => (x.xhair.length >= 3 ? Math.round(median(x.xhair) * 10) / 10 : null)),
+    shotsPerKill: both((x) => (x.gunKills ? r2(x.shots / x.gunKills) : null)),
+    enemiesPerFlash: both((x) => (x.flashes ? r2(x.flashEnemies / x.flashes) : null)),
+    blindSecPerFlash: both((x) => (x.flashBlinding ? r2(x.flashEnemySec / x.flashBlinding) : null)),
+    teamFlashPct: both((x) => div(x.flashTeam, x.flashes)),
+    flashKillPct: both((x) => div(x.flashKills, x.flashes)),
+    heDmg: both((x) => (x.he ? Math.round(x.heDmg / x.he) : null)),
+    mollyDmg: both((x) => (x.molly ? Math.round(x.mollyDmg / x.molly) : null)),
+    utilOnDeath: both((x) => (x.deaths ? Math.round(x.utilOnDeath / x.deaths) : null)),
+    ctSmokeStop: both((x) => div(x.ctSmokesGood, x.ctSmokes)),
+    tradeAttempt: both((x) => div(x.tradeTry, x.tradeOpp)),
+    tradeSuccess: both((x) => div(x.tradeWin, x.tradeOpp)),
+    tradedAttempt: both((x) => div(x.tradedTry, x.tradedOpp)),
+    tradedSuccess: both((x) => div(x.tradedWin, x.tradedOpp)),
+    samples: { ttd: sk.ttd.length, strafe: sk.strafeShots, tradeOpp: sk.tradeOpp, ctSmokes: sk.ctSmokes },
   };
   findings.push({
     topic: "aim",
-    title: `Стрельба: точность ${skill.accuracy[0]}% (у топов ${skill.accuracy[1]}%), в голову ${skill.hs[0]}% попаданий (${skill.hs[1]}%), первая пуля ${skill.firstBullet[0]}% (${skill.firstBullet[1]}%)`,
+    title: `Стрельба: точность в бою ${skill.accuracy[0]}% (у топов ${skill.accuracy[1]}%), в голову ${skill.hs[0]}% (${skill.hs[1]}%), контрстрейф ${skill.counterStrafe[0] ?? "—"}% (${skill.counterStrafe[1] ?? "—"}%), время до урона ${skill.ttd[0] ?? "—"} мс (${skill.ttd[1] ?? "—"} мс)`,
     skill,
     moments: sk.missDeaths.map((d) => ({ ...ref(d.round, d.t), shots: d.shots, by: me.players[d.by]?.name })),
   });
@@ -310,7 +416,7 @@ export function coach(myId, steamid) {
   highlights.sort((x, y) => y.score - x.score);
   const top = highlights.slice(0, 8).map((h) => ({ ...h, ...ref(h.round, h.t) }));
 
-  return { v: 2, skill, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings, highlights: top };
+  return { v: 3, skill, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings, highlights: top };
 }
 
 if (process.argv[1]?.endsWith("coach.mjs")) {

@@ -15,11 +15,14 @@ type Moment = ClipRef & {
   died?: boolean; gotKill?: boolean; gap?: number; proDied?: number | null; proCount?: number;
   vs?: number; won?: boolean; kills?: number; route?: string[]; nades?: string[]; proWin?: number | null;
   proShare?: number;
-  shots?: number; team?: number; self?: boolean; enemies?: number; kind?: string; equip?: number; money?: number; teamAvg?: number;
+  shots?: number; team?: number; mate?: string; dist?: number; self?: boolean; enemies?: number; kind?: string; equip?: number; money?: number; teamAvg?: number;
   pro?: (ClipRef & { from?: string; to?: string; route?: string[]; nades?: string[] }) | null;
 };
 type Pair = [number | null, number | null];
-type Skill = { accuracy: Pair; hs: Pair; firstBullet: Pair; spray: Pair; shotsPerKill: Pair; enemiesPerFlash: Pair; blindSecPerFlash: Pair; teamFlashPct: Pair; flashKillPct: Pair; heDmg: Pair; mollyDmg: Pair };
+type Skill = {
+  accuracy: Pair; hs: Pair; firstBullet: Pair; spray: Pair; shotsPerKill: Pair; enemiesPerFlash: Pair; blindSecPerFlash: Pair; teamFlashPct: Pair; flashKillPct: Pair; heDmg: Pair; mollyDmg: Pair;
+  counterStrafe?: Pair; ttd?: Pair; crosshair?: Pair; utilOnDeath?: Pair; ctSmokeStop?: Pair; tradeAttempt?: Pair; tradeSuccess?: Pair; tradedAttempt?: Pair; tradedSuccess?: Pair;
+};
 type Finding = { topic: string; title: string; moments: Moment[]; perRound?: Record<string, [number, number]>; skill?: Skill };
 type Highlight = ClipRef & { kind: string; title: string; kills: number; hs?: number; weapons?: string[] };
 type Report = {
@@ -36,14 +39,14 @@ const t = (s?: number) => (s == null ? "" : `${Math.floor(Math.max(0, s) / 60)}:
 const NADE_ONE: Record<string, string> = { smoke: "смок", flash: "флешка", molotov: "молотов", he: "HE" };
 const ORDER = ["trades", "opening_deaths", "aim", "utility", "flashes", "repeeks", "clutches", "economy", "positions"];
 const ABOUT: Record<string, string> = {
-  trades: "Размен — когда напарник убивает твоего убийцу за 3 секунды. Если смерти не разменивают, значит, ты играешь далеко от команды, и каждая смерть — чистый минус.",
+  trades: "Размен — когда напарник убивает твоего убийцу. «Мог разменять» — ты был в 10 м от убийцы напарника или видел его; «пытался» — вступил с ним в бой за 5 секунд. Ниже — смерти без размена и моменты, когда напарника убили рядом, а ты не вступил.",
   opening_deaths: "Первая смерть раунда — самое дорогое: команда сразу играет 4 против 5. Справа — как про на этом же месте выигрывает первую дуэль.",
   utility: "Каждую твою гранату сравниваем с раскидками топов: та же точка броска и то же место падения — «как у топов». Справа — как её кидает про.",
   repeeks: "Второй тайминг — выглянул, спрятался и снова вышел в тот же угол. Соперник уже ждёт, поэтому это часто кончается смертью.",
   clutches: "Последний живой против одного или нескольких. Справа — выигранный клатч про в похожей ситуации.",
   positions: "Где ты стоишь на 20-й секунде раунда и насколько часто там стоят топы. Редкая позиция — не ошибка, но повод проверить, зачем ты там.",
-  aim: "Точность — доля выстрелов, попавших во врага. Первая пуля — попал ли первым выстрелом очереди: это наводка. Спрей — попадания с 5-й пули: контроль отдачи. Ниже — смерти, когда ты стрелял очередью и ни разу не попал.",
-  flashes: "Хорошая флешка ослепляет врагов на секунду и дольше и не трогает своих. Ниже — флешки, которые ослепили своих или никого; справа — как про кидает флешку в это место.",
+  aim: "Считаем только выстрелы в бою (видел врага или шёл обмен уроном). Время до урона — от появления врага до первого попадания. Довод прицела — на сколько градусов пришлось довести прицел до попадания: меньше — значит прицел уже стоял на уровне головы. Контрстрейф — доля выстрелов из винтовки с остановки (скорость ниже 34% от максимальной). Спрей — очереди из винтовки от 3 пуль.",
+  flashes: "Хорошая флешка ослепляет врагов дольше 1.1 секунды и не трогает своих. Слепота — по самому ослеплённому врагу. Ниже — флешки, которые ослепили своих или никого; справа — как про кидает флешку в это место.",
   economy: "Закупка вместе с командой — основа экономики. Форс в одного, сейв, когда все купились, и недокуп с деньгами в кармане обычно стоят раунда.",
 };
 
@@ -60,7 +63,7 @@ function StatCard({ label, me, pro, better }: { label: string; me: number; pro: 
   );
 }
 
-function SkillRow({ items }: { items: [string, Pair, "up" | "down", string?][] }) {
+function SkillRow({ items }: { items: (readonly [string, Pair, "up" | "down", string?])[] }) {
   return (
     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {items.map(([label, [me, pro], better, unit]) => {
@@ -85,6 +88,7 @@ function momentText(f: Finding, m: Moment) {
     case "opening_deaths":
       return { head, body: `Умер первым на ${P(m.place)} — убил ${m.by} (${m.weapon})`, tone: "bad" as const };
     case "trades":
+      if (m.kind === "missed") return { head, body: `Напарника ${m.mate ?? ""} убил ${m.by ?? "?"}${m.place ? ` на ${P(m.place)}` : ""} в ${Math.round((m.dist ?? 0) / 100)} м от тебя — ты не вступил в бой`, tone: "warn" as const, tag: "упущенный размен" };
       return { head, body: `Смерть на ${P(m.place)} — напарника рядом не было, не разменяли`, tone: "bad" as const };
     case "utility":
       return { head, body: `${NADE_ONE[m.type ?? ""] ?? m.type}: ${P(m.from)} → ${P(m.to)}`, tone: m.standard ? ("good" as const) : ("warn" as const), tag: m.standard ? "как у топов" : "не так, как у топов" };
@@ -257,13 +261,41 @@ export function CoachReport({ analysisId, steamid }: { analysisId: string; steam
           <h2 className="text-[18px] font-extrabold">{f.title}</h2>
           <p className="mt-1 text-[13.5px] text-white/55">{ABOUT[f.topic]}</p>
           {f.topic === "aim" && f.skill && (
-            <SkillRow items={[["Точность", f.skill.accuracy, "up", "%"], ["В голову (от попаданий)", f.skill.hs, "up", "%"], ["Первая пуля", f.skill.firstBullet, "up", "%"], ["Спрей (с 5-й пули)", f.skill.spray, "up", "%"], ["Выстрелов на убийство", f.skill.shotsPerKill, "down"]]} />
+            <SkillRow
+              items={[
+                ["Точность в бою", f.skill.accuracy, "up", "%"],
+                ["В голову (без AWP)", f.skill.hs, "up", "%"],
+                ["Первая пуля", f.skill.firstBullet, "up", "%"],
+                ["Спрей (винтовки, от 3 пуль)", f.skill.spray, "up", "%"],
+                ["Выстрелов на убийство", f.skill.shotsPerKill, "down"],
+                ...(f.skill.ttd ? ([["Время до урона", f.skill.ttd, "down", " мс"]] as const) : []),
+                ...(f.skill.crosshair ? ([["Довод прицела", f.skill.crosshair, "down", "°"]] as const) : []),
+                ...(f.skill.counterStrafe ? ([["Контрстрейф", f.skill.counterStrafe, "up", "%"]] as const) : []),
+              ]}
+            />
           )}
           {f.topic === "flashes" && f.skill && (
             <SkillRow items={[["Врагов на флешку", f.skill.enemiesPerFlash, "up"], ["Секунд слепоты врагам", f.skill.blindSecPerFlash, "up", " с"], ["Флешки по своим", f.skill.teamFlashPct, "down", "%"], ["Флешка → убийство", f.skill.flashKillPct, "up", "%"]]} />
           )}
           {f.topic === "utility" && data.skill && (
-            <SkillRow items={[["Урон с одной HE", data.skill.heDmg, "up"], ["Урон с одного молотова", data.skill.mollyDmg, "up"]]} />
+            <SkillRow
+              items={[
+                ["Урон с одной HE", data.skill.heDmg, "up"],
+                ["Урон с одного молотова", data.skill.mollyDmg, "up"],
+                ...(data.skill.utilOnDeath ? ([["Гранат на руках при смерти", data.skill.utilOnDeath, "down", " $"]] as const) : []),
+                ...(data.skill.ctSmokeStop ? ([["Смоки защиты, остановившие выход", data.skill.ctSmokeStop, "up", "%"]] as const) : []),
+              ]}
+            />
+          )}
+          {f.topic === "trades" && data.skill?.tradeAttempt && (
+            <SkillRow
+              items={[
+                ["Мог разменять — пытался", data.skill.tradeAttempt, "up", "%"],
+                ["Мог разменять — разменял", data.skill.tradeSuccess ?? [null, null], "up", "%"],
+                ["Тебя пытались разменять", data.skill.tradedAttempt ?? [null, null], "up", "%"],
+                ["Тебя разменяли (когда было кому)", data.skill.tradedSuccess ?? [null, null], "up", "%"],
+              ]}
+            />
           )}
           {f.moments.length === 0 && <p className="mt-3 text-[14px] text-[#9fe870]">Здесь всё чисто 👍</p>}
           <div className="mt-3 space-y-2">
