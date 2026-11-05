@@ -4,8 +4,8 @@ import { checkBearer } from "@/lib/server/state";
 import { db } from "@/lib/supabase";
 
 /*
- * Программа разбора демок (server/analyzer) регистрирует новый разбор: присылает карточку, получает ссылку
- * для загрузки файла прямо в хранилище (через Vercel большой файл не пройдёт — предел 4.5 МБ).
+ * Программа разбора демок (server/analyzer) регистрирует новый разбор: POST — карточка (получает id),
+ * затем PUT ?id=… — сам файл (gzip, до 4 МБ); сайт кладёт его в закрытое хранилище своим ключом.
  * Тот же исходный файл (source) разбирается заново — карточка обновляется, файл перезаписывается.
  */
 export const dynamic = "force-dynamic";
@@ -70,7 +70,24 @@ export async function POST(request: NextRequest) {
     const { error } = await db().from("demo_analyses").insert({ ...row, id, storage_path: storagePath });
     if (error) return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
-  const { data, error } = await db().storage.from(ANALYSIS_BUCKET).createSignedUploadUrl(storagePath, { upsert: true });
-  if (error || !data) return NextResponse.json({ error: "upload url failed" }, { status: 500 });
-  return NextResponse.json({ id, uploadUrl: data.signedUrl, path: storagePath });
+  // файл разбора приходит вторым запросом (PUT ?id=…): свой сервер Supabase не пускает в хранилище по одноразовой ссылке без ключа
+  return NextResponse.json({ id, path: storagePath });
+}
+
+const MAX_BYTES = 4_000_000; // предел тела запроса Vercel — 4.5 МБ; разбор карты в gzip ~0.5–1.5 МБ
+
+/** Файл разбора (gzip-JSON) → закрытое хранилище */
+export async function PUT(request: NextRequest) {
+  if (!checkBearer(request, "AGENT_TOKEN")) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const id = request.nextUrl.searchParams.get("id") ?? "";
+  if (!UUID.test(id)) return NextResponse.json({ error: "id" }, { status: 400 });
+  const { data: row } = await db().from("demo_analyses").select("storage_path").eq("id", id).maybeSingle();
+  if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const body = new Uint8Array(await request.arrayBuffer());
+  if (!body.length || body.length > MAX_BYTES) return NextResponse.json({ error: "size" }, { status: 413 });
+  if (body[0] !== 0x1f || body[1] !== 0x8b) return NextResponse.json({ error: "not gzip" }, { status: 400 });
+  const { error } = await db().storage.from(ANALYSIS_BUCKET).upload(row.storage_path, body, { contentType: "application/gzip", upsert: true });
+  if (error) return NextResponse.json({ error: "storage", detail: error.message }, { status: 500 });
+  await db().from("demo_analyses").update({ size_bytes: body.length }).eq("id", id);
+  return NextResponse.json({ ok: true });
 }

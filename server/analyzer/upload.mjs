@@ -67,8 +67,9 @@ async function upload(res, source) {
   const site = (cfg.siteUrl ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
   const r = await fetch(`${site}/api/agent/analysis`, { method: "POST", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/json" }, body: JSON.stringify(meta) });
   if (!r.ok) throw new Error(`сайт: HTTP ${r.status} ${await r.text()}`);
-  const { id, uploadUrl } = await r.json();
-  const put = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "application/gzip", "x-upsert": "true" }, body: gz });
+  const { id } = await r.json();
+  if (gz.length > 4_000_000) throw new Error(`разбор ${(gz.length / 1e6).toFixed(1)} МБ — больше предела 4 МБ`);
+  const put = await fetch(`${site}/api/agent/analysis?id=${id}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: gz });
   if (!put.ok) throw new Error(`хранилище: HTTP ${put.status} ${await put.text()}`);
   return { id, gz: gz.length };
 }

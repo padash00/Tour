@@ -36,8 +36,14 @@ export async function getAnalysis(id: string): Promise<{ card: AnalysisCard; url
   const { data } = await db().from("demo_analyses").select("*").eq("id", id).maybeSingle();
   if (!data) return null;
   const card = data as unknown as AnalysisCard & { storage_path: string };
-  // ссылка на файл разбора на час — браузер качает его прямо из хранилища (без предела размера Vercel)
-  const { data: signed, error } = await db().storage.from(ANALYSIS_BUCKET).createSignedUrl(card.storage_path, 3600);
-  if (error || !signed?.signedUrl) return null;
-  return { card, url: signed.signedUrl };
+  // файл отдаёт сам сайт (только админам): свой сервер Supabase не пускает браузер в хранилище без ключа
+  return { card, url: `/api/analysis/${card.id}` };
+}
+
+/** Файл разбора (gzip) из закрытого хранилища */
+export async function analysisFile(id: string): Promise<Blob | null> {
+  const { data } = await db().from("demo_analyses").select("storage_path").eq("id", id).maybeSingle();
+  if (!data) return null;
+  const { data: file, error } = await db().storage.from(ANALYSIS_BUCKET).download(data.storage_path);
+  return error ? null : file;
 }

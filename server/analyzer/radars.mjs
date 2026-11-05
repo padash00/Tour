@@ -6,7 +6,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { openVpk } from "./vpk.mjs";
 
-const MAPS = ["de_mirage", "de_inferno", "de_dust2", "de_nuke", "de_ancient", "de_anubis", "de_train", "de_overpass", "de_vertigo"];
+const MAPS = ["de_mirage", "de_inferno", "de_dust2", "de_nuke", "de_ancient", "de_anubis", "de_train", "de_overpass", "de_vertigo", "de_cache"];
 const LOWER = { de_nuke: "de_nuke_lower", de_train: "de_train_lower", de_vertigo: "de_vertigo_lower" };
 
 function lz4Block(src, outSize) {

@@ -136,5 +136,19 @@
       "image": "de_vertigo_lower.png",
       "below_z": 11700
     }
+  },
+  "de_cache": {
+    "pos_x": -2000,
+    "pos_y": 3250,
+    "scale": 5.5,
+    "size": 1024,
+    "bombA": [
+      0.325,
+      0.26
+    ],
+    "bombB": [
+      0.345,
+      0.79
+    ]
   }
 }
