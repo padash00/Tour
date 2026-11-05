@@ -25,11 +25,21 @@ type Skill = {
 };
 type Finding = { topic: string; title: string; moments: Moment[]; perRound?: Record<string, [number, number]>; skill?: Skill };
 type Highlight = ClipRef & { kind: string; title: string; kills: number; hs?: number; weapons?: string[] };
+type Fight = { at: number; enemy: string; place: string | null; shots: number; hits: number; head: number; dmg: number; took: number; firstHit: string; result: string; moving: number | null; rifleShots: number; ttd: number | null; aimDeg: number | null };
+type RoundStory = {
+  n: number; side: "T" | "CT"; won: boolean; buy: string | null; equip: number | null;
+  route: { place: string; at: number }[]; at20: string | null; at20Pro: number | null;
+  nades: { type: string; from: string | null; to: string | null; at: number; enemies?: number }[];
+  fights: Fight[]; kills: { at: number; victim: string; hs: boolean }[]; damage: number;
+  death: { at: number; place: string | null; by: string | null; traded: boolean; nearestMate: number | null; util: number | null } | null;
+  bomb: string | null; tags: string[]; start: number; end: number; text: string;
+};
 type Report = {
   v: number; map: string; player: { name: string; steamid: string }; analysis: string; proMaps: number;
   stats: { rounds: number; kpr: [number, number]; dpr: [number, number]; adr: [number, number]; openingDeathRate: [number, number]; openingKillRate: [number, number]; traded: [number, number]; nadesPerRound: Record<string, [number, number]> };
   findings: Finding[];
   highlights?: Highlight[];
+  rounds?: RoundStory[];
   skill?: Skill;
 };
 
@@ -196,6 +206,99 @@ function CoachText({ analysisId, steamid }: { analysisId: string; steamid: strin
   );
 }
 
+const BAD_TAGS = ["умер первым", "смерть без размена", "упустил размен", "умер после очереди мимо", "флешка по своим", "флешка в никуда", "форс в одного", "сейв в одного", "недокуп", "повторный выход — умер"];
+
+function fightLine(f: Fight) {
+  const notes: string[] = [];
+  if (f.firstHit === "враг" && f.result === "умер") notes.push("враг попал первым");
+  if (f.moving != null && f.rifleShots >= 3 && f.moving / f.rifleShots > 0.5) notes.push(`стрелял на ходу (${f.moving} из ${f.rifleShots})`);
+  if (f.shots >= 6 && f.hits === 0) notes.push("ни одного попадания — зажим вместо коротких очередей");
+  if (f.ttd != null) notes.push(`от появления врага до попадания ${f.ttd} мс`);
+  return { main: `${t(f.at)} · ${f.enemy}${f.place ? ` · ${P(f.place)}` : ""} — ${f.shots} выстр., попал ${f.hits}${f.head ? ` (в голову ${f.head})` : ""}, урон ${f.dmg}, получил ${f.took}`, notes };
+}
+
+function RoundsList({ list, me, analysisId }: { list: RoundStory[]; me: string; analysisId: string }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const [onlyBad, setOnlyBad] = useState(false);
+  const shown = onlyBad ? list.filter((r) => r.tags.some((x) => BAD_TAGS.includes(x)) || !r.won) : list;
+  return (
+    <section className="rounded-2xl bg-[#0f120c] p-4 text-white sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[18px] font-extrabold">Каждый раунд: что ты делал</h2>
+        <button type="button" onClick={() => setOnlyBad((v) => !v)} className="rounded-lg bg-white/10 px-3 py-1.5 text-[13px] font-bold text-white/85 hover:bg-white/15">
+          {onlyBad ? "Показать все раунды" : "Только проигранные и с ошибками"}
+        </button>
+      </div>
+      <p className="mt-1 text-[13.5px] text-white/55">Путь по карте, гранаты, каждая перестрелка (сколько стрелял и попал, кто попал первым, стрелял ли на ходу), как умер и был ли рядом свой. Нажми на раунд — откроется повтор.</p>
+      <div className="mt-3 space-y-2">
+        {shown.map((r) => {
+          const bad = r.tags.filter((x) => BAD_TAGS.includes(x));
+          const good = r.tags.filter((x) => !BAD_TAGS.includes(x));
+          return (
+            <div key={r.n} className={`rounded-xl border bg-white/[0.03] ${bad.length ? "border-[#ff6a5a]/35" : "border-white/10"}`}>
+              <button type="button" onClick={() => setOpen(open === r.n ? null : r.n)} className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left">
+                <span className="text-[15px] font-black">Раунд {r.n}</span>
+                <span className="rounded px-1.5 py-0.5 text-[12px] font-bold" style={{ background: SIDE_COLOR[r.side], color: "#0b0d09" }}>{r.side === "T" ? "атака" : "защита"}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[12px] font-bold ${r.won ? "bg-[#9fe870]/20 text-[#9fe870]" : "bg-[#ff6a5a]/20 text-[#ff8a7a]"}`}>{r.won ? "выигран" : "проигран"}</span>
+                {r.buy && <span className="text-[12.5px] text-white/50">{r.buy}{r.equip ? ` · $${r.equip}` : ""}</span>}
+                {bad.map((x) => <span key={x} className="rounded bg-[#ff6a5a]/15 px-1.5 py-0.5 text-[12px] text-[#ff8a7a]">{x}</span>)}
+                {good.map((x) => <span key={x} className="rounded bg-[#d4ff1f]/15 px-1.5 py-0.5 text-[12px] text-[#d4ff1f]">{x}</span>)}
+                <span className="ml-auto text-[12.5px] text-white/40">{open === r.n ? "свернуть" : "подробнее"}</span>
+              </button>
+              {open === r.n && (
+                <div className="grid gap-3 border-t border-white/10 p-3 lg:grid-cols-[1fr_minmax(0,420px)]">
+                  <div className="space-y-2 text-[14px] leading-relaxed text-white/85">
+                    {r.route.length > 0 && (
+                      <p><b className="text-white">Путь:</b> {r.route.map((x) => `${P(x.place)} (${t(x.at)})`).join(" → ")}</p>
+                    )}
+                    {r.at20 && r.at20Pro != null && (
+                      <p className={r.at20Pro < 3 ? "text-[#ffb347]" : ""}>
+                        <b className="text-white">На 0:20:</b> {P(r.at20)} — {r.at20Pro < 3 ? `топы здесь почти не стоят (${r.at20Pro}%)` : `обычная позиция топов (${r.at20Pro}%)`}
+                      </p>
+                    )}
+                    <p>
+                      <b className="text-white">Гранаты:</b>{" "}
+                      {r.nades.length ? r.nades.map((n) => `${n.type} ${P(n.from)} → ${P(n.to)}${n.enemies != null ? ` (ослепил ${n.enemies})` : ""}`).join(", ") : "не бросал"}
+                    </p>
+                    {r.fights.length > 0 && (
+                      <div>
+                        <b className="text-white">Перестрелки:</b>
+                        <ul className="mt-1 space-y-1">
+                          {r.fights.map((f, k) => {
+                            const l = fightLine(f);
+                            return (
+                              <li key={k} className={`rounded-lg px-2.5 py-1.5 ${f.result === "убил" ? "bg-[#9fe870]/10" : f.result === "умер" ? "bg-[#ff6a5a]/10" : "bg-white/5"}`}>
+                                <span className="font-bold">{f.result === "убил" ? "✓ убил" : f.result === "умер" ? "✗ умер" : "— разошлись"}</span> · {l.main}
+                                {l.notes.length > 0 && <div className="text-[13px] text-white/60">{l.notes.join(" · ")}</div>}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                    {r.death ? (
+                      <p className="text-[#ff8a7a]">
+                        <b>Смерть:</b> {t(r.death.at)}{r.death.place ? ` на ${P(r.death.place)}` : ""} от {r.death.by ?? "?"}
+                        {r.death.nearestMate != null ? (r.death.nearestMate >= 15 ? ` — ближайший свой в ${r.death.nearestMate} м, разменять было некому` : ` — свой был в ${r.death.nearestMate} м`) : ""}
+                        {r.death.traded ? ", тебя разменяли" : ", без размена"}
+                        {r.death.util ? ` · не использовал гранат на $${r.death.util}` : ""}
+                      </p>
+                    ) : (
+                      <p className="text-[#9fe870]"><b>Выжил</b>{r.damage ? ` · урон ${r.damage}` : ""}</p>
+                    )}
+                    {r.bomb && <p><b className="text-white">Бомба:</b> {r.bomb}</p>}
+                  </div>
+                  <ClipView analysisId={analysisId} clip={{ round: r.n, from: r.start - 2 * TR, to: r.end }} focusName={me} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 const HL_ICON: Record<string, string> = { ace: "💥", "4k": "🔥", "3k": "🔥", clutch: "🧊", entry: "⚡" };
 
 function Highlights({ list, me }: { list: Highlight[]; me: string }) {
@@ -255,6 +358,8 @@ export function CoachReport({ analysisId, steamid }: { analysisId: string; steam
       {(data.highlights?.length ?? 0) > 0 && <Highlights list={data.highlights!} me={data.player.name} />}
 
       <CoachText analysisId={analysisId} steamid={steamid} />
+
+      {(data.rounds?.length ?? 0) > 0 && <RoundsList list={data.rounds!} me={data.player.name} analysisId={analysisId} />}
 
       {findings.map((f) => (
         <section key={f.topic} className="rounded-2xl bg-[#0f120c] p-4 text-white sm:p-5">

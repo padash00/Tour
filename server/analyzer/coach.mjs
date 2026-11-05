@@ -397,6 +397,123 @@ export function coach(myId, steamid) {
     }),
   });
 
+  // 10. история каждого раунда: закупка, маршрут по карте, контакт, гранаты, убийства и смерть, кто был рядом,
+  // где стояли топы на этой стороне в это время — то, из чего тренер пишет «как ты играл карту»
+  const NADE_RU = { smoke: "смок", flash: "флешка", molotov: "молотов", he: "HE" };
+  const BUY_RU = { pistol: "пистолетный", full: "полная закупка", force: "форс", semi: "полуэко", eco: "эко" };
+  const proTop = (side) => [...proSetup.entries()].filter(([k]) => k.startsWith(`${side}|`)).sort((x, y) => y[1] - x[1]).slice(0, 6).map(([k, n]) => ({ place: k.split("|")[1], share: pct(n, proSetupTotal[side]) }));
+  const tagsOf = new Map();
+  const tag = (round, text) => { if (!tagsOf.has(round)) tagsOf.set(round, []); if (!tagsOf.get(round).includes(text)) tagsOf.get(round).push(text); };
+  for (const o of sit.openings) { if (o.victim === i) tag(o.round, "умер первым"); if (o.killer === i) tag(o.round, "первое убийство"); }
+  for (const t of untraded) tag(t.round, "смерть без размена");
+  for (const m of sk.missedTrades) tag(m.round, "упустил размен");
+  for (const d of sk.missDeaths) tag(d.round, "умер после очереди мимо");
+  for (const f of sk.badFlashes) tag(f.round, f.team || f.self ? "флешка по своим" : "флешка в никуда");
+  for (const e of sk.econ) tag(e.round, e.kind === "force_alone" ? "форс в одного" : e.kind === "save_alone" ? "сейв в одного" : "недокуп");
+  for (const c of sit.clutches.filter((c) => c.hero === i)) tag(c.round, `клатч 1v${c.vs} — ${c.won ? "вытащил" : "проиграл"}`);
+  for (const r of myRe) tag(r.round, r.died ? "повторный выход — умер" : "повторный выход");
+  const rt = (r, tick) => Math.round(((tick - r.freezeEnd) / TR) * 10) / 10;
+  const roundsStory = [];
+  for (const r of me.rounds) {
+    const start = frameAt(r, r.freezeEnd);
+    const meStart = start?.[1].find((q) => q[0] === i);
+    if (!meStart) continue;
+    const side = meStart[1] === 0 ? "T" : "CT";
+    const death = r.kills.find((k) => k.v === i);
+    const until = death ? death.t : r.end;
+    // маршрут: места, где пробыл от 1.5 с (или последнее), со временем входа
+    const route = [];
+    let cur = null;
+    for (const [t, l] of r.frames) {
+      if (t < r.freezeEnd || t > until) continue;
+      const q = l.find((x) => x[0] === i);
+      if (!q || q[6] <= 0 || q[9] == null || q[9] < 0) continue;
+      const place = me.places[q[9]];
+      if (!cur || cur.place !== place) { cur = { place, from: t, to: t }; route.push(cur); }
+      else cur.to = t;
+    }
+    const steps = route.filter((x, k) => x.to - x.from >= 1.5 * TR || k === route.length - 1 || k === 0).reduce((acc, x) => (acc.length && acc[acc.length - 1].place === x.place ? acc : [...acc, x]), []).slice(0, 10).map((x) => ({ place: x.place, at: rt(r, x.from) }));
+    // первый контакт: первый урон от огнестрела — нанёс или получил
+    const contact = (r.hurts ?? []).filter((h) => (h[1] === i || h[2] === i) && h[1] != null && h[1] !== h[2] && GUN(h[5])).sort((x, y) => x[0] - y[0])[0];
+    const contactPos = contact ? posAt(r, contact[0], i) : null;
+    const dealt = (r.hurts ?? []).filter((h) => h[1] === i && h[2] !== i).reduce((x, h) => x + Math.min(100, h[3]), 0);
+    const kills = r.kills.filter((k) => k.a === i && k.v !== i).map((k) => ({ at: rt(r, k.t), victim: me.players[k.v]?.name, weapon: k.w, hs: k.hs }));
+    let deathInfo = null;
+    if (death) {
+      const dp = posAt(r, death.t - 8, i);
+      const mates = (frameAt(r, death.t)?.[1] ?? []).filter((q) => q[0] !== i && q[1] === meStart[1] && q[6] > 0);
+      const nearest = dp && mates.length ? Math.min(...mates.map((q) => Math.hypot(q[2] - dp[2], q[3] - dp[3]))) : null;
+      deathInfo = {
+        at: rt(r, death.t), place: dp && dp[9] >= 0 ? me.places[dp[9]] : null, by: me.players[death.a]?.name ?? null, weapon: death.w,
+        traded: !untraded.some((u) => u.round === r.n && u.t === death.t), nearestMate: nearest != null ? Math.round(nearest / 100) : null, util: death.util ?? null, alive: mates.length,
+      };
+    }
+    const nades = r.nades.filter((n) => n.p === i && NADE_RU[n.type]).map((n) => ({ type: NADE_RU[n.type], from: n.from, to: n.to, at: n.rt, enemies: n.type === "flash" ? (n.blind ?? []).filter(([p, d, own]) => !own && p !== i && d > 1.1).length : undefined }));
+    const fights = [];
+    const foes = new Set((r.hurts ?? []).filter((h) => GUN(h[5]) && h[1] != null && h[1] !== h[2] && (h[1] === i || h[2] === i)).map((h) => (h[1] === i ? h[2] : h[1])));
+    for (const e of foes) {
+      const hs = (r.hurts ?? []).filter((h) => GUN(h[5]) && ((h[1] === i && h[2] === e) || (h[1] === e && h[2] === i))).sort((x, y) => x[0] - y[0]);
+      const from = hs[0][0] - TR, to = hs[hs.length - 1][0];
+      const myShots = (r.shots ?? []).filter((x) => x[1] === i && x[0] >= from && x[0] <= to + 8);
+      const myHits = hs.filter((h) => h[1] === i);
+      const theirHits = hs.filter((h) => h[1] === e);
+      const iKilled = r.kills.some((k) => k.a === i && k.v === e && k.t >= from && k.t <= to + 16);
+      const iDied = r.kills.some((k) => k.a === e && k.v === i && k.t >= from && k.t <= to + 16);
+      const rifle = myShots.filter((x) => x[2] != null && RIFLE_MAX[x[5]] && !x[4]);
+      const duel = (r.duels ?? []).find((d) => d[0] === i && d[1] === e);
+      const fp = posAt(r, hs[0][0], i);
+      fights.push({
+        at: rt(r, hs[0][0]), enemy: me.players[e]?.name ?? "?", place: fp && fp[9] >= 0 ? me.places[fp[9]] : null,
+        shots: myShots.length, hits: myHits.length, head: myHits.filter((h) => h[4] === "head").length, dmg: myHits.reduce((x, h) => x + Math.min(100, h[3]), 0),
+        took: theirHits.reduce((x, h) => x + Math.min(100, h[3]), 0), firstHit: hs[0][1] === i ? "ты" : "враг",
+        result: iKilled ? "убил" : iDied ? "умер" : "разошлись",
+        moving: rifle.length ? rifle.filter((x) => x[2] >= RIFLE_MAX[x[5]] * 0.34).length : null, rifleShots: rifle.length,
+        ttd: duel && duel[3] != null ? Math.round(((duel[2] - duel[3]) / TR) * 1000) : null, aimDeg: duel?.[4] ?? null,
+      });
+    }
+    fights.sort((x, y) => x.at - y.at);
+    const pos20 = sit.setups.find((x) => x.player === i && x.round === r.n && x.at === 20);
+    const econ = r.econ.find((e) => e.p === i);
+    roundsStory.push({
+      n: r.n, side, won: r.winner === side, buy: BUY_RU[r[`buy${side}`]] ?? null, equip: econ?.equip ?? null,
+      route: steps, at20: pos20?.place ?? null, at20Pro: pos20?.place ? pct(proSetup.get(`${side}|${pos20.place}`) ?? 0, proSetupTotal[side]) : null,
+      contact: contact ? { at: rt(r, contact[0]), place: contactPos && contactPos[9] >= 0 ? me.places[contactPos[9]] : null, first: contact[1] === i ? "нанёс урон" : "получил урон" } : null,
+      kills, damage: dealt, nades, fights, death: deathInfo, survived: !death,
+      bomb: r.bomb?.planted?.p === i ? "заложил бомбу" : r.bomb?.defused?.p === i ? "разминировал" : null,
+      tags: tagsOf.get(r.n) ?? [],
+      start: r.freezeEnd, end: Math.min(r.end + 2 * TR, (death?.t ?? r.end) + 3 * TR),
+    });
+  }
+  const proSetups = { T: proTop("T"), CT: proTop("CT") };
+  const mm = (x) => { const v = Math.max(0, Math.round(x)); return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`; };
+  for (const x of roundsStory) {
+    const parts = [];
+    parts.push(`${x.side === "T" ? "Атака" : "Защита"}${x.buy ? `, ${x.buy}` : ""}${x.equip ? ` ($${x.equip})` : ""}.`);
+    if (x.route.length) parts.push(`Путь: ${x.route.map((s) => `${s.place} (${mm(s.at)})`).join(" → ")}.`);
+    if (x.at20 && x.at20Pro != null) parts.push(x.at20Pro < 3 ? `На 0:20 стоял на ${x.at20} — топы на этой стороне там почти не стоят (${x.at20Pro}%).` : `На 0:20 — ${x.at20}, обычная позиция для топов (${x.at20Pro}%).`);
+    if (x.nades.length) parts.push(`Гранаты: ${x.nades.map((n) => `${n.type} ${n.from ?? "?"} → ${n.to ?? "?"}${n.enemies != null ? ` (ослепил ${n.enemies})` : ""}`).join(", ")}.`);
+    else if (x.buy && x.buy !== "эко" && x.buy !== "пистолетный") parts.push("Гранат не бросал.");
+    for (const f of x.fights) {
+      let t = `${mm(f.at)} перестрелка с ${f.enemy}${f.place ? ` на ${f.place}` : ""}: ${f.shots} выстр., попал ${f.hits}${f.head ? ` (в голову ${f.head})` : ""}, урон ${f.dmg}, получил ${f.took} — ${f.result}.`;
+      if (f.firstHit === "враг" && f.result === "умер") t += " Враг попал первым.";
+      if (f.moving != null && f.rifleShots >= 3 && f.moving / f.rifleShots > 0.5) t += ` Стрелял на ходу (${f.moving} из ${f.rifleShots} выстрелов).`;
+      if (f.ttd != null) t += ` От появления врага до попадания — ${f.ttd} мс.`;
+      if (f.shots >= 6 && f.hits === 0) t += " Ни одного попадания — зажим вместо коротких очередей.";
+      parts.push(t);
+    }
+    if (x.kills.length) parts.push(`Убил: ${x.kills.map((k) => `${k.victim}${k.hs ? " в голову" : ""}`).join(", ")}.`);
+    if (x.death) {
+      let d = `Умер на ${mm(x.death.at)}${x.death.place ? ` на ${x.death.place}` : ""} от ${x.death.by ?? "?"}`;
+      if (x.death.nearestMate != null) d += x.death.nearestMate >= 15 ? ` — ближайший свой в ${x.death.nearestMate} м, разменять было некому` : ` — свой был в ${x.death.nearestMate} м`;
+      d += x.death.traded ? ", тебя разменяли." : ", без размена.";
+      if (x.death.util) d += ` Не использовал гранат на $${x.death.util}.`;
+      parts.push(d);
+    } else parts.push("Выжил.");
+    if (x.bomb) parts.push(`${x.bomb[0].toUpperCase()}${x.bomb.slice(1)}.`);
+    parts.push(x.won ? "Раунд выигран." : "Раунд проигран.");
+    x.text = parts.join(" ");
+  }
+
   // 8. хайлайты: мультикиллы, выигранные клатчи, первые убийства, хедшоты — лучшие моменты игрока
   const highlights = [];
   for (const r of me.rounds) {
@@ -416,7 +533,7 @@ export function coach(myId, steamid) {
   highlights.sort((x, y) => y.score - x.score);
   const top = highlights.slice(0, 8).map((h) => ({ ...h, ...ref(h.round, h.t) }));
 
-  return { v: 3, skill, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings, highlights: top };
+  return { v: 3, skill, rounds: roundsStory, proSetups, map: me.map, player: { name, steamid, index: i }, analysis: myId, proMaps: pros.length, stats, findings, highlights: top };
 }
 
 if (process.argv[1]?.endsWith("coach.mjs")) {
