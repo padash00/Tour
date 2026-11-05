@@ -195,9 +195,14 @@ async function talkThreads() {
 
 // ── модель
 
+let lastSkip = "";
 async function ask(topic: string, prompt: string): Promise<string | null> {
+  lastSkip = "";
   const apiKey = await getSetting("ANTHROPIC_API_KEY");
-  if (!apiKey) return null;
+  if (!apiKey) {
+    lastSkip = "нет ключа ANTHROPIC_API_KEY";
+    return null;
+  }
   const [tours, general] = await Promise.all([tournamentsContext(), getSetting("TG_PERSONA_GENERAL")]);
   const client = new Anthropic({ apiKey });
   try {
@@ -211,12 +216,19 @@ async function ask(topic: string, prompt: string): Promise<string | null> {
       ],
       messages: [{ role: "user", content: `${topic}\n\n${prompt}` }],
     });
-    if (res.stop_reason === "refusal") return null;
+    if (res.stop_reason === "refusal") {
+      lastSkip = "модель отказалась отвечать";
+      return null;
+    }
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    if (!text || /^SKIP\b/i.test(text)) return null;
+    if (!text || /^SKIP\b/i.test(text)) {
+      lastSkip = text ? "модель решила промолчать (SKIP)" : "пустой ответ модели";
+      return null;
+    }
     return text;
   } catch (e) {
     console.error("tg buddy", e instanceof Error ? e.message : e);
+    lastSkip = `ошибка Claude API: ${String(e instanceof Error ? e.message : e).slice(0, 200)}`;
     await audit(null, "telegram.faq_error", undefined, { reason: `бот в чате: ${String(e instanceof Error ? e.message : e).slice(0, 300)}` }).catch(() => {});
     return null;
   }
@@ -285,7 +297,12 @@ function parseTags(reply: string) {
 
 async function send(token: string, chatId: number, thread: number, text: string, replyTo?: number, extra?: Record<string, unknown>) {
   const clean = text.trim();
-  if (!clean || findViolation(clean)?.kind === "mat") return null;
+  if (!clean) return null;
+  const bad = findViolation(clean);
+  if (bad?.kind === "mat") {
+    await audit(null, "telegram.talk_skip", undefined, { reason: "ответ бота остановил фильтр мата", match: bad.match, text: clean.slice(0, 500) }).catch(() => {});
+    return null;
+  }
   const r = await tgCall<{ message_id: number }>(token, "sendMessage", {
     chat_id: chatId,
     message_thread_id: thread,
@@ -295,6 +312,7 @@ async function send(token: string, chatId: number, thread: number, text: string,
     ...extra,
   });
   if (r.ok) await remember(thread, { who: "бот", text: clean, at: Date.now(), bot: true, id: r.result?.message_id });
+  else await audit(null, "telegram.talk_skip", undefined, { reason: `Telegram не принял: ${r.description ?? "?"}`, text: clean.slice(0, 300) }).catch(() => {});
   return r.ok ? { text: clean, id: r.result!.message_id } : null;
 }
 
@@ -397,6 +415,9 @@ export async function onBuddyCallback(token: string, cb: TgCallback) {
 const ADDRESS = /(^|[^а-яёa-z0-9])(бот|бота|боту|ботом|ботик|ботяра|ботэ|f16|ф16)(?=$|[^а-яёa-z0-9])/i;
 
 export async function onTalkMessage(token: string, msg: TgMessage, t: TalkThread, admin: boolean, wasDeleted: boolean) {
+  // временно: обращения к боту — в журнал (кто, от чьего имени), чтобы видеть, доходят ли они
+  const rawText = msg.text ?? msg.caption ?? "";
+  if (ADDRESS.test(rawText)) await audit(null, "telegram.talk_in", undefined, { thread: t.name, from: msg.from?.id ?? null, is_bot: msg.from?.is_bot ?? null, sender_chat: msg.sender_chat?.id ?? null, chat: msg.chat.id, text: rawText.slice(0, 200) }).catch(() => {});
   // анонимный админ пишет от имени группы: from — служебный бот Telegram
   const anon = msg.sender_chat?.id === msg.chat.id;
   if (anon) {
@@ -432,7 +453,10 @@ export async function onTalkMessage(token: string, msg: TgMessage, t: TalkThread
   else if ((t.role === "banter" || t.role === "teammates" || t.role === "lobby") && Date.now() - (s.lastBot[t.id] ?? 0) > JOIN_GAP_MS && Math.random() < JOIN_CHANCE) mode = "join";
   if (!mode) return;
   if (admin && mode !== "direct") return;
-  if (!budget(mode === "join" ? undefined : msg.from.id)) return;
+  if (!budget(mode === "join" ? undefined : msg.from.id)) {
+    if (mode === "direct") await audit(null, "telegram.talk_skip", undefined, { reason: "лимит (не чаще раза в 12 с на человека / 600 в день)", text: text.slice(0, 300) }).catch(() => {});
+    return;
+  }
 
   void tgCall(token, "sendChatAction", { chat_id: msg.chat.id, message_thread_id: t.id, action: voice ? "record_voice" : "typing" });
   const tours = await tournamentsContext();
@@ -448,11 +472,15 @@ export async function onTalkMessage(token: string, msg: TgMessage, t: TalkThread
     await topicLine(t),
     `Последние сообщения темы:\n${await transcript(t.id)}\n\n${people}\n\nО собеседнике: ${asker}\n${stats}\n\n${situation}\nПоследнее сообщение — от ${nameOf(msg.from)}: «${text.slice(0, 1500)}»`,
   );
-  if (!reply) return;
-  const tags = parseTags(reply);
+  if (!reply && mode !== "direct") return;
+  if (!reply) await audit(null, "telegram.talk_skip", undefined, { reason: lastSkip || "нет ответа", text: text.slice(0, 300), user: String(msg.from.id) }).catch(() => {});
+  // к боту обратились напрямую — молчать нельзя: модель промолчала или упала — короткий запасной ответ
+  const tags = parseTags(reply ?? (lastSkip.startsWith("ошибка") || lastSkip.startsWith("нет ключа") ? "Я тут, но голова сейчас не варит 🤯 Напиши чуть позже." : "Тут я 👋 Что надо?"));
   let sentText: string | null = null;
   if (voice && tags.text && (await sendVoiceReply(token, msg.chat.id, t.id, tags.text, msg.message_id))) sentText = tags.text;
   else sentText = (await send(token, msg.chat.id, t.id, tags.text, mode === "join" ? undefined : msg.message_id))?.text ?? null;
+  // ответ напрямую не прошёл (фильтр или Telegram) — запасной короткий
+  if (!sentText && mode === "direct") sentText = (await send(token, msg.chat.id, t.id, "Тут я 👋 Что надо?", msg.message_id))?.text ?? null;
   if (tags.gather && (t.role === "banter" || t.role === "lobby" || t.role === "teammates")) await startGather(token, msg.chat.id, t.id, tags.gather, msg.from);
   if (sentText) await audit(null, "telegram.talk", undefined, { thread: t.name, mode, user: String(msg.from.id), name: nameOf(msg.from), text: text.slice(0, 500), answer: sentText.slice(0, 1000), org: tags.org || null }).catch(() => {});
 }
