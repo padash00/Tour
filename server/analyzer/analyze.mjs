@@ -167,6 +167,33 @@ export function analyze(file) {
     rounds[ri].nades.push({ type, p: first.name ? pid(first.steamid, first.name) : null, t0: first.tick, t1: last.tick, x: r1(last.x), y: r1(last.y), path: pathPts });
   }
 
+  // ── ослепления: в демках турниров нет события «ослепил», но у каждого игрока есть flash_duration —
+  // через 6 тиков после вспышки смотрим, кто ослеплён и на сколько (врагов и своих)
+  const flashes = P.parseEvent(file, "flashbang_detonate", [], []).filter((e) => roundAt(e.tick) >= 0);
+  if (flashes.length) {
+    // два замера: до вспышки и сразу после — flash_duration не сбрасывается, ослепила именно эта вспышка, если значение изменилось
+    const fr = P.parseTicks(file, ["flash_duration", "team_num", "is_alive"], flashes.flatMap((e) => [e.tick - 2, e.tick + 6]));
+    const byTick = new Map();
+    for (const row of fr) {
+      if (!byTick.has(row.tick)) byTick.set(row.tick, []);
+      byTick.get(row.tick).push(row);
+    }
+    for (const e of flashes) {
+      const r = rounds[roundAt(e.tick)];
+      const thrower = e.user_name ? pid(e.user_steamid, e.user_name) : null;
+      // граната этой вспышки: тот же бросивший, сработала в пределах 16 тиков
+      const nade = r.nades.find((n) => n.type === "flash" && n.p === thrower && Math.abs(n.t1 - e.tick) <= 16) ?? r.nades.find((n) => n.type === "flash" && Math.abs(n.t1 - e.tick) <= 8);
+      if (!nade) continue;
+      const rows = byTick.get(e.tick + 6) ?? [];
+      const before = new Map((byTick.get(e.tick - 2) ?? []).map((x) => [pid(x.steamid, x.name), x.flash_duration ?? 0]));
+      const me = rows.find((x) => pid(x.steamid, x.name) === thrower);
+      const blinded = rows
+        .filter((x) => x.is_alive && (x.flash_duration ?? 0) > 0.7 && Math.abs((x.flash_duration ?? 0) - (before.get(pid(x.steamid, x.name)) ?? 0)) > 0.01)
+        .map((x) => [pid(x.steamid, x.name), Math.round(x.flash_duration * 10) / 10, me && x.team_num === me.team_num ? 1 : 0]);
+      nade.blind = blinded; // [игрок, секунд, 1 — свой]
+    }
+  }
+
   // стороны и названия команд: игрок → сторона в первом раунде
   for (const r of rounds.slice(0, 1)) for (const [, list] of r.frames.slice(0, 1)) for (const [i, s] of list) players[i].team = s === 0 ? "A" : "B";
   const top = (m) => [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
@@ -215,7 +242,7 @@ export function analyze(file) {
   }
 
   return {
-    v: 3,
+    v: 4,
     map,
     server: header.server_name ?? null,
     tickrate: 64,

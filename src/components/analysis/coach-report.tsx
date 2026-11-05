@@ -15,22 +15,26 @@ type Moment = ClipRef & {
   died?: boolean; gotKill?: boolean; gap?: number; proDied?: number | null; proCount?: number;
   vs?: number; won?: boolean; kills?: number; route?: string[]; nades?: string[]; proWin?: number | null;
   proShare?: number;
+  shots?: number; team?: number; self?: boolean; enemies?: number; kind?: string; equip?: number; money?: number; teamAvg?: number;
   pro?: (ClipRef & { from?: string; to?: string; route?: string[]; nades?: string[] }) | null;
 };
-type Finding = { topic: string; title: string; moments: Moment[]; perRound?: Record<string, [number, number]> };
+type Pair = [number | null, number | null];
+type Skill = { accuracy: Pair; hs: Pair; firstBullet: Pair; spray: Pair; shotsPerKill: Pair; enemiesPerFlash: Pair; blindSecPerFlash: Pair; teamFlashPct: Pair; flashKillPct: Pair; heDmg: Pair; mollyDmg: Pair };
+type Finding = { topic: string; title: string; moments: Moment[]; perRound?: Record<string, [number, number]>; skill?: Skill };
 type Highlight = ClipRef & { kind: string; title: string; kills: number; hs?: number; weapons?: string[] };
 type Report = {
   v: number; map: string; player: { name: string; steamid: string }; analysis: string; proMaps: number;
   stats: { rounds: number; kpr: [number, number]; dpr: [number, number]; adr: [number, number]; openingDeathRate: [number, number]; openingKillRate: [number, number]; traded: [number, number]; nadesPerRound: Record<string, [number, number]> };
   findings: Finding[];
   highlights?: Highlight[];
+  skill?: Skill;
 };
 
 const TR = 64;
 const P = (n: string | null | undefined) => (n ? placeLabel(n) : "?");
 const t = (s?: number) => (s == null ? "" : `${Math.floor(Math.max(0, s) / 60)}:${String(Math.round(Math.max(0, s) % 60)).padStart(2, "0")}`);
 const NADE_ONE: Record<string, string> = { smoke: "смок", flash: "флешка", molotov: "молотов", he: "HE" };
-const ORDER = ["trades", "opening_deaths", "utility", "repeeks", "clutches", "positions"];
+const ORDER = ["trades", "opening_deaths", "aim", "utility", "flashes", "repeeks", "clutches", "economy", "positions"];
 const ABOUT: Record<string, string> = {
   trades: "Размен — когда напарник убивает твоего убийцу за 3 секунды. Если смерти не разменивают, значит, ты играешь далеко от команды, и каждая смерть — чистый минус.",
   opening_deaths: "Первая смерть раунда — самое дорогое: команда сразу играет 4 против 5. Справа — как про на этом же месте выигрывает первую дуэль.",
@@ -38,6 +42,9 @@ const ABOUT: Record<string, string> = {
   repeeks: "Второй тайминг — выглянул, спрятался и снова вышел в тот же угол. Соперник уже ждёт, поэтому это часто кончается смертью.",
   clutches: "Последний живой против одного или нескольких. Справа — выигранный клатч про в похожей ситуации.",
   positions: "Где ты стоишь на 20-й секунде раунда и насколько часто там стоят топы. Редкая позиция — не ошибка, но повод проверить, зачем ты там.",
+  aim: "Точность — доля выстрелов, попавших во врага. Первая пуля — попал ли первым выстрелом очереди: это наводка. Спрей — попадания с 5-й пули: контроль отдачи. Ниже — смерти, когда ты стрелял очередью и ни разу не попал.",
+  flashes: "Хорошая флешка ослепляет врагов на секунду и дольше и не трогает своих. Ниже — флешки, которые ослепили своих или никого; справа — как про кидает флешку в это место.",
+  economy: "Закупка вместе с командой — основа экономики. Форс в одного, сейв, когда все купились, и недокуп с деньгами в кармане обычно стоят раунда.",
 };
 
 function StatCard({ label, me, pro, better }: { label: string; me: number; pro: number; better: "up" | "down"; }) {
@@ -49,6 +56,25 @@ function StatCard({ label, me, pro, better }: { label: string; me: number; pro: 
         <span className={`num text-[24px] font-black ${good ? "text-[#9fe870]" : "text-[#ff8a7a]"}`}>{me}</span>
         <span className="text-[13px] text-white/45">топы {pro}</span>
       </div>
+    </div>
+  );
+}
+
+function SkillRow({ items }: { items: [string, Pair, "up" | "down", string?][] }) {
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {items.map(([label, [me, pro], better, unit]) => {
+        const good = me == null || pro == null ? null : better === "up" ? me >= pro : me <= pro;
+        return (
+          <div key={label} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="text-[12px] text-white/55">{label}</div>
+            <div className="mt-0.5 flex items-baseline gap-1.5">
+              <span className={`num text-[19px] font-black ${good == null ? "text-white" : good ? "text-[#9fe870]" : "text-[#ff8a7a]"}`}>{me ?? "—"}{me != null ? unit ?? "" : ""}</span>
+              <span className="text-[12px] text-white/45">топы {pro ?? "—"}{pro != null ? unit ?? "" : ""}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -66,6 +92,18 @@ function momentText(f: Finding, m: Moment) {
       return { head, body: `${P(m.place)}: снова вышел через ${m.gap} с → ${m.died ? "умер" : m.gotKill ? "убил" : "без результата"}${m.proDied != null ? ` · у топов здесь умирают в ${m.proDied}%` : ""}`, tone: m.died ? ("bad" as const) : ("good" as const) };
     case "clutches":
       return { head, body: `1 против ${m.vs} — ${m.won ? "вытащил" : "проиграл"}, убил ${m.kills}${m.route?.length ? ` · ${m.route.map(P).join(" → ")}` : ""}${m.proWin != null ? ` · топы выигрывают 1v${m.vs} в ${m.proWin}%` : ""}`, tone: m.won ? ("good" as const) : ("bad" as const) };
+    case "aim":
+      return { head, body: `Умер после очереди мимо: ${m.shots} выстрелов, ни одного попадания — убил ${m.by ?? "?"}`, tone: "bad" as const };
+    case "flashes":
+      return {
+        head,
+        body: `Флешка ${P(m.from)} → ${P(m.to)}: ${m.team ? `ослепила своих (${m.team})` : ""}${m.team && m.self ? ", " : ""}${m.self ? "ослепила тебя" : ""}${!m.team && !m.self ? "никого не ослепила" : ""}${m.enemies ? ` · врагов: ${m.enemies}` : ""}`,
+        tone: m.team || m.self ? ("bad" as const) : ("warn" as const),
+      };
+    case "economy": {
+      const what = m.kind === "force_alone" ? `Форс в одного: у тебя $${m.equip}, у команды в среднем $${m.teamAvg}` : m.kind === "save_alone" ? `Сейв в одного: у тебя $${m.equip}, команда купилась ($${m.teamAvg})` : `Недокуп: снаряжение $${m.equip}, а в кармане $${m.money}`;
+      return { head, body: `${what} · раунд ${m.won ? "выигран" : "проигран"}`, tone: m.won ? ("warn" as const) : ("bad" as const) };
+    }
     case "positions":
       return { head: `Раунд ${m.round}`, body: `${m.side} · ${P(m.place)} — у топов здесь ${m.proShare}% игроков на 0:20`, tone: (m.proShare ?? 0) < 3 ? ("warn" as const) : ("good" as const), tag: (m.proShare ?? 0) < 3 ? "редкая позиция" : undefined };
     default:
@@ -94,7 +132,13 @@ function Compare({ f, m, me }: { f: Finding; m: Moment; me: string }) {
           </>
         ) : (
           <div className="flex h-full min-h-40 items-center justify-center rounded-2xl border border-dashed border-white/15 p-6 text-center text-[14px] text-white/55">
-            {f.topic === "trades" ? "Здесь сравнивать не с кем: суть ошибки — ты был один. Держись в 1–2 секундах от напарника, чтобы он мог разменять." : "Для этого момента у топов в библиотеке пока нет похожего примера — станет больше с новыми про-демками."}
+            {f.topic === "trades"
+              ? "Здесь сравнивать не с кем: суть ошибки — ты был один. Держись в 1–2 секундах от напарника, чтобы он мог разменять."
+              : f.topic === "aim"
+                ? "Посмотри слева, куда смотрел прицел до контакта и как ты стрелял. Топы попадают первой пулей чаще: прицел заранее на уровне головы, стрельба с остановки, короткие очереди вместо зажима."
+                : f.topic === "economy"
+                  ? "Закупайтесь вместе: если команда копит — копи тоже, если команда покупается — докупи всё (броня, гранаты, оружие). Деньги в кармане в раунде с закупкой — потерянный раунд."
+                  : "Для этого момента у топов в библиотеке пока нет похожего примера — станет больше с новыми про-демками."}
           </div>
         )}
       </div>
@@ -212,6 +256,15 @@ export function CoachReport({ analysisId, steamid }: { analysisId: string; steam
         <section key={f.topic} className="rounded-2xl bg-[#0f120c] p-4 text-white sm:p-5">
           <h2 className="text-[18px] font-extrabold">{f.title}</h2>
           <p className="mt-1 text-[13.5px] text-white/55">{ABOUT[f.topic]}</p>
+          {f.topic === "aim" && f.skill && (
+            <SkillRow items={[["Точность", f.skill.accuracy, "up", "%"], ["В голову (от попаданий)", f.skill.hs, "up", "%"], ["Первая пуля", f.skill.firstBullet, "up", "%"], ["Спрей (с 5-й пули)", f.skill.spray, "up", "%"], ["Выстрелов на убийство", f.skill.shotsPerKill, "down"]]} />
+          )}
+          {f.topic === "flashes" && f.skill && (
+            <SkillRow items={[["Врагов на флешку", f.skill.enemiesPerFlash, "up"], ["Секунд слепоты врагам", f.skill.blindSecPerFlash, "up", " с"], ["Флешки по своим", f.skill.teamFlashPct, "down", "%"], ["Флешка → убийство", f.skill.flashKillPct, "up", "%"]]} />
+          )}
+          {f.topic === "utility" && data.skill && (
+            <SkillRow items={[["Урон с одной HE", data.skill.heDmg, "up"], ["Урон с одного молотова", data.skill.mollyDmg, "up"]]} />
+          )}
           {f.moments.length === 0 && <p className="mt-3 text-[14px] text-[#9fe870]">Здесь всё чисто 👍</p>}
           <div className="mt-3 space-y-2">
             {f.moments.map((m, i) => {
