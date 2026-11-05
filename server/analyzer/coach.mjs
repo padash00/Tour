@@ -96,7 +96,11 @@ export function coach(myId, steamid) {
     findings.push({
       topic: "opening_deaths",
       title: `Умираешь первым в раунде: ${myOpenDeaths.length} из ${mine.rounds} раундов (${stats.openingDeathRate[0]}%), у топов — ${stats.openingDeathRate[1]}% на игрока`,
-      moments: myOpenDeaths.map((o) => ({ ...ref(o.round, o.t), place: o.victimPlace, by: me.players[o.killer]?.name, weapon: o.weapon, rt: o.rt })),
+      moments: myOpenDeaths.map((o) => {
+        const win = knowledge?.openings?.find((x) => x.side === o.victimSide && x.from === o.victimPlace) ?? knowledge?.openings?.find((x) => x.side === o.victimSide);
+        const ex = win?.examples?.[0];
+        return { ...ref(o.round, o.t), place: o.victimPlace, side: o.victimSide, by: me.players[o.killer]?.name, weapon: o.weapon, rt: o.rt, pro: ex ? { analysis: ex.analysis, round: ex.round, t: ex.t, who: ex.who, from: win.from, to: win.to } : null };
+      }),
       pro: knowledge?.openings?.filter((x) => myOpenDeaths.some((o) => o.victimPlace === x.to && o.victimSide !== x.side)).slice(0, 3) ?? [],
     });
   }
@@ -123,7 +127,10 @@ export function coach(myId, steamid) {
     topic: "utility",
     title: `Гранаты: ${myNades.length} за ${mine.rounds} раундов (у топов ~${r2(NADES.reduce((n, t) => n + base.nades[t], 0) / base.rounds * mine.rounds)}); совпадают с раскидками топов ${nadeCheck.filter((n) => n.standard).length} из ${myNades.length}`,
     perRound: stats.nadesPerRound,
-    moments: nadeCheck.map((n) => ({ ...ref(n.round, n.t), type: n.type, from: n.from, to: n.to, rt: n.rt, standard: n.standard, lineup: n.lineup, proExample: n.proExample })),
+    moments: nadeCheck.map((n) => ({
+      ...ref(n.round, n.t), t1: myNades.find((x) => x.round === n.round && x.t0 === n.t)?.t1, type: n.type, side: n.side, from: n.from, to: n.to, rt: n.rt, standard: n.standard, lineup: n.lineup,
+      pro: n.proExample ? { analysis: n.proExample.analysis, round: n.proExample.round, t: n.proExample.t0, t1: n.proExample.t1, who: n.proExample.who } : null,
+    })),
   });
 
   // 5. второй тайминг
@@ -134,7 +141,9 @@ export function coach(myId, steamid) {
       title: `Повторно выходишь в тот же угол: ${myRe.length} раз, умер в ${myRe.filter((r) => r.died).length}`,
       moments: myRe.map((r) => {
         const pr = proRepeek.get(`${r.side}|${r.place}`);
-        return { ...ref(r.round, r.t), place: r.place, side: r.side, died: r.died, gotKill: r.gotKill, gap: r.gap, proDied: pr ? pct(pr[1], pr[0]) : null, proCount: pr?.[0] ?? 0 };
+        const kr = knowledge?.repeeks?.find((x) => x.side === r.side && x.place === r.place);
+        const ex = kr?.examples?.[0];
+        return { ...ref(r.round, r.t), place: r.place, side: r.side, died: r.died, gotKill: r.gotKill, gap: r.gap, proDied: pr ? pct(pr[1], pr[0]) : null, proCount: pr?.[0] ?? 0, pro: ex ? { analysis: ex.analysis, round: ex.round, t: ex.t, who: ex.who } : null };
       }),
     });
   }
@@ -145,7 +154,11 @@ export function coach(myId, steamid) {
     findings.push({
       topic: "clutches",
       title: `Клатчи: ${myCl.filter((c) => c.won).length} из ${myCl.length}`,
-      moments: myCl.map((c) => { const p = proClutch.get(c.vs); return { ...ref(c.round, c.t), end: c.end, vs: c.vs, won: c.won, kills: c.kills, route: c.route, nades: c.nades, proWin: p ? pct(p[1], p[0]) : null }; }),
+      moments: myCl.map((c) => {
+        const p = proClutch.get(c.vs);
+        const ex = knowledge?.clutches?.find((x) => x.won && x.side === c.side && x.vs === c.vs && (x.startPlace === c.startPlace || x.route?.includes(c.startPlace))) ?? knowledge?.clutches?.find((x) => x.won && x.side === c.side && x.vs === c.vs);
+        return { ...ref(c.round, c.t), end: c.end, side: c.side, vs: c.vs, won: c.won, kills: c.kills, route: c.route, nades: c.nades, proWin: p ? pct(p[1], p[0]) : null, pro: ex ? { analysis: ex.analysis, round: ex.round, t: ex.t, end: ex.end, who: ex.hero, route: ex.route, nades: ex.nades } : null };
+      }),
     });
   }
 
@@ -166,6 +179,12 @@ export function coach(myId, steamid) {
 if (process.argv[1]?.endsWith("coach.mjs")) {
   const [, , id, steamid] = process.argv;
   const out = coach(id, steamid);
+  if (process.argv.includes("--upload")) {
+    const cfg = JSON.parse(readFileSync(process.env.F16_AGENT_JSON ?? "D:/cs2server/f16/agent.json", "utf8").replace(/^\uFEFF/, ""));
+    const site = (process.env.F16_SITE_URL ?? cfg.siteUrl ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
+    const r = await fetch(`${site}/api/agent/analysis/coach?analysis=${id}&steamid=${steamid}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: zlib.gzipSync(JSON.stringify(out)) });
+    console.log(r.ok ? "✓ разбор игрока загружен на сайт" : `✗ загрузка: HTTP ${r.status} ${await r.text()}`);
+  }
   const j = process.argv.indexOf("--json");
   if (j > 0) writeFileSync(process.argv[j + 1], JSON.stringify(out, null, 1));
   const s = out.stats;
@@ -174,6 +193,6 @@ if (process.argv[1]?.endsWith("coach.mjs")) {
   console.log("гранаты за раунд (ты / топы):", Object.entries(s.nadesPerRound).map(([t, [a, b]]) => `${t} ${a}/${b}`).join(", "));
   for (const f of out.findings) {
     console.log(`\n• ${f.title}`);
-    for (const m of f.moments.slice(0, 12)) console.log("   ", JSON.stringify({ ...m, analysis: undefined, who: undefined, proExample: m.proExample ? `${m.proExample.who} р${m.proExample.round}` : undefined }));
+    for (const m of f.moments.slice(0, 12)) console.log("   ", JSON.stringify({ ...m, analysis: undefined, who: undefined, pro: m.pro ? `${m.pro.who} р${m.pro.round}` : undefined }));
   }
 }

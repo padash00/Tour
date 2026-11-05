@@ -59,3 +59,15 @@ export async function knowledgeMaps(): Promise<string[]> {
   const { data } = await db().storage.from(ANALYSIS_BUCKET).list("knowledge", { limit: 100 });
   return (data ?? []).map((f) => f.name.replace(/\.json\.gz$/, "")).filter((m) => /^[a-z0-9_]+$/.test(m)).sort();
 }
+
+/** Разбор игрока против топов (server/analyzer/coach.mjs) */
+export async function coachFile(analysisId: string, steamid: string): Promise<Blob | null> {
+  const { data, error } = await db().storage.from(ANALYSIS_BUCKET).download(`coach/${analysisId}-${steamid}.json.gz`);
+  return error ? null : data;
+}
+
+/** Для каких игроков этого разбора уже есть разбор игрока (steamid) */
+export async function coachPlayers(analysisId: string): Promise<string[]> {
+  const { data } = await db().storage.from(ANALYSIS_BUCKET).list("coach", { limit: 100, search: analysisId });
+  return (data ?? []).map((f) => f.name.match(/-(\d{17})\.json\.gz$/)?.[1]).filter((x): x is string => !!x);
+}
