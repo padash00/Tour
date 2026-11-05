@@ -47,3 +47,15 @@ export async function analysisFile(id: string): Promise<Blob | null> {
   const { data: file, error } = await db().storage.from(ANALYSIS_BUCKET).download(data.storage_path);
   return error ? null : file;
 }
+
+/** Библиотека топов по карте (раскидки и т. д.), собирается server/analyzer/learn.mjs */
+export async function knowledgeFile(map: string): Promise<Blob | null> {
+  const { data, error } = await db().storage.from(ANALYSIS_BUCKET).download(`knowledge/${map}.json.gz`);
+  return error ? null : data;
+}
+
+/** Карты, по которым уже собрана библиотека топов */
+export async function knowledgeMaps(): Promise<string[]> {
+  const { data } = await db().storage.from(ANALYSIS_BUCKET).list("knowledge", { limit: 100 });
+  return (data ?? []).map((f) => f.name.replace(/\.json\.gz$/, "")).filter((m) => /^[a-z0-9_]+$/.test(m)).sort();
+}

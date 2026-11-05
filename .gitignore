@@ -44,3 +44,4 @@ next-env.d.ts
 
 # программа разбора демок — свои зависимости
 /server/analyzer/node_modules
+/server/analyzer/cache

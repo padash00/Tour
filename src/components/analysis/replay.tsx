@@ -26,14 +26,14 @@ type Round = {
 };
 export type Analysis = { v: number; map: string; tickrate: number; every: number; places?: string[]; callouts?: { name: string; x: number; y: number; z: number }[]; teams: { A: string; B: string }; score: { A: number; B: number }; players: { name: string; steamid: string | null; team: "A" | "B" | null }[]; rounds: Round[] };
 
-type RadarMeta = { pos_x: number; pos_y: number; scale: number; size: number; bombA?: (number | null)[]; bombB?: (number | null)[]; lower?: { image: string; below_z: number | null } };
-const radars = RADARS as Record<string, RadarMeta>;
+export type RadarMeta = { pos_x: number; pos_y: number; scale: number; size: number; bombA?: (number | null)[]; bombB?: (number | null)[]; lower?: { image: string; below_z: number | null } };
+export const radars = RADARS as Record<string, RadarMeta>;
 
-const SIDE_COLOR = { T: "#e8a23a", CT: "#5aa9e6" } as const;
+export const SIDE_COLOR = { T: "#e8a23a", CT: "#5aa9e6" } as const;
 const TAIL = 3 * 64;
 const SMOKE_S = 18, MOLLY_S = 7;
-const NADE_COLOR: Record<string, string> = { smoke: "#cfd6dd", flash: "#ffffff", he: "#ff5a4a", molotov: "#ff8a1f", decoy: "#9aa" };
-const NADE_NAME: Record<string, string> = { smoke: "Смоки", flash: "Флешки", he: "HE", molotov: "Молотовы", decoy: "Декои" };
+export const NADE_COLOR: Record<string, string> = { smoke: "#cfd6dd", flash: "#ffffff", he: "#ff5a4a", molotov: "#ff8a1f", decoy: "#9aa" };
+export const NADE_NAME: Record<string, string> = { smoke: "Смоки", flash: "Флешки", he: "HE", molotov: "Молотовы", decoy: "Декои" };
 const BUY_NAME: Record<string, string> = { pistol: "Пистолетка", full: "Полная", force: "Форс", semi: "Полуэко", eco: "Эко" };
 const weaponName = (w: string | null) => (w ? w.replace(/^weapon_/, "").replace(/_/g, " ") : "");
 const fmt = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, "0")}`;
@@ -49,30 +49,51 @@ function useImage(src: string | null) {
   return img;
 }
 
-export function AnalysisView({ url, map }: { url: string; map: string }) {
-  const [data, setData] = useState<Analysis | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/** Загрузка gzip-JSON с сайта (разбор демки, библиотека топов) */
+export function useGzJson<T>(url: string | null): { data: T | null; error: string | null } {
+  const [state, setState] = useState<{ url: string | null; data: T | null; error: string | null }>({ url: null, data: null, error: null });
   useEffect(() => {
+    if (!url) return;
+    let alive = true;
     (async () => {
       try {
         const r = await fetch(url);
-        if (r.status === 404) throw new Error("файл этого разбора ещё загружается — откройте через пару минут");
+        if (r.status === 404) throw new Error("файл ещё загружается или его нет — откройте через пару минут");
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        // файл — gzip; если хранилище уже распаковало его по дороге, читаем как есть
+        // файл — gzip; если по дороге его уже распаковали, читаем как есть
         const buf = new Uint8Array(await r.arrayBuffer());
         const gz = buf[0] === 0x1f && buf[1] === 0x8b;
         const text = gz ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text() : new TextDecoder().decode(buf);
-        setData(JSON.parse(text) as Analysis);
+        if (alive) setState({ url, data: JSON.parse(text) as T, error: null });
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        if (alive) setState({ url, data: null, error: e instanceof Error ? e.message : String(e) });
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, [url]);
+  return state.url === url ? { data: state.data, error: state.error } : { data: null, error: null };
+}
+
+export function AnalysisView({ url, map }: { url: string; map: string }) {
+  const { data, error } = useGzJson<Analysis>(url);
   if (error) return <p className="text-danger">Не удалось загрузить разбор: {error}</p>;
   if (!data) return <p className="text-fg-3">Загружаем разбор…</p>;
   const meta = radars[map];
   if (!meta) return <p className="text-fg-3">Для карты {map} нет радара.</p>;
   return <Viewer data={data} meta={meta} />;
+}
+
+/** Отрывок чужого разбора по кругу (пример про-игрока, момент игрока) */
+export function ClipView({ analysisId, clip, focusName }: { analysisId: string; clip: Omit<Clip, "focus">; focusName: string | null }) {
+  const { data, error } = useGzJson<Analysis>(`/api/analysis/${analysisId}`);
+  if (error) return <p className="text-[14px] text-danger">Не удалось загрузить момент: {error}</p>;
+  if (!data) return <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-[#0f120c] text-[14px] text-white/50">Загружаем момент…</div>;
+  const meta = radars[data.map];
+  if (!meta) return null;
+  const focus = focusName ? data.players.findIndex((p) => p.name === focusName) : -1;
+  return <Replay key={`${analysisId}-${clip.round}-${clip.from}`} data={data} meta={meta} clip={{ ...clip, focus: focus >= 0 ? focus : null }} compact />;
 }
 
 type Tab = "replay" | "heat" | "nades" | "econ";
@@ -108,7 +129,7 @@ function Viewer({ data, meta }: { data: Analysis; meta: RadarMeta }) {
 // ─────────────────────────── холст радара
 
 /** Холст 1024×1024 и картинка радара: основная — по названию карты, нижний уровень — из meta.lower */
-function useRadarCanvas(map: string, meta: RadarMeta, lower: boolean) {
+export function useRadarCanvas(map: string, meta: RadarMeta, lower: boolean) {
   const ref = useRef<HTMLCanvasElement>(null);
   const base = useImage(`/analysis/radars/${lower && meta.lower ? meta.lower.image : `${map}.png`}`);
   // обрезка по краям карты: на картинке радара вокруг карты много пустого места — карта заполняет весь холст
@@ -144,7 +165,7 @@ function cropOf(img: HTMLImageElement): Crop {
   return { x: Math.max(0, Math.min(1024 - side, cx - side / 2)), y: Math.max(0, Math.min(1024 - side, cy - side / 2)), s: side };
 }
 /** Очистить холст и включить обрезку: дальше рисуем в координатах радара 1024×1024 */
-function beginDraw(g: CanvasRenderingContext2D, crop: Crop | null) {
+export function beginDraw(g: CanvasRenderingContext2D, crop: Crop | null) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, 1024, 1024);
   g.fillStyle = "#0b0d09";
@@ -155,7 +176,7 @@ function beginDraw(g: CanvasRenderingContext2D, crop: Crop | null) {
   return k;
 }
 
-function toPx(meta: RadarMeta, x: number, y: number): [number, number] {
+export function toPx(meta: RadarMeta, x: number, y: number): [number, number] {
   return [(x - meta.pos_x) / meta.scale, (meta.pos_y - y) / meta.scale];
 }
 /** Буква точки закладки по ближайшей отметке A/B из файлов карты; если точки рядом (Nuke) — не угадываем */
@@ -169,14 +190,14 @@ function siteLetter(meta: RadarMeta, x: number | null, y: number | null): "A" | 
 }
 
 /** Название места из игры для людей: «BombsiteA» → «A Site», «PalaceAlley» → «Palace Alley», «TSpawn» → «T Spawn» */
-function placeLabel(name: string) {
+export function placeLabel(name: string) {
   const m = /^Bombsite([A-Z])$/.exec(name);
   if (m) return `${m[1]} Site`;
   return name.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^([TC]T?)(Spawn)/, "$1 $2").replace(/of/gi, "of");
 }
 
 /** Подписи мест на радаре (для тепловой карты и гранат) */
-function drawCallouts(g: CanvasRenderingContext2D, data: Analysis, meta: RadarMeta, lower: boolean) {
+export function drawCallouts(g: CanvasRenderingContext2D, data: { callouts?: Analysis["callouts"] }, meta: RadarMeta, lower: boolean) {
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.font = "600 13px Inter, sans-serif";
@@ -247,9 +268,13 @@ function framesAt(round: Round, tick: number): P[] {
 
 type Layers = { places: boolean; names: boolean; trails: boolean; shots: boolean };
 
-function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
+/** Клип: отрывок раунда (тики from–to) по кругу, с подсветкой игрока — для библиотеки топов и сравнения «ты / про» */
+export type Clip = { round: number; from: number; to: number; focus: number | null };
+
+function Replay({ data, meta, clip, compact = false }: { data: Analysis; meta: RadarMeta; clip?: Clip; compact?: boolean }) {
   // ссылка на момент: ?r=5&t=30 — 5-й раунд, 30-я секунда после закупки
   const [ri, setRi] = useState(() => {
+    if (clip) return Math.max(0, data.rounds.findIndex((r) => r.n === clip.round));
     const r = typeof window === "undefined" ? NaN : Number(new URLSearchParams(window.location.search).get("r"));
     return Number.isInteger(r) && r >= 1 && r <= data.rounds.length ? r - 1 : 0;
   });
@@ -257,13 +282,14 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
   const [tick, setTick] = useState(() => {
     const r = data.rounds[ri];
     if (!r) return 0;
+    if (clip) return clip.from;
     const t = typeof window === "undefined" ? NaN : Number(new URLSearchParams(window.location.search).get("t"));
     return Number.isFinite(t) ? Math.min(r.end + TAIL, r.freezeEnd + t * data.tickrate) : r.freezeEnd - 3 * 64;
   });
-  const [playing, setPlaying] = useState(false);
+  const [playing, setPlaying] = useState(!!clip);
   const [speed, setSpeed] = useState(1);
   const [lower, setLower] = useState(false);
-  const [sel, setSel] = useState<number | null>(null);
+  const [sel, setSel] = useState<number | null>(clip?.focus ?? null);
   const [layers, setLayers] = useState<Layers>({ places: true, names: true, trails: false, shots: true });
   const { ref, base, crop } = useRadarCanvas(data.map, meta, lower);
   const last = useRef<number | null>(null);
@@ -300,6 +326,7 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
       last.current = now;
       setTick((t) => {
         const nt = t + dt * tr * speed;
+        if (clip && nt >= clip.to) return clip.from; // клип — по кругу
         if (nt >= round.end + TAIL) {
           setPlaying(false);
           return round.end + TAIL;
@@ -313,10 +340,11 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
       cancelAnimationFrame(raf);
       last.current = null;
     };
-  }, [playing, speed, round, tr]);
+  }, [playing, speed, round, tr, clip]);
 
-  // клавиши: пробел — пауза, ←/→ — 5 секунд, ↑/↓ — раунд
+  // клавиши: пробел — пауза, ←/→ — 5 секунд, ↑/↓ — раунд (в клипах — нет: их на странице несколько)
   useEffect(() => {
+    if (compact) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT" && (e.target as HTMLInputElement).type !== "range") return;
       if (e.code === "Space") { e.preventDefault(); setPlaying((v) => !v); }
@@ -328,7 +356,7 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [round, tr, ri, selectRound]);
+  }, [round, tr, ri, selectRound, compact]);
 
   const players = useMemo(() => (round ? framesAt(round, tick) : []), [round, tick]);
 
@@ -642,8 +670,8 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 xl:grid-cols-[250px_minmax(0,1fr)_250px]">
-        <div className="order-2 xl:order-1">{teamPanel("A")}</div>
+      <div className={`mt-3 grid gap-3 ${compact ? "" : "xl:grid-cols-[250px_minmax(0,1fr)_250px]"}`}>
+        {!compact && <div className="order-2 xl:order-1">{teamPanel("A")}</div>}
         <div className="order-1 xl:order-2">
           <div className={`relative mx-auto aspect-square w-full ${full ? "max-w-[min(100%,calc(100vh-190px))]" : "max-w-[min(100%,82vh)]"}`}>
             <canvas ref={ref} width={1024} height={1024} className="size-full rounded-xl" />
@@ -665,7 +693,7 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
             )}
           </div>
         </div>
-        <div className="order-3">{teamPanel("B")}</div>
+        {!compact && <div className="order-3">{teamPanel("B")}</div>}
       </div>
 
       {/* управление */}
@@ -713,6 +741,7 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
       </div>
 
       {/* раунды */}
+      {!compact && <>
       <div className="mt-2 flex flex-wrap items-center gap-1">
         {data.rounds.map((r, i) => {
           const aWon = r.winner && r.aSide ? r.winner === r.aSide : null;
@@ -733,6 +762,7 @@ function Replay({ data, meta }: { data: Analysis; meta: RadarMeta }) {
         })}
       </div>
       <p className="mt-1.5 text-[12px] text-white/45">Яркие — раунды {data.teams.A}, бледные — {data.teams.B}; цвет — сторона, которая выиграла. Клик по игроку — подсветить и показать его путь.</p>
+      </>}
     </div>
   );
 }

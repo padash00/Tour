@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, EmptyState, PageTitle } from "@/components/ds";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
-import { listAnalyses } from "@/lib/analysis";
+import { knowledgeMaps, listAnalyses } from "@/lib/analysis";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Разбор демок", robots: { index: false, follow: false } };
@@ -16,12 +16,25 @@ export const dynamic = "force-dynamic";
 export default async function AnalysisListPage() {
   const me = await getCurrentPlayer();
   if (!isAdmin(me)) notFound();
-  const list = await listAnalyses();
+  const [list, pro] = await Promise.all([listAnalyses(), knowledgeMaps()]);
   const maps = [...new Set(list.map((a) => a.map))].sort();
   return (
     <Container className="pb-16 pt-6 sm:pt-8">
       <PageTitle>Разбор демок</PageTitle>
       <p className="mt-1 text-meta text-fg-3">Пока видно только админам. 2D-повтор раундов, тепловые карты, гранаты, экономика.</p>
+      {pro.length > 0 && (
+        <section className="mt-6 rounded-xl border border-line p-4">
+          <h2 className="text-[17px] font-extrabold">Как играют про</h2>
+          <p className="mt-0.5 text-[14px] text-fg-3">Библиотека раскидок топов по каждой карте — откуда кидают, куда ложится, с клипами.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {pro.map((m) => (
+              <Link key={m} href={`/analysis/pro/${m}`} className="rounded-lg bg-accent px-3 py-1.5 text-[14px] font-bold text-accent-ink hover:bg-accent-strong">
+                {m.replace(/^de_/, "").replace(/^./, (c) => c.toUpperCase())}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
       {list.length === 0 ? (
         <div className="mt-6">
           <EmptyState title="Разборов пока нет" text="Положите демки в папку и запустите разбор: node server/analyzer/upload.mjs <папка>" />

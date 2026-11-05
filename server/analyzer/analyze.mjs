@@ -190,13 +190,37 @@ export function analyze(file) {
     m.set(row.team_clan_name, (m.get(row.team_clan_name) ?? 0) + 1);
   }
 
+  const callouts = [...placeSum.entries()].filter(([, v]) => v.n >= 40).map(([name, v]) => ({ name, x: r1(v.x / v.n), y: r1(v.y / v.n), z: r1(v.z / v.n) }));
+
+  // гранаты для библиотеки раскидок: сторона бросившего, откуда (место) и куда легла (ближайшее место), секунда раунда
+  const nearestPlace = (x, y) => {
+    let best = null, bd = Infinity;
+    for (const c of callouts) {
+      const d = (c.x - x) ** 2 + (c.y - y) ** 2;
+      if (d < bd) { bd = d; best = c.name; }
+    }
+    return best;
+  };
+  for (const r of rounds) {
+    for (const n of r.nades) {
+      const fr = r.frames.reduce((b, f) => (Math.abs(f[0] - n.t0) < Math.abs(b[0] - n.t0) ? f : b), r.frames[0] ?? [0, []]);
+      const me = fr[1].find((q) => q[0] === n.p);
+      n.side = me ? (me[1] === 0 ? "T" : "CT") : null;
+      n.from = me && me[9] >= 0 ? places[me[9]] : null;
+      n.fx = me ? me[2] : n.path[0]?.[1] ?? null; // где стоял бросивший
+      n.fy = me ? me[3] : n.path[0]?.[2] ?? null;
+      n.to = nearestPlace(n.x, n.y);
+      n.rt = Math.round(((n.t0 - r.freezeEnd) / 64) * 10) / 10; // секунда раунда после закупки
+    }
+  }
+
   return {
-    v: 2,
+    v: 3,
     map,
     server: header.server_name ?? null,
     tickrate: 64,
     places,
-    callouts: [...placeSum.entries()].filter(([, v]) => v.n >= 40).map(([name, v]) => ({ name, x: r1(v.x / v.n), y: r1(v.y / v.n), z: r1(v.z / v.n) })),
+    callouts,
     every: EVERY,
     teams: { A: top(aNames) ?? top(teamNames.T) ?? "Команда A", B: top(bNames) ?? top(teamNames.CT) ?? "Команда B" },
     score: { A: scoreA, B: scoreB },

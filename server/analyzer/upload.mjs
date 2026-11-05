@@ -2,10 +2,11 @@
 //   node upload.mjs <файл.dem | архив.rar/.zip | папка> [--kind pro|match] [--match <uuid> --map-number N] [--dry]
 // Архивы HLTV распаковываются во временную папку. Токен и адрес сайта — из агента (D:/cs2server/f16/agent.json).
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { fileURLToPath } from "node:url";
 import { createExtractorFromFile } from "node-unrar-js";
 import { analyze } from "./analyze.mjs";
 
@@ -15,6 +16,8 @@ const WITH_VALUE = ["--kind", "--match", "--map-number"];
 const inputs = args.filter((a, i) => !a.startsWith("--") && !WITH_VALUE.includes(args[i - 1]));
 const kind = flag("--kind") === "match" ? "match" : "pro";
 const dry = args.includes("--dry");
+const CACHE = path.join(path.dirname(fileURLToPath(import.meta.url)), "cache");
+const INDEX = path.join(CACHE, "index.json");
 const cfgPath = process.env.F16_AGENT_JSON ?? "D:/cs2server/f16/agent.json";
 const cfg = JSON.parse(readFileSync(cfgPath, "utf8").replace(/^\uFEFF/, ""));
 
@@ -71,6 +74,12 @@ async function upload(res, source) {
   if (gz.length > 4_000_000) throw new Error(`разбор ${(gz.length / 1e6).toFixed(1)} МБ — больше предела 4 МБ`);
   const put = await fetch(`${site}/api/agent/analysis?id=${id}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: gz });
   if (!put.ok) throw new Error(`хранилище: HTTP ${put.status} ${await put.text()}`);
+  // копия для «обучения» (learn.mjs): библиотека раскидок и позиций собирается из всех разборов
+  mkdirSync(CACHE, { recursive: true });
+  writeFileSync(path.join(CACHE, `${id}.json.gz`), gz);
+  const idx = existsSync(INDEX) ? JSON.parse(readFileSync(INDEX, "utf8")) : {};
+  idx[id] = { kind, source, map: res.map, title: meta.title, teams: res.teams, at: new Date().toISOString() };
+  writeFileSync(INDEX, JSON.stringify(idx, null, 1));
   return { id, gz: gz.length };
 }
 
