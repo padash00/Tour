@@ -24,6 +24,8 @@ const ownStorageHost = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  // время сборки — /api/version: видно, какая сборка сейчас на сайте
+  env: { BUILD_AT: new Date().toISOString() },
   // выгрузка Excel (только сервер, админка) — пакет загружается Node.js как есть, без сборки в бандл
   serverExternalPackages: ["exceljs"],
   experimental: {
