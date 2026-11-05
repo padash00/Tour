@@ -21,12 +21,20 @@ const INDEX = path.join(CACHE, "index.json");
 const cfgPath = process.env.F16_AGENT_JSON ?? "D:/cs2server/f16/agent.json";
 const cfg = JSON.parse(readFileSync(cfgPath, "utf8").replace(/^\uFEFF/, ""));
 
+// источники, которые уже разобраны (из cache/index.json)
+const KNOWN = existsSync(INDEX) ? new Set(Object.values(JSON.parse(readFileSync(INDEX, "utf8"))).map((x) => x.source)) : new Set();
+
 /** Все .dem из файла, архива или папки (архивы — во временную папку) */
 async function demosOf(p, tmp) {
   const st = statSync(p);
   if (st.isDirectory()) return (await Promise.all(readdirSync(p).map((f) => demosOf(path.join(p, f), tmp)))).flat();
   const ext = path.extname(p).toLowerCase();
   if (ext === ".dem") return [{ file: p, source: path.basename(p) }];
+  // архив уже разобран целиком — не распаковываем (--force — заново)
+  if ((ext === ".rar" || ext === ".zip") && !args.includes("--force") && [...KNOWN].some((x) => x.startsWith(`${path.basename(p)}/`))) {
+    console.log(`· ${path.basename(p)}: уже разобрано`);
+    return [];
+  }
   if (ext === ".rar") {
     // архивы HLTV по 0.5–1 ГБ: распаковываем прямо на диск, не в память
     const dir = mkdtempSync(path.join(tmp, "rar-"));
@@ -93,6 +101,11 @@ try {
   for (const input of inputs) {
     if (!existsSync(input)) { console.error(`нет файла: ${input}`); fail++; continue; }
     for (const d of await demosOf(input, tmp)) {
+      // уже разобрано — пропускаем (--force — разобрать заново)
+      if (KNOWN.has(d.source) && !args.includes("--force")) {
+        console.log(`· ${d.source}: уже разобрано`);
+        continue;
+      }
       const t0 = Date.now();
       try {
         const res = analyze(d.file);

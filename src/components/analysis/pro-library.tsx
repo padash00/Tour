@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ClipView, NADE_COLOR, NADE_NAME, SIDE_COLOR, beginDraw, drawCallouts, placeLabel, radars, toPx, useGzJson, useRadarCanvas, type Analysis } from "./replay";
+import { Situations, type KnowledgeV2 } from "./pro-situations";
 
 /*
  * «Как играют про»: библиотека раскидок по карте из про-демок (server/analyzer/learn.mjs).
@@ -10,13 +11,36 @@ import { ClipView, NADE_COLOR, NADE_NAME, SIDE_COLOR, beginDraw, drawCallouts, p
 
 type Example = { analysis: string; round: number; t0: number; t1: number; rt: number; who: string | null; team: string | null; fx: number; fy: number; path: [number, number, number][] };
 type Lineup = { id: string; side: "T" | "CT"; type: string; from: string | null; to: string | null; x: number; y: number; fx: number; fy: number; count: number; rate: number; rt: number | null; pros: { name: string; n: number }[]; examples: Example[] };
-type Knowledge = { v: number; map: string; at: string; demos: number; rounds: { T: number; CT: number }; throws: number; callouts: Analysis["callouts"]; lineups: Lineup[] };
+export type Knowledge = { v: number; map: string; at: string; demos: number; rounds: { T: number; CT: number }; throws: number; callouts: Analysis["callouts"]; lineups: Lineup[] };
 
 const sec = (s: number | null) => (s == null ? "—" : s < 0 ? `${Math.abs(s).toFixed(0)} с до конца закупки` : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
 const TYPE_ONE: Record<string, string> = { smoke: "Смок", flash: "Флешка", molotov: "Молотов", he: "HE" };
 
+type Tab = "lineups" | "openings" | "clutches" | "repeeks" | "setups" | "trades";
+const TABS: [Tab, string][] = [["lineups", "Раскидки"], ["openings", "Первые дуэли"], ["clutches", "Клатчи"], ["repeeks", "Второй тайминг"], ["setups", "Позиции"], ["trades", "Размены"]];
+
 export function ProLibrary({ map }: { map: string }) {
   const { data, error } = useGzJson<Knowledge>(`/api/analysis/knowledge/${map}`);
+  const [tab, setTab] = useState<Tab>("lineups");
+  if (!radars[map]) return <p className="text-fg-3">Для карты {map} нет радара.</p>;
+  if (error) return <p className="text-danger">Библиотека не загрузилась: {error}</p>;
+  if (!data) return <p className="text-fg-3">Загружаем библиотеку…</p>;
+  const has = (t: Tab) => t === "lineups" || (data.v ?? 1) >= 2;
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-line p-1">
+        {TABS.filter(([t]) => has(t)).map(([t, label]) => (
+          <button key={t} type="button" onClick={() => setTab(t)} className={`rounded-md px-3 py-1.5 text-[14px] font-semibold ${tab === t ? "bg-accent text-accent-ink" : "text-fg-2 hover:text-fg"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "lineups" ? <Lineups map={map} data={data} /> : <Situations map={map} data={data as KnowledgeV2} tab={tab} />}
+    </div>
+  );
+}
+
+function Lineups({ map, data }: { map: string; data: Knowledge }) {
   const meta = radars[map];
   const [side, setSide] = useState<"T" | "CT">("T");
   const [type, setType] = useState("smoke");
@@ -85,9 +109,6 @@ export function ProLibrary({ map }: { map: string }) {
     if (best && bd < 40 ** 2) { setSelId(best.id); setExIdx(0); }
   };
 
-  if (!meta) return <p className="text-fg-3">Для карты {map} нет радара.</p>;
-  if (error) return <p className="text-danger">Библиотека не загрузилась: {error}</p>;
-  if (!data) return <p className="text-fg-3">Загружаем библиотеку…</p>;
   const ex = sel?.examples[exIdx];
 
   return (
