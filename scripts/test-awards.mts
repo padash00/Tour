@@ -55,21 +55,19 @@ check(bestBy([{ key: "x", maps: 3, clutches: 0, adr: 0, teamMaps: 3 }], (l) => l
 // Тренды
 check(trend(1.1, 1.0) === "up" && trend(0.9, 1.0) === "down" && trend(1.01, 1.0) === "flat" && trend(1.2, null) === "flat", "тренд: ±3% порог, без прошлого — без стрелки");
 
-// Места V–VIII (п. 4.6.1): разница раундов в 1/4 финала, затем выигранные раунды, затем — жеребьёвка
+// Места V–VIII (п. 4.6.1): платформа решает сама — 1/4 разница, выигранные, разница за турнир, ELO, жребий
 {
-  const r = rankQuarterLosers([
-    { teamId: "B", won: 10, lost: 13, walkover: false },
-    { teamId: "A", won: 11, lost: 13, walkover: false },
-    { teamId: "D", won: 0, lost: 13, walkover: true },
-    { teamId: "C", won: 13, lost: 16, walkover: false },
-  ]);
+  const q = (teamId: string, won: number, lost: number, extra: Partial<{ walkover: boolean; totalDiff: number; elo: number | null; lot: number }> = {}) => ({
+    teamId, won, lost, walkover: false, totalDiff: 0, elo: null, lot: 0, ...extra,
+  });
+  const r = rankQuarterLosers([q("B", 10, 13), q("A", 11, 13), q("D", 0, 13, { walkover: true }), q("C", 13, 16)]);
   check(r.map((x) => `${x.teamId}:${x.place}`).join(",") === "A:5,C:6,B:7,D:8", "V–VIII: разница раундов, при равенстве — больше выигранных; тех. поражение — последнее");
-  const tie = rankQuarterLosers([
-    { teamId: "A", won: 8, lost: 13, walkover: false },
-    { teamId: "B", won: 8, lost: 13, walkover: false },
-    { teamId: "C", won: 12, lost: 13, walkover: false },
-  ]);
-  check(tie.map((x) => `${x.teamId}:${x.place}:${x.tie}`).join(",") === "C:5:false,A:6–7:true,B:6–7:true", "полное равенство — общее место «6–7» и пометка для жеребьёвки");
+  const t = rankQuarterLosers([q("A", 8, 13, { totalDiff: 1 }), q("B", 8, 13, { totalDiff: 4 }), q("C", 12, 13)]);
+  check(t.map((x) => `${x.teamId}:${x.place}:${x.by}`).join(",") === "C:5:diff,B:6:total,A:7:total", "равенство в 1/4 — решает разница раундов за весь турнир");
+  const e = rankQuarterLosers([q("A", 8, 13, { totalDiff: 2, elo: 1500 }), q("B", 8, 13, { totalDiff: 2, elo: 1700 })]);
+  check(e.map((x) => `${x.teamId}:${x.place}:${x.by}`).join(",") === "B:5:elo,A:6:elo", "дальше — средний FACEIT ELO");
+  const l = rankQuarterLosers([q("A", 8, 13, { totalDiff: 2, elo: 1500, lot: 10 }), q("B", 8, 13, { totalDiff: 2, elo: 1500, lot: 99 })]);
+  check(l.map((x) => `${x.teamId}:${x.place}:${x.by}`).join(",") === "B:5:lot,A:6:lot", "совпало всё — жребий платформы, общего места не бывает");
 }
 
 console.log(failed ? `\nПРОВАЛЕНО: ${failed}` : "\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ");

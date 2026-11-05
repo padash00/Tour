@@ -86,27 +86,48 @@ export function trend(cur: number, prev: number | null | undefined): Trend {
   return d > 0.03 ? "up" : d < -0.03 ? "down" : "flat";
 }
 
-/** Проигравший в 1/4 финала: раунды в его матче (тех. поражение — 0:13) */
-export type QuarterLoser = { teamId: string; won: number; lost: number; walkover: boolean };
-export type QuarterPlace = QuarterLoser & { place: string; tie: boolean };
+/** Проигравший в 1/4 финала: раунды в его матче (тех. поражение — 0:13) и данные для следующих шагов сравнения */
+export type QuarterLoser = {
+  teamId: string;
+  won: number;
+  lost: number;
+  walkover: boolean;
+  /** разница раундов за весь турнир (все его карты) */
+  totalDiff: number;
+  /** средний FACEIT ELO основного состава; null — нет данных */
+  elo: number | null;
+  /** жребий платформы: число из хэша «турнир:команда» — заранее известно и проверяемо, без участия людей */
+  lot: number;
+};
+export type QuarterPlace = QuarterLoser & { place: string; by: QuarterTiebreak };
+export type QuarterTiebreak = "diff" | "won" | "total" | "elo" | "lot";
 
 /** Раунды, которые засчитываются за техническое поражение в 1/4 финала */
 export const WALKOVER_ROUNDS = { won: 0, lost: 13 } as const;
 
 /**
- * Места V–VIII среди выбывших в 1/4 финала (регламент OSKEMEN 2026, п. 4.6.1): по разнице выигранных и проигранных
- * раундов в матче 1/4 финала, при равенстве — по выигранным раундам. Если совпало и это — места делятся («5–6»)
- * и помечаются tie: судьи разыгрывают их жеребьёвкой при капитанах.
+ * Места V–VIII среди выбывших в 1/4 финала (регламент OSKEMEN 2026, п. 4.6.1) — платформа решает сама, без судей:
+ * 1) разница раундов в матче 1/4 финала; 2) выигранные раунды в нём; 3) разница раундов за весь турнир;
+ * 4) средний FACEIT ELO основного состава; 5) жребий платформы. Равенства не остаётся никогда.
+ * by — каким шагом место отделено от следующей команды (для подписи «почему так»).
  */
 export function rankQuarterLosers(list: QuarterLoser[], firstPlace = 5): QuarterPlace[] {
-  const sorted = [...list].sort((a, b) => b.won - b.lost - (a.won - a.lost) || b.won - a.won);
-  const out: QuarterPlace[] = [];
-  for (let i = 0; i < sorted.length; ) {
-    let j = i;
-    while (j + 1 < sorted.length && sorted[j + 1].won - sorted[j + 1].lost === sorted[i].won - sorted[i].lost && sorted[j + 1].won === sorted[i].won) j++;
-    const from = firstPlace + i, to = firstPlace + j;
-    for (let k = i; k <= j; k++) out.push({ ...sorted[k], place: from === to ? String(from) : `${from}–${to}`, tie: from !== to });
-    i = j + 1;
-  }
-  return out;
+  const keys: [QuarterTiebreak, (q: QuarterLoser) => number][] = [
+    ["diff", (q) => q.won - q.lost],
+    ["won", (q) => q.won],
+    ["total", (q) => q.totalDiff],
+    ["elo", (q) => q.elo ?? -1],
+    ["lot", (q) => q.lot],
+  ];
+  const sorted = [...list].sort((a, b) => {
+    for (const [, k] of keys) if (k(b) !== k(a)) return k(b) - k(a);
+    return a.teamId < b.teamId ? -1 : 1;
+  });
+  return sorted.map((q, i) => {
+    const prev = sorted[i - 1], next = sorted[i + 1];
+    // шаг, на котором команда отличается от соседей (от того, что «ближе»)
+    const step = (o: QuarterLoser | undefined) => (o ? keys.findIndex(([, k]) => k(o) !== k(q)) : 0);
+    const deepest = Math.max(step(prev), step(next));
+    return { ...q, place: String(firstPlace + i), by: keys[Math.max(0, deepest)][0] };
+  });
 }

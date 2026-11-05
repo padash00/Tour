@@ -1,6 +1,8 @@
 import "server-only";
 import { roundTitle } from "./bracket";
-import { rankQuarterLosers, WALKOVER_ROUNDS } from "./awards-core";
+import { rankQuarterLosers, WALKOVER_ROUNDS, type QuarterTiebreak } from "./awards-core";
+import { createHash } from "node:crypto";
+import { averageElo } from "./data";
 import { makeT, type T } from "./i18n/core";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
@@ -51,7 +53,7 @@ export type RecapNomination = {
 export type TournamentRecap = {
   placements: Placement[];
   /** места V–VIII среди выбывших в 1/4 финала (п. 4.6.1): по разнице раундов; tie — равенство, жеребьёвка судей */
-  quarterPlaces: { place: string; team: Team; won: number; lost: number; walkover: boolean; tie: boolean; record: Placement["record"] }[];
+  quarterPlaces: { place: string; team: Team; won: number; lost: number; walkover: boolean; by: QuarterTiebreak; totalDiff: number; elo: number | null; record: Placement["record"] }[];
   nominations: RecapNomination[];
   championPath: PathStep[];
   mvp: ReturnType<typeof mvpOf>;
@@ -246,8 +248,27 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
       return { team, teamId: team?.id ?? "", won, lost, walkover: false };
     }).filter((x): x is typeof x & { team: Team } => !!x.team);
     const teamOf = new Map(losers.map((l) => [l.teamId, l.team]));
-    quarterPlaces = rankQuarterLosers(losers.map(({ teamId, won, lost, walkover }) => ({ teamId, won, lost, walkover }))).map((q) => ({
-      place: q.place, team: teamOf.get(q.teamId)!, won: q.won, lost: q.lost, walkover: q.walkover, tie: q.tie, record: recordOf(q.teamId),
+    // разница раундов за весь турнир (все сыгранные карты команды)
+    const totalDiff = (teamId: string) =>
+      maps.reduce((n, x) => {
+        const m = byMatch.get(x.match_id);
+        if (!m) return n;
+        if (m.team1_id === teamId) return n + x.team1_score - x.team2_score;
+        if (m.team2_id === teamId) return n + x.team2_score - x.team1_score;
+        return n;
+      }, 0);
+    // средний FACEIT ELO основного состава заявки (как при отборе команд, п. 3.6.1)
+    const eloOf = (teamId: string) => {
+      const reg = regs.find((r) => r.team_id === teamId);
+      const mains = (reg?.roster ?? []).filter((r) => r.role === "main" && r.player);
+      return mains.length ? averageElo(mains as { player: NonNullable<(typeof mains)[number]["player"]> }[]) : null;
+    };
+    // жребий платформы: число из хэша «турнир:команда» — известно заранее, проверяемо, без участия людей
+    const lotOf = (teamId: string) => parseInt(createHash("sha256").update(`${t.id}:${teamId}`).digest("hex").slice(0, 8), 16);
+    quarterPlaces = rankQuarterLosers(
+      losers.map(({ teamId, won, lost, walkover }) => ({ teamId, won, lost, walkover, totalDiff: totalDiff(teamId), elo: eloOf(teamId), lot: lotOf(teamId) })),
+    ).map((q) => ({
+      place: q.place, team: teamOf.get(q.teamId)!, won: q.won, lost: q.lost, walkover: q.walkover, by: q.by, totalDiff: q.totalDiff, elo: q.elo, record: recordOf(q.teamId),
     }));
   }
   const closestMap = [...highlights].sort((a, b) => a.diff - b.diff || b.rounds - a.rounds)[0] ?? null;

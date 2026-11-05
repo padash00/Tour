@@ -25,8 +25,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/admin/tournamen
     const recap = await getTournamentRecap(t).catch(() => null);
     results = [
       ...(recap?.placements ?? []).map((p) => ({ place: p.place, team: p.team.name, ...p.record })),
-      // места V–VIII (п. 4.6.1); общее место («6–7») — жеребьёвка судей
-      ...(recap?.quarterPlaces ?? []).map((q) => ({ place: q.tie ? `${q.place} (жеребьёвка)` : q.place, team: q.team.name, ...q.record })),
+      // места V–VIII (п. 4.6.1) — платформа определяет сама, без равенств
+      ...(recap?.quarterPlaces ?? []).map((q) => ({ place: q.place, team: q.team.name, ...q.record })),
     ];
   }
   const sheets = buildOfficialExport(exportTeams(data), data.day, results);

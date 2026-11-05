@@ -167,13 +167,17 @@ export async function RecapView({ recap, solo, imageBase }: { recap: TournamentR
               <div key={q.team.id} className="flex items-center gap-3 rounded-[10px] border border-line px-4 py-2.5">
                 <span className="num w-10 text-[17px] font-bold">{q.place}</span>
                 <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{q.team.name}</span>
-                <span className="num text-[13px] text-fg-3">{q.walkover ? tx("тех. поражение") : tx("1/4 финала: {won}:{lost} ({diff})", { won: q.won, lost: q.lost, diff: `${q.won - q.lost >= 0 ? "+" : ""}${q.won - q.lost}` })}</span>
+                <span className="text-right">
+                  <span className="num block text-[13px] text-fg-3">{q.walkover ? tx("тех. поражение") : tx("1/4 финала: {won}:{lost} ({diff})", { won: q.won, lost: q.lost, diff: `${q.won - q.lost >= 0 ? "+" : ""}${q.won - q.lost}` })}</span>
+                  {q.by === "total" && <span className="block text-[12px] text-fg-4">{tx("за турнир: {d}", { d: `${q.totalDiff >= 0 ? "+" : ""}${q.totalDiff}` })}</span>}
+                  {q.by === "elo" && <span className="block text-[12px] text-fg-4">{tx("по среднему ELO: {e}", { e: q.elo ?? "—" })}</span>}
+                  {q.by === "lot" && <span className="block text-[12px] text-fg-4">{tx("жребий платформы")}</span>}
+                </span>
               </div>
             ))}
           </div>
           <p className="mt-2 text-[13px] text-fg-3">
-            {tx("По разнице выигранных и проигранных раундов в матче 1/4 финала, при равенстве — по выигранным раундам.")}
-            {quarterPlaces.some((q) => q.tie) ? ` ${tx("Общее место — полное равенство: судьи разыгрывают его жеребьёвкой при капитанах.")}` : ""}
+            {tx("Места определяет платформа: разница раундов в матче 1/4 финала, затем выигранные раунды в нём, затем разница раундов за весь турнир, затем средний FACEIT ELO основного состава, затем жребий платформы.")}
           </p>
         </section>
       )}
