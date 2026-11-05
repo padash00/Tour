@@ -1,14 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
-import { ANALYSIS_BUCKET, coachFile } from "@/lib/analysis";
+import { ANALYSIS_BUCKET, canViewCoach, coachFile } from "@/lib/analysis";
 import { getSetting } from "@/lib/settings";
 import { db } from "@/lib/supabase";
 
 /*
  * ИИ-тренер: по разбору игрока против топов (coach.mjs) Claude пишет разбор по-русски — главное, ошибки с раундами
  * и примером про, что хорошо, план на следующую игру. Только факты из разбора. Текст кэшируется в хранилище.
- * GET — готовый текст (или null), POST — написать заново. Пока только админам.
+ * GET — готовый текст (или null), POST — написать. Видят сам игрок и админы; игрок пишет один раз, переписывает админ.
  */
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -39,10 +39,9 @@ const COACH = `Ты — тренер по Counter-Strike 2 в компьютер
 
 async function auth(ctx: RouteContext<"/api/analysis/coach/[id]/[steamid]/text">) {
   const me = await getCurrentPlayer();
-  if (!isAdmin(me)) return null;
   const { id, steamid } = await ctx.params;
-  if (!UUID.test(id) || !/^\d{17}$/.test(steamid)) return null;
-  return { id, steamid, path: `coach/${id}-${steamid}.text.json` };
+  if (!UUID.test(id) || !/^\d{17}$/.test(steamid) || !canViewCoach(steamid, me)) return null;
+  return { id, steamid, path: `coach/${id}-${steamid}.text.json`, admin: isAdmin(me) };
 }
 
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/analysis/coach/[id]/[steamid]/text">) {
@@ -56,6 +55,11 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/analysis/co
 export async function POST(_req: NextRequest, ctx: RouteContext<"/api/analysis/coach/[id]/[steamid]/text">) {
   const a = await auth(ctx);
   if (!a) return NextResponse.json({ error: "not found" }, { status: 404 });
+  // игрок пишет разбор один раз (ИИ платный); переписать может только админ
+  if (!a.admin) {
+    const { data: existing } = await db().storage.from(ANALYSIS_BUCKET).download(a.path);
+    if (existing) return NextResponse.json(JSON.parse(await existing.text()));
+  }
   const apiKey = await getSetting("ANTHROPIC_API_KEY");
   if (!apiKey) return NextResponse.json({ error: "Нет ключа ANTHROPIC_API_KEY в настройках" }, { status: 400 });
   const file = await coachFile(a.id, a.steamid);

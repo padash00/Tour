@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "./supabase";
+import { isAdmin } from "./auth";
+import type { Player } from "./types";
 
 /*
  * Разбор демок. Сам разбор (позиции, убийства, гранаты, экономика) — gzip-JSON в закрытом хранилище «analyses»;
@@ -70,4 +72,37 @@ export async function coachFile(analysisId: string, steamid: string): Promise<Bl
 export async function coachPlayers(analysisId: string): Promise<string[]> {
   const { data } = await db().storage.from(ANALYSIS_BUCKET).list("coach", { limit: 100, search: analysisId });
   return (data ?? []).map((f) => f.name.match(/-(\d{17})\.json\.gz$/)?.[1]).filter((x): x is string => !!x);
+}
+
+/*
+ * Доступ к разбору демок:
+ * — повтор карты матча клуба (kind = match, привязан к матчу) и демки про — всем;
+ * — демка, загруженная вручную (без матча клуба, например FACEIT), — её участникам и админам;
+ * — разбор игрока против топов и ИИ-тренер — самому игроку и админам.
+ */
+export function canViewAnalysis(card: Pick<AnalysisCard, "kind" | "match_id" | "players">, viewer: Player | null) {
+  if (card.kind === "pro" || card.match_id) return true;
+  if (isAdmin(viewer)) return true;
+  return !!viewer && card.players.some((p) => p.steamid === viewer.steam_id);
+}
+
+export function canViewCoach(steamid: string, viewer: Player | null) {
+  return isAdmin(viewer) || (!!viewer && viewer.steam_id === steamid);
+}
+
+export async function analysisCard(id: string): Promise<AnalysisCard | null> {
+  const { data } = await db().from("demo_analyses").select("*").eq("id", id).maybeSingle();
+  return (data as unknown as AnalysisCard | null) ?? null;
+}
+
+/** Разборы, где играл этот игрок (по steamid), новые сверху */
+export async function analysesOfPlayer(steamid: string): Promise<AnalysisCard[]> {
+  const { data } = await db().from("demo_analyses").select("*").eq("kind", "match").contains("players", [{ steamid }]).order("created_at", { ascending: false }).limit(100);
+  return (data ?? []) as unknown as AnalysisCard[];
+}
+
+/** Разборы карт матча клуба (по номеру карты) */
+export async function analysesOfMatch(matchId: string): Promise<Pick<AnalysisCard, "id" | "map_number">[]> {
+  const { data } = await db().from("demo_analyses").select("id, map_number").eq("match_id", matchId);
+  return (data ?? []) as Pick<AnalysisCard, "id" | "map_number">[];
 }

@@ -4,15 +4,12 @@ import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { ProLibrary } from "@/components/analysis/pro-library";
 import { Container, PageTitle } from "@/components/ds";
-import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 
-export const metadata: Metadata = { title: "Как играют про", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Как играют про", };
 export const dynamic = "force-dynamic";
 
-/** Библиотека топов по карте: раскидки из про-демок с клипами. Пока только админам. */
+/** Библиотека топов по карте: раскидки и ситуации из про-демок с клипами. Открыта всем. */
 export default async function ProMapPage(props: PageProps<"/analysis/pro/[map]">) {
-  const me = await getCurrentPlayer();
-  if (!isAdmin(me)) notFound();
   const { map } = await props.params;
   if (!/^[a-z0-9_]{3,40}$/.test(map)) notFound();
   return (

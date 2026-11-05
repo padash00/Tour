@@ -170,10 +170,9 @@ for (const [map, list] of byMap) {
   const gz = zlib.gzipSync(JSON.stringify(knowledge), { level: 9 });
   const top = lineups.slice(0, 5).map((l) => `${l.side} ${l.type} ${l.from}→${l.to} ×${l.count}`).join("; ");
   console.log(`${map}: демок ${list.length}, бросков ${throws.length}, раскидок ${lineups.length}, первых дуэлей ${openings.length}, клатчей ${sit.clutches.length}, выходов в тот же угол ${sit.repeeks.length}, размены T ${trades.T}% CT ${trades.CT}% (${(gz.length / 1e3).toFixed(0)} КБ). Раскидки: ${top}`);
-  if (dry) {
-    writeFileSync(path.join(CACHE, `knowledge-${map}.json`), JSON.stringify(knowledge, null, 1));
-    continue;
-  }
+  // локальная копия — для разбора игроков (coach.mjs) на этом ПК
+  writeFileSync(path.join(CACHE, `knowledge-${map}.json`), JSON.stringify(knowledge));
+  if (dry) continue;
   const site = (process.env.F16_SITE_URL ?? cfg.siteUrl ?? "https://tournament.f16-arena.kz").replace(/\/$/, "");
   const r = await fetch(`${site}/api/agent/analysis/knowledge?map=${map}`, { method: "PUT", headers: { Authorization: `Bearer ${cfg.token}`, "Content-Type": "application/gzip" }, body: gz });
   if (!r.ok) console.error(`  ✗ загрузка: HTTP ${r.status} ${await r.text()}`);

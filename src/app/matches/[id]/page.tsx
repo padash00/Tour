@@ -5,6 +5,7 @@ import { SocialDownloads } from "@/components/social-downloads";
 import { getMapImages } from "@/lib/settings";
 import { getT } from "@/lib/i18n/server";
 import { getMatchDemos } from "@/lib/demos";
+import { analysesOfMatch } from "@/lib/analysis";
 import { openDispute } from "@/app/actions/dispute";
 import { db } from "@/lib/supabase";
 import type { Dispute } from "@/lib/types";
@@ -81,7 +82,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
   const serverNow = serverTime();
   const mapImages = await getMapImages();
-  const [player, stageRounds, rosters, statRows, demoInfo] = await Promise.all([
+  const [player, stageRounds, rosters, statRows, demoInfo, analyses] = await Promise.all([
     getCurrentPlayer(),
     // для подписи стадии нужны только раунды сетки, а не все матчи турнира
     ["group", "swiss", "grand_final", "third_place"].includes(m.bracket) ? Promise.resolve([]) : getStageRounds(m.tournament_id),
@@ -90,6 +91,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
     // демо карт лежат на серверном ПК; у будущих матчей их нет. Скачивание идёт напрямую с ПК клуба (через VPS
     // не пересылается) — в онлайн-турнире игрокам дома ссылки не работали бы, поэтому их не показываем
     ["live", "finished"].includes(m.status) && m.tournament.is_lan !== false ? getMatchDemos(m.matchzy_id) : Promise.resolve({ demos: [], online: false }),
+    // разбор карт (2D-повтор) — появляется сам после каждой карты
+    m.status === "finished" || m.status === "live" ? analysesOfMatch(m.id) : Promise.resolve([]),
   ]);
 
   const roundMaps = ["live", "finished"].includes(m.status)
@@ -128,13 +131,19 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           const w1 = map.status === "finished" && map.team1_score > map.team2_score;
           const w2 = map.status === "finished" && map.team2_score > map.team1_score;
           const mapDemos = map.status === "finished" ? demoInfo.demos.filter((d) => d.mapNumber === map.map_number) : [];
+          const mapAnalysis = analyses.find((x) => x.map_number === map.map_number);
           return (
             <div key={map.id} className="grid min-h-14 grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:grid-cols-[80px_minmax(0,1fr)_120px_auto] sm:px-5">
               <span className="text-meta text-fg-3">{t("Карта {n}", { n: map.map_number })}</span>
               <span className="min-w-0">
                 <span className="block truncate text-[15px] font-medium text-fg">{mapName(map.map_name)}</span>
-                {mapDemos.length > 0 && (
+                {(mapDemos.length > 0 || mapAnalysis) && (
                   <span className="mt-0.5 flex flex-wrap gap-x-3 text-meta">
+                    {mapAnalysis && (
+                      <a href={`/analysis/${mapAnalysis.id}`} className="font-semibold text-accent hover:underline">
+                        {t("Разбор карты")}
+                      </a>
+                    )}
                     {mapDemos.map((d) =>
                       demoInfo.online ? (
                         <a key={d.file} href={`/matches/${m.id}/demo?f=${encodeURIComponent(d.file)}`} rel="nofollow" className="text-accent hover:underline">

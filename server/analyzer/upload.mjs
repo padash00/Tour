@@ -12,7 +12,7 @@ import { analyze } from "./analyze.mjs";
 
 const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
-const WITH_VALUE = ["--kind", "--match", "--map-number"];
+const WITH_VALUE = ["--kind", "--match", "--map-number", "--matchzy"];
 const inputs = args.filter((a, i) => !a.startsWith("--") && !WITH_VALUE.includes(args[i - 1]));
 const kind = flag("--kind") === "match" ? "match" : "pro";
 const dry = args.includes("--dry");
@@ -69,6 +69,7 @@ async function upload(res, source) {
     kind,
     match_id: flag("--match"),
     map_number: flag("--map-number") ? Number(flag("--map-number")) : null,
+    matchzy_id: flag("--matchzy") ? Number(flag("--matchzy")) : null,
     map: res.map,
     title: `${res.teams.A} vs ${res.teams.B} · ${res.map.replace(/^de_/, "")}`,
     team_a: res.teams.A,

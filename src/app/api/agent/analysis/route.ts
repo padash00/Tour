@@ -24,6 +24,8 @@ type Meta = {
   players?: unknown;
   source?: string | null;
   size_bytes?: number | null;
+  /** демка с сервера клуба: номер матча MatchZy → матч турнира или игра лобби */
+  matchzy_id?: number | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,6 +57,19 @@ export async function POST(request: NextRequest) {
     source: str(m.source, 300),
     size_bytes: int(m.size_bytes),
   };
+
+  // демка с сервера клуба: привязываем к матчу турнира (повтор открыт всем) или к игре лобби (видят участники)
+  if (typeof m.matchzy_id === "number" && Number.isFinite(m.matchzy_id)) {
+    const { data: match } = await db().from("matches").select("id, number, team1:teams!matches_team1_id_fkey(name), team2:teams!matches_team2_id_fkey(name), tournament:tournaments(name)").eq("matchzy_id", m.matchzy_id).maybeSingle();
+    if (match) {
+      const mt = match as unknown as { id: string; number: number; team1: { name: string } | null; team2: { name: string } | null; tournament: { name: string } | null };
+      row.match_id = mt.id;
+      row.title = `${mt.tournament?.name ?? "Турнир"} · матч ${mt.number} · ${map.replace(/^de_/, "")}`;
+    } else {
+      const { data: game } = await db().from("lobby_games").select("id, lobby:lobbies(code)").eq("matchzy_id", m.matchzy_id).maybeSingle();
+      if (game) row.title = `Лобби ${(game as unknown as { lobby: { code: string } | null }).lobby?.code ?? ""} · ${map.replace(/^de_/, "")}`.trim();
+    }
+  }
 
   const existing = row.source ? (await db().from("demo_analyses").select("id, storage_path").eq("source", row.source).maybeSingle()).data : null;
   let id: string;
