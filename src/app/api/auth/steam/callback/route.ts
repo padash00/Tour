@@ -10,9 +10,11 @@ import { LANG_COOKIE, isLang } from "@/lib/i18n/core";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
+  // при ошибке входа возвращаем на /login с тем же next — игрок не теряет приглашение или регистрацию
+  const back = (error: string) => new URL(`/login?error=${error}&next=${encodeURIComponent(safeNext(url.searchParams.get("next")))}`, url.origin);
   const steamId = await verifySteamCallback(new URL(url.toString()));
   if (!steamId) {
-    return NextResponse.redirect(new URL("/login?error=steam", url.origin));
+    return NextResponse.redirect(back("steam"));
   }
 
   const [profile, faceit] = await Promise.all([fetchSteamProfile(steamId), fetchFaceitBySteamId(steamId)]);
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   if (error || !player) {
     console.error("steam login upsert failed", error);
-    return NextResponse.redirect(new URL("/login?error=db", url.origin));
+    return NextResponse.redirect(back("db"));
   }
 
   if (profile.ok) await markLoginRefreshed(player.id);

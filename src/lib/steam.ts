@@ -37,14 +37,25 @@ export async function verifySteamCallback(url: URL): Promise<string | null> {
   for (const [k, v] of q) if (k.startsWith("openid.")) body.set(k, v);
   body.set("openid.mode", "check_authentication");
 
-  const res = await fetch(OPENID_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-    cache: "no-store",
-  });
-  const text = await res.text();
-  return /is_valid\s*:\s*true/.test(text) ? match[1] : null;
+  // Сеть до steamcommunity.com иногда рвётся («fetch failed») — без повтора вход падал целиком (site.error).
+  // Повторяем только сетевой сбой; ответ Steam (даже is_valid:false) не повторяем. Не дозвались — null → «Steam не ответил».
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(OPENID_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
+      });
+      const text = await res.text();
+      return /is_valid\s*:\s*true/.test(text) ? match[1] : null;
+    } catch (e) {
+      console.warn(`steam openid check failed (attempt ${attempt})`, e);
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
+  }
+  return null;
 }
 
 export type SteamProfile = {
