@@ -210,6 +210,8 @@ export function TournamentForm({
   const [thirdPlace, setThirdPlace] = useState(t?.third_place_match ?? false);
   // официальный турнир (городской, с акиматом): анкеты, возраст, город, тренер, без запасных
   const [official, setOfficial] = useState(t?.is_official ?? false);
+  // закрытый турнир: виден только приглашённым, пары составляет организатор
+  const [isPrivate, setIsPrivate] = useState(t?.is_private ?? false);
   const [minAge, setMinAge] = useState(t?.min_age ?? 16);
   const [maxAge, setMaxAge] = useState(t?.max_age ?? 35);
   const [city, setCity] = useState(t?.city ?? "Усть-Каменогорск");
@@ -318,6 +320,7 @@ export function TournamentForm({
       <input type="hidden" name="sponsors" value={JSON.stringify(sponsors.filter((x) => x.name.trim()))} />
       {thirdPlace && <input type="hidden" name="third_place_match" value="on" />}
       {official && <input type="hidden" name="is_official" value="on" />}
+      {isPrivate && <input type="hidden" name="is_private" value="on" />}
       <input type="hidden" name="min_age" value={minAge} />
       <input type="hidden" name="max_age" value={maxAge} />
       <input type="hidden" name="city" value={city} />
@@ -858,6 +861,23 @@ export function TournamentForm({
           </Section>
 
           <Section show={step === 5} title="Регистрация" hint="Что нужно знать участникам: взнос, призы, ссылки и контакты. Всё необязательно — заполняйте, что есть.">
+            <div className="rounded-control bg-surface-2 border border-line-subtle p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="max-w-lg">
+                  <div className="text-[17px] font-bold text-fg">Закрытый турнир (только по приглашению)</div>
+                  <p className="mt-1 text-[13.5px] text-fg-3 leading-relaxed">
+                    Турнир не видят гости и другие игроки: его нет в списках, на главной, в статистике и рейтинге, бот о нём не пишет
+                    в общий чат. Участников приглашаете по нику в пульте турнира, они принимают приглашение и проходят check-in,
+                    пары составляются кнопкой. Заявок от команд нет.
+                  </p>
+                </div>
+                <Segmented
+                  value={isPrivate ? "on" : "off"}
+                  onChange={(v) => setIsPrivate(v === "on")}
+                  options={[{ value: "off", label: "Открытый" }, { value: "on", label: "Закрытый" }]}
+                />
+              </div>
+            </div>
             <div className="rounded-control bg-surface-2 border border-line-subtle p-5 space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="max-w-lg">

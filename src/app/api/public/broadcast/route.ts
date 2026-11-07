@@ -32,13 +32,14 @@ export async function GET(request: NextRequest) {
 
 async function findTournament(slug: string | null): Promise<Tournament | null> {
   if (slug) {
-    const { data } = await db().from("tournaments").select("*").eq("slug", slug).neq("status", "draft").maybeSingle();
+    const { data } = await db().from("tournaments").select("*").eq("slug", slug).neq("status", "draft").eq("is_private", false).maybeSingle();
     return (data as Tournament | null) ?? null;
   }
   const { data } = await db()
     .from("tournaments")
     .select("*")
     .in("status", ["live", "checkin", "registration_closed", "registration", "finished"])
+    .eq("is_private", false)
     .order("starts_at", { ascending: false, nullsFirst: false })
     .limit(50);
   return pickBroadcastTournament((data ?? []) as Tournament[]);

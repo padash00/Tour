@@ -46,6 +46,7 @@ import { clearNomination, setNomination } from "@/app/actions/admin-nominations"
 import { drawOrderText } from "@/lib/draw";
 import { approveWarningOf, loadOfficial } from "@/lib/official-data";
 import { OfficialTab } from "./official-tab";
+import { PrivateTab } from "./private-tab";
 import { BroadcastPanel } from "@/components/admin/obs-overlay";
 
 export const metadata: Metadata = { title: "Турнир — F16 Control" };
@@ -65,6 +66,8 @@ const TABS = [
   { key: "registration", label: "Регистрация" },
   // только у официального турнира: анкеты участников, документы, выгрузки
   { key: "official", label: "Участники" },
+  // только у закрытого турнира: приглашения, check-in игроков, пары
+  { key: "access", label: "Доступ и пары" },
   { key: "bracket", label: "Сетка" },
   { key: "matches", label: "Матчи" },
   { key: "awards", label: "Награды" },
@@ -80,7 +83,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
   const sp = await props.searchParams;
   const t = await getTournamentById(id);
   if (!t) notFound();
-  const tabs = TABS.filter((x) => x.key !== "official" || t.is_official);
+  const tabs = TABS.filter((x) => (x.key !== "official" || t.is_official) && (x.key !== "access" || t.is_private));
   // старые ссылки ?tab=registrations ведут на регистрацию
   const raw = sp.tab === "registrations" ? "registration" : String(sp.tab ?? "overview");
   const tab: TabKey = (tabs.find((x) => x.key === raw)?.key ?? "overview") as TabKey;
@@ -134,6 +137,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
       {tab === "official" && <OfficialTab t={t} admin={admin} />}
+      {tab === "access" && <PrivateTab t={t} />}
       {tab === "bracket" && (
         <>
           <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} />

@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
+import { canViewTournament } from "./private-tournament";
 import { modeOf } from "./modes";
 import { tr } from "./i18n/core";
 import type {
@@ -151,6 +152,8 @@ export async function listPublicTournaments(): Promise<Tournament[]> {
     .from("tournaments")
     .select("*")
     .neq("status", "draft")
+    // закрытые турниры — ни в списках, ни на главной, ни в sitemap
+    .eq("is_private", false)
     .order("starts_at", { ascending: true, nullsFirst: false });
   return (data ?? []) as Tournament[];
 }
@@ -174,6 +177,8 @@ export async function getTournamentBySlug(slug: string, includeDraft = false): P
   let q = db().from("tournaments").select("*").eq("slug", slug);
   if (!includeDraft) q = q.neq("status", "draft");
   const { data } = await q.maybeSingle();
+  // закрытый турнир чужому не отдаём — все публичные страницы по адресу турнира отвечают 404
+  if (data?.is_private && !(await canViewTournament(data))) return null;
   return data as Tournament | null;
 }
 
@@ -316,7 +321,8 @@ export async function getUnreadCount(playerId: string) {
 
 /** Соло-команда игрока для турниров 1×1 (скрытая, по одной на игрока). create — создать, если нет. */
 export async function getSoloTeam(player: Player, create = false): Promise<Team | null> {
-  const { data } = await db().from("teams").select("*").eq("captain_id", player.id).eq("is_solo", true).maybeSingle();
+  // пары закрытых турниров тоже is_solo, но это не соло-команда дуэлей
+  const { data } = await db().from("teams").select("*").eq("captain_id", player.id).eq("is_solo", true).is("private_tournament_id", null).maybeSingle();
   if (data) {
     if (data.name !== player.nickname || data.logo_url !== player.avatar_url) {
       await db().from("teams").update({ name: player.nickname, logo_url: player.avatar_url }).eq("id", data.id);

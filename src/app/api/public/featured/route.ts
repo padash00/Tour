@@ -22,7 +22,7 @@ const headers = {
 };
 
 export async function GET() {
-  const { data } = await db().from("tournaments").select("*").in("status", [...SHOWN]).order("starts_at", { ascending: true, nullsFirst: false });
+  const { data } = await db().from("tournaments").select("*").in("status", [...SHOWN]).eq("is_private", false).order("starts_at", { ascending: true, nullsFirst: false });
   const t = ((data ?? []) as Tournament[]).sort((a, b) => PRIORITY[a.status as keyof typeof PRIORITY] - PRIORITY[b.status as keyof typeof PRIORITY])[0];
   if (!t) return NextResponse.json({ tournament: null, updated_at: new Date().toISOString() }, { headers });
 

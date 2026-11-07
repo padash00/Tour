@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isPrivateTournament } from "@/lib/private-tournament";
 import { mockOverlay, parseOverlayQuery, pickOverlayMatch, shapeOverlay, type OverlayQuery, type OverlaySource } from "@/lib/overlay";
 import { db } from "@/lib/supabase";
 import type { MatchStatus } from "@/lib/types";
@@ -34,7 +35,13 @@ export async function GET(request: NextRequest) {
 
 type Row = { id: string; status: string; number: number; bracket: string; round: number; group_label: string | null; best_of: number; team1_id: string | null; team2_id: string | null; team1_score: number; team2_score: number; scheduled_at: string | null; tournament_id: string };
 
+/** Оверлей трансляции: матчи закрытых турниров наружу не отдаём */
 async function findMatch(query: OverlayQuery): Promise<Row | null> {
+  const m = await findAnyMatch(query);
+  return m && !(await isPrivateTournament(m.tournament_id)) ? m : null;
+}
+
+async function findAnyMatch(query: OverlayQuery): Promise<Row | null> {
   if ("match" in query) {
     const { data } = await db().from("matches").select(MATCH_COLUMNS).eq("id", query.match).maybeSingle();
     return (data as Row | null) ?? null;

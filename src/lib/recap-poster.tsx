@@ -96,7 +96,7 @@ export async function buildRecapPoster(t: Tournament, recap: TournamentRecap, fm
 
   const picOf = async (p: Placement | undefined, px: number): Promise<Pic> => {
     if (!p) return { src: null, tag: "" };
-    const solo = !!p.team.is_solo || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
+    const solo = (!!p.team.is_solo && !p.team.private_tournament_id) || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
     const url = solo ? (p.roster[0]?.avatar_url ?? p.team.logo_url) : p.team.logo_url;
     return { src: await ogImage(url, px * scale, 90, px * scale), tag: p.team.tag || p.team.name };
   };

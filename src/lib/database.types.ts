@@ -1988,6 +1988,7 @@ export type Database = {
           is_solo: boolean
           logo_url: string | null
           name: string
+          private_tournament_id: string | null
           region: string | null
           tag: string
         }
@@ -2003,6 +2004,7 @@ export type Database = {
           is_solo?: boolean
           logo_url?: string | null
           name: string
+          private_tournament_id?: string | null
           region?: string | null
           tag: string
         }
@@ -2018,10 +2020,18 @@ export type Database = {
           is_solo?: boolean
           logo_url?: string | null
           name?: string
+          private_tournament_id?: string | null
           region?: string | null
           tag?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "teams_private_tournament_id_fkey"
+            columns: ["private_tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teams_coach_id_fkey"
             columns: ["coach_id"]
@@ -2055,6 +2065,61 @@ export type Database = {
           token?: string
         }
         Relationships: []
+      }
+      tournament_access: {
+        Row: {
+          checked_in_at: string | null
+          decided_at: string | null
+          invited_at: string
+          invited_by: string | null
+          is_reserve: boolean
+          player_id: string
+          status: string
+          tournament_id: string
+        }
+        Insert: {
+          checked_in_at?: string | null
+          decided_at?: string | null
+          invited_at?: string
+          invited_by?: string | null
+          is_reserve?: boolean
+          player_id: string
+          status?: string
+          tournament_id: string
+        }
+        Update: {
+          checked_in_at?: string | null
+          decided_at?: string | null
+          invited_at?: string
+          invited_by?: string | null
+          is_reserve?: boolean
+          player_id?: string
+          status?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_access_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_access_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_access_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tournament_applications: {
         Row: {
@@ -2387,6 +2452,7 @@ export type Database = {
           id: string
           is_lan: boolean
           is_official: boolean
+          is_private: boolean
           kk: Json
           knife_round: boolean
           location: string | null
@@ -2444,6 +2510,7 @@ export type Database = {
           id?: string
           is_lan?: boolean
           is_official?: boolean
+          is_private?: boolean
           kk?: Json
           knife_round?: boolean
           location?: string | null
@@ -2501,6 +2568,7 @@ export type Database = {
           id?: string
           is_lan?: boolean
           is_official?: boolean
+          is_private?: boolean
           kk?: Json
           knife_round?: boolean
           location?: string | null
@@ -2598,6 +2666,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_private_pairs: {
+        Args: {
+          p_actor: string
+          p_pairs: Json
+          p_reserve: string[]
+          p_tournament: string
+        }
+        Returns: number
+      }
       accept_team_application: {
         Args: {
           p_actor: string

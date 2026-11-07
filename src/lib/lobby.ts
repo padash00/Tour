@@ -557,19 +557,22 @@ export async function maybeStartOnReady(lobbyId: string) {
  * Если ни один не помечен — любой свободный, пока нет турнира в check-in или «идёт» (серверы нужны турниру).
  */
 export async function pickLobbyInstance() {
-  const [{ data: all }, { data: host }, { data: m1 }, { data: m2 }, { count: activeTournaments }] = await Promise.all([
+  const [{ data: all }, { data: host }, { data: m1 }, { data: m2 }, { data: active }] = await Promise.all([
     db().from("server_instances").select("name, running, gamestate, for_lobby").order("name"),
     db().from("server_host").select("last_seen_at, info").eq("id", "main").maybeSingle(),
     db().from("matches").select("server_instance").not("server_instance", "is", null).in("status", ["ready", "live"]),
     db().from("lobby_games").select("server_instance").not("server_instance", "is", null).in("status", ["waiting", "live"]),
-    db().from("tournaments").select("id", { count: "exact", head: true }).in("status", ["checkin", "live"]),
+    db().from("tournaments").select("id, is_private").in("status", ["checkin", "live"]),
   ]);
+  const activeTournaments = active?.length ?? 0;
   const online = !!host?.last_seen_at && Date.now() - new Date(host.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
   if (!online) return { inst: null, stopped: [] as string[], reason: tr("агент серверного ПК не на связи") };
   if ((host?.info as { busy?: string | null } | null)?.busy) return { inst: null, stopped: [] as string[], reason: tr("идёт обслуживание серверов") };
   const marked = (all ?? []).filter((i) => i.for_lobby);
-  if (!marked.length && (activeTournaments ?? 0) > 0) {
-    return { inst: null, stopped: [] as string[], reason: tr("идёт турнир — серверы отданы турниру, лобби запустится после него") };
+  if (!marked.length && activeTournaments > 0) {
+    // закрытый турнир не называем: просто «серверы заняты»
+    const reason = active!.every((t) => t.is_private) ? tr("серверы сейчас заняты — лобби запустится позже") : tr("идёт турнир — серверы отданы турниру, лобби запустится после него");
+    return { inst: null, stopped: [] as string[], reason };
   }
   const insts = marked.length ? marked : (all ?? []);
   const taken = new Set([...(m1 ?? []), ...(m2 ?? [])].map((r) => r.server_instance));

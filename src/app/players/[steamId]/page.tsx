@@ -45,7 +45,8 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
       .select("tournament_id, registration:tournament_registrations!tournament_roster_players_registration_id_fkey!inner(status), tournament:tournaments!inner(status)")
       .eq("player_id", player.id)
       .eq("registration.status", "approved")
-      .neq("tournament.status", "draft"),
+      .neq("tournament.status", "draft")
+      .eq("tournament.is_private", false),
     getPlayerAwards(player.id),
     getPlayerProgress(player.id),
   ]);

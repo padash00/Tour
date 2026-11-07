@@ -79,6 +79,7 @@ async function loadTournamentsContext() {
     .from("tournaments")
     .select("id, name, slug, status, format, is_lan, is_official, starts_at, checkin_opens_at, checkin_closes_at, registration_closes_at, location, city, max_teams, entry_fee, prize_pool, description, requirements, rules, bracket_type, default_best_of, final_best_of, final_bo_scope, map_pool, prize_distribution, third_place_match, overtime, knife_round, match_format, timeouts_per_team, tech_pauses")
     .in("status", ["registration", "registration_closed", "checkin", "live"])
+    .eq("is_private", false)
     .order("starts_at", { ascending: true })
     .limit(3);
   const list = data ?? [];

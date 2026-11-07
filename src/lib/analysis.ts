@@ -1,4 +1,5 @@
 import "server-only";
+import { privateMatchIds } from "./private-tournament";
 import { db } from "./supabase";
 import { isAdmin } from "./auth";
 import type { Player } from "./types";
@@ -31,7 +32,9 @@ export type AnalysisCard = {
 export async function listAnalyses(): Promise<AnalysisCard[]> {
   const { data, error } = await db().from("demo_analyses").select("*").order("created_at", { ascending: false }).limit(300);
   if (error) throw new Error("Не удалось загрузить разборы", { cause: error });
-  return (data ?? []) as unknown as AnalysisCard[];
+  // карты закрытых турниров в общий список не попадают
+  const hidden = await privateMatchIds();
+  return ((data ?? []) as unknown as AnalysisCard[]).filter((a) => !a.match_id || !hidden.has(a.match_id));
 }
 
 export async function getAnalysis(id: string): Promise<{ card: AnalysisCard; url: string } | null> {

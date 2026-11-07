@@ -1,4 +1,5 @@
 import "server-only";
+import { isPrivateMatch, privateMatchIds } from "./private-tournament";
 import { gunzipSync } from "node:zlib";
 import Anthropic from "@anthropic-ai/sdk";
 import { ANALYSIS_BUCKET, analysesOfPlayer, coachFile } from "./analysis";
@@ -507,6 +508,8 @@ export type TourEvent =
 /** Событие матча турнира (из MatchZy) → пара строк в «Общение», прогноз до старта, итоги прогноза */
 export async function tournamentEvent(ev: TourEvent) {
   const { telegramConfig, telegramGroup } = await import("./telegram");
+  // матчи закрытого турнира в общий чат не пишем (ни события, ни прогнозы)
+  if (await isPrivateMatch(ev.matchId)) return;
   const [cfg, group] = await Promise.all([telegramConfig(), telegramGroup()]);
   if (!cfg.token || !group.id) return;
   const banter = (await talkThreads()).find((t) => t.role === "banter");
@@ -609,8 +612,9 @@ async function freshNews() {
   const lines: string[] = [];
   const { data: games } = await db().from("lobby_games").select("id").gte("created_at", since).limit(100);
   if (games?.length) lines.push(`За сутки в лобби клуба сыграно карт: ${games.length}.`);
-  const { data: an } = await db().from("demo_analyses").select("title, score_a, score_b, team_a, team_b").eq("kind", "match").gte("created_at", since).order("created_at", { ascending: false }).limit(5);
-  for (const a of an ?? []) lines.push(`Сыграна карта: ${a.team_a} ${a.score_a}:${a.score_b} ${a.team_b} (повтор и разбор — на сайте, «Разбор игры»).`);
+  const { data: an } = await db().from("demo_analyses").select("title, score_a, score_b, team_a, team_b, match_id").eq("kind", "match").gte("created_at", since).order("created_at", { ascending: false }).limit(5);
+  const hidden = await privateMatchIds();
+  for (const a of (an ?? []).filter((x) => !x.match_id || !hidden.has(x.match_id))) lines.push(`Сыграна карта: ${a.team_a} ${a.score_a}:${a.score_b} ${a.team_b} (повтор и разбор — на сайте, «Разбор игры»).`);
   const { data: teams } = await db().from("teams").select("name").gte("created_at", since).eq("is_solo", false).limit(10);
   if (teams?.length) lines.push(`Новые команды за сутки: ${teams.map((x) => x.name).join(", ")}.`);
   return lines.join("\n") || "Свежих событий за сутки нет.";

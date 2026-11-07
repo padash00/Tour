@@ -1,5 +1,6 @@
 import "server-only";
 import { audit, notify } from "./audit";
+import { isPrivateMatch, isPrivateTournament } from "./private-tournament";
 import { db } from "./supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape } from "./telegram";
 import { VETO_STEP_SECONDS } from "./veto";
@@ -220,7 +221,12 @@ const mentionList = (t: TeamInfo) =>
   t.players.map((p) => (p.tg ? `<a href="tg://user?id=${p.tg}">${tgEscape(p.nickname)}</a>` : tgEscape(p.nickname))).join(", ");
 
 /** Сообщение в тему «Матчи турнира»: кто куда садится */
-export async function announceCalls(calls: CallResult[]) {
+export async function announceCalls(all: CallResult[]) {
+  // закрытый турнир: в общий чат не пишем — игрокам вызов уже ушёл в личку (callMatch → notify)
+  const priv = new Set<string>();
+  for (const c of all) if (await isPrivateMatch(c.matchId)) priv.add(c.matchId);
+  if (priv.size) await db().from("audit_logs").insert([...priv].map((id) => ({ action: "hall.announced", entity_type: "match", entity_id: id, payload: { private: true } })));
+  const calls = all.filter((c) => !priv.has(c.matchId));
   if (!calls.length) return;
   const [cfg, group, tg] = await Promise.all([hallConfig(), telegramGroup(), telegramConfig()]);
   if (!tg.token || !group.id || !cfg.thread) return;
@@ -392,6 +398,7 @@ async function warnNextInQueue(tournamentId: string, cfg: HallConfig) {
   const warned = new Set((done ?? []).map((d) => d.entity_id));
   const [group, tg] = await Promise.all([telegramGroup(), telegramConfig()]);
   if (!tg.token || !group.id) return;
+  const hidden = await isPrivateTournament(tournamentId);
   for (const m of next.filter((x) => !warned.has(x.id))) {
     await audit(null, "hall.prepare", { type: "match", id: m.id }, { tournament: tournamentId });
     const [team1, team2] = await Promise.all([teamInfo(tournamentId, m.team1_id!), teamInfo(tournamentId, m.team2_id!)]);
@@ -401,7 +408,8 @@ async function warnNextInQueue(tournamentId: string, cfg: HallConfig) {
         .reduce((a, x) => Math.max(a, new Date(x.finished_at!).getTime()), 0);
     const restUntil = Math.max(lastEnd(m.team1_id!), lastEnd(m.team2_id!)) + REST_MS;
     const rest = restUntil > Date.now() ? `\nПерерыв до ${new Date(restUntil).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" })}.` : "";
-    await tgCall(tg.token, "sendMessage", {
+    // закрытый турнир — только в личку
+    if (!hidden) await tgCall(tg.token, "sendMessage", {
       chat_id: group.id,
       message_thread_id: cfg.thread,
       text: `⚠️ <b>Готовьтесь — вы следующие</b>\n⚔️ <b>Матч #${m.number}</b>: ${tgEscape(team1.name)} vs ${tgEscape(team2.name)}\n${mentionList(team1)}\n${mentionList(team2)}${rest}\n\nБудьте рядом с залом: как только освободятся места, бот напишет, за какие ПК садиться.`,
@@ -426,13 +434,16 @@ export async function boardText() {
   const cfg = await hallConfig();
   const { data: ts } = await db().from("tournaments").select("id, name").eq("is_lan", true).in("status", ["checkin", "live"]);
   const teamIds = new Set<string>();
-  const seats: { block: string; team: string; match: HallMatch | null }[] = [];
+  const seats: { block: string; team: string; match: HallMatch | null; hidden?: boolean }[] = [];
   const queue: { m: HallMatch; restUntil: number }[] = [];
   const now = Date.now();
   for (const t of ts ?? []) {
     const snap = await hallSnapshot(t.id, cfg);
+    // закрытый турнир: на табло места просто «заняты» — без команд, матчей и очереди
+    const hidden = await isPrivateTournament(t.id);
     // очередь: соперники известны, на места ещё не вызваны
     for (const m of snap.matches) {
+      if (hidden) break;
       if (m.status !== "upcoming" || !m.team1_id || !m.team2_id || snap.calls.has(m.id)) continue;
       const lastEnd = (team: string) =>
         snap.matches
@@ -443,12 +454,12 @@ export async function boardText() {
       teamIds.add(m.team2_id);
     }
     for (const [block, v] of snap.occupiedBy) {
-      seats.push({ block, team: v.team, match: v.match });
+      seats.push({ block, team: v.team, match: v.match, hidden });
       teamIds.add(v.team);
     }
     for (const [block, team] of snap.reserved) {
       if (snap.occupiedBy.has(block)) continue;
-      seats.push({ block, team, match: null });
+      seats.push({ block, team, match: null, hidden });
       teamIds.add(team);
     }
   }
@@ -457,6 +468,7 @@ export async function boardText() {
   const lines = HALL_BLOCKS.map((b) => {
     const s = seats.find((x) => x.block === b.id);
     if (!s) return `▫️ ${blockLabel(b.id, false)} — свободно`;
+    if (s.hidden) return `⛔ ${blockLabel(b.id, false)} — занято`;
     if (!s.match) return `⏸ ${blockLabel(b.id, false)} — <b>${tgEscape(name.get(s.team) ?? "?")}</b> · ждёт следующий матч`;
     const score = s.match.status === "live" || s.match.status === "finished" ? ` · ${s.match.team1_score}:${s.match.team2_score}` : "";
     return `${s.match.status === "live" ? "🔴" : "🟢"} ${blockLabel(b.id, false)} — <b>${tgEscape(name.get(s.team) ?? "?")}</b> · матч #${s.match.number} · ${STATUS_TEXT[s.match.status] ?? s.match.status}${score}`;

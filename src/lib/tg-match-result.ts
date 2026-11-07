@@ -30,6 +30,7 @@ export async function postMatchResults() {
     .gte("finished_at", new Date(now - WINDOW_MS).toISOString())
     .lte("finished_at", new Date(now - STATS_WAIT_MS).toISOString())
     .neq("tournament.status", "draft")
+    .eq("tournament.is_private", false)
     .order("finished_at")
     .limit(10);
   if (!ms?.length) return;

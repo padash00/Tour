@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { demoDownloadUrl, demoFileName, getMatchDemos } from "@/lib/demos";
-import { getMatch } from "@/lib/matches";
+import { getVisibleMatch } from "@/lib/matches";
 
 /**
  * «Скачать демо»: /matches/<id>/demo?f=<файл> → свежая подписанная ссылка на серверный ПК.
@@ -9,8 +9,8 @@ import { getMatch } from "@/lib/matches";
 export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/demo">) {
   const { id } = await ctx.params;
   const file = req.nextUrl.searchParams.get("f") ?? "";
-  const m = await getMatch(id);
-  if (!m || m.tournament.status === "draft" || m.matchzy_id == null) return text(404, "Матч не найден");
+  const m = await getVisibleMatch(id);
+  if (!m || m.matchzy_id == null) return text(404, "Матч не найден");
   const { demos, online } = await getMatchDemos(m.matchzy_id);
   const demo = demos.find((d) => d.file === file);
   if (!demo) return text(404, "Демо этого матча не найдено — возможно, оно уже удалено с сервера");

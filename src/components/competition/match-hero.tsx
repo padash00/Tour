@@ -136,7 +136,10 @@ function Side({ team, align, winner, dim, t }: { team: Team | null; align: "left
         <span className="size-12 shrink-0 rounded-[16px] border border-dashed border-white/40 sm:size-16" />
       )}
       <div className="min-w-0 max-w-full">
-        {team ? (
+        {team?.private_tournament_id ? (
+          // пара закрытого турнира — своей страницы команды нет
+          <div className={cn("block truncate text-[15px] font-extrabold text-white sm:text-[24px]", dim && "text-white/60")}>{team.name}</div>
+        ) : team ? (
           <Link
             href={`/teams/${encodeURIComponent(team.tag)}`}
             className={cn("block truncate text-[15px] font-extrabold text-white hover:underline sm:text-[24px]", dim && "text-white/60")}

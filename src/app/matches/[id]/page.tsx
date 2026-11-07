@@ -11,7 +11,7 @@ import { db } from "@/lib/supabase";
 import type { Dispute } from "@/lib/types";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { formatDateTime, mapName } from "@/lib/format";
-import { applyVetoTimeouts, getMatch, getMatchRosters } from "@/lib/matches";
+import { applyVetoTimeouts, getMatch, getMatchRosters, getVisibleMatch } from "@/lib/matches";
 import { getStageRounds } from "@/lib/match-stage";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
 import { vetoState } from "@/lib/veto";
@@ -54,7 +54,7 @@ import {
 
 export async function generateMetadata(props: PageProps<"/matches/[id]">): Promise<Metadata> {
   const { id } = await props.params;
-  const m = await getMatch(id);
+  const m = await getVisibleMatch(id);
   const t = await getT();
   const title = m ? `${m.team1?.name ?? "TBD"} vs ${m.team2?.name ?? "TBD"}` : t("Матч");
   const description = m
@@ -77,8 +77,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const { id } = await props.params;
   const t = await getT();
   await applyVetoTimeouts(id);
-  const m = await getMatch(id);
-  if (!m || m.tournament.status === "draft") notFound();
+  const m = await getVisibleMatch(id);
+  if (!m) notFound();
 
   const serverNow = serverTime();
   const mapImages = await getMapImages();
@@ -471,7 +471,8 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   // во время игры сначала раунды и статистика, после — итоги серии
   // разведка соперника: игрокам состава — на соперника, админам — на обе команды (до конца матча)
   const mySide = rosters.team1.some((r) => r.player.id === player?.id) ? 1 : rosters.team2.some((r) => r.player.id === player?.id) ? 2 : 0;
-  const scoutTeams = !["finished", "cancelled"].includes(m.status) && m.team1 && m.team2 ? (admin ? [m.team1, m.team2] : mySide === 1 ? [m.team2] : mySide === 2 ? [m.team1] : []) : [];
+  // у пар закрытого турнира страницы команды (и разведки) нет
+  const scoutTeams = !["finished", "cancelled"].includes(m.status) && m.team1 && m.team2 && !m.tournament.is_private ? (admin ? [m.team1, m.team2] : mySide === 1 ? [m.team2] : mySide === 2 ? [m.team1] : []) : [];
   const scoutBlock = scoutTeams.length > 0 && (
     <Section title={t("Разведка соперника")}>
       <p className="text-[14px] text-fg-3">{t("Как команда играет по разборам её карт в клубе: где стоят, куда закладывают, какие гранаты, кто идёт первым и кто с AWP.")}</p>

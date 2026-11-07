@@ -43,7 +43,8 @@ export async function registerTeam(_prev: ActionResult, formData: FormData): Pro
   const t = await getT();
   const tournamentId = String(formData.get("tournamentId"));
   const tournament = await getTournamentById(tournamentId);
-  if (!tournament || tournament.status === "draft") return { error: t("Турнир не найден") };
+  // закрытый турнир: участие только по приглашению, пары составляет организатор
+  if (!tournament || tournament.status === "draft" || tournament.is_private) return { error: t("Турнир не найден") };
   if (tournament.status !== "registration") return { error: t("Регистрация на турнир закрыта") };
   if (tournament.registration_closes_at && Date.now() > new Date(tournament.registration_closes_at).getTime()) {
     return { error: t("Регистрация на турнир закрыта") };
@@ -155,7 +156,7 @@ export async function withdrawRegistration(_prev: ActionResult, formData: FormDa
   const t = await getT();
   const tournamentId = String(formData.get("tournamentId"));
   const tournament = await getTournamentById(tournamentId);
-  if (!tournament) return { error: t("Турнир не найден") };
+  if (!tournament || tournament.is_private) return { error: t("Турнир не найден") };
 
   const ctx = await captainContext(t, `/tournaments/${tournament.slug}`, tournament);
   if ("error" in ctx) return { error: ctx.error };
@@ -180,7 +181,7 @@ export async function checkIn(_prev: ActionResult, formData: FormData): Promise<
   const t = await getT();
   const tournamentId = String(formData.get("tournamentId"));
   const tournament = await getTournamentById(tournamentId);
-  if (!tournament) return { error: t("Турнир не найден") };
+  if (!tournament || tournament.is_private) return { error: t("Турнир не найден") };
 
   const ctx = await captainContext(t, `/tournaments/${tournament.slug}/checkin`, tournament);
   if ("error" in ctx) return { error: ctx.error };

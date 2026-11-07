@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { canViewMatchId } from "@/lib/private-tournament";
 import { getCurrentPlayer } from "@/lib/auth";
 import { analysisCard, analysisFile, canViewAnalysis } from "@/lib/analysis";
 
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/analysis/[i
   const { id } = await ctx.params;
   if (!UUID.test(id)) return NextResponse.json({ error: "not found" }, { status: 404 });
   const card = await analysisCard(id);
-  if (!card || !canViewAnalysis(card, me)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!card || !canViewAnalysis(card, me) || !(await canViewMatchId(card.match_id, me))) return NextResponse.json({ error: "not found" }, { status: 404 });
   const file = await analysisFile(id);
   if (!file) return NextResponse.json({ error: "not found" }, { status: 404 });
   // отдаём байты gzip как есть: страница распаковывает сама

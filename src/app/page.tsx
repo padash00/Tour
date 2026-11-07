@@ -24,6 +24,7 @@ async function recentResults(limit = 6) {
     )
     .eq("status", "finished")
     .neq("tournament.status", "draft")
+    .eq("tournament.is_private", false)
     .order("finished_at", { ascending: false, nullsFirst: false })
     .limit(limit * 2);
   return visibleMatches((data ?? []) as HomeMatch[])

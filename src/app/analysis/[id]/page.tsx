@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { canViewMatchId } from "@/lib/private-tournament";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
@@ -17,7 +18,7 @@ export default async function AnalysisPage(props: PageProps<"/analysis/[id]">) {
   const { id } = await props.params;
   if (!UUID.test(id)) notFound();
   const a = await getAnalysis(id);
-  if (!a || !canViewAnalysis(a.card, me)) notFound();
+  if (!a || !canViewAnalysis(a.card, me) || !(await canViewMatchId(a.card.match_id, me))) notFound();
   // разборы против топов видит сам игрок (свой) и админ (все)
   const coached = (await coachPlayers(id)).filter((sid) => canViewCoach(sid, me));
   return (

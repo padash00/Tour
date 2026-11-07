@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentPlayer, isAdmin } from "@/lib/auth";
+import { canViewTournament } from "@/lib/private-tournament";
 import { getEntrantTeam, getRegistration, getTeamMembers, getTournamentById } from "@/lib/data";
 
 /**
@@ -13,7 +14,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/tournaments/[id
   const player = await getCurrentPlayer();
   if (!player) return NextResponse.json({ loggedIn: false, isAdmin: false, team: null, isCaptain: false, reg: null }, { headers });
   const t = await getTournamentById(id);
-  if (!t) return NextResponse.json({ error: "not found" }, { status: 404, headers });
+  if (!t || !(await canViewTournament(t, player))) return NextResponse.json({ error: "not found" }, { status: 404, headers });
   const team = await getEntrantTeam(player, t);
   const [reg, members] = team ? await Promise.all([getRegistration(t.id, team.id), getTeamMembers(team.id)]) : [null, []];
   return NextResponse.json(

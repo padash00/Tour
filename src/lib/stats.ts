@@ -179,6 +179,8 @@ const statRowsCached = cache(async (tournamentId?: string, playerId?: string, ma
       .select("*, match:matches!inner(id, tournament_id, status, tournament:tournaments!inner(status, format))")
       .neq("match.tournament.status", "draft")
       .gt("rounds_played", 0);
+    // закрытые турниры — только в их собственной статистике (страница турнира/матча проверяет доступ)
+    if (!tournamentId && !matchId) q = q.eq("match.tournament.is_private", false);
     if (tournamentId) q = q.eq("match.tournament_id", tournamentId);
     if (playerId) q = q.eq("player_id", playerId);
     if (matchId) q = q.eq("match_id", matchId);
@@ -344,6 +346,7 @@ export async function getTeamTable(tournamentId?: string): Promise<TeamAgg[]> {
     .eq("is_walkover", false)
     .neq("tournament.status", "draft");
   if (tournamentId) q = q.eq("tournament_id", tournamentId);
+  else q = q.eq("tournament.is_private", false);
   const { data } = await q;
   const table = new Map<string, TeamAgg>();
   const get = (t: TeamAgg["team"]) => {
@@ -483,6 +486,7 @@ export async function getHeadToHead({ teamIds, matchIds }: { teamIds: string[]; 
     .eq("status", "finished")
     .eq("is_walkover", false)
     .neq("tournament.status", "draft")
+    .eq("tournament.is_private", false)
     .or(`team1_id.in.(${list}),team2_id.in.(${list})`);
   if (matchIds) q = q.in("id", matchIds);
   const { data } = await q;
@@ -544,6 +548,9 @@ export async function getMapTable(tournamentId?: string): Promise<MapAgg[]> {
   if (tournamentId) {
     mq = mq.eq("match.tournament_id", tournamentId);
     vq = vq.eq("match.tournament_id", tournamentId);
+  } else {
+    mq = mq.eq("match.tournament.is_private", false);
+    vq = vq.eq("match.tournament.is_private", false);
   }
   const [{ data: maps }, { data: veto }] = await Promise.all([mq, vq]);
   const table = new Map<string, MapAgg & { rounds: number }>();
@@ -575,6 +582,7 @@ export async function getPlayerMapHistory(playerId: string) {
     )
     .eq("player_id", playerId)
     .neq("match.tournament.status", "draft")
+    .eq("match.tournament.is_private", false)
     .gt("rounds_played", 0)
     .order("updated_at", { ascending: false })
     .limit(30)

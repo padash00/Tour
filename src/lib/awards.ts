@@ -77,7 +77,7 @@ export const AWARDS_TAG = "awards";
 export const getAllAwards = cache(
   unstable_cache(
     async (): Promise<Award[]> => {
-      const { data } = await db().from("tournaments").select("*").eq("status", "finished").order("starts_at", { ascending: false });
+      const { data } = await db().from("tournaments").select("*").eq("status", "finished").eq("is_private", false).order("starts_at", { ascending: false });
       const all = await Promise.all(((data ?? []) as Tournament[]).map(tournamentAwards));
       return all.flat();
     },

@@ -28,7 +28,7 @@ export async function searchAll(raw: string): Promise<SearchResult> {
     steamId ? db().from("players").select("id, nickname, avatar_url, steam_id, faceit_level").eq("steam_id", steamId).limit(1) : Promise.resolve({ data: [] }),
     db().from("teams").select("id, name, tag, logo_url").is("disbanded_at", null).ilike("name", pattern).order("name").limit(5),
     db().from("teams").select("id, name, tag, logo_url").is("disbanded_at", null).ilike("tag", pattern).order("tag").limit(5),
-    db().from("tournaments").select("id, name, slug, status, starts_at").neq("status", "draft").ilike("name", pattern).order("starts_at", { ascending: false, nullsFirst: false }).limit(5),
+    db().from("tournaments").select("id, name, slug, status, starts_at").neq("status", "draft").eq("is_private", false).ilike("name", pattern).order("starts_at", { ascending: false, nullsFirst: false }).limit(5),
   ]);
 
   const players = new Map<string, NonNullable<typeof byNick.data>[number]>();
@@ -48,6 +48,7 @@ export async function searchAll(raw: string): Promise<SearchResult> {
       )
       .or(`team1_id.in.(${ids.join(",")}),team2_id.in.(${ids.join(",")})`)
       .neq("tournament.status", "draft")
+      .eq("tournament.is_private", false)
       .in("status", ["upcoming", "veto", "ready", "live", "finished"])
       .not("team1_id", "is", null)
       .not("team2_id", "is", null)

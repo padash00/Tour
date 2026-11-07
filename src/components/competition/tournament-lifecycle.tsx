@@ -34,6 +34,7 @@ export function nextStepText(t: Tournament, tx: T = makeT("ru")) {
     case "draft":
       return tx("Турнир ещё не опубликован.");
     case "registration":
+      if (t.is_private) return "Закрытый турнир: участие только по приглашению.";
       return t.registration_closes_at ? tx("Регистрация открыта до {date}.", { date: formatDateTime(t.registration_closes_at, tx.lang) }) : tx("Регистрация открыта.");
     case "registration_closed":
       return t.checkin_opens_at ? tx("Регистрация закрыта. Check-in откроется {date}.", { date: formatDateTime(t.checkin_opens_at, tx.lang) }) : tx("Регистрация закрыта. Ждём check-in.");

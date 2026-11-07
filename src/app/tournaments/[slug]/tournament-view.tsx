@@ -22,6 +22,7 @@ import { matchStage, visibleMatches } from "@/components/match-bits";
 import { MatchListRow } from "@/components/match-row";
 import { MapTile } from "@/components/competition/map-tile";
 import { RecapView } from "@/components/competition/recap-view";
+import { PrivatePanel } from "@/components/competition/private-panel";
 import { TournamentAwards } from "@/components/competition/tournament-awards";
 import { getTournamentNominations } from "@/lib/nominations";
 import { AdminControlLink, HeroCta, MobileCta, MyRequirements, ParticipationPanel, type TournamentLite } from "@/components/competition/tournament-viewer";
@@ -175,9 +176,11 @@ export async function TournamentView({ t: raw }: { t: Tournament }) {
               </dl>
             </div>
             <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
-              <div className="hidden sm:block">
-                <HeroCta t={lite} approvedCount={approved.length} />
-              </div>
+              {!t.is_private && (
+                <div className="hidden sm:block">
+                  <HeroCta t={lite} approvedCount={approved.length} />
+                </div>
+              )}
               <p className="max-w-sm text-[14.5px] text-white/80 lg:text-right">{nextStepText(t, tx)}</p>
             </div>
           </div>
@@ -185,6 +188,12 @@ export async function TournamentView({ t: raw }: { t: Tournament }) {
         <div className="mt-3 mb-2">
           <TournamentLifecycle t={t} approvedCount={approved.length} played={progress.played} total={progress.total} />
         </div>
+        {/* телефон: приглашение и check-in закрытого турнира — сразу под шапкой, не в конце обзора */}
+        {t.is_private && (
+          <div className="mb-2 lg:hidden">
+            <PrivatePanel t={t} />
+          </div>
+        )}
       </Container>
 
       {/* ── вкладки (липкие) + содержимое: общий контейнер, чтобы вкладки держались при прокрутке */}
@@ -224,7 +233,14 @@ export async function TournamentView({ t: raw }: { t: Tournament }) {
                 <Overview t={t} lite={lite} mapImages={mapImages} />
               </div>
               <aside className="space-y-5 lg:sticky lg:top-[calc(var(--shell-h)+72px)]">
-                <ParticipationPanel t={lite} approvedCount={approved.length} />
+                {/* закрытый турнир: приглашение, личный check-in и пары вместо заявки команды */}
+                {t.is_private ? (
+                  <div className="hidden lg:block">
+                    <PrivatePanel t={t} />
+                  </div>
+                ) : (
+                  <ParticipationPanel t={lite} approvedCount={approved.length} />
+                )}
                 <div className="rounded-surface border border-line-subtle bg-surface p-5">
                   <SubsectionTitle>{tx("Даты")}</SubsectionTitle>
                   <dl className="divide-y divide-line-subtle text-[14px]">
@@ -359,7 +375,7 @@ export async function TournamentView({ t: raw }: { t: Tournament }) {
           </TabPanel>
         </div>
       </Container>
-      <MobileCta t={lite} approvedCount={approved.length} />
+      {!t.is_private && <MobileCta t={lite} approvedCount={approved.length} />}
     </>
   );
 }
@@ -443,7 +459,7 @@ async function Overview({ t, lite, mapImages }: { t: Tournament; lite: Tournamen
             ))}
           </ul>
         )}
-        <MyRequirements t={lite} />
+        {!t.is_private && <MyRequirements t={lite} />}
       </Section>
 
       {t.sponsors?.length > 0 && (
@@ -523,9 +539,14 @@ async function TeamsTab({ approved, pendingCount, solo, maxTeams }: { approved: 
               <header className="flex items-center gap-4 border-b border-line-subtle bg-gradient-to-r from-accent-dim/40 to-transparent p-4">
                 <TeamLogo src={r.team.logo_url} tag={r.team.tag} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <Link href={`/teams/${encodeURIComponent(r.team.tag)}`} className="block truncate text-[18px] font-bold text-fg hover:text-accent">
-                    {r.team.name}
-                  </Link>
+                  {/* пара закрытого турнира — своей страницы команды нет */}
+                  {r.team.private_tournament_id ? (
+                    <div className="truncate text-[18px] font-bold text-fg">{r.team.name}</div>
+                  ) : (
+                    <Link href={`/teams/${encodeURIComponent(r.team.tag)}`} className="block truncate text-[18px] font-bold text-fg hover:text-accent">
+                      {r.team.name}
+                    </Link>
+                  )}
                   <div className="mt-0.5 truncate text-meta text-fg-3">
                     <span className="font-semibold text-fg-2">{r.team.tag}</span>
                     {r.team.region ? ` · ${r.team.region}` : ""}

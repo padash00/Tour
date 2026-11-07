@@ -1,5 +1,6 @@
 "use server";
 
+import { acceptedPlayerIds } from "@/lib/private-tournament";
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -79,6 +80,7 @@ const tournamentSchema = z.object({
   third_place_match: z.string().optional(),
   // официальный турнир: возраст, город, тренер, запасные
   is_official: z.string().optional(),
+  is_private: z.string().optional(),
   min_age: z.coerce.number().int().min(0, "Минимальный возраст — от 0").max(120).default(16),
   max_age: z.coerce.number().int().min(0).max(120, "Максимальный возраст — до 120").default(35),
   city: z.string().trim().max(60).optional().default(""),
@@ -237,6 +239,7 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
     checkin_closes_at: fromLocalInput(data.checkin_closes_at),
     third_place_match: data.third_place_match === "on",
     is_official: data.is_official === "on",
+    is_private: data.is_private === "on",
     min_age: data.min_age,
     max_age: data.max_age,
     city: data.city || "Усть-Каменогорск",
@@ -247,9 +250,12 @@ function tournamentRow(data: z.infer<typeof tournamentSchema>) {
 }
 
 /** Официальный турнир — только командный режим, возрастной диапазон по порядку */
-function checkOfficial(row: { is_official: boolean; format: string; min_age: number; max_age: number }) {
+function checkOfficial(row: { is_official: boolean; is_private: boolean; format: string; min_age: number; max_age: number }) {
   if (row.max_age < row.min_age) return "Максимальный возраст должен быть не меньше минимального";
   if (row.is_official && row.format === "1v1") return "Официальный турнир — только командный режим (5×5 или 2×2)";
+  // пары составляет кнопка «Составить пары» из приглашённых — поэтому только 2×2
+  if (row.is_private && row.format !== "2v2") return "Закрытый турнир — только режим 2×2: пары составляются из приглашённых";
+  if (row.is_private && row.is_official) return "Закрытый турнир не может быть официальным";
   return null;
 }
 
@@ -360,7 +366,12 @@ export async function setTournamentStatus(_prev: ActionResult, formData: FormDat
     }
   }
 
-  if (status === "checkin") {
+  if (status === "checkin" && before.is_private) {
+    // закрытый турнир: check-in проходит каждый приглашённый сам, на странице турнира
+    await enqueuePrefetch(id, admin.id);
+    const players = await acceptedPlayerIds(id);
+    await notify(players, `Check-in на «${before.name}» открыт`, "Подтвердите, что вы на месте: кнопка «Я на месте» на странице турнира.", `/tournaments/${before.slug}`);
+  } else if (status === "checkin") {
     await enqueuePrefetch(id, admin.id);
     const { data } = await db()
       .from("tournament_registrations")

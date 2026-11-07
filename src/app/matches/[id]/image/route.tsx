@@ -6,7 +6,7 @@ import type { NextRequest } from "next/server";
 import type { ReactNode } from "react";
 import { roundTitle } from "@/lib/bracket";
 import { formatDate, mapName } from "@/lib/format";
-import { getMatch, getMatchRosters } from "@/lib/matches";
+import { getMatchRosters, getVisibleMatch } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
 import { OG_FONT, ogFonts } from "@/lib/og-font";
 import { OG_FORMATS, ogAccess, ogFormat, ogImage } from "@/lib/og-image";
@@ -98,7 +98,7 @@ async function svgPng(svg: string | Buffer, width: number) {
 
 export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/image">) {
   const { id } = await ctx.params;
-  const m = await getMatch(id);
+  const m = await getVisibleMatch(id);
   // серия ещё идёт (BO3 на третьей карте) — картинки по уже сыгранным картам можно скачать сразу
   const seriesLive = m?.status === "live" && m.maps.some((x) => x.status === "finished");
   if (!m || (m.status !== "finished" && !seriesLive) || m.tournament.status === "draft" || !m.team1 || !m.team2) {
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
 
   // 1×1: «команда» — сам игрок, показываем его аватар
   const side = (team: NonNullable<typeof m.team1>, list: typeof rosters.team1) => {
-    const solo = !!team.is_solo || (list.length === 1 && list[0].player.nickname === team.name);
+    const solo = (!!team.is_solo && !team.private_tournament_id) || (list.length === 1 && list[0].player.nickname === team.name);
     return { id: team.id, name: team.name, tag: team.tag, src: solo ? (list[0]?.player.avatar_url ?? team.logo_url) : team.logo_url };
   };
   const s1 = side(m.team1, rosters.team1);

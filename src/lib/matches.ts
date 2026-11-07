@@ -1,4 +1,5 @@
 import "server-only";
+import { canViewTournament } from "./private-tournament";
 import { randomUUID } from "node:crypto";
 import { cache } from "react";
 import { notify } from "./audit";
@@ -58,6 +59,13 @@ async function fetchMatch(id: string): Promise<MatchFull | null> {
 }
 
 export const getMatch = cache(fetchMatch);
+
+/** Матч для публичных страниц: черновик турнира и закрытый турнир чужому — null (404) */
+export async function getVisibleMatch(id: string): Promise<MatchFull | null> {
+  const m = await getMatch(id);
+  if (!m || m.tournament.status === "draft" || !(await canViewTournament(m.tournament))) return null;
+  return m;
+}
 
 /** Матчи команды (кроме отменённых и технических без соперника) */
 export const getTeamMatches = cache(async (teamId: string): Promise<(MatchWithTeams & { tournament: Tournament })[]> => {
@@ -538,6 +546,7 @@ export async function getUpcomingMatches(limit = 6) {
     .select(`${MATCH_SELECT}, ${LIVE_MAPS}, tournament:tournaments!inner(id, name, slug, status)`)
     .in("status", ["upcoming", "veto", "ready", "live"])
     .neq("tournament.status", "draft")
+    .eq("tournament.is_private", false)
     .not("team1_id", "is", null)
     .not("team2_id", "is", null);
   const order = { live: 0, veto: 1, ready: 2, upcoming: 3 } as Record<string, number>;

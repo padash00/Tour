@@ -23,7 +23,7 @@ const MEDAL: Record<string, string> = {
 const PLACE_LABEL: Record<string, string> = { "1": tr("Чемпион"), "2": tr("2 место"), "3": tr("3 место"), "3–4": tr("3–4 место") };
 
 /** одиночный участник (1×1): «команда» — это сам игрок */
-const isSoloPlacement = (p: Placement) => !!p.team.is_solo || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
+const isSoloPlacement = (p: Placement) => (!!p.team.is_solo && !p.team.private_tournament_id) || (p.roster.length === 1 && p.roster[0].nickname === p.team.name);
 
 /**
  * Карточка пьедестала: компактная, высота по содержимому. 1 место — крупнее и с золотым свечением,

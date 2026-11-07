@@ -28,7 +28,8 @@ export const getTeamRanking = unstable_cache(
       .from("tournaments")
       .select("*")
       .in("status", ["live", "finished"])
-      .eq("format", "5v5");
+      .eq("format", "5v5")
+      .eq("is_private", false);
     const tournaments = (ts ?? []) as Tournament[];
     if (!tournaments.length) return { rows: [], updatedAt: new Date(now).toISOString() };
 
