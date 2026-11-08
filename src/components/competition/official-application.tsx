@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { Check, TriangleAlert, X } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { registerTeam } from "@/app/actions/tournament";
 import type { ActionResult } from "@/components/forms";
 import { useToast } from "@/components/toast";
@@ -95,6 +95,27 @@ export function OfficialApplicationForm({
   const set = (k: keyof ApplicationValues) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [k]: e.target.value }));
   const show = (k: keyof ApplicationValues) => (touched && errors[k] ? errors[k] : undefined);
 
+  // красный пункт проверки — кнопка: прокрутить к полю, которое надо исправить, и поставить в него курсор
+  const formRef = useRef<HTMLFormElement>(null);
+  const firstError = (keys: (keyof ApplicationValues)[]) => keys.find((k) => errors[k]);
+  const targetOf = (key: string): string | null => {
+    if (key === "organization") return "organization";
+    if (key === "captain") return "captain_phone";
+    if (key === "responsible") return firstError(["responsible_name", "responsible_phone"]) ?? "responsible_name";
+    if (key === "coach") return firstError(["coach_name", "coach_birth_date", "coach_workplace", "coach_position"]) ?? null;
+    return null;
+  };
+  const goTo = (key: string) => {
+    setTouched(true);
+    const form = formRef.current;
+    if (!form) return;
+    const name = targetOf(key);
+    const el = name ? form.querySelector<HTMLElement>(`[name="${name}"]`) : form.querySelector<HTMLElement>("[data-roster]");
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (name) el.focus({ preventScroll: true });
+  };
+
   const text = (k: keyof ApplicationValues, labelText: string, opts: { type?: string; placeholder?: string; hint?: string; max?: number } = {}) => (
     <Field label={labelText} required error={show(k)} hint={opts.hint}>
       {(p) => <Input {...p} name={k} type={opts.type ?? "text"} value={v[k]} onChange={set(k)} onBlur={() => setTouched(true)} placeholder={opts.placeholder} maxLength={opts.max ?? 200} state={show(k) ? "error" : undefined} />}
@@ -103,6 +124,7 @@ export function OfficialApplicationForm({
 
   return (
     <form
+      ref={formRef}
       action={action}
       onSubmit={(e) => {
         setTouched(true);
@@ -116,7 +138,7 @@ export function OfficialApplicationForm({
       {rulesGate && <input type="hidden" name="rules_ack" value={rulesOk ? "1" : ""} />}
 
       {/* состав */}
-      <div className="border-b border-line-subtle px-4 pb-1 pt-4 sm:px-5">
+      <div data-roster className="scroll-mt-24 border-b border-line-subtle px-4 pb-1 pt-4 sm:px-5">
         <h3 className="text-title text-fg">{tx("Игроки")}</h3>
         <p className="mt-0.5 text-meta text-fg-3">
           {subs
@@ -187,7 +209,7 @@ export function OfficialApplicationForm({
         <h3 className="text-title text-fg">{tx("Проверка заявки")}</h3>
         <ul className="mt-3 divide-y divide-line-subtle">
           {items.map((i) => (
-            <ChecklistRow key={i.key} item={i} />
+            <ChecklistRow key={i.key} item={i} onGo={i.ok ? undefined : () => goTo(i.key)} />
           ))}
           {coachWarning && <ChecklistRow item={{ key: "coach-age", label: tx("Возраст тренера"), ok: true, warn: true, detail: coachWarning }} />}
         </ul>
@@ -213,11 +235,11 @@ export function OfficialApplicationForm({
   );
 }
 
-function ChecklistRow({ item }: { item: CheckItem }) {
+function ChecklistRow({ item, onGo }: { item: CheckItem; onGo?: () => void }) {
   const tx = useT();
   const tone = !item.ok ? "fail" : item.warn ? "warn" : "ok";
-  return (
-    <li className="flex items-start gap-3 py-2.5">
+  const body = (
+    <>
       <span
         className={cn(
           "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
@@ -233,6 +255,18 @@ function ChecklistRow({ item }: { item: CheckItem }) {
         <span className="block text-[14px] text-fg">{item.label}</span>
         {item.detail && <span className={cn("block text-meta", tone === "fail" ? "text-danger" : tone === "warn" ? "text-warn" : "text-fg-3")}>{item.detail}</span>}
       </span>
+      {onGo && <span className="mt-0.5 shrink-0 text-meta font-medium text-accent">{tx("Исправить")} →</span>}
+    </>
+  );
+  return (
+    <li>
+      {onGo ? (
+        <button type="button" onClick={onGo} className="-mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-control px-2 py-2.5 text-left transition-colors hover:bg-ink/[0.04]">
+          {body}
+        </button>
+      ) : (
+        <div className="flex items-start gap-3 py-2.5">{body}</div>
+      )}
     </li>
   );
 }

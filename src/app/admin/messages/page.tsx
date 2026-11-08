@@ -52,7 +52,13 @@ export default async function AdminMessagesPage() {
                 <div className="max-h-80 space-y-1.5 overflow-y-auto rounded-control border border-line-subtle bg-surface-2 p-3 text-[14px]">
                   {thread.map((m) => (
                     <p key={m.id} className={cn(m.id === r.message_id && "rounded bg-danger/10 px-1")}>
-                      <span className="font-semibold">{m.sender_id === r.reported.id ? r.reported.nickname : r.reporter.nickname}:</span> <span className="whitespace-pre-wrap">{m.body}</span>
+                      <span className="font-semibold">{m.sender_id === r.reported.id ? r.reported.nickname : r.reporter.nickname}:</span>{" "}
+                      {m.image && (
+                        <a href={`/api/dm/image/${m.id}`} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">
+                          [картинка]
+                        </a>
+                      )}{" "}
+                      <span className="whitespace-pre-wrap">{m.body}</span>
                       <span className="ml-2 text-[11px] text-fg-4">{time.format(new Date(m.created_at))}</span>
                     </p>
                   ))}

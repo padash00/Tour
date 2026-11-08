@@ -10,7 +10,15 @@ export const DM_MAX_LEN = 1000;
 export const DM_PAGE = 60;
 
 export type DmPeer = { id: string; nickname: string; avatar_url: string | null; steam_id: string; last_seen_at: string | null };
-export type DmMessage = { id: number; sender_id: string; recipient_id: string; body: string; created_at: string; read_at: string | null };
+/** image — есть картинка: её отдаёт /api/dm/image/<id> (путь в хранилище наружу не уходит) */
+export type DmMessage = { id: number; sender_id: string; recipient_id: string; body: string; created_at: string; read_at: string | null; image: boolean };
+type DmRow = Omit<DmMessage, "image"> & { image_path: string | null };
+const toMessage = ({ image_path, ...m }: DmRow): DmMessage => ({ ...m, image: !!image_path });
+const MSG = "id, sender_id, recipient_id, body, created_at, read_at, image_path";
+
+/** Картинки в сообщениях: закрытое хранилище, до 3 МБ, PNG / JPG / WEBP */
+export const DM_IMAGE_BUCKET = "dm-images";
+export const DM_IMAGE_MAX = 3 * 1024 * 1024;
 export type DmConversation = { peer: DmPeer; last: DmMessage; unread: number };
 
 const PEER = "id, nickname, avatar_url, steam_id, last_seen_at";
@@ -53,12 +61,12 @@ export async function listConversations(me: string): Promise<DmConversation[]> {
   // последние 500 сообщений игрока хватает, чтобы собрать список диалогов
   const { data } = await db()
     .from("direct_messages")
-    .select("id, sender_id, recipient_id, body, created_at, read_at")
+    .select(MSG)
     .or(`sender_id.eq.${me},recipient_id.eq.${me}`)
     .order("id", { ascending: false })
     .limit(500);
   const byPeer = new Map<string, { last: DmMessage; unread: number }>();
-  for (const m of (data ?? []) as DmMessage[]) {
+  for (const m of ((data ?? []) as DmRow[]).map(toMessage)) {
     const peer = m.sender_id === me ? m.recipient_id : m.sender_id;
     const cur = byPeer.get(peer) ?? { last: m, unread: 0 };
     if (m.recipient_id === me && !m.read_at) cur.unread++;
@@ -78,13 +86,13 @@ export async function listThread(me: string, other: string, afterId?: number): P
   ids(me, other);
   let q = db()
     .from("direct_messages")
-    .select("id, sender_id, recipient_id, body, created_at, read_at")
+    .select(MSG)
     .or(`and(sender_id.eq.${me},recipient_id.eq.${other}),and(sender_id.eq.${other},recipient_id.eq.${me})`)
     .order("id", { ascending: false })
     .limit(DM_PAGE);
   if (afterId) q = q.gt("id", afterId);
   const { data } = await q;
-  return ((data ?? []) as DmMessage[]).reverse();
+  return ((data ?? []) as DmRow[]).map(toMessage).reverse();
 }
 
 export async function getPeer(id: string): Promise<DmPeer | null> {

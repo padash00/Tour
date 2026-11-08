@@ -675,6 +675,7 @@ export type Database = {
           body: string
           created_at: string
           id: number
+          image_path: string | null
           read_at: string | null
           recipient_id: string
           sender_id: string
@@ -683,6 +684,7 @@ export type Database = {
           body: string
           created_at?: string
           id?: never
+          image_path?: string | null
           read_at?: string | null
           recipient_id: string
           sender_id: string
@@ -691,6 +693,7 @@ export type Database = {
           body?: string
           created_at?: string
           id?: never
+          image_path?: string | null
           read_at?: string | null
           recipient_id?: string
           sender_id?: string
