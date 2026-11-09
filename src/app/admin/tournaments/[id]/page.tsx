@@ -19,7 +19,7 @@ import { MODES, type ModeKey } from "@/lib/modes";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, manualBracketAction } from "@/app/actions/admin-match";
-import { bracketSize, seedOrder } from "@/lib/bracket";
+import { bracketSize, playInLast, seedOrder } from "@/lib/bracket";
 import { BracketDraft, type DraftTeam } from "@/components/admin/bracket-draft";
 import { prefetchMaps, setAutoApprove, setAutopilot } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
@@ -509,7 +509,7 @@ function BracketTab({
   checkedIn,
   draw,
 }: {
-  t: Pick<T, "id" | "slug" | "bracket_published_at" | "bracket_type" | "playoff_type" | "third_place_match">;
+  t: Pick<T, "id" | "slug" | "bracket_published_at" | "bracket_type" | "playoff_type" | "third_place_match" | "max_teams">;
   approved: number;
   checkedIn: number;
   draw: Awaited<ReturnType<typeof getLastDraw>>;
@@ -562,6 +562,12 @@ function BracketTab({
             Одобрено команд: <span className="num font-semibold text-fg">{approved}</span>, подтвердили участие: <span className="num font-semibold text-fg">{checkedIn}</span>. Если мест в сетке больше, чем команд,
             свободные места пропускаются — соперник проходит дальше автоматически.
           </div>
+          {t.bracket_type === "single_elimination" && (t.max_teams & (t.max_teams - 1)) !== 0 && (
+            <div className="rounded-control border border-accent/30 bg-accent-dim px-4 py-3 text-[15px] leading-relaxed text-fg-2">
+              <b className="text-fg">Лимит {t.max_teams} — с отборочными.</b> Команды сверх 16 отсеиваются в первом раунде: в отборочных играют последние
+              одобренные (по времени одобрения), остальные проходят сразу в 1/8. В предпросмотре ниже они уже стоят в парах — при необходимости поменяйте вручную.
+            </div>
+          )}
           {thirdPlaceNote}
         </div>
       )}
@@ -597,7 +603,7 @@ async function ManualPairs({
   thirdPlace,
 }: {
   thirdPlace: boolean;
-  t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official">;
+  t: Pick<T, "id" | "bracket_type" | "bracket_published_at" | "is_official" | "max_teams">;
   regs: RegistrationWithTeam[];
   fill: string;
   seed: string;
@@ -607,8 +613,12 @@ async function ManualPairs({
   const size = bracketSize(Math.max(regs.length, t.bracket_type === "double_elimination" ? 4 : 2));
   const elo = (r: RegistrationWithTeam) => averageElo(r.roster.filter((p) => p.role === "main")) ?? 0;
   const order = seedOrder(size);
-  const fromList = (list: RegistrationWithTeam[]): [string | null, string | null][] =>
-    Array.from({ length: size / 2 }, (_, p) => [list[order[2 * p] - 1]?.team_id ?? null, list[order[2 * p + 1] - 1]?.team_id ?? null]);
+  // лимит 18 и т.п.: последние одобренные команды — в отборочные (пары первого раунда), остальные проходят без игры
+  const playIn = (list: RegistrationWithTeam[]) => (t.bracket_type === "single_elimination" ? playInLast(list, t.max_teams) : list);
+  const fromList = (raw: RegistrationWithTeam[]): [string | null, string | null][] => {
+    const list = playIn(raw);
+    return Array.from({ length: size / 2 }, (_, p) => [list[order[2 * p] - 1]?.team_id ?? null, list[order[2 * p + 1] - 1]?.team_id ?? null]);
+  };
   // предпросмотр: «случайно» (кнопка даёт новое зерно), «по рейтингу» — сильные разведены, иначе — как сейчас на сайте
   const mode = fill === "elo" ? "elo" : fill === "random" || !t.bracket_published_at ? "random" : "current";
   let pairs: [string | null, string | null][] = [];

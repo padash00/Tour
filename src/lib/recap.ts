@@ -1,5 +1,5 @@
 import "server-only";
-import { roundTitle } from "./bracket";
+import { hasPlayIn, roundTitle } from "./bracket";
 import { rankQuarterLosers, WALKOVER_ROUNDS, type QuarterTiebreak } from "./awards-core";
 import { createHash } from "node:crypto";
 import { averageElo } from "./data";
@@ -176,7 +176,7 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
         : tx("тур {n}", { n: m.round })
       : m.bracket === "swiss"
         ? tx("Швейцарка · раунд {n}", { n: m.round })
-        : roundTitle(m.bracket, m.round, totalUpper, totalLower, tx);
+        : roundTitle(m.bracket, m.round, totalUpper, totalLower, tx, hasPlayIn(matches));
   const championPath: PathStep[] = champion
     ? matches
         .filter((m) => m.status === "finished" && (m.team1_id === champion.id || m.team2_id === champion.id))

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { roundTitle } from "@/lib/bracket";
+import { hasPlayIn, roundTitle, type StageRound } from "@/lib/bracket";
 import type { MatchWithTeams } from "@/lib/matches";
 import { formatDateTime } from "@/lib/format";
 import type { MatchStatus } from "@/lib/types";
@@ -47,14 +47,14 @@ export function MatchStatusBadge({ status, compact }: { status: MatchStatus; com
 
 export function matchStage(
   m: { bracket: MatchWithTeams["bracket"]; round: number; group_label?: string | null },
-  all: { bracket: string; round: number }[],
+  all: StageRound[],
   t: T = makeT("ru"),
 ) {
   if (m.bracket === "group") return m.group_label ? t("Группа {g} · тур {n}", { g: m.group_label, n: m.round }) : t("тур {n}", { n: m.round });
   if (m.bracket === "swiss") return t("Швейцарка · раунд {n}", { n: m.round });
   const totalUpper = Math.max(0, ...all.filter((x) => x.bracket === "upper").map((x) => x.round));
   const totalLower = Math.max(0, ...all.filter((x) => x.bracket === "lower").map((x) => x.round));
-  return roundTitle(m.bracket, m.round, totalUpper, totalLower, t);
+  return roundTitle(m.bracket, m.round, totalUpper, totalLower, t, hasPlayIn(all));
 }
 
 /** Строка матча: команды по краям, счёт или время по центру. Без рамки-карточки */

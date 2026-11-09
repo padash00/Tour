@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
 import type { ReactNode } from "react";
-import { roundTitle } from "@/lib/bracket";
+import { hasPlayIn, roundTitle } from "@/lib/bracket";
 import { formatDate, mapName } from "@/lib/format";
 import { getMatchRosters, getVisibleMatch } from "@/lib/matches";
 import { modeOf } from "@/lib/modes";
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
     getStatRows({ matchId: m.id }),
     getMapImages(),
     ogFonts(),
-    db().from("matches").select("bracket, round").eq("tournament_id", m.tournament_id),
+    db().from("matches").select("bracket, round, is_walkover, team1_id, team2_id").eq("tournament_id", m.tournament_id),
   ]);
 
   // 1×1: «команда» — сам игрок, показываем его аватар
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/ima
       ? `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`
       : m.bracket === "swiss"
         ? `Швейцарка · раунд ${m.round}`
-        : roundTitle(m.bracket, m.round, totalUpper, totalLower);
+        : roundTitle(m.bracket, m.round, totalUpper, totalLower, undefined, hasPlayIn(rounds));
   const tagOf = (teamId: string | null) => (teamId === m.team1_id ? m.team1!.tag : teamId === m.team2_id ? m.team2!.tag : null);
   // логотип для тёмного фона
   const logo = await svgPng(await readFile(join(process.cwd(), "public/brand/f16-arena-horizontal.svg")), 240 * scale);

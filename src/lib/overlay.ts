@@ -4,7 +4,7 @@
  * Наружу уходит только публичное: названия, теги и логотипы команд, счёт, карты, этап, название турнира.
  * Ни адреса и пароля сервера, ни игроков, ни анкет.
  */
-import { roundTitle, type Side } from "./bracket";
+import { hasPlayIn, roundTitle, type Side, type StageRound } from "./bracket";
 import { mapLabel } from "./maps";
 
 export type OverlayTeam = { name: string; tag: string; logo: string | null };
@@ -78,13 +78,13 @@ export function pickOverlayMatch<T extends MatchCandidate>(rows: T[]): T | null 
 // ───────────────────────── подпись этапа
 
 /** Как matchStage на сайте: «Полуфинал», «Матч за 3-е место», «Группа A · тур 2» */
-export function overlayStage(m: { bracket: string; round: number; group_label?: string | null }, all: { bracket: string; round: number }[]) {
+export function overlayStage(m: { bracket: string; round: number; group_label?: string | null }, all: StageRound[]) {
   if (m.bracket === "group") return `${m.group_label ? `Группа ${m.group_label} · ` : ""}тур ${m.round}`;
   if (m.bracket === "swiss") return `Швейцарка · раунд ${m.round}`;
   const upper = Math.max(0, ...all.filter((x) => x.bracket === "upper").map((x) => x.round));
   const lower = Math.max(0, ...all.filter((x) => x.bracket === "lower").map((x) => x.round));
   // «Гранд-финал · фора 1:0» — фора видна по счёту, на оверлее хватит «Гранд-финал»
-  return roundTitle(m.bracket as Side, m.round, upper, lower).replace(/ · фора.*$/, "");
+  return roundTitle(m.bracket as Side, m.round, upper, lower, undefined, hasPlayIn(all)).replace(/ · фора.*$/, "");
 }
 
 // ───────────────────────── сборка ответа
@@ -107,7 +107,7 @@ export type OverlaySource = {
   teams: { id: string; name: string; tag: string; logo_url: string | null }[];
   maps: { map_number: number; map_name: string; status: string; team1_score: number; team2_score: number; winner_id: string | null; picked_by: string | null }[];
   /** bracket/round всех матчей турнира — для «Финал верхней сетки» и т.п. */
-  rounds: { bracket: string; round: number }[];
+  rounds: StageRound[];
   /** готовая подпись этапа (игра лобби — не матч сетки) */
   stage?: string;
 };

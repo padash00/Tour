@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Info, MoveHorizontal } from "lucide-react";
-import { THIRD_PLACE_TITLE, roundTitle } from "@/lib/bracket";
+import { THIRD_PLACE_TITLE, hasPlayIn, roundTitle } from "@/lib/bracket";
 import { liveMapOf, mapLabel } from "@/lib/maps";
 import type { MatchWithTeams } from "@/lib/matches";
 import type { Team } from "@/lib/types";
@@ -142,6 +142,7 @@ function BracketSection({
   totalLower,
   hints,
   t,
+  playIn = false,
 }: {
   title: string;
   matches: MatchWithTeams[];
@@ -149,6 +150,7 @@ function BracketSection({
   totalLower: number;
   hints: SlotHints;
   t: T;
+  playIn?: boolean;
 }) {
   const { placed, rounds } = layout(matches);
   const all = [...placed.values()];
@@ -199,7 +201,7 @@ function BracketSection({
                 )}
                 style={{ left: col * (W + GAP_X), top: 0, width: W }}
               >
-                <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower, t)}</span>
+                <span className="truncate">{roundTitle(inRound[0]?.bracket ?? side, r, totalUpper, totalLower, t, playIn)}</span>
                 <span className="num text-meta font-medium text-fg-3">
                   {active && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" aria-hidden />}
                   {inRound.length} {t.plural(inRound.length, "матч", "матча", "матчей")}
@@ -229,6 +231,10 @@ export async function BracketView({ matches }: { matches: MatchWithTeams[] }) {
   const thirdPlace = playoff.filter((m) => m.bracket === "third_place");
   const totalUpper = Math.max(0, ...upper.map((m) => m.round));
   const totalLower = Math.max(0, ...lower.map((m) => m.round));
+  // отборочные (18 команд в сетке на 32): первый раунд — отдельным блоком, только настоящие матчи, без строк «проходит без игры»
+  const playIn = hasPlayIn(upper);
+  const qualifiers = playIn ? upper.filter((m) => m.round === 1 && m.team1_id && m.team2_id) : [];
+  const main = playIn ? upper.filter((m) => m.round > 1) : upper;
 
   if (playoff.length === 0) return null;
   const hints = slotHints(playoff, t);
@@ -267,10 +273,14 @@ export async function BracketView({ matches }: { matches: MatchWithTeams[] }) {
           </div>
         </div>
 
-        {upper.length > 0 && (
+        {qualifiers.length > 0 && (
+          <BracketSection title={t("Отборочные")} matches={qualifiers} totalUpper={totalUpper} totalLower={totalLower} hints={hints} t={t} playIn />
+        )}
+
+        {main.length > 0 && (
           <BracketSection
             title={lower.length ? t("Верхняя сетка") : t("Плей-офф")}
-            matches={upper}
+            matches={main}
             totalUpper={totalUpper}
             totalLower={totalLower}
             hints={hints}

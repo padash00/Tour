@@ -8,7 +8,7 @@ import { eloAverage, getTournamentById, getTournamentRegistrations } from "@/lib
 import { formatDateTime, fromLocalInput } from "@/lib/format";
 import { createBracket, getMatch, syncBracket } from "@/lib/matches";
 import { drawOrder, type DrawRecord } from "@/lib/draw";
-import { bracketSize, seedOrder } from "@/lib/bracket";
+import { bracketSize, playInLast, seedOrder } from "@/lib/bracket";
 import { enqueueCommand } from "@/lib/server-control";
 import { db } from "@/lib/supabase";
 import type { SeriesResult } from "@/lib/types";
@@ -58,7 +58,7 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
   };
   // перемешивание до сортировки: при равном ELO без ручного seed порядок случайный
   const shuffled = drawOrder(regs);
-  const ordered =
+  const sorted =
     seeding === "draw"
       ? shuffled
       : shuffled.sort((a, b) => {
@@ -68,6 +68,8 @@ export async function generateBracketAction(_prev: ActionResult, formData: FormD
           if (b.seed != null) return 1;
           return avgElo(b) - avgElo(a);
         });
+  // лимит 18 и т.п.: последние одобренные команды — в отборочные
+  const ordered = t.bracket_type === "single_elimination" ? playInLast(sorted, t.max_teams) : sorted;
 
   if (t.bracket_published_at) await clearBracket(t.id);
   for (const [i, r] of ordered.entries()) {

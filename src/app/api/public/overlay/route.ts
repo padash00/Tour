@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isPrivateTournament } from "@/lib/private-tournament";
 import { mockOverlay, parseOverlayQuery, pickOverlayMatch, shapeOverlay, type OverlayQuery, type OverlaySource } from "@/lib/overlay";
+import type { StageRound } from "@/lib/bracket";
 import { db } from "@/lib/supabase";
 import type { MatchStatus } from "@/lib/types";
 
@@ -124,7 +125,7 @@ async function load(query: OverlayQuery): Promise<OverlaySource | null> {
     db().from("match_maps").select("map_number, map_name, status, team1_score, team2_score, winner_id, picked_by").eq("match_id", m.id).order("map_number"),
     // для подписи этапа нужны только раунды верхней/нижней сетки
     m.bracket === "upper" || m.bracket === "lower"
-      ? db().from("matches").select("bracket, round").eq("tournament_id", m.tournament_id).in("bracket", ["upper", "lower"])
+      ? db().from("matches").select("bracket, round, is_walkover, team1_id, team2_id").eq("tournament_id", m.tournament_id).in("bracket", ["upper", "lower"])
       : Promise.resolve({ data: [] }),
   ]);
   return {
@@ -132,6 +133,6 @@ async function load(query: OverlayQuery): Promise<OverlaySource | null> {
     tournament: tournament.data ?? null,
     teams: teams.data ?? [],
     maps: maps.data ?? [],
-    rounds: (rounds.data ?? []) as { bracket: string; round: number }[],
+    rounds: (rounds.data ?? []) as StageRound[],
   };
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { roundTitle } from "@/lib/bracket";
+import { hasPlayIn, roundTitle } from "@/lib/bracket";
 import { FORMATS, isFormat } from "@/lib/formats";
 import { mapLabel } from "@/lib/maps";
 import { MODES } from "@/lib/modes";
@@ -60,12 +60,13 @@ export async function GET() {
 
 /** Идущие матчи турнира: команды, счёт серии (BO1 — счёт идущей карты), карта, этап */
 async function liveMatches(tournamentId: string) {
-  const { data: all } = await db().from("matches").select("id, status, bracket, round, best_of, team1_id, team2_id, team1_score, team2_score").eq("tournament_id", tournamentId);
+  const { data: all } = await db().from("matches").select("id, status, bracket, round, best_of, team1_id, team2_id, team1_score, team2_score, is_walkover").eq("tournament_id", tournamentId);
   const rows = all ?? [];
   const playing = rows.filter((m) => m.status === "live").slice(0, 6);
   if (!playing.length) return { matches: [] };
   const upper = Math.max(0, ...rows.filter((m) => m.bracket === "upper").map((m) => m.round));
   const lower = Math.max(0, ...rows.filter((m) => m.bracket === "lower").map((m) => m.round));
+  const playIn = hasPlayIn(rows);
   const teamIds = playing.flatMap((m) => [m.team1_id, m.team2_id]).filter((x): x is string => !!x);
   const [{ data: teams }, { data: maps }] = await Promise.all([
     db().from("teams").select("id, name").in("id", teamIds),
@@ -85,7 +86,7 @@ async function liveMatches(tournamentId: string) {
         score1: rounds ? map.team1_score : m.team1_score,
         score2: rounds ? map.team2_score : m.team2_score,
         map: map?.map_name ? mapLabel(map.map_name) : null,
-        stage: roundTitle(m.bracket, m.round, upper, lower),
+        stage: roundTitle(m.bracket, m.round, upper, lower, undefined, playIn),
         url: `${SITE}/matches/${m.id}`,
       };
     }),

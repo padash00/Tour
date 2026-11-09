@@ -47,6 +47,37 @@ export function bracketSize(teams: number) {
   return size;
 }
 
+/**
+ * Отборочные (Single Elimination с лимитом не степенью двойки, например 18): лишние команды сверх 16
+ * отсеиваются в первом раунде. Играют в нём последние одобренные — по одной паре на каждую лишнюю команду.
+ * В сетке на 2P мест реальные матчи первого раунда — у сидов P−extra+1..n, поэтому эти команды ставятся в конец посева.
+ * Лимит 4/8/16/32 — правило не действует, посев как был.
+ */
+export function playInLast<X extends { decided_at: string | null }>(ordered: X[], maxTeams: number): X[] {
+  const n = ordered.length;
+  if (n < 3 || (maxTeams & (maxTeams - 1)) === 0) return ordered;
+  const extra = n - 2 ** Math.floor(Math.log2(n));
+  if (!extra) return ordered;
+  const late = new Set(
+    [...ordered].sort((a, b) => (b.decided_at ?? "").localeCompare(a.decided_at ?? "")).slice(0, 2 * extra),
+  );
+  return [...ordered.filter((x) => !late.has(x)), ...ordered.filter((x) => late.has(x))];
+}
+
+/**
+ * Первый раунд олимпийки — отборочные: больше половины его матчей — проход без игры (18 команд в сетке на 32).
+ * Тогда раунд называется «Отборочные», а на сайте показываются только настоящие матчи.
+ */
+/** Раунд сетки для подписи этапа; поля прохода без игры нужны, чтобы узнать отборочные */
+export type StageRound = { bracket: string; round: number; is_walkover?: boolean | null; team1_id?: string | null; team2_id?: string | null };
+
+export function hasPlayIn(all: StageRound[]) {
+  if (all.some((m) => m.bracket === "lower")) return false;
+  const first = all.filter((m) => m.bracket === "upper" && m.round === 1);
+  const byes = first.filter((m) => m.is_walkover && (!m.team1_id || !m.team2_id)).length;
+  return first.length >= 4 && byes * 2 > first.length;
+}
+
 /** Количество матчей в раунде нижней сетки (раунды 1..2(k-1)) */
 function lowerRoundSize(size: number, round: number) {
   if (round === 1) return size / 4;
@@ -252,7 +283,7 @@ export function resolveBracket(matches: BracketMatch[]): Set<string> {
   return changed;
 }
 
-export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number, t: T = makeT("ru")) {
+export function roundTitle(bracket: Side, round: number, totalUpper: number, totalLower: number, t: T = makeT("ru"), playIn = false) {
   if (bracket === "grand_final") return t("Гранд-финал · фора 1:0");
   if (bracket === "third_place") return t(THIRD_PLACE_TITLE);
   if (bracket === "group") return t("Тур {n}", { n: round });
@@ -260,6 +291,7 @@ export function roundTitle(bracket: Side, round: number, totalUpper: number, tot
   if (bracket === "upper") {
     if (round === totalUpper) return totalLower ? t("Финал верхней сетки") : t("Финал");
     if (round === totalUpper - 1) return totalLower ? t("Полуфинал верхней сетки") : t("Полуфинал");
+    if (playIn && round === 1 && !totalLower) return t("Отборочные");
     // олимпийка без нижней сетки: «1/4 финала», «1/8 финала» — так понятнее, чем «раунд 2»
     if (!totalLower) return t("1/{n} финала", { n: 2 ** (totalUpper - round) });
     return t("Верхняя · раунд {n}", { n: round });

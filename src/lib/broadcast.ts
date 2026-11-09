@@ -4,7 +4,7 @@
  * Наружу уходит только публичное (как на странице турнира): команды, счёт, карты, этап, расписание,
  * ники и статистика игроков. Ни адресов и паролей серверов, ни анкет.
  */
-import { THIRD_PLACE_TITLE, roundTitle, type Side } from "./bracket";
+import { THIRD_PLACE_TITLE, hasPlayIn, roundTitle, type Side } from "./bracket";
 import { mapLabel } from "./maps";
 
 // ───────────────────────── типы ответа
@@ -162,7 +162,7 @@ export function pickBroadcastTournament<T extends { status: string; starts_at: s
  * Название раунда для трансляции. Одиночная сетка — «1/8 финала», «1/4 финала», «Полуфинал», «Финал»;
  * двойная — как на сайте («Финал верхней сетки», «Нижняя · раунд 2»), гранд-финал без пометки форы.
  */
-export function bcRoundLabel(bracket: Side, round: number, totalUpper: number, totalLower: number, groupLabel?: string | null) {
+export function bcRoundLabel(bracket: Side, round: number, totalUpper: number, totalLower: number, groupLabel?: string | null, playIn = false) {
   if (bracket === "group") return `${groupLabel ? `Группа ${groupLabel} · ` : ""}тур ${round}`;
   if (bracket === "swiss") return `Швейцарка · раунд ${round}`;
   if (bracket === "third_place") return THIRD_PLACE_TITLE;
@@ -171,6 +171,7 @@ export function bcRoundLabel(bracket: Side, round: number, totalUpper: number, t
     const left = totalUpper - round;
     if (left <= 0) return "Финал";
     if (left === 1) return "Полуфинал";
+    if (playIn && round === 1) return "Отборочные";
     return `1/${2 ** left} финала`;
   }
   return roundTitle(bracket, round, totalUpper, totalLower);
@@ -241,6 +242,7 @@ export function shapeBroadcast(src: BroadcastSource | null, now = new Date()): B
   const elim = rows.filter((m) => m.bracket === "upper" || m.bracket === "lower");
   const totalUpper = Math.max(0, ...elim.filter((m) => m.bracket === "upper").map((m) => m.round));
   const totalLower = Math.max(0, ...elim.filter((m) => m.bracket === "lower").map((m) => m.round));
+  const playIn = hasPlayIn(elim);
 
   const shape = (m: BroadcastSource["matches"][number]): BcMatch => {
     const side = (id: string | null): 1 | 2 | null => (!id ? null : id === m.team1_id ? 1 : id === m.team2_id ? 2 : null);
@@ -265,7 +267,7 @@ export function shapeBroadcast(src: BroadcastSource | null, now = new Date()): B
       bracket: m.bracket as Side,
       round: m.round,
       position: m.position,
-      stage: bcRoundLabel(m.bracket as Side, m.round, totalUpper, totalLower, m.group_label),
+      stage: bcRoundLabel(m.bracket as Side, m.round, totalUpper, totalLower, m.group_label, playIn),
       bestOf: m.best_of,
       team1: (m.team1_id && teamById.get(m.team1_id)) || null,
       team2: (m.team2_id && teamById.get(m.team2_id)) || null,
@@ -288,7 +290,8 @@ export function shapeBroadcast(src: BroadcastSource | null, now = new Date()): B
   const playoff = all.filter((m, i) => (rows[i].stage ?? "playoff") === "playoff" && m.bracket !== "group" && m.bracket !== "swiss");
   const columns = (list: BcMatch[]) =>
     [...new Set(list.map((m) => m.round))].sort((a, b) => a - b).map((r) => list.filter((m) => m.round === r).sort((a, b) => a.position - b.position));
-  const upper = playoff.filter((m) => m.bracket === "upper");
+  // отборочные (18 команд в сетке на 32) на экране сетки не рисуем — сетка начинается с 1/8, сами матчи видны в расписании
+  const upper = playoff.filter((m) => m.bracket === "upper" && !(playIn && m.round === 1));
   const lower = playoff.filter((m) => m.bracket === "lower");
   const bracket: BcBracket = {
     kind: !upper.length ? "none" : lower.length ? "de" : "se",

@@ -43,7 +43,9 @@ export function BracketDraft({ teams, initial, thirdPlace }: { teams: DraftTeam[
   let names: (string | null)[] = pairs.map(([a, b]) => (a && !b ? byId.get(a)!.name : b && !a ? byId.get(b)!.name : null));
   let numbers = pairs.map((_, i) => i + 1);
   let n = pairs.length;
-  rounds.push({ label: roundName(1, k), slots: pairs.map(([a, b]) => [a ? byId.get(a)!.name : null, b ? byId.get(b)!.name : null]) });
+  // больше половины пар — проход без игры: первый раунд — отборочные (18 команд в сетке на 32)
+  const playIn = pairs.length >= 4 && pairs.filter(([a, b]) => !a || !b).length * 2 > pairs.length;
+  rounds.push({ label: playIn ? "Отборочные" : roundName(1, k), slots: pairs.map(([a, b]) => [a ? byId.get(a)!.name : null, b ? byId.get(b)!.name : null]) });
   for (let r = 2; r <= k; r++) {
     const slots: (string | null)[][] = [];
     const nextNames: (string | null)[] = [];

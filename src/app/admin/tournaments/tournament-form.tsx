@@ -494,8 +494,11 @@ export function TournamentForm({
                 <Segmented
                   value={maxTeams}
                   onChange={setMaxTeams}
-                  options={(bracket === "round_robin" ? [3, 4, 5, 6, 8] : [4, 8, 16, 32]).map((n) => ({ value: n, label: String(n) }))}
+                  options={(bracket === "round_robin" ? [3, 4, 5, 6, 8] : bracket === "single_elimination" ? [4, 8, 16, 18, 32] : [4, 8, 16, 32]).map((n) => ({ value: n, label: String(n) }))}
                 />
+                {bracket === "single_elimination" && maxTeams === 18 && (
+                  <Hint>18 = 16 + отборочные: последние 4 одобренные команды играют 2 матча, победители проходят в 1/8.</Hint>
+                )}
               </div>
               <div>
                 <Label>Обычные матчи (сколько карт)</Label>
