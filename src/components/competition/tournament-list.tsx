@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ChevronRight, Trophy } from "lucide-react";
+import { ArrowRight, ChevronRight, Lock, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bracketLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { modeOf } from "@/lib/modes";
@@ -30,6 +30,8 @@ export type TournamentItem = {
   approved: number;
   prize_pool: string | null;
   cover_url: string | null;
+  /** закрытый турнир — в списке только у администратора */
+  private?: boolean;
 };
 
 const FILTERS: { key: string; label: string; match: TournamentStatus[] }[] = [
@@ -191,7 +193,14 @@ function Row({ t }: { t: TournamentItem }) {
   return (
     <Link href={`/tournaments/${t.slug}`} className="group flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 transition-colors duration-[var(--dur-hover)] hover:bg-surface-2 sm:flex-nowrap">
       <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-        <div className="truncate text-[15px] font-semibold text-fg group-hover:text-accent">{t.name}</div>
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[15px] font-semibold text-fg group-hover:text-accent">{t.name}</span>
+          {t.private && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2 py-0.5 text-micro text-fg-3" title="Виден только администраторам">
+              <Lock className="size-3" aria-hidden /> Закрытый · видите только вы
+            </span>
+          )}
+        </div>
         <div className="mt-0.5 truncate text-meta text-fg-3">
           {facts(t, tx).join(" · ")} · {t.starts_at ? formatDateTime(t.starts_at, tx.lang) : tx("дата уточняется")}
         </div>

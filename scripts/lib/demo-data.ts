@@ -7,7 +7,7 @@ import { pick, rngFrom, ROLES, type Rng } from "./demo-sim";
 
 export const DEMO_SLUG = "demo-cs-uka-2026";
 export const DEMO_NAME = "DEMO · CS Uka-2026";
-/** SteamID демо-игроков: префикс + две цифры (01–80 — участники, 81–90 — неверные заявки, 99 — организатор) */
+/** SteamID демо-игроков: префикс + две цифры (01–90 — участники, 81–90 — сначала неверные заявки, их удаляют до основных; 99 — организатор) */
 export const DEMO_STEAM_PREFIX = "765611999990000";
 export const DEMO_INVITE_PREFIX = "DEMO-UKA-";
 export const DEMO_ORGANIZER_STEAM = `${DEMO_STEAM_PREFIX}99`;
@@ -80,9 +80,11 @@ const TEAMS: TeamDef[] = [
   { name: "Строитель Hammers", org: "ТОО «УК Строй Монтаж Демо»", kind: "work", groups: [] },
   { name: "IT Hub Bytes", org: "ИП «Алтай IT Решения Демо»", kind: "work", groups: [] },
   { name: "Горняки Miners", org: "ТОО «Восток Горный Сервис Демо»", kind: "work", groups: [] },
+  { name: "Транспорт Drift", org: "ТОО «Восток Транс Демо»", kind: "work", groups: [] },
+  { name: "Связь Signal", org: "ТОО «Алтай Телеком Демо»", kind: "work", groups: [] },
 ];
 /** Уровни команд (по номеру DM01…DM16) — разные, чтобы результаты выглядели естественно */
-const STRENGTH = [1.18, 1.04, 1.12, 0.93, 1.07, 1.15, 0.88, 0.97, 1.1, 0.9, 1.0, 0.95, 0.86, 1.02, 1.21, 0.92];
+const STRENGTH = [1.18, 1.04, 1.12, 0.93, 1.07, 1.15, 0.88, 0.97, 1.1, 0.9, 1.0, 0.95, 0.86, 1.02, 1.21, 0.92, 0.98, 1.06];
 
 /** Дата рождения, при которой на день `day` исполнилось ровно `age` полных лет */
 function birthFor(rng: Rng, age: number, day: string) {
@@ -117,8 +119,9 @@ const TRANSLIT: Record<string, string> = {
 };
 const latin = (s: string) => s.toLowerCase().split("").map((c) => TRANSLIT[c] ?? c).join("");
 
-/** 16 команд по 5 игроков. day — день турнира (YYYY-MM-DD по Алматы) для возраста 16–35 */
-export function demoTeams(day = almatyDay(), seed = 2026): DemoTeam[] {
+/** count команд (до 18) по 5 игроков. day — день турнира (YYYY-MM-DD по Алматы) для возраста 16–35 */
+export const DEMO_MAX_TEAMS = 18;
+export function demoTeams(day = almatyDay(), seed = 2026, count = 16): DemoTeam[] {
   const rng = rngFrom(seed);
   const phones = new Set<string>();
   const nicks = new Set<string>();
@@ -131,7 +134,7 @@ export function demoTeams(day = almatyDay(), seed = 2026): DemoTeam[] {
       }
     }
   };
-  return TEAMS.map((def, ti) => {
+  return TEAMS.slice(0, Math.min(count, DEMO_MAX_TEAMS)).map((def, ti) => {
     const players: DemoPlayer[] = ROLES.map((role, pi) => {
       const who = person(rng);
       // учатся: студенты 17–22 (колледж 16–19); работают: 21–35; в рабочих командах один может учиться

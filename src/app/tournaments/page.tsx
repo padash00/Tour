@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { approvedCounts, getFeaturedTournament, listPublicTournaments } from "@/lib/data";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
+import { approvedCounts, getFeaturedTournament, listPrivateTournaments, listPublicTournaments } from "@/lib/data";
 import { TournamentList, type TournamentItem } from "@/components/competition/tournament-list";
 import { Container, PageTitle } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
@@ -22,7 +23,10 @@ const ORDER: Record<string, number> = { live: 0, checkin: 1, registration: 2, re
 
 export default async function TournamentsPage() {
   const tx = await getT();
-  const [all, featured] = await Promise.all([listPublicTournaments(), getFeaturedTournament()]);
+  const [open, featured, me] = await Promise.all([listPublicTournaments(), getFeaturedTournament(), getCurrentPlayer()]);
+  // закрытые турниры видит только администратор — с пометкой «Закрытый»
+  const closed = isAdmin(me) ? await listPrivateTournaments() : [];
+  const all = [...open, ...closed];
   const counts = await approvedCounts(all.map((t) => t.id));
   const current = featured && !["finished", "cancelled"].includes(featured.status) ? featured : null;
   // идущие и открытые — сверху; завершённые — новые первыми
@@ -43,6 +47,7 @@ export default async function TournamentsPage() {
       approved: counts[t.id] ?? 0,
       prize_pool: tournamentForLang(t, tx.lang).prize_pool,
       cover_url: t.cover_url,
+      private: !!t.is_private,
     }));
 
   return (

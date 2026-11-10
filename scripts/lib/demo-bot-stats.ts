@@ -68,7 +68,9 @@ export async function attributeBotStats(matchId: string, mapNumber: number): Pro
   };
 
   // события раундов → на игроков (уже переписанные раунды не меняются)
+  // игроки карты: закреплённые боты и уже переписанные раунды (повторный пересчёт идущей карты)
   const present = new Set([...assign.values()].map((p) => p.steamId));
+  for (const r of rounds) for (const a of actors(r.events as LogEvent[])) if (a.steamId && bySteam.has(a.steamId)) present.add(a.steamId);
   type Stat = { k: number; d: number; a: number; hs: number; fk: number; fd: number; fa: number; plant: number; defuse: number; kast: number; mvp: number; multi: Record<string, number>; rounds: number };
   const stat = new Map<string, Stat>();
   const st = (id: string) => {

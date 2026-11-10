@@ -158,6 +158,12 @@ export async function listPublicTournaments(): Promise<Tournament[]> {
   return (data ?? []) as Tournament[];
 }
 
+/** Закрытые турниры (кроме черновиков) — только для списка «Турниры» у администратора */
+export async function listPrivateTournaments(): Promise<Tournament[]> {
+  const { data } = await db().from("tournaments").select("*").neq("status", "draft").eq("is_private", true).order("starts_at", { ascending: true, nullsFirst: false });
+  return (data ?? []) as Tournament[];
+}
+
 const featuredPriority: Record<TournamentStatus, number> = {
   live: 0,
   checkin: 1,

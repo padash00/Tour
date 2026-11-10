@@ -12,7 +12,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { audit, notify } from "../../src/lib/audit";
 import { getTournamentRegistrations } from "../../src/lib/data";
+import { roundTitle } from "../../src/lib/bracket";
 import { drawOrder, type DrawRecord } from "../../src/lib/draw";
+import { markReady, matchHall } from "../../src/lib/hall";
+import { playInFirstKey } from "../../src/lib/settings";
 import { mapLabel } from "../../src/lib/maps";
 import { createBracket, getMatch, getMatchRosters, insertVetoAction, type MatchFull } from "../../src/lib/matches";
 import { getTournamentNominations } from "../../src/lib/nominations";
@@ -29,6 +32,7 @@ import { VETO_STEP_SECONDS, vetoState } from "../../src/lib/veto";
 import {
   DEMO_INVITE_PREFIX,
   DEMO_MAP_POOL,
+  DEMO_MAX_TEAMS,
   DEMO_NAME,
   DEMO_ORGANIZER_STEAM,
   DEMO_SLUG,
@@ -110,9 +114,11 @@ export type DemoOptions = {
   bots?: boolean;
   /** seed: турнир — копия настоящего (REAL_SLUG) со всеми настройками, регламентом и призами */
   copyReal?: boolean;
+  /** seed: сколько команд (до 18); по умолчанию 16, с copyReal — лимит настоящего турнира */
+  teams?: number;
 };
 
-type Ctx = Required<Omit<DemoOptions, "seed">> & { rng: Rng };
+type Ctx = Required<Omit<DemoOptions, "seed" | "teams">> & { rng: Rng };
 const context = (o: DemoOptions): Ctx => ({
   transport: o.transport,
   fast: !!o.fast,
@@ -216,7 +222,6 @@ export async function seedDemo(o: DemoOptions) {
 
   const startsAt = now();
   const day = tournamentDay({ starts_at: startsAt });
-  const teams = demoTeams(day);
 
   const { data: org } = await db()
     .from("players")
@@ -228,13 +233,18 @@ export async function seedDemo(o: DemoOptions) {
 
   // копия настоящего турнира: все его настройки, регламент, призы и спонсоры; своё — только адрес, имя, статус и даты
   let copy: Record<string, unknown> = {};
+  let realId: string | null = null;
+  let realMax: number | null = null;
   if (o.copyReal) {
     const { data: real } = await db().from("tournaments").select("*").eq("slug", REAL_SLUG).single().throwOnError();
     const OWN = ["id", "slug", "name", "status", "created_at", "updated_at", "bracket_published_at", "playoff_created_at", "starts_at",
       "registration_opens_at", "registration_closes_at", "checkin_opens_at", "checkin_closes_at", "autopilot"];
     const rest = Object.fromEntries(Object.entries(real!).filter(([k]) => !OWN.includes(k)));
     copy = { ...rest, description: `Генеральный прогон: копия «${real!.name}» со всеми настройками. Команды и игроки вымышлены, на серверах играют боты. Будет удалён после проверки.` };
+    realId = real!.id;
+    realMax = real!.max_teams;
   }
+  const teams = demoTeams(day, 2026, Math.min(DEMO_MAX_TEAMS, o.teams ?? realMax ?? 16));
   const { data: t } = await db()
     .from("tournaments")
     .insert({
@@ -262,13 +272,21 @@ export async function seedDemo(o: DemoOptions) {
       location: "Усть-Каменогорск",
       description: "Демонстрационный турнир: команды, игроки и матчи вымышлены и будут удалены после показа. Ранние раунды BO1, полуфиналы, матч за 3-е место и финал — BO3.",
       ...copy,
+      // закрытый: видят только админы — ни в списках, ни в чате Telegram, ни в боте
+      is_private: true,
     })
     .select("*")
     .single()
     .throwOnError();
   const tournament = t as Tournament;
   await audit(organizer, "tournament.create", { type: "tournament", id: tournament.id }, { slug: DEMO_SLUG, demo: true });
-  log(`Турнир «${DEMO_NAME}» создан (${tournament.id}), регистрация открыта`);
+  log(`Турнир «${DEMO_NAME}» создан (${tournament.id}), закрытый, лимит ${tournament.max_teams}, регистрация открыта`);
+  if (realId) {
+    // «Сначала отборочные» — как у настоящего турнира
+    const { data: flag } = await db().from("app_settings").select("value").eq("key", playInFirstKey(realId)).maybeSingle().throwOnError();
+    if (flag) await db().from("app_settings").upsert({ key: playInFirstKey(tournament.id), value: flag.value, updated_at: now() }).throwOnError();
+    log(`  «Сначала отборочные»: ${flag?.value === "1" ? "включено" : "выключено"}, как у ${REAL_SLUG}`);
+  }
 
   // ── две неверные заявки: их отклоняет та же проверка, что и на сайте
   log("\nПроверка отказов (заявки, которые сайт не должен принять):");
@@ -321,7 +339,7 @@ export async function seedDemo(o: DemoOptions) {
     await notify([r.captain], `Заявка ${r.team.name} на «${DEMO_NAME}» одобрена`, undefined, `/tournaments/${DEMO_SLUG}`);
     await audit(organizer, "registration.approved", { type: "registration", id: r.registrationId }, { team: r.team.tag, note: null });
   }
-  log("Документы отмечены сданными, 16 заявок одобрены");
+  log(`Документы отмечены сданными, ${registered.length} заявок одобрены`);
 
   // ── check-in
   await db().from("tournaments").update({ status: "checkin", updated_at: now() }).eq("id", tournament.id).throwOnError();
@@ -331,7 +349,7 @@ export async function seedDemo(o: DemoOptions) {
     await db().rpc("check_in_registration", { p_registration: r.registrationId, p_actor: organizer, p_admin: true }).throwOnError();
     await audit(organizer, "registration.checkin_admin", { type: "registration", id: r.registrationId });
   }
-  log("Check-in открыт, все 16 команд отмечены");
+  log(`Check-in открыт, все ${registered.length} команд отмечены`);
   log(`\nДальше: play — жеребьёвка, сетка и матчи. Страница: ${ctx.site}/tournaments/${DEMO_SLUG}`);
   return { tournamentId: tournament.id, teams: registered.length };
 }
@@ -356,8 +374,18 @@ async function drawBracket(ctx: Ctx, t: Tournament, organizer: string) {
   ctx.log(`Жеребьёвка: ${record.order.map((x) => `${x.seed}. ${x.name}`).join(", ")}`);
 }
 
-const ROUND_TITLE: Record<string, string> = { "upper:1": "1/8 финала", "upper:2": "1/4 финала", "upper:3": "Полуфинал", "upper:4": "Финал", "third_place:4": "Матч за 3-е место" };
-const stageOf = (m: { bracket: string; round: number }) => ROUND_TITLE[`${m.bracket}:${m.round}`] ?? `${m.bracket} ${m.round}`;
+/** Форма демо-сетки (раундов верхней сетки, есть ли отборочные) — для подписей этапов в журнале */
+const shape = { totalUpper: 4, playIn: false };
+async function loadShape(tournamentId: string) {
+  const { data } = await db().from("matches").select("round").eq("tournament_id", tournamentId).eq("bracket", "upper").throwOnError();
+  const rounds = (data ?? []).map((m) => m.round);
+  if (!rounds.length) return;
+  shape.totalUpper = Math.max(...rounds);
+  const r1 = rounds.filter((r) => r === 1).length;
+  const r2 = rounds.filter((r) => r === 2).length;
+  shape.playIn = shape.totalUpper > 1 && r1 < r2 * 2;
+}
+const stageOf = (m: { bracket: string; round: number }) => roundTitle(m.bracket as Parameters<typeof roundTitle>[0], m.round, shape.totalUpper, 0, undefined, shape.playIn);
 
 /** Вето капитанами: случайные допустимые баны/пики с паузами, через insertVetoAction (как ход капитана на сайте) */
 async function runVeto(ctx: Ctx, matchId: string, organizer: string) {
@@ -426,8 +454,8 @@ async function waitVetoStep(matchId: string, done: number, timeoutMs: number) {
 
 /** Составы матча → команды симуляции (роль и уровень игрока — из demo-data, уровень команды — по тегу) */
 async function simTeams(m: MatchFull): Promise<{ team1: SimTeam; team2: SimTeam }> {
-  const known = new Map(demoTeams().flatMap((t) => t.players.map((p) => [p.steamId, p] as const)));
-  const strength = new Map(demoTeams().map((t) => [t.tag, t.strength]));
+  const known = new Map(demoTeams(undefined, 2026, DEMO_MAX_TEAMS).flatMap((t) => t.players.map((p) => [p.steamId, p] as const)));
+  const strength = new Map(demoTeams(undefined, 2026, DEMO_MAX_TEAMS).map((t) => [t.tag, t.strength]));
   const rosters = await getMatchRosters(m);
   const build = (team: MatchFull["team1"], rows: typeof rosters.team1): SimTeam => {
     const mains = rows.filter((r) => r.role === "main").map((r) => r.player);
@@ -598,18 +626,36 @@ async function playWithBots(ctx: Ctx, m: MatchFull) {
  */
 async function playOnServers(ctx: Ctx, tournamentId: string, organizer: string) {
   const running = new Map<string, Promise<void>>();
+  const seated = new Map<string, number>();
   let failure: Error | null = null;
   for (;;) {
     if (failure) throw failure;
     const { data: list } = await db()
       .from("matches")
-      .select("id, number, bracket, round, status")
+      .select("id, number, bracket, round, status, team1:teams!matches_team1_id_fkey(captain_id), team2:teams!matches_team2_id_fkey(captain_id)")
       .eq("tournament_id", tournamentId)
       .not("status", "in", "(finished,cancelled)")
       .order("number")
       .throwOnError();
     if (!list?.length && !running.size) return;
     for (const row of list ?? []) {
+      // зал: матч вызван — команды «садятся» 20–90 с, капитаны жмут «Готов» (как кнопка на странице матча)
+      if (row.status === "upcoming" && !running.has(row.id)) {
+        const hall = await matchHall(row.id);
+        if (hall && !hall.vetoStarted) {
+          if (!seated.has(row.id)) {
+            seated.set(row.id, Date.now() + 20_000 + ctx.rng() * 70_000);
+            ctx.log(`  #${row.number} ${stageOf(row)}: вызван в зал — ${hall.seat1} / ${hall.seat2}`);
+          } else if (Date.now() >= seated.get(row.id)!) {
+            for (const cap of [row.team1?.captain_id, row.team2?.captain_id]) {
+              const err = cap ? await markReady(row.id, cap) : "нет капитана";
+              if (err && err !== "Бан-пик уже начался") ctx.log(`  #${row.number} «Готов»: ${err}`);
+            }
+            seated.set(row.id, Number.POSITIVE_INFINITY);
+          }
+        }
+        continue;
+      }
       if (running.has(row.id) || !["veto", "ready", "live"].includes(row.status)) continue;
       ctx.log(`  #${row.number} ${stageOf(row)}: ${row.status === "veto" ? "вето началось" : row.status}`);
       running.set(
@@ -660,6 +706,7 @@ export async function playDemo(o: DemoOptions) {
     t = (await loadTournament())!;
   }
   if (!t.bracket_published_at) await drawBracket(ctx, t, organizer);
+  await loadShape(t.id);
   if (t.status !== "live" && t.status !== "finished") {
     await db().from("tournaments").update({ status: "live", updated_at: now() }).eq("id", t.id).throwOnError();
     await audit(organizer, "tournament.status", { type: "tournament", id: t.id }, { from: t.status, to: "live" });
@@ -801,6 +848,7 @@ export async function cleanupDemo(o: DemoOptions) {
   await inChunks(playerIds, async (c) => (await db().from("player_profiles").delete().in("player_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("rate_limit_claims").delete().in("actor_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("players").delete().in("id", c).throwOnError()).data);
+  if (tournamentIds.length) await db().from("app_settings").delete().in("key", tournamentIds.map(playInFirstKey)).throwOnError();
   if (tournamentIds.length) await db().from("tournaments").delete().in("id", tournamentIds).throwOnError();
   // отметки о принятых событиях: лог — по номеру матча, события MatchZy — по журналу этого компьютера
   for (const id of matchzyIds) await db().from("ingest_dedupe").delete().like("key", `log${id}:%`).throwOnError();
