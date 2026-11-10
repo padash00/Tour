@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { audit, notify } from "../../src/lib/audit";
 import { getTournamentRegistrations } from "../../src/lib/data";
-import { roundTitle } from "../../src/lib/bracket";
+import { hasPlayIn, roundTitle } from "../../src/lib/bracket";
 import { drawOrder, type DrawRecord } from "../../src/lib/draw";
 import { markReady, matchHall } from "../../src/lib/hall";
 import { playInFirstKey } from "../../src/lib/settings";
@@ -377,13 +377,11 @@ async function drawBracket(ctx: Ctx, t: Tournament, organizer: string) {
 /** Форма демо-сетки (раундов верхней сетки, есть ли отборочные) — для подписей этапов в журнале */
 const shape = { totalUpper: 4, playIn: false };
 async function loadShape(tournamentId: string) {
-  const { data } = await db().from("matches").select("round").eq("tournament_id", tournamentId).eq("bracket", "upper").throwOnError();
-  const rounds = (data ?? []).map((m) => m.round);
-  if (!rounds.length) return;
-  shape.totalUpper = Math.max(...rounds);
-  const r1 = rounds.filter((r) => r === 1).length;
-  const r2 = rounds.filter((r) => r === 2).length;
-  shape.playIn = shape.totalUpper > 1 && r1 < r2 * 2;
+  const { data } = await db().from("matches").select("bracket, round, is_walkover, team1_id, team2_id").eq("tournament_id", tournamentId).throwOnError();
+  const upper = (data ?? []).filter((m) => m.bracket === "upper");
+  if (!upper.length) return;
+  shape.totalUpper = Math.max(...upper.map((m) => m.round));
+  shape.playIn = hasPlayIn(data ?? []);
 }
 const stageOf = (m: { bracket: string; round: number }) => roundTitle(m.bracket as Parameters<typeof roundTitle>[0], m.round, shape.totalUpper, 0, undefined, shape.playIn);
 

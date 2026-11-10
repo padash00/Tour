@@ -14,6 +14,21 @@ const observerIds = async () =>
     .map((s) => s.trim())
     .filter((s) => /^\d{17}$/.test(s));
 
+/**
+ * Короткие карты для генерального прогона: app_settings TEST_MAXROUNDS:<id турнира> = N (2…24) — MR N вместо MR24,
+ * смена сторон через N/2 раундов, овертайм тоже по N. Только для закрытых турниров (тестовых), у открытых не действует.
+ */
+export const testMaxRoundsKey = (tournamentId: string) => `TEST_MAXROUNDS:${tournamentId}`;
+async function testMaxRounds(tournamentId: string): Promise<Record<string, number>> {
+  const [{ data: t }, { data: row }] = await Promise.all([
+    db().from("tournaments").select("is_private").eq("id", tournamentId).maybeSingle(),
+    db().from("app_settings").select("value").eq("key", testMaxRoundsKey(tournamentId)).maybeSingle(),
+  ]);
+  const n = Number.parseInt(row?.value ?? "", 10);
+  if (!t?.is_private || !Number.isFinite(n) || n < 2 || n > 24 || n % 2) return {};
+  return { mp_maxrounds: n, mp_overtime_maxrounds: n, mp_halftime_duration: 3 };
+}
+
 export async function buildMatchzyConfig(matchId: string) {
   const [m, observers, admins] = await Promise.all([getMatch(matchId), observerIds(), adminPlayers()]);
   if (!m) {
@@ -60,6 +75,7 @@ export async function buildMatchzyConfig(matchId: string) {
       mp_team_timeout_time: m.tournament.timeout_seconds,
       // MatchZy применяет эти cvars через секунду после live.cfg; на aim-картах — без фризтайма
       ...modeCvars(m.tournament.format, m.maps.map((x) => x.map_name)),
+      ...(await testMaxRounds(m.tournament_id)),
     },
   };
 }
@@ -112,7 +128,7 @@ export function isAimMap(map: string) {
 }
 
 export async function matchEnforce(matchId: string) {
-  const { data } = await db().from("matches").select("matchzy_id, tournament:tournaments(format, overtime, timeouts_per_team, timeout_seconds)").eq("id", matchId).single();
+  const { data } = await db().from("matches").select("matchzy_id, tournament_id, tournament:tournaments(format, overtime, timeouts_per_team, timeout_seconds)").eq("id", matchId).single();
   const row = data;
   if (!row) return null;
   const { data: maps } = await db().from("match_maps").select("map_number, map_name").eq("match_id", matchId).order("map_number");
@@ -122,6 +138,7 @@ export async function matchEnforce(matchId: string) {
     mp_overtime_maxrounds: 6,
     mp_team_timeout_max: row.tournament.timeouts_per_team,
     mp_team_timeout_time: row.tournament.timeout_seconds,
+    ...(await testMaxRounds(row.tournament_id)),
   };
   // MatchZy нумерует карты с нуля. Голос между командами включается только на de-картах турнира.
   const halftimeVoiceMaps = (maps ?? [])
