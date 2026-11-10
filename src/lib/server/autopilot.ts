@@ -1,4 +1,7 @@
 import "server-only";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { AWARDS_TAG } from "../awards";
+import { FORMATS, type FormatKind } from "../formats";
 import { notify } from "../audit";
 import { assignLobbyServers } from "../lobby";
 import { getMaxParallelMatches, getPlayInFirst } from "../settings";
@@ -235,6 +238,47 @@ export async function workshopBusyFor(mapNames: string[], selfId: string) {
 /** Игры лобби, ждущие сервер, → на свободные серверы лобби (на каждой синхронизации агента) */
 export async function lobbyServersTick() {
   await assignLobbyServers({ workshopBusy: workshopBusyFor });
+}
+
+// ───────────────────────── автозавершение турнира
+
+/**
+ * Все матчи сетки сыграны (финал и матч за 3-е место тоже) — турнир сам переходит в «Завершён»: итоги, награды,
+ * серверы снова доступны лобби. Без админа. Не трогает: турниры без сетки, двухэтапные форматы до плей-офф,
+ * матчи на проверке судей (under_review).
+ */
+export async function finishCompletedTournaments() {
+  const { data: ts } = await db()
+    .from("tournaments")
+    .select("id, slug, status, bracket_type, bracket_published_at, playoff_created_at")
+    .in("status", ["checkin", "live"])
+    .not("bracket_published_at", "is", null);
+  let finished = 0;
+  for (const t of ts ?? []) {
+    if (FORMATS[t.bracket_type as FormatKind]?.playoff && !t.playoff_created_at) continue;
+    const { data: ms } = await db().from("matches").select("status, under_review").eq("tournament_id", t.id);
+    if (!ms?.length || ms.some((m) => !["finished", "cancelled"].includes(m.status) || m.under_review)) continue;
+    if (!ms.some((m) => m.status === "finished")) continue;
+    const { data: done } = await db()
+      .from("tournaments")
+      .update({ status: "finished", updated_at: new Date().toISOString() })
+      .eq("id", t.id)
+      .eq("status", t.status)
+      .select("id");
+    if (!done?.length) continue;
+    await db().from("audit_logs").insert({ action: "tournament.status", entity_type: "tournament", entity_id: t.id, payload: { from: t.status, to: "finished", auto: true } });
+    try {
+      for (const path of ["/", "/tournaments", "/matches", "/stats", "/tv"]) revalidatePath(path);
+      for (const sub of ["", "/recap", "/tv"]) revalidatePath(`/tournaments/${t.slug}${sub}`);
+      revalidatePath("/players/[steamId]", "page");
+      revalidatePath("/teams/[tag]", "page");
+      revalidateTag(AWARDS_TAG, "max");
+    } catch {
+      // вне запроса Next (скрипты, тесты) кэша страниц нет — нечего сбрасывать
+    }
+    finished++;
+  }
+  return finished;
 }
 
 // ───────────────────────── закрытие матчей завершённого турнира

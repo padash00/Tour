@@ -24,6 +24,7 @@ import { PRIVACY_VERSION, tournamentDay } from "../../src/lib/profile";
 import { getProfiles } from "../../src/lib/profiles";
 import { getTournamentRecap } from "../../src/lib/recap";
 import { registrationError } from "../../src/lib/registration-errors";
+import { testMaxRoundsKey } from "../../src/lib/server/matchzy-config";
 import { ingestKey } from "../../src/lib/server/ops";
 import { enqueueCommand } from "../../src/lib/server/state";
 import { db } from "../../src/lib/supabase";
@@ -846,7 +847,7 @@ export async function cleanupDemo(o: DemoOptions) {
   await inChunks(playerIds, async (c) => (await db().from("player_profiles").delete().in("player_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("rate_limit_claims").delete().in("actor_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("players").delete().in("id", c).throwOnError()).data);
-  if (tournamentIds.length) await db().from("app_settings").delete().in("key", tournamentIds.map(playInFirstKey)).throwOnError();
+  if (tournamentIds.length) await db().from("app_settings").delete().in("key", [...tournamentIds.map(playInFirstKey), ...tournamentIds.map(testMaxRoundsKey)]).throwOnError();
   if (tournamentIds.length) await db().from("tournaments").delete().in("id", tournamentIds).throwOnError();
   // отметки о принятых событиях: лог — по номеру матча, события MatchZy — по журналу этого компьютера
   for (const id of matchzyIds) await db().from("ingest_dedupe").delete().like("key", `log${id}:%`).throwOnError();

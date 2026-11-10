@@ -1,6 +1,6 @@
 import "server-only";
 import { autoMaintenanceTick } from "./auto-maintenance";
-import { autopilotTick, closeMatchesOfEndedTournaments, lobbyServersTick } from "./autopilot";
+import { autopilotTick, closeMatchesOfEndedTournaments, finishCompletedTournaments, lobbyServersTick } from "./autopilot";
 import { expireStaleWork, resyncLiveBrackets } from "./watchdog";
 import { verifyWorkshopLibrary } from "./workshop";
 import { applyDueVetoTimeouts } from "../matches";
@@ -35,6 +35,7 @@ export async function runAgentJobs(lane: AgentJobLane, safely: SafeJob, cs2Patch
   await safely("watchdog", expireStaleWork);
   await safely("bracket resync", resyncLiveBrackets);
   await safely("workshop check", verifyWorkshopLibrary);
+  await safely("auto finish", finishCompletedTournaments);
   await safely("close ended", () => closeMatchesOfEndedTournaments());
   await safely("cs2 version", () => checkCs2UpToDate(cs2Patch));
   await safely("dedupe prune", pruneIngest);

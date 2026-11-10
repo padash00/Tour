@@ -15,6 +15,17 @@ type State = {
 
 /** Вызывается из события MatchZy going_live: с этого момента раунды карты идут в зачёт */
 export async function startMapLogging(matchId: string, mapNumber: number) {
+  // перезапуск той же карты (карта уже закончилась или была остановлена): раунды прошлой попытки удаляем,
+  // иначе «хвост» длинной первой попытки остаётся в Swing, убийствах из AWP и номинациях
+  const { data: prev } = await db().from("match_log_state").select("live, map_number").eq("match_id", matchId).maybeSingle().throwOnError();
+  const { data: map } = prev && !prev.live && prev.map_number === mapNumber
+    ? await db().from("match_maps").select("status").eq("match_id", matchId).eq("map_number", mapNumber).maybeSingle().throwOnError()
+    : { data: null };
+  // запоздалый повтор going_live по уже сыгранной карте ничего не стирает
+  if (map && map.status !== "finished") {
+    await db().from("match_rounds").delete().eq("match_id", matchId).eq("map_number", mapNumber).throwOnError();
+    await db().from("player_map_swing").delete().eq("match_id", matchId).eq("map_number", mapNumber).throwOnError();
+  }
   await db().rpc("start_map_logging", { p_match: matchId, p_map: mapNumber }).throwOnError();
 }
 
