@@ -179,30 +179,37 @@ const line = (key: string, o: Partial<NominationLine> = {}): NominationLine => (
   sniperKills: 0, loggedKills: 50, ...o,
 });
 
-await test("Номинации: снайпер — больше всего убийств из AWP/SSG 08, при равенстве — за раунд", () => {
+await test("Номинации: снайпер — больше всего убийств из AWP/SSG 08 за раунд, при равенстве — больше убийств; от 3 карт", () => {
   assert.ok(isSniperWeapon("awp") && isSniperWeapon("weapon_ssg08") && isSniperWeapon("AWP"));
   assert.ok(!isSniperWeapon("ak47") && !isSniperWeapon("g3sg1") && !isSniperWeapon(null));
   const lines = [
-    line("awper", { sniperKills: 40, loggedKills: 60 }),
-    line("tie", { sniperKills: 40, rounds: 60, loggedKills: 55 }), // столько же, но за меньше раундов
+    line("awper", { sniperKills: 40, loggedKills: 60 }), // 0,50 за раунд
+    line("deep", { sniperKills: 48, rounds: 120, maps: 6, teamMaps: 6, loggedKills: 70 }), // больше всего, но 0,40 за раунд
     line("bench", { sniperKills: 90, maps: 1 }), // сыграл меньше половины карт команды — не участвует
+    line("oneMap", { sniperKills: 15, rounds: 20, maps: 1, teamMaps: 1 }), // 0,75 за раунд, но одна карта — не участвует
   ];
-  assert.equal(bestSniper(lines)?.line.key, "tie");
-  assert.match(bestSniper(lines)!.value, /40 убийств из AWP\/SSG 08/);
+  assert.equal(bestSniper(lines)?.line.key, "awper");
+  assert.match(bestSniper(lines)!.value, /40 убийств из AWP\/SSG 08 · 0,50 за раунд/);
+  assert.equal(bestSniper([line("a", { sniperKills: 40 }), line("b", { sniperKills: 40, rounds: 80 })])?.line.key, "a", "равенство за раунд — порядок стабильный");
   assert.equal(bestSniper([line("a", { sniperKills: null, loggedKills: null })]), null, "нет лога с оружием — нет кандидата");
   assert.equal(bestSniper([line("a")]), null, "ноль снайперских убийств — нет кандидата");
-  assert.deepEqual(eligibleLines(lines).map((l) => l.key), ["awper", "tie"]);
+  assert.deepEqual(eligibleLines(lines).map((l) => l.key), ["awper", "deep"]);
+  // маленький турнир: больше 2 карт никто не сыграл — порог по максимуму сыгранных
+  assert.deepEqual(eligibleLines([line("x", { maps: 2, teamMaps: 2 }), line("y", { maps: 1, teamMaps: 1 })]).map((l) => l.key), ["x"]);
 });
 
-await test("Номинации: рифлер — лучший Rating среди тех, у кого снайперские убийства < 30%", () => {
+await test("Номинации: рифлер — лучший Rating, автоматы ≥ 50% и снайперские < 30% убийств; лучший снайпер не участвует", () => {
   const lines = [
-    line("awper", { rating: 1.4, sniperKills: 30, loggedKills: 60 }), // 50% — снайпер
-    line("rifler", { rating: 1.2, adr: 80, sniperKills: 5, loggedKills: 60 }),
-    line("rifler2", { rating: 1.2, adr: 90, sniperKills: 0, loggedKills: 40 }),
+    line("awper", { rating: 1.4, sniperKills: 30, loggedKills: 60, rifleKills: 20 }), // 50% снайперских
+    line("rifler", { rating: 1.2, adr: 80, sniperKills: 5, loggedKills: 60, rifleKills: 45 }),
+    line("rifler2", { rating: 1.2, adr: 90, sniperKills: 0, loggedKills: 40, rifleKills: 30 }),
+    line("smg", { rating: 1.5, sniperKills: 0, loggedKills: 50, rifleKills: 10 }), // в основном SMG/пистолеты
   ];
-  assert.ok(!isRifler(lines[0]) && isRifler(lines[1]));
+  assert.ok(!isRifler(lines[0]) && isRifler(lines[1]) && !isRifler(lines[3]));
   assert.equal(bestRifler(lines)?.line.key, "rifler2", "при равном Rating — выше ADR");
+  assert.equal(bestRifler(lines, ["rifler2"])?.line.key, "rifler", "одна награда на человека");
   assert.equal(bestRifler([line("x", { rating: 1.3, sniperKills: null, loggedKills: null })])?.line.key, "x", "без лога с оружием рифлеры — все");
+  assert.ok(!isRifler(line("z", { sniperKills: 0, loggedKills: 0, rifleKills: 0 })), "лог есть, а убийств игрока нет — не рифлер");
 });
 
 await test("Номинации: опорник — (ассисты + флеш-ассисты)/раунд + урон гранатами/(100·раунд), при равенстве — KAST", () => {

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { db } from "./supabase";
 import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
-import { isSniperWeapon } from "./nominations-core";
+import { awardMinMaps, isRifleWeapon, isSniperWeapon } from "./nominations-core";
 import type { Tables } from "./database.types";
 import type { Narrow, Player, Team } from "./types";
 
@@ -319,8 +319,9 @@ export function mvpOf(board: LeaderboardRow[]) {
   if (board.length === 0) return null;
   const teamMaps = new Map<string, number>();
   for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));
-  // регламент: не меньше половины карт своей команды (минимум одна)
-  const eligible = board.filter((p) => p.maps >= Math.max(1, Math.ceil((teamMaps.get(p.team_id ?? "") ?? 0) / 2)));
+  // регламент: не меньше половины карт своей команды и не меньше 3 карт за турнир (в маленьком турнире — максимум сыгранных)
+  const maxMaps = Math.max(0, ...board.map((p) => p.maps));
+  const eligible = board.filter((p) => awardMinMaps(p.maps, teamMaps.get(p.team_id ?? "") ?? 0, maxMaps));
   const withSwing = eligible.filter((p) => p.swing != null);
   if (withSwing.length) return { ...withSwing.sort((a, b) => b.swing! - a.swing!)[0], by: "swing" as const };
   return eligible[0] ? { ...eligible[0], by: "rating" as const } : null;
@@ -440,10 +441,10 @@ export async function getPlayerWeapons(steamId: string, matchIds: string[]): Pro
  * (лог сервера, match_rounds). Только убийства соперников. Ключ — SteamID64.
  * Если лог не собирался — пустая карта (номинация «Лучший снайпер» тогда без кандидата).
  */
-export async function getTournamentWeaponKills(tournamentId: string): Promise<Map<string, { sniper: number; total: number }>> {
+export async function getTournamentWeaponKills(tournamentId: string): Promise<Map<string, { sniper: number; rifle: number; total: number }>> {
   const { data: ms } = await db().from("matches").select("id").eq("tournament_id", tournamentId).eq("status", "finished");
   const ids = (ms ?? []).map((m) => m.id);
-  const out = new Map<string, { sniper: number; total: number }>();
+  const out = new Map<string, { sniper: number; rifle: number; total: number }>();
   if (!ids.length) return out;
   const data = await fetchAllIn<{ events: LogEvent[] }>(ids, (chunk, from, to) =>
     db().from("match_rounds").select("events").in("match_id", chunk).order("match_id").order("map_number").order("round_number").range(from, to),
@@ -451,9 +452,10 @@ export async function getTournamentWeaponKills(tournamentId: string): Promise<Ma
   for (const r of data) {
     for (const e of r.events ?? []) {
       if (e.type !== "kill" || !e.killer.steamId || !e.killer.side || e.killer.side === e.victim.side) continue;
-      const cur = out.get(e.killer.steamId) ?? { sniper: 0, total: 0 };
+      const cur = out.get(e.killer.steamId) ?? { sniper: 0, rifle: 0, total: 0 };
       cur.total++;
       if (isSniperWeapon(e.weapon)) cur.sniper++;
+      if (isRifleWeapon(e.weapon)) cur.rifle++;
       out.set(e.killer.steamId, cur);
     }
   }

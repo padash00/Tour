@@ -81,6 +81,7 @@ async function nominationLines(tournamentId: string) {
         k5: p.k5,
         sniperKills: hasWeapons ? (w?.sniper ?? 0) : null,
         loggedKills: hasWeapons ? (w?.total ?? 0) : null,
+        rifleKills: hasWeapons ? (w?.rifle ?? 0) : null,
       };
     });
   return { board, lines };
@@ -103,9 +104,11 @@ export const getTournamentNominations = cache(async (tournamentId: string, tx: T
       value: mvp.by === "swing" && mvp.swing != null ? `Swing ${mvp.swing >= 0 ? "+" : ""}${mvp.swing.toFixed(1)}` : `Rating ${mvp.rating.toFixed(2)}`,
     });
   }
+  // одна награда на человека: лучший снайпер в номинации рифлера не участвует
+  const sniper = bestSniper(lines, tx);
   for (const [key, pick] of [
-    ["sniper", bestSniper(lines, tx)],
-    ["rifler", bestRifler(lines)],
+    ["sniper", sniper],
+    ["rifler", bestRifler(lines, [sniper?.line.key])],
   ] as const) {
     if (pick) computed.set(key, { playerId: pick.line.key, teamId: pick.line.teamId, value: pick.value });
   }

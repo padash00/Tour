@@ -38,9 +38,9 @@ export type NominationDef = {
  * и на случай, если их вернут в регламент.
  */
 export const NOMINATIONS: NominationDef[] = [
-  { key: "mvp", title: tr("Лучший игрок (MVP)"), auto: true, rule: "Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше половины карт своей команды." },
-  { key: "sniper", title: tr("Лучший снайпер"), auto: true, rule: "Больше всего убийств из AWP и SSG 08 по логу сервера; при равенстве — за раунд." },
-  { key: "rifler", title: tr("Лучший рифлер"), auto: true, rule: "Лучший F16 Rating среди игроков, у кого снайперские убийства < 30% всех; при равенстве — ADR." },
+  { key: "mvp", title: tr("Лучший игрок (MVP)"), auto: true, rule: "Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше 3 карт за турнир и половины карт своей команды." },
+  { key: "sniper", title: tr("Лучший снайпер"), auto: true, rule: "Больше всего убийств из AWP и SSG 08 за раунд по логу сервера (как в рейтингах снайперов HLTV/bo3.gg); при равенстве — больше убийств. Не меньше 3 карт за турнир." },
+  { key: "rifler", title: tr("Лучший рифлер"), auto: true, rule: "Лучший F16 Rating среди игроков, у кого не меньше половины убийств — с автоматов (AK-47, M4A4, M4A1-S, FAMAS, Galil AR, AUG, SG 553) и снайперских < 30%; лучший снайпер в номинации не участвует; при равенстве — ADR. Не меньше 3 карт за турнир." },
 ];
 
 export const nominationTitle = (key: string) => NOMINATIONS.find((n) => n.key === key)?.title ?? key;
@@ -52,6 +52,22 @@ export const isSniperWeapon = (weapon: string | null | undefined) =>
 
 /** Порог доли снайперских убийств, ниже которого игрок считается рифлером */
 export const RIFLER_MAX_SNIPER_SHARE = 0.3;
+
+/** Автоматы CS2 по имени оружия в логе (M4A4 в логе — «m4a1», M4A1-S — «m4a1_silencer») */
+export const RIFLE_WEAPONS = ["ak47", "m4a1", "m4a1_silencer", "m4a1_silencer_off", "famas", "galilar", "aug", "sg556"] as const;
+export const isRifleWeapon = (weapon: string | null | undefined) =>
+  !!weapon && (RIFLE_WEAPONS as readonly string[]).includes(weapon.toLowerCase().replace(/^weapon_/, ""));
+
+/** Рифлер: не меньше этой доли убийств — с автоматов */
+export const RIFLER_MIN_RIFLE_SHARE = 0.5;
+
+/** Номинации: не меньше стольких карт за турнир (если кто-то вообще сыграл столько — иначе по максимуму сыгранных) */
+export const MIN_AWARD_MAPS = 3;
+
+/** Порог карт для номинаций: половина карт своей команды и не меньше MIN_AWARD_MAPS (в маленьком турнире — максимум сыгранных) */
+export function awardMinMaps(maps: number, teamMaps: number, maxMaps: number) {
+  return maps >= Math.max(1, Math.ceil(teamMaps / 2), Math.min(MIN_AWARD_MAPS, maxMaps));
+}
 
 export type NominationLine = {
   /** id игрока на сайте */
@@ -78,12 +94,16 @@ export type NominationLine = {
   sniperKills: number | null;
   /** все убийства соперников по логу (для доли снайперских); null — лога нет */
   loggedKills: number | null;
+  /** убийства с автоматов по логу; null — лога нет */
+  rifleKills?: number | null;
 };
 
 export type NominationPick = { line: NominationLine; value: string; score: number };
 
-export const eligibleLines = (lines: NominationLine[]) =>
-  lines.filter((l) => l.rounds > 0 && l.maps >= Math.max(1, Math.ceil(l.teamMaps / 2)));
+export const eligibleLines = (lines: NominationLine[]) => {
+  const maxMaps = Math.max(0, ...lines.map((l) => l.maps));
+  return lines.filter((l) => l.rounds > 0 && awardMinMaps(l.maps, l.teamMaps, maxMaps));
+};
 
 /** Лучший по score, при равенстве — по tie; score ≤ 0 — кандидата нет */
 function top(lines: NominationLine[], score: (l: NominationLine) => number, tie: (l: NominationLine) => number) {
@@ -95,18 +115,30 @@ const fixed = (n: number, d = 2) => n.toFixed(d).replace(".", ",");
 
 export function bestSniper(lines: NominationLine[], tx: T = makeT("ru")): NominationPick | null {
   const pool = eligibleLines(lines).filter((l) => l.sniperKills != null);
-  const best = top(pool, (l) => l.sniperKills!, (l) => l.sniperKills! / l.rounds);
-  return best ? { line: best, score: best.sniperKills!, value: tx("{n} убийств из AWP/SSG 08", { n: best.sniperKills }) } : null;
+  const best = top(pool, (l) => l.sniperKills! / l.rounds, (l) => l.sniperKills!);
+  return best
+    ? { line: best, score: best.sniperKills! / best.rounds, value: tx("{n} убийств из AWP/SSG 08 · {per} за раунд", { n: best.sniperKills, per: fixed(best.sniperKills! / best.rounds) }) }
+    : null;
 }
 
 /** Доля снайперских убийств; null — лога с оружием нет */
 export const sniperShare = (l: NominationLine) =>
   l.sniperKills == null || !l.loggedKills ? null : l.sniperKills / l.loggedKills;
 
-export const isRifler = (l: NominationLine) => (sniperShare(l) ?? 0) < RIFLER_MAX_SNIPER_SHARE;
+/**
+ * Рифлер: снайперских < 30% и автоматных ≥ 50% убийств. Лога с оружием нет вовсе (sniperKills = null) — рифлеры все;
+ * лог есть, а убийств игрока в нём нет — не рифлер (подтвердить нечем).
+ */
+export const isRifler = (l: NominationLine) => {
+  if (l.sniperKills == null) return true;
+  if (!l.loggedKills) return false;
+  if ((sniperShare(l) ?? 0) >= RIFLER_MAX_SNIPER_SHARE) return false;
+  return l.rifleKills == null || l.rifleKills / l.loggedKills >= RIFLER_MIN_RIFLE_SHARE;
+};
 
-export function bestRifler(lines: NominationLine[]): NominationPick | null {
-  const pool = eligibleLines(lines).filter(isRifler);
+/** exclude — игроки, уже получившие другую номинацию (лучший снайпер): одна награда на человека */
+export function bestRifler(lines: NominationLine[], exclude: (string | null | undefined)[] = []): NominationPick | null {
+  const pool = eligibleLines(lines).filter((l) => isRifler(l) && !exclude.includes(l.key));
   const best = top(pool, (l) => l.rating, (l) => l.adr);
   return best ? { line: best, score: best.rating, value: `Rating ${fixed(best.rating)} · ADR ${fixed(best.adr, 1)}` } : null;
 }
