@@ -54,14 +54,22 @@ export async function ingestLog(matchzyId: number, body: string, receipt: { key:
   let rounds = 0;
   const completed = [];
 
+  let sawStart = false;
   for (const line of body.split(/\r?\n/)) {
     const e = parseLogLine(line);
     if (!e) continue;
     if (e.type === "round_start") {
       buffer = [];
+      sawStart = true;
       continue;
     }
     buffer.push(e);
+    // рестарт игры сразу после going_live (MatchZy: mp_restartgame) пишет «конец раунда» без единого действия
+    // до первого настоящего раунда карты — это не раунд, иначе лента раундов сдвигается на один
+    if (e.type === "round_end" && round === 0 && !sawStart && !buffer.some((x) => x.type !== "round_end")) {
+      buffer = [];
+      continue;
+    }
     if (e.type === "round_end") {
       updateRoster(roster, buffer);
       const swing = computeRoundSwing(buffer, roster, teamSize);
