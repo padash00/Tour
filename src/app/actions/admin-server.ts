@@ -7,7 +7,7 @@ import { getMatch } from "@/lib/matches";
 import { assignServer, enqueueCommand, enqueuePrefetch, getServerState, pickFreeInstance } from "@/lib/server-control";
 import { adminIds } from "@/lib/server/admins";
 import { db } from "@/lib/supabase";
-import { playInFirstKey } from "@/lib/settings";
+import { playInFirstKey, roundStrictKey } from "@/lib/settings";
 import type { ActionResult } from "@/components/forms";
 
 const TYPES = ["start", "stop", "restart", "end_match"] as const;
@@ -143,6 +143,23 @@ export async function setPlayInFirst(_prev: ActionResult, formData: FormData): P
   await audit(admin.id, on ? "tournament.playin_first_on" : "tournament.playin_first_off", { type: "tournament", id });
   revalidatePath(`/admin/tournaments/${id}`);
   return { success: on ? "Сначала отборочные: 1/8 начнётся, когда сыграют все отборочные" : "Отборочные и 1/8 идут параллельно" };
+}
+
+export async function setRoundStrict(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("tournamentId"));
+  const onValue = formData.get("on");
+  if (onValue !== "0" && onValue !== "1") return { error: "Не удалось определить состояние" };
+  const on = onValue === "1";
+  const { data: t } = await db().from("tournaments").select("id").eq("id", id).maybeSingle();
+  if (!t) return { error: "Турнир не найден" };
+  const { error } = await db()
+    .from("app_settings")
+    .upsert({ key: roundStrictKey(id), value: on ? "1" : "0", updated_by: admin.id, updated_at: new Date().toISOString() });
+  if (error) return { error: "Не удалось сохранить" };
+  await audit(admin.id, on ? "tournament.round_strict_on" : "tournament.round_strict_off", { type: "tournament", id });
+  revalidatePath(`/admin/tournaments/${id}`);
+  return { success: on ? "Строго по раундам: следующий раунд — когда сыгран весь предыдущий, финал — последним" : "Матчи идут, как только известны соперники" };
 }
 
 export async function setAutoApprove(_prev: ActionResult, formData: FormData): Promise<ActionResult> {

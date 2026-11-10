@@ -104,6 +104,18 @@ export async function getPlayInFirst(tournamentIds: string[]): Promise<Set<strin
   return new Set((data ?? []).filter((r) => r.value === "1").map((r) => r.key.slice("PLAYIN_FIRST:".length)));
 }
 
+/**
+ * Олимпийка «строго по раундам»: матч следующего раунда не вызывается в зал и не уходит на сервер, пока не сыграны
+ * все матчи предыдущих раундов; финал — последним, после матча за 3-е место. app_settings ROUND_STRICT:<id турнира> «1».
+ */
+export const roundStrictKey = (tournamentId: string) => `ROUND_STRICT:${tournamentId}`;
+
+export async function getRoundStrict(tournamentIds: string[]): Promise<Set<string>> {
+  if (!tournamentIds.length) return new Set();
+  const { data } = await db().from("app_settings").select("key, value").in("key", tournamentIds.map(roundStrictKey));
+  return new Set((data ?? []).filter((r) => r.value === "1").map((r) => r.key.slice("ROUND_STRICT:".length)));
+}
+
 /** Библиотека карт Workshop: строки «name@id» (хранится в app_settings.WORKSHOP_MAPS как JSON) */
 export async function getWorkshopMaps(): Promise<string[]> {
   try {

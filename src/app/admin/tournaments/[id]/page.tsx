@@ -21,7 +21,7 @@ import type { TournamentStatus } from "@/lib/types";
 import { deleteBracketAction, manualBracketAction } from "@/app/actions/admin-match";
 import { bracketSize, playInLast, seedOrder } from "@/lib/bracket";
 import { BracketDraft, type DraftTeam } from "@/components/admin/bracket-draft";
-import { prefetchMaps, setAutoApprove, setAutopilot, setPlayInFirst } from "@/app/actions/admin-server";
+import { prefetchMaps, setAutoApprove, setAutopilot, setPlayInFirst, setRoundStrict } from "@/app/actions/admin-server";
 import { ActionForm, SubmitButton } from "@/components/forms";
 import { ActionToggle } from "@/components/admin/action-toggle";
 import { ChipInput, PlayerPicker, type PickPlayer } from "@/components/pickers";
@@ -32,7 +32,7 @@ import { Lifecycle, type LifeStep } from "@/components/admin/kit";
 import { MatchStatusBadge, visibleMatches } from "@/components/match-bits";
 import { Avatar, EmptyState, FaceitLevel, TeamLogo, cn, buttonClass } from "@/components/ui";
 import { AdminHeader, Dot, Panel, SubTabs, TableBox } from "@/components/admin/control";
-import { getWorkshopMaps, getDisabledMaps, getMapImages, getPlayInFirst } from "@/lib/settings";
+import { getWorkshopMaps, getDisabledMaps, getMapImages, getPlayInFirst, getRoundStrict } from "@/lib/settings";
 import { workshopInfo } from "@/lib/server-control";
 import { TournamentForm } from "../tournament-form";
 import { requireAdmin } from "@/lib/auth";
@@ -140,7 +140,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
       {tab === "access" && <PrivateTab t={t} />}
       {tab === "bracket" && (
         <>
-          <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} playInFirst={(await getPlayInFirst([t.id])).has(t.id)} />
+          <BracketTab t={t} approved={approved.length} checkedIn={checkedIn} draw={await getLastDraw(t.id)} playInFirst={(await getPlayInFirst([t.id])).has(t.id)} roundStrict={(await getRoundStrict([t.id])).has(t.id)} />
           {(t.bracket_type === "single_elimination" || t.bracket_type === "double_elimination") && approved.length >= 2 && (
             <ManualPairs t={t} regs={approved} thirdPlace={hasThirdPlaceMatch(t)} fill={String(sp.fill ?? "")} seed={String(sp.s ?? "")} onlyCheckedIn={sp.ci === "1"} />
           )}
@@ -509,12 +509,14 @@ function BracketTab({
   checkedIn,
   draw,
   playInFirst,
+  roundStrict,
 }: {
   t: Pick<T, "id" | "slug" | "bracket_published_at" | "bracket_type" | "playoff_type" | "third_place_match" | "max_teams">;
   approved: number;
   checkedIn: number;
   draw: Awaited<ReturnType<typeof getLastDraw>>;
   playInFirst: boolean;
+  roundStrict: boolean;
 }) {
   const playInOrder =
     t.bracket_type === "single_elimination" && (t.max_teams & (t.max_teams - 1)) !== 0 ? (
@@ -528,6 +530,20 @@ function BracketTab({
           </p>
         </div>
         <ActionToggle action={setPlayInFirst} fields={{ tournamentId: t.id }} on={playInFirst} label="Сначала отборочные" onLabel="Включено" offLabel="Выключено" />
+      </div>
+    ) : null;
+  const roundOrder =
+    t.bracket_type === "single_elimination" ? (
+      <div className="rounded-surface border border-line-subtle bg-surface shadow-[var(--shadow-soft)] p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-xl">
+          <div className="text-[17px] font-bold text-fg">Строго по раундам</div>
+          <p className="mt-1.5 text-[15px] text-fg-2 leading-relaxed">
+            {roundStrict
+              ? "Следующий раунд начинается, когда сыгран весь предыдущий: 1/8 → 1/4 → полуфиналы → матч за 3-е место → финал последним."
+              : "Матч начинается, как только известны соперники и команды отдохнули, — не дожидаясь конца раунда."}
+          </p>
+        </div>
+        <ActionToggle action={setRoundStrict} fields={{ tournamentId: t.id }} on={roundStrict} label="Строго по раундам" onLabel="Включено" offLabel="Выключено" />
       </div>
     ) : null;
   const elimination = t.bracket_type === "single_elimination" || FORMATS[t.bracket_type as FormatKind]?.playoff;
@@ -556,6 +572,7 @@ function BracketTab({
           {drawInfo}
           {thirdPlaceNote}
           {playInOrder}
+          {roundOrder}
           <div className="flex flex-wrap gap-5 text-[15px] font-semibold">
             <Link href={`/tournaments/${t.slug}?tab=bracket`} className="text-accent hover:underline">
               Открыть сетку на сайте ↗
@@ -586,6 +603,7 @@ function BracketTab({
             </div>
           )}
           {playInOrder}
+          {roundOrder}
           {thirdPlaceNote}
         </div>
       )}

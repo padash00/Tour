@@ -4,7 +4,7 @@ import { AWARDS_TAG } from "../awards";
 import { FORMATS, type FormatKind } from "../formats";
 import { notify } from "../audit";
 import { assignLobbyServers } from "../lobby";
-import { getMaxParallelMatches, getPlayInFirst } from "../settings";
+import { getMaxParallelMatches, getPlayInFirst, getRoundStrict } from "../settings";
 import { db } from "../supabase";
 import type { Match } from "../types";
 import { enqueueCommand, getServerState, hostBusy } from "./state";
@@ -70,7 +70,8 @@ export async function autopilotTick() {
     .eq("autopilot", true)
     .in("status", ["checkin", "live"]);
   if (!ts?.length) return;
-  const playInFirst = await getPlayInFirst(ts.filter((t) => t.bracket_type === "single_elimination").map((t) => t.id));
+  const seIds = ts.filter((t) => t.bracket_type === "single_elimination").map((t) => t.id);
+  const [playInFirst, roundStrict] = await Promise.all([getPlayInFirst(seIds), getRoundStrict(seIds)]);
 
   const now = Date.now();
   const due = (m: { scheduled_at: string | null }) => !m.scheduled_at || new Date(m.scheduled_at).getTime() - now <= AUTOPILOT_LEAD_MS;
@@ -110,12 +111,20 @@ export async function autopilotTick() {
     const currentRound = openStage?.length ? Math.min(...openStage.map((x) => x.round)) : null;
     // «Сначала отборочные»: пока не сыграны все матчи первого раунда олимпийки, следующие раунды ждут
     const playInPending = playInFirst.has(t.id) && matches.some((x) => x.bracket === "upper" && x.round === 1);
-    const free = (m: { team1_id: string | null; team2_id: string | null; round: number; id: string }) =>
+    // «Строго по раундам»: раунд начинается, когда весь предыдущий сыгран; финал — после матча за 3-е место
+    const strict = roundStrict.has(t.id);
+    const finalRound = Math.max(0, ...matches.filter((x) => x.bracket === "upper").map((x) => x.round));
+    const strictWaits = (m: { bracket: string; round: number }) =>
+      strict &&
+      (matches.some((x) => x.bracket === "upper" && x.round < m.round) ||
+        (m.bracket === "upper" && m.round === finalRound && matches.some((x) => x.bracket === "third_place")));
+    const free = (m: { team1_id: string | null; team2_id: string | null; round: number; id: string; bracket: string }) =>
       !!m.team1_id &&
       !!m.team2_id &&
       !busy.has(m.team1_id) &&
       !busy.has(m.team2_id) &&
       (!playInPending || m.round === 1) &&
+      !strictWaits(m) &&
       (currentRound == null || !stageIds.has(m.id) || m.round === currentRound);
 
     // 1а. LAN с рассадкой: матч не начинает вето сам — его вызывают на места (бот пишет в Telegram, где садиться),
