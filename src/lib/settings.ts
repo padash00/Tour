@@ -91,6 +91,19 @@ export async function getMaxParallelMatches(): Promise<number | null> {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Олимпийка с отборочными: «сначала отборочные» — матчи следующих раундов не вызываются в зал и не уходят на серверы,
+ * пока не сыграны все матчи первого раунда. Выключено — 1/8 идёт параллельно с отборочными на свободных местах.
+ * Хранится в app_settings под ключом PLAYIN_FIRST:<id турнира> («1» — включено).
+ */
+export const playInFirstKey = (tournamentId: string) => `PLAYIN_FIRST:${tournamentId}`;
+
+export async function getPlayInFirst(tournamentIds: string[]): Promise<Set<string>> {
+  if (!tournamentIds.length) return new Set();
+  const { data } = await db().from("app_settings").select("key, value").in("key", tournamentIds.map(playInFirstKey));
+  return new Set((data ?? []).filter((r) => r.value === "1").map((r) => r.key.slice("PLAYIN_FIRST:".length)));
+}
+
 /** Библиотека карт Workshop: строки «name@id» (хранится в app_settings.WORKSHOP_MAPS как JSON) */
 export async function getWorkshopMaps(): Promise<string[]> {
   try {

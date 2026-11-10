@@ -1,7 +1,7 @@
 import "server-only";
 import { notify } from "../audit";
 import { assignLobbyServers } from "../lobby";
-import { getMaxParallelMatches } from "../settings";
+import { getMaxParallelMatches, getPlayInFirst } from "../settings";
 import { db } from "../supabase";
 import type { Match } from "../types";
 import { enqueueCommand, getServerState, hostBusy } from "./state";
@@ -63,10 +63,11 @@ const AUTOPILOT_LEAD_MS = 10 * 60_000; // матч с расписанием у�
 export async function autopilotTick() {
   const { data: ts } = await db()
     .from("tournaments")
-    .select("id, map_pool, is_lan")
+    .select("id, map_pool, is_lan, bracket_type")
     .eq("autopilot", true)
     .in("status", ["checkin", "live"]);
   if (!ts?.length) return;
+  const playInFirst = await getPlayInFirst(ts.filter((t) => t.bracket_type === "single_elimination").map((t) => t.id));
 
   const now = Date.now();
   const due = (m: { scheduled_at: string | null }) => !m.scheduled_at || new Date(m.scheduled_at).getTime() - now <= AUTOPILOT_LEAD_MS;
@@ -79,7 +80,7 @@ export async function autopilotTick() {
   for (const t of ts) {
     const { data: list } = await db()
       .from("matches")
-      .select("id, number, round, stage, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
+      .select("id, number, bracket, round, stage, status, scheduled_at, server_instance, server_state, team1_id, team2_id")
       .eq("tournament_id", t.id)
       .in("status", ["upcoming", "veto", "ready", "live"])
       .order("number");
@@ -104,11 +105,14 @@ export async function autopilotTick() {
       .in("stage", ["group", "swiss"])
       .not("status", "in", "(finished,cancelled)");
     const currentRound = openStage?.length ? Math.min(...openStage.map((x) => x.round)) : null;
+    // «Сначала отборочные»: пока не сыграны все матчи первого раунда олимпийки, следующие раунды ждут
+    const playInPending = playInFirst.has(t.id) && matches.some((x) => x.bracket === "upper" && x.round === 1);
     const free = (m: { team1_id: string | null; team2_id: string | null; round: number; id: string }) =>
       !!m.team1_id &&
       !!m.team2_id &&
       !busy.has(m.team1_id) &&
       !busy.has(m.team2_id) &&
+      (!playInPending || m.round === 1) &&
       (currentRound == null || !stageIds.has(m.id) || m.round === currentRound);
 
     // 1а. LAN с рассадкой: матч не начинает вето сам — его вызывают на места (бот пишет в Telegram, где садиться),
