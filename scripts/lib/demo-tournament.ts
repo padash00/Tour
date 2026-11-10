@@ -14,7 +14,7 @@ import { audit, notify } from "../../src/lib/audit";
 import { getTournamentRegistrations } from "../../src/lib/data";
 import { hasPlayIn, roundTitle } from "../../src/lib/bracket";
 import { drawOrder, type DrawRecord } from "../../src/lib/draw";
-import { markReady, matchHall } from "../../src/lib/hall";
+import { markReady, matchHall, testHallFastKey } from "../../src/lib/hall";
 import { playInFirstKey } from "../../src/lib/settings";
 import { mapLabel } from "../../src/lib/maps";
 import { createBracket, getMatch, getMatchRosters, insertVetoAction, type MatchFull } from "../../src/lib/matches";
@@ -847,7 +847,7 @@ export async function cleanupDemo(o: DemoOptions) {
   await inChunks(playerIds, async (c) => (await db().from("player_profiles").delete().in("player_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("rate_limit_claims").delete().in("actor_id", c).throwOnError()).data);
   await inChunks(playerIds, async (c) => (await db().from("players").delete().in("id", c).throwOnError()).data);
-  if (tournamentIds.length) await db().from("app_settings").delete().in("key", [...tournamentIds.map(playInFirstKey), ...tournamentIds.map(testMaxRoundsKey)]).throwOnError();
+  if (tournamentIds.length) await db().from("app_settings").delete().in("key", [...tournamentIds.map(playInFirstKey), ...tournamentIds.map(testMaxRoundsKey), ...tournamentIds.map(testHallFastKey)]).throwOnError();
   if (tournamentIds.length) await db().from("tournaments").delete().in("id", tournamentIds).throwOnError();
   // отметки о принятых событиях: лог — по номеру матча, события MatchZy — по журналу этого компьютера
   for (const id of matchzyIds) await db().from("ingest_dedupe").delete().like("key", `log${id}:%`).throwOnError();

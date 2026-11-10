@@ -130,7 +130,7 @@ export async function autopilotTick() {
         for (const m of waiting) {
           if (snap.calls.has(m.id)) continue; // уже вызван — ждём «Готов»
           if (limit != null && inHall >= limit) break;
-          if (!rested(snap.matches, m.team1_id!) || !rested(snap.matches, m.team2_id!)) continue; // перерыв между матчами
+          if (!rested(snap.matches, m.team1_id!, now, snap.restMs) || !rested(snap.matches, m.team2_id!, now, snap.restMs)) continue; // перерыв между матчами
           const r = await callMatch(m.id, { announce: false });
           if (typeof r === "string") {
             if (r.startsWith("Свободных мест нет")) break; // мест нет — следующий матч тоже не сядет

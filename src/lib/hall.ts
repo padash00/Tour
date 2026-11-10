@@ -81,10 +81,24 @@ async function tournamentCalls(tournamentId: string): Promise<Map<string, HallCa
 const freedAfter = (cfg: HallConfig, seat: string, since: string) => !!cfg.freed[seat] && Date.parse(cfg.freed[seat]) > Date.parse(since);
 
 /** Кто где сидит: занятые блоки, последнее место каждой команды, места ждущих команд */
+/**
+ * Генеральный прогон: app_settings TEST_HALL_FAST:<id турнира> = «1» — перерыв команды 2 минуты и блок проигравших
+ * освобождается через 1 минуту (вместо 20 и 5). Только у закрытых (тестовых) турниров.
+ */
+export const testHallFastKey = (tournamentId: string) => `TEST_HALL_FAST:${tournamentId}`;
+async function hallTimings(tournamentId: string) {
+  const [{ data: t }, { data: row }] = await Promise.all([
+    db().from("tournaments").select("is_private").eq("id", tournamentId).maybeSingle(),
+    db().from("app_settings").select("value").eq("key", testHallFastKey(tournamentId)).maybeSingle(),
+  ]);
+  return t?.is_private && row?.value === "1" ? { restMs: 2 * 60_000, releaseMs: 60_000 } : { restMs: REST_MS, releaseMs: RELEASE_MS };
+}
+
 export async function hallSnapshot(tournamentId: string, cfg: HallConfig, exceptMatch?: string) {
-  const [allCalls, { data: ms }] = await Promise.all([
+  const [allCalls, { data: ms }, { restMs, releaseMs }] = await Promise.all([
     tournamentCalls(tournamentId),
     db().from("matches").select("id, number, status, team1_id, team2_id, winner_id, finished_at, team1_score, team2_score, is_walkover").eq("tournament_id", tournamentId),
+    hallTimings(tournamentId),
   ]);
   const matches = (ms ?? []) as HallMatch[];
   const byId = new Map(matches.map((m) => [m.id, m]));
@@ -107,7 +121,7 @@ export async function hallSnapshot(tournamentId: string, cfg: HallConfig, except
       lastAt.set(team, c.at);
     }
     const active = ACTIVE.includes(m.status) && m.team1_id === c.team1 && m.team2_id === c.team2;
-    const justFinished = m.status === "finished" && !m.is_walkover && !!m.finished_at && now - new Date(m.finished_at).getTime() < RELEASE_MS;
+    const justFinished = m.status === "finished" && !m.is_walkover && !!m.finished_at && now - new Date(m.finished_at).getTime() < releaseMs;
     if (!active && !justFinished) continue;
     for (const [seat, team] of [[c.seat1, c.team1], [c.seat2, c.team2]] as const) {
       // «Блок свободен» в пульте снимает только места закончившихся матчей
@@ -129,15 +143,15 @@ export async function hallSnapshot(tournamentId: string, cfg: HallConfig, except
     if (freedAfter(cfg, seat, lastAt.get(team) ?? "1970-01-01")) continue;
     reserved.set(seat, team);
   }
-  return { calls, matches, occupied, occupiedBy, last, reserved };
+  return { calls, matches, occupied, occupiedBy, last, reserved, restMs };
 }
 
 /** Команда отдохнула после прошлого матча турнира */
-export function rested(matches: HallMatch[], teamId: string, now = Date.now()) {
+export function rested(matches: HallMatch[], teamId: string, now = Date.now(), restMs = REST_MS) {
   const lastEnd = matches
     .filter((m) => m.status === "finished" && !m.is_walkover && m.finished_at && (m.team1_id === teamId || m.team2_id === teamId))
     .reduce((acc, m) => Math.max(acc, new Date(m.finished_at!).getTime()), 0);
-  return now - lastEnd >= REST_MS;
+  return now - lastEnd >= restMs;
 }
 
 type CallResult = { matchId: string; number: number; plan: SeatPlan; team1: TeamInfo; team2: TeamInfo };
@@ -407,7 +421,7 @@ async function warnNextInQueue(tournamentId: string, cfg: HallConfig) {
       snap.matches
         .filter((x) => x.status === "finished" && x.finished_at && (x.team1_id === team || x.team2_id === team))
         .reduce((a, x) => Math.max(a, new Date(x.finished_at!).getTime()), 0);
-    const restUntil = Math.max(lastEnd(m.team1_id!), lastEnd(m.team2_id!)) + REST_MS;
+    const restUntil = Math.max(lastEnd(m.team1_id!), lastEnd(m.team2_id!)) + snap.restMs;
     const rest = restUntil > Date.now() ? `\nПерерыв до ${new Date(restUntil).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Almaty" })}.` : "";
     // закрытый турнир — только в личку
     if (!hidden) await tgCall(tg.token, "sendMessage", {
@@ -450,7 +464,7 @@ export async function boardText() {
         snap.matches
           .filter((x) => x.status === "finished" && x.finished_at && (x.team1_id === team || x.team2_id === team))
           .reduce((a, x) => Math.max(a, new Date(x.finished_at!).getTime()), 0);
-      queue.push({ m, restUntil: Math.max(lastEnd(m.team1_id), lastEnd(m.team2_id)) + REST_MS });
+      queue.push({ m, restUntil: Math.max(lastEnd(m.team1_id), lastEnd(m.team2_id)) + snap.restMs });
       teamIds.add(m.team1_id);
       teamIds.add(m.team2_id);
     }
