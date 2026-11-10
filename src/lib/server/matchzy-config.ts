@@ -97,6 +97,9 @@ export function modeCvars(format: string, maps: string[] = []): Record<string, n
     // держим 0, тогда экран итогов 15 с (минимум MatchZy)
     tv_delay: 0,
     mp_match_restart_delay: 15,
+    // голосования CS2 выключены, как в турнирных конфигах: «выгнать» по голосованию банит игрока на 15 минут,
+    // «сдаться» завершает карту. Паузы — командами MatchZy (.tac, .tech)
+    sv_allow_votes: 0,
   };
   // aim-карты (aim_map и т.п.): без фризтайма и с быстрым рестартом раунда; на обычных картах — стандарт MatchZy
   if (maps.length > 0 && maps.every(isAimMap)) return { ...base, mp_freezetime: 0, mp_round_restart_delay: 2 };
