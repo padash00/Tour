@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { adminCallMatch, adminHallForbid, adminHallFree, adminHallResetForbidden, adminHallToggle, adminHallVetoNow } from "@/app/actions/admin-hall";
+import { adminCallMatch, adminHallBlockOff, adminHallForbid, adminHallFree, adminHallResetForbidden, adminHallToggle, adminHallVetoNow } from "@/app/actions/admin-hall";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { HALL_BLOCKS, HALL_SPARE_PCS, blockLabel, pairKey } from "@/lib/hall-core";
@@ -49,8 +49,16 @@ export default async function AdminHallPage() {
   const block = (id: string) => {
     const s = seats.get(id);
     return (
-      <div key={id} className={cn("rounded-control border p-3", s?.match ? "border-accent/40 bg-accent/10" : s ? "border-warn/40 bg-warn/10" : "border-line bg-surface-4")}>
-        <div className="text-[15px] font-bold text-fg num">{blockLabel(id, false)}</div>
+      <div key={id} className={cn("rounded-control border p-3", s?.match ? "border-accent/40 bg-accent/10" : s ? "border-warn/40 bg-warn/10" : cfg.off.has(id) ? "border-dashed border-line opacity-60" : "border-line bg-surface-4")}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[15px] font-bold text-fg num">{blockLabel(id, false)}</span>
+          <ActionForm action={adminHallBlockOff} inline>
+            <input type="hidden" name="block" value={id} />
+            <button className={cn("rounded border px-1.5 py-0.5 text-[12px] font-semibold", cfg.off.has(id) ? "border-line text-fg-3" : "border-ok/40 bg-ok/10 text-ok")} title="Сажать ли сюда команды на турнире">
+              {cfg.off.has(id) ? "не используется" : "в игре"}
+            </button>
+          </ActionForm>
+        </div>
         {s ? (
           <>
             <div className="mt-1 truncate text-[14.5px] font-semibold text-fg">{name(s.team)}</div>

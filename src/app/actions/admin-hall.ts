@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import type { ActionResult } from "@/components/forms";
-import { blockById, blockLabel, pairKey, serializeForbidden } from "@/lib/hall-core";
+import { blockById, blockLabel, pairKey, serializeForbidden, serializeOff } from "@/lib/hall-core";
 import { callMatch, hallConfig, hallSnapshot, startHallVeto, updateBoard } from "@/lib/hall";
 import { db } from "@/lib/supabase";
 import { setAppSettings } from "@/lib/telegram";
@@ -63,6 +63,21 @@ export async function adminHallForbid(_prev: ActionResult, formData: FormData): 
   else set.add(key);
   await setAppSettings({ HALL_FORBIDDEN: serializeForbidden(set) });
   await audit(admin.id, "hall.forbidden", undefined, { pair: key, forbidden: set.has(key) });
+  revalidatePath("/admin/hall");
+  return null;
+}
+
+/** Блок в игре / не используется на турнире (HALL_OFF) */
+export async function adminHallBlockOff(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  const id = String(formData.get("block") ?? "");
+  if (!blockById(id)) return { error: "Нет такого блока" };
+  const cfg = await hallConfig();
+  const set = new Set(cfg.off);
+  if (set.has(id)) set.delete(id);
+  else set.add(id);
+  await setAppSettings({ HALL_OFF: serializeOff(set) });
+  await audit(admin.id, "hall.block_off", undefined, { block: id, off: set.has(id) });
   revalidatePath("/admin/hall");
   return null;
 }

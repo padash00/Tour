@@ -22,8 +22,21 @@ export const HALL_BLOCKS: HallBlock[] = [
   { id: "S1", zone: "standart", from: 31, to: 36 },
   { id: "S2", zone: "standart", from: 37, to: 41 },
   { id: "S3", zone: "standart", from: 42, to: 47 },
-  { id: "S4", zone: "standart", from: 48, to: 53 },
+  { id: "S4", zone: "standart", from: 49, to: 53 },
 ];
+
+/** Блоки, где на турнире не сидят (по умолчанию): 31–36 и 42–47. В пульте «Зал» — кнопкой у блока (HALL_OFF) */
+export const DEFAULT_OFF = ["S1", "S3"];
+
+/** HALL_OFF из настроек: "S1,S3"; пусто — по умолчанию; "none" — все блоки в игре */
+export function parseOff(raw: string | null | undefined): Set<string> {
+  if (raw == null || !raw.trim()) return new Set(DEFAULT_OFF);
+  if (raw.trim() === "none") return new Set();
+  const ids = new Set(HALL_BLOCKS.map((b) => b.id));
+  return new Set(raw.split(",").map((x) => x.trim()).filter((x) => ids.has(x)));
+}
+
+export const serializeOff = (set: Set<string>) => (set.size ? [...set].sort().join(",") : "none");
 
 /** Запасные ПК — не входят в блоки, пересадка одного игрока при поломке */
 export const HALL_SPARE_PCS = [54, 55];
@@ -92,6 +105,8 @@ export type SeatInput = {
   /** блоки, которые «держит» команда, ждущая следующего матча, — занимать можно, но лучше не надо */
   reserved: Map<string, string>;
   forbidden: Set<string>;
+  /** блоки, где на турнире не сидят */
+  off?: Set<string>;
 };
 
 export type SeatPlan = { seat1: string; seat2: string; moved1: boolean; moved2: boolean };
@@ -101,8 +116,9 @@ export type SeatPlan = { seat1: string; seat2: string; moved1: boolean; moved2: 
  * пересаживаем как можно меньше команд; чужие занятые блоки не трогаем. null — мест нет, ждём.
  */
 export function chooseSeats(input: SeatInput): SeatPlan | null {
-  const { team1, team2, last, occupied, reserved, forbidden } = input;
+  const { team1, team2, last, occupied, reserved, forbidden, off } = input;
   const usable = (block: string, team: string) => {
+    if (off?.has(block)) return false;
     const who = occupied.get(block);
     return !who || who === team;
   };

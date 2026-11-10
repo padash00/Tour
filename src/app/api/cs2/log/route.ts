@@ -32,6 +32,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     await releaseIngest(key, claim.token).catch(() => {});
+    // пачка лога столкнулась с соседней или с итогом карты (состояние разбора сменилось) — обычная гонка,
+    // агент повторит через пару секунд; в журнал ошибок не пишем
+    if ((e as { message?: string })?.message === "log_state_changed") {
+      return NextResponse.json({ error: "retry" }, { status: 503, headers: { "Retry-After": "2" } });
+    }
     console.error("cs2 log ingest failed", e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }

@@ -4,7 +4,7 @@ import { isPrivateMatch, isPrivateTournament } from "./private-tournament";
 import { db } from "./supabase";
 import { SITE_URL, setAppSettings, telegramConfig, telegramGroup, tgCall, tgEscape } from "./telegram";
 import { VETO_STEP_SECONDS } from "./veto";
-import { HALL_BLOCKS, blockById, blockLabel, chooseSeats, parseForbidden, type SeatPlan } from "./hall-core";
+import { HALL_BLOCKS, blockById, blockLabel, chooseSeats, parseForbidden, parseOff, type SeatPlan } from "./hall-core";
 
 /*
  * Рассадка в зале (LAN-турниры). Всё хранится событиями в audit_logs — схема базы не меняется:
@@ -26,7 +26,7 @@ export async function hallConfig() {
   const { data } = await db()
     .from("app_settings")
     .select("key, value")
-    .in("key", ["HALL_SEATING", "HALL_FORBIDDEN", "HALL_FREED", "TELEGRAM_MATCHES_THREAD", "HALL_BOARD_MSG", "HALL_BOARD_TEXT"]);
+    .in("key", ["HALL_SEATING", "HALL_FORBIDDEN", "HALL_OFF", "HALL_FREED", "TELEGRAM_MATCHES_THREAD", "HALL_BOARD_MSG", "HALL_BOARD_TEXT"]);
   const m = new Map((data ?? []).map((r) => [r.key, String(r.value ?? "")]));
   let freed: Record<string, string> = {};
   try {
@@ -36,6 +36,7 @@ export async function hallConfig() {
     enabled: m.get("HALL_SEATING") === "1",
     forbiddenRaw: m.get("HALL_FORBIDDEN") ?? "",
     forbidden: parseForbidden(m.get("HALL_FORBIDDEN")),
+    off: parseOff(m.get("HALL_OFF")),
     freed,
     thread: Number(m.get("TELEGRAM_MATCHES_THREAD") || "") || null,
     boardMsg: Number(m.get("HALL_BOARD_MSG") || "") || null,
@@ -188,7 +189,7 @@ export async function callMatch(matchId: string, opts: { actorId?: string | null
     }
     plan = { seat1: s1, seat2: s2, moved1: !!snap.last.get(m.team1_id) && snap.last.get(m.team1_id) !== s1, moved2: !!snap.last.get(m.team2_id) && snap.last.get(m.team2_id) !== s2 };
   } else {
-    plan = chooseSeats({ team1: m.team1_id, team2: m.team2_id, last: snap.last, occupied: snap.occupied, reserved: snap.reserved, forbidden: cfg.forbidden });
+    plan = chooseSeats({ team1: m.team1_id, team2: m.team2_id, last: snap.last, occupied: snap.occupied, reserved: snap.reserved, forbidden: cfg.forbidden, off: cfg.off });
   }
   if (!plan) return "Свободных мест нет — матч подождёт, пока освободится блок";
 

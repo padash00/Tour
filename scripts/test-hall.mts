@@ -1,6 +1,6 @@
 // Рассадка в зале без базы: запреты по схеме клуба, 5 матчей одновременно, победитель остаётся на месте.
 // Запуск: npx tsx scripts/test-hall.mts
-import { chooseSeats, defaultForbidden, pairKey, parseForbidden, serializeForbidden } from "../src/lib/hall-core";
+import { chooseSeats, defaultForbidden, pairKey, parseForbidden, parseOff, serializeForbidden } from "../src/lib/hall-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -55,6 +55,23 @@ check(!!near && !F.has(pairKey(near.seat1, near.seat2)), "после перес�
 // место ждущей команды занимаем только если других нет
 const res = chooseSeats({ team1: "a", team2: "b", last: new Map(), occupied: new Map(), reserved: new Map([["P3", "w"], ["S1", "w2"]]), forbidden: F });
 check(!!res && res.seat1 !== "P3" && res.seat2 !== "S1" && res.seat1 !== "S1" && res.seat2 !== "P3", "места ждущих команд не занимаем без нужды");
+
+// блоки вне игры (31–36, 42–47): туда не сажаем; 8 блоков в игре вмещают 4 матча сразу с запретами по умолчанию
+{
+  const off = parseOff("");
+  check(off.has("S1") && off.has("S3") && !off.has("S2") && !off.has("S4") && parseOff("none").size === 0, "по умолчанию не используются 31–36 и 42–47");
+  const occupied = new Map<string, string>();
+  let seated = 0;
+  for (let i = 0; i < 4; i++) {
+    const r = chooseSeats({ team1: `a${i}`, team2: `b${i}`, last: new Map(), occupied, reserved: new Map(), forbidden: F, off });
+    if (!r) break;
+    check(!off.has(r.seat1) && !off.has(r.seat2) && !F.has(pairKey(r.seat1, r.seat2)), `матч ${i + 1}: ${r.seat1}–${r.seat2} — блоки в игре, пара разрешена`);
+    occupied.set(r.seat1, `a${i}`);
+    occupied.set(r.seat2, `b${i}`);
+    seated++;
+  }
+  check(seated === 4, `4 матча сразу на 8 блоках (рассажено ${seated})`);
+}
 
 if (failed) {
   console.error(`\n${failed} проверок не прошли`);
