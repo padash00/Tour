@@ -115,7 +115,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         }
       />
 
-      <LifecyclePanel t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} eta={await tournamentEta(t.id).catch(() => null)} />
+      <LifecyclePanel t={t} approved={approved.length} checkedIn={checkedIn} pending={approved.length >= t.max_teams ? 0 : pendingRegs.length} eta={await tournamentEta(t.id).catch(() => null)} />
 
       <SubTabs
         active={tab}
@@ -126,7 +126,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
             x.key === "registration" ? (
               <span>
                 Регистрация <span className="num text-fg-3">{regs.length}</span>
-                {pendingRegs.length > 0 && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-warn align-middle" />}
+                {pendingRegs.length > 0 && approved.length < t.max_teams && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-warn align-middle" />}
               </span>
             ) : (
               x.label
@@ -134,7 +134,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
         }))}
       />
 
-      {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={pendingRegs.length} />}
+      {tab === "overview" && <OverviewTab t={t} approved={approved.length} checkedIn={checkedIn} pending={approved.length >= t.max_teams ? 0 : pendingRegs.length} />}
       {tab === "registration" && <RegistrationTab t={t} regs={regs} />}
       {tab === "official" && <OfficialTab t={t} admin={admin} />}
       {tab === "access" && <PrivateTab t={t} />}
@@ -955,25 +955,50 @@ async function RegistrationTab({
   // официальный турнир: одобрение без полного комплекта документов — только после подтверждения
   const official = t.is_official ? await loadOfficial(t) : null;
   const approveWarning = new Map((official?.teams ?? []).map((x) => [x.registration.id, approveWarningOf(x)]));
-  const groups: { key: string; title: string; items: RegistrationWithTeam[] }[] = [
-    { key: "pending", title: "Ждут вашего решения", items: regs.filter((r) => r.status === "pending") },
-    { key: "approved", title: "Приняты в турнир", items: regs.filter((r) => r.status === "approved") },
-    { key: "other", title: "Отклонены или отозваны", items: regs.filter((r) => r.status === "rejected" || r.status === "withdrawn") },
-  ];
+  const pending = regs.filter((r) => r.status === "pending");
+  const approved = regs.filter((r) => r.status === "approved");
+  const other = regs.filter((r) => r.status === "rejected" || r.status === "withdrawn");
+  // мест больше нет: решать нечего — сверху принятые, остальные заявки свёрнуты внизу (принять можно, если кто-то снимется)
+  const full = approved.length >= t.max_teams;
+  const groups: { key: string; title: string; items: RegistrationWithTeam[]; folded?: boolean }[] = full
+    ? [
+        { key: "approved", title: "Приняты в турнир", items: approved },
+        { key: "pending", title: "Не прошли — мест нет", items: pending, folded: true },
+        { key: "other", title: "Отклонены или отозваны", items: other, folded: true },
+      ]
+    : [
+        { key: "pending", title: "Ждут вашего решения", items: pending },
+        { key: "approved", title: "Приняты в турнир", items: approved },
+        { key: "other", title: "Отклонены или отозваны", items: other },
+      ];
+  const table = (items: RegistrationWithTeam[]) => (
+    <div className="rounded-surface border border-line-subtle bg-surface shadow-[var(--shadow-soft)] divide-y divide-ink/[0.06] overflow-hidden">
+      <RegistrationHead />
+      {items.map((r) => (
+        <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} official={t.is_official} players={players} approveWarning={approveWarning.get(r.id)} />
+      ))}
+    </div>
+  );
   return (
     <div className="space-y-10">
       {groups
         .filter((g) => g.items.length > 0)
-        .map((g) => (
-          <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
-            <div className="rounded-surface border border-line-subtle bg-surface shadow-[var(--shadow-soft)] divide-y divide-ink/[0.06] overflow-hidden">
-              <RegistrationHead />
-              {g.items.map((r) => (
-                <RegistrationRow key={r.id} r={r} tournamentStatus={t.status} official={t.is_official} players={players} approveWarning={approveWarning.get(r.id)} />
-              ))}
-            </div>
-          </Panel>
-        ))}
+        .map((g) =>
+          g.folded ? (
+            <details key={g.key} className="group/fold">
+              <summary className="cursor-pointer list-none text-[17px] font-bold text-fg-2 hover:text-fg [&::-webkit-details-marker]:hidden">
+                <span className="mr-2 inline-block text-[13px] text-fg-3 transition-transform group-open/fold:rotate-90">▸</span>
+                {g.title} <span className="num text-fg-3">{g.items.length}</span>
+                <span className="ml-3 text-[14px] font-normal text-fg-3 group-open/fold:hidden">показать</span>
+              </summary>
+              <div className="mt-4">{table(g.items)}</div>
+            </details>
+          ) : (
+            <Panel key={g.key} title={<span>{g.title} <span className="num text-fg-3">{g.items.length}</span></span>}>
+              {table(g.items)}
+            </Panel>
+          ),
+        )}
     </div>
   );
 }
