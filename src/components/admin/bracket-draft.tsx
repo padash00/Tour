@@ -45,7 +45,13 @@ export function BracketDraft({ teams, initial, thirdPlace }: { teams: DraftTeam[
   let n = pairs.length;
   // больше половины пар — проход без игры: первый раунд — отборочные (18 команд в сетке на 32)
   const playIn = pairs.length >= 4 && pairs.filter(([a, b]) => !a || !b).length * 2 > pairs.length;
-  rounds.push({ label: playIn ? "Отборочные" : roundName(1, k), slots: pairs.map(([a, b]) => [a ? byId.get(a)!.name : null, b ? byId.get(b)!.name : null]) });
+  // отборочные показываем как на сайте: только настоящие матчи, команды с проходом стоят сразу в 1/8.
+  // Пока есть нерасставленные команды — обычный вид со всеми слотами, иначе их некуда поставить
+  const split = playIn && missing.length === 0;
+  rounds.push({
+    label: playIn ? "Отборочные" : roundName(1, k),
+    slots: pairs.filter(([a, b]) => !split || (a && b)).map(([a, b]) => [a ? byId.get(a)!.name : null, b ? byId.get(b)!.name : null]),
+  });
   for (let r = 2; r <= k; r++) {
     const slots: (string | null)[][] = [];
     const nextNames: (string | null)[] = [];
@@ -73,7 +79,7 @@ export function BracketDraft({ teams, initial, thirdPlace }: { teams: DraftTeam[
       >
         {t ? <TeamLogo src={t.logo} tag={t.tag} size={32} /> : <span className="grid size-8 place-items-center rounded-[8px] border border-dashed border-line text-[12px]">—</span>}
         <span className="min-w-0 flex-1">
-          <span className={cn("block truncate text-[15px] font-semibold", t ? "text-fg" : "text-fg-3")}>{t ? t.name : "Проход без игры"}</span>
+          <span className={cn("block truncate text-[15px] font-semibold", t ? "text-fg" : "text-fg-3")}>{t ? t.name : split ? "Команда не выбрана" : "Проход без игры"}</span>
           {t && <span className="block text-[12.5px] text-fg-3">{t.elo ? `${t.elo} ELO` : "ELO нет"}</span>}
         </span>
         <span className="text-[12px] text-fg-3" aria-hidden>
@@ -97,11 +103,82 @@ export function BracketDraft({ teams, initial, thirdPlace }: { teams: DraftTeam[
     );
   };
 
+  const cardHead = "mb-2 flex items-center justify-between px-1 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-fg-3";
+  const versus = <div className="text-center text-[11px] font-bold uppercase tracking-[0.2em] text-fg-3">vs</div>;
+  // сторона матча 1/8: команда с проходом (её можно поменять) или победитель отборочного матча
+  const entrant = (q: number) => {
+    const [a, b] = pairs[q];
+    if (a && b)
+      return (
+        <div className="flex h-14 items-center gap-3 rounded-control border border-dashed border-line bg-surface-2 px-3">
+          <span className="grid size-8 place-items-center rounded-[8px] border border-dashed border-line text-[12px] text-fg-3">?</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold text-fg-2">Победитель отборочного М{q + 1}</span>
+            <span className="block truncate text-[12.5px] text-fg-3">
+              {byId.get(a)!.name} / {byId.get(b)!.name}
+            </span>
+          </span>
+        </div>
+      );
+    const side = b && !a ? 1 : 0;
+    return (
+      <>
+        {slot(q, side)}
+        <input type="hidden" name={`m${q}${side ? "a" : "b"}`} value="" />
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {split && (
+        <>
+          <div>
+            <div className="mb-2 text-[15px] font-bold text-fg">Отборочные — играют первыми</div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {pairs.map(([a, b], p) =>
+                a && b ? (
+                  <div key={p} className="rounded-surface border border-accent/40 bg-accent-dim/40 p-3">
+                    <div className={cardHead}>
+                      <span>Матч {p + 1}</span>
+                      <span className="normal-case tracking-normal text-accent">победитель — в 1/8</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {slot(p, 0)}
+                      {versus}
+                      {slot(p, 1)}
+                    </div>
+                  </div>
+                ) : null,
+              )}
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 text-[15px] font-bold text-fg">{roundName(2, k)}</div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: pairs.length / 2 }, (_, i) => {
+                const empty = [2 * i, 2 * i + 1].some((q) => !pairs[q][0] && !pairs[q][1]);
+                return (
+                  <div key={i} className={cn("rounded-surface border bg-surface-2/60 p-3", empty ? "border-danger/50" : "border-line-subtle")}>
+                    <div className={cardHead}>
+                      <span>Матч {pairs.length + i + 1}</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {entrant(2 * i)}
+                      {versus}
+                      {entrant(2 * i + 1)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* карточки матчей первого раунда */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {pairs.map(([a, b], p) => (
+      <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", split && "hidden")}>
+        {(split ? [] : pairs).map(([a, b], p) => (
           <div key={p} className={cn("rounded-surface border bg-surface-2/60 p-3", !a && !b ? "border-danger/50" : "border-line-subtle")}>
             <div className="mb-2 flex items-center justify-between px-1 text-[12.5px] font-semibold uppercase tracking-[0.08em] text-fg-3">
               <span>Матч {p + 1}</span>
