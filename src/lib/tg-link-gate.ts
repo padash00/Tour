@@ -7,7 +7,8 @@ import { db } from "./supabase";
  * бот не отметит его в рассадке и не напишет о вызове на матч.
  */
 
-const OPEN = ["registration", "checkin", "live"];
+// registration_closed — регистрация закрыта, но турнир впереди: подтверждать Telegram всё ещё нужно (без него напоминания замолкали до check-in)
+const OPEN = ["registration", "registration_closed", "checkin", "live"];
 
 type RosterRow = {
   player_id: string;
