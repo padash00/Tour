@@ -77,9 +77,9 @@ const REMIND_FROM_HOUR = 11;
 const REMIND_TO_HOUR = 21;
 
 function almatyNow() {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  return { day: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
+  return { day: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")), minute: Number(get("minute")) };
 }
 
 export async function captainLinkRemindTick() {
@@ -134,12 +134,12 @@ export async function captainLinkRemindTick() {
 }
 
 /*
- * Каждый час (11:00–21:00 по Алматы) бот публикует в теме «Матчи турнира» список участников без подтверждённого
+ * Каждые 30 минут (11:00–21:00 по Алматы) бот публикует в теме «Матчи турнира» список участников без подтверждённого
  * Telegram, с отметками @ник (ник из анкеты), и удаляет прошлое такое сообщение — в теме всегда одно, свежее.
  * Когда подтвердят все — прошлое сообщение удаляется и напоминания прекращаются.
  */
 export async function groupLinkRemindTick(force = false) {
-  const { day, hour } = almatyNow();
+  const { day, hour, minute } = almatyNow();
   if (!force && (hour < REMIND_FROM_HOUR || hour >= REMIND_TO_HOUR)) return;
   const { telegramConfig, telegramGroup, tgCall, tgEscape, setAppSettings, SITE_URL } = await import("./telegram");
   const [cfg, group, { data: st }] = await Promise.all([
@@ -150,8 +150,8 @@ export async function groupLinkRemindTick(force = false) {
   const s = new Map((st ?? []).map((r) => [r.key, String(r.value ?? "")]));
   const thread = Number(s.get("TELEGRAM_MATCHES_THREAD") || "") || null;
   if (!cfg.token || !group.id || !thread) return;
-  const slot = `${day}T${hour}`;
-  if (!force && s.get("TG_LINK_REMIND_AT") === slot) return; // в этот час уже публиковали
+  const slot = `${day}T${hour}:${minute < 30 ? "00" : "30"}`;
+  if (!force && s.get("TG_LINK_REMIND_AT") === slot) return; // в эти полчаса уже публиковали
 
   const rows = await approvedRosters();
   const ids = [...new Set(rows.map((r) => r.player_id))];
@@ -186,7 +186,7 @@ export async function groupLinkRemindTick(force = false) {
     `⚠️ <b>Подтвердите Telegram — ${total} ${total % 10 === 1 && total % 100 !== 11 ? "игрок" : total % 10 >= 2 && total % 10 <= 4 && (total % 100 < 12 || total % 100 > 14) ? "игрока" : "игроков"} ещё без него</b>\n\n` +
     `В день турнира бот пишет каждому игроку, за какие ПК садиться и когда его матч. Этим игрокам сообщения не придут:\n\n${list}\n\n` +
     `Как подтвердить (1 минута): зайдите на сайт со своего аккаунта → окно «Подтвердите Telegram» → «Подтвердить через бота» → в боте «Старт». Нет Telegram на компьютере — в окне QR-код для телефона.\n\n` +
-    `<i>Список обновляется каждый час.</i>`;
+    `<i>Список обновляется каждые 30 минут.</i>`;
   const r = await tgCall<{ message_id: number }>(cfg.token, "sendMessage", {
     chat_id: group.id,
     message_thread_id: thread,
