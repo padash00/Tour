@@ -17,8 +17,9 @@ import { SectionTitle } from "./heading";
  * Вопрос для каждой рамки: «почему это карточка?» Если не объект — это Section.
  */
 
-export function Container({ children, width = "product", className }: { children: ReactNode; width?: "product" | "wide" | "read"; className?: string }) {
-  const max = { product: "max-w-product", wide: "max-w-wide", read: "max-w-read" }[width];
+export function Container({ children, width = "product", className }: { children: ReactNode; width?: "product" | "wide" | "read" | "match"; className?: string }) {
+  // match — страница матча: табло и колонки шире обычной страницы, чтобы на большом экране не жались к центру
+  const max = { product: "max-w-product", wide: "max-w-wide", read: "max-w-read", match: "max-w-[1560px]" }[width];
   return <div className={cn("mx-auto w-full px-4 sm:px-6 lg:px-8", max, className)}>{children}</div>;
 }
 

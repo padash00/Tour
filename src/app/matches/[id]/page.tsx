@@ -40,7 +40,6 @@ import {
   Button,
   Container,
   EmptyState,
-  Facts,
   FeatureSurface,
   Panel,
   RowList,
@@ -355,18 +354,6 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           })()}
         />
       </FeatureSurface>
-    ) : m.status === "pending" || m.status === "upcoming" ? (
-      <FeatureSurface>
-        <h2 className="text-heading text-fg">{t("Когда и как играется")}</h2>
-        <Facts
-          className="mt-5"
-          items={[
-            { label: t("Начало"), value: m.scheduled_at ? formatDateTime(m.scheduled_at, t.lang) : t("Будет объявлено") },
-            { label: t("Формат"), value: bestOfText },
-            { label: t("Стадия"), value: stage },
-          ]}
-        />
-      </FeatureSurface>
     ) : m.status === "veto" ? (
       <>
         <VetoBoard m={m} state={state} myTurn={myTurn} images={mapImages} serverNow={serverNow} />
@@ -496,7 +483,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
 
       <MatchHero m={m} stage={stage} adminHref={admin ? `/admin/matches/${m.id}` : undefined} mapImages={mapImages} />
 
-      <Container width="wide" className="pb-6 pt-4 sm:pb-10">
+      <Container width="match" className="pb-6 pt-4 sm:pb-10">
         <div className="flex flex-col gap-4">
           <MatchExplain
             m={m}
@@ -510,7 +497,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           <MatchProgress status={m.status} singleMap={m.tournament.map_pool.length <= 1} />
         </div>
 
-        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex min-w-0 flex-col gap-5">
             {currentState && <section aria-label={t("Текущее состояние матча")}>{currentState}</section>}
             {mainBlocks.map((node, i) => (
@@ -528,7 +515,18 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
                 <div className="flex justify-between gap-3"><dt className="text-fg-3">{t("Турнир")}</dt><dd className="text-right font-semibold">{m.tournament.name}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-fg-3">{t("Стадия")}</dt><dd className="text-right font-semibold">{stage}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-fg-3">{t("Формат")}</dt><dd className="text-right font-semibold">{bestOfText}</dd></div>
-                {m.scheduled_at && <div className="flex justify-between gap-3"><dt className="text-fg-3">{t("Начало")}</dt><dd className="text-right font-semibold">{formatDateTime(m.scheduled_at, t.lang)}</dd></div>}
+                {(m.scheduled_at || m.status === "pending" || m.status === "upcoming") && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">{t("Начало")}</dt>
+                    <dd className="text-right font-semibold">{m.scheduled_at ? formatDateTime(m.scheduled_at, t.lang) : t("Будет объявлено")}</dd>
+                  </div>
+                )}
+                {nextStage && !["finished", "cancelled"].includes(m.status) && (
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-fg-3">{t("Победитель выходит в")}</dt>
+                    <dd className="text-right font-semibold">{nextStage}</dd>
+                  </div>
+                )}
               </dl>
             </section>
           </aside>
