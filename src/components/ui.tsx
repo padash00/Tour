@@ -109,8 +109,8 @@ export function Meta({ items, className }: { items: ReactNode[]; className?: str
 // ───────────────────────── layout
 
 const widths = {
-  public: "max-w-[1320px]",
-  competition: "max-w-[1280px]",
+  public: "max-w-[1560px]",
+  competition: "max-w-[1560px]",
   admin: "max-w-[1480px]",
   narrow: "max-w-[820px]",
   form: "max-w-[640px]",

@@ -113,8 +113,8 @@
   --shadow-pop: 0 16px 40px -16px #1214172e, 0 0 0 1px var(--color-line-subtle);
   --shadow-soft: 0 1px 2px #1214170a;
 
-  --container-product: 1320px;
-  --container-wide: 1320px;
+  --container-product: 1560px;
+  --container-wide: 1560px;
   --container-read: 760px;
 
   --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
