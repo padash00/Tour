@@ -107,7 +107,7 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
       </Panel>
 
       {!disbanded && (
-        <Panel title="Название и тег" boxed>
+        <Panel title="Название, тег и описание" boxed>
           <ActionForm action={adminRenameTeam} className="p-5">
             <input type="hidden" name="teamId" value={team.id} />
             <div className="flex flex-wrap items-end gap-3">
@@ -119,6 +119,12 @@ export default async function AdminTeamPage(props: PageProps<"/admin/teams/[id]"
                 Тег
                 <input name="tag" defaultValue={team.tag} required maxLength={6} className="field w-36 uppercase" autoComplete="off" />
               </label>
+            </div>
+            <label className="mt-4 flex flex-col gap-1.5 text-[14px] font-semibold text-fg-2">
+              Описание — текст о команде на её странице
+              <textarea name="description" defaultValue={team.description ?? ""} maxLength={400} rows={3} className="field h-auto py-2.5 font-normal" placeholder="Пусто — описания на странице команды не будет" />
+            </label>
+            <div className="mt-4">
               <SubmitButton variant="secondary">Сохранить</SubmitButton>
             </div>
             <p className="mt-3 text-[13px] text-fg-3">Пока у команды есть заявка на официальный турнир, капитан название, тег и состав менять не может — только вы здесь.</p>

@@ -58,10 +58,18 @@ export async function adminRenameTeam(_prev: ActionResult, formData: FormData): 
   const tag = String(formData.get("tag") ?? "").trim().toUpperCase();
   if (name.length < 2 || name.length > 32) return { error: "Название — от 2 до 32 символов" };
   if (!/^[A-Z0-9]{2,6}$/.test(tag)) return { error: "Тег — 2–6 латинских букв или цифр" };
-  if (name === team.name && tag === team.tag) return { success: "Без изменений" };
-  const { error } = await db().from("teams").update({ name, tag }).eq("id", team.id);
+  // описание — то, что капитан написал о команде на её странице; поле в форме есть не всегда (старые вкладки)
+  const rawDescription = formData.get("description");
+  const description = rawDescription == null ? (team.description ?? null) : String(rawDescription).trim() || null;
+  if (description && description.length > 400) return { error: "Описание — максимум 400 символов" };
+  if (name === team.name && tag === team.tag && description === (team.description ?? null)) return { success: "Без изменений" };
+  const { error } = await db().from("teams").update({ name, tag, description }).eq("id", team.id);
   if (error) return { error: error.code === "23505" ? "Такой тег или название уже заняты другой командой" : "Не удалось сохранить" };
-  await audit(admin.id, "admin.team.rename", { type: "team", id: team.id }, { from: `${team.name} [${team.tag}]`, to: `${name} [${tag}]` });
+  await audit(admin.id, "admin.team.rename", { type: "team", id: team.id }, {
+    from: `${team.name} [${team.tag}]`,
+    to: `${name} [${tag}]`,
+    ...(description !== (team.description ?? null) ? { description_from: team.description ?? null, description_to: description } : {}),
+  });
   revalidateTeam(team.id, team.tag);
   revalidatePath(`/teams/${encodeURIComponent(tag)}`);
   return { success: `Сохранено: ${name} [${tag}]` };
