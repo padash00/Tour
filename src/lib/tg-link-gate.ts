@@ -71,10 +71,10 @@ export async function unlinkedParticipants(): Promise<UnlinkedTeam[]> {
 
 /*
  * Раз в день бот пишет капитану в Telegram, кто из его состава ещё не подтвердил Telegram.
- * Только днём (11:00–21:00 по Алматы), только капитанам с подтверждённым Telegram, один раз в сутки на команду.
+ * Только днём (08:00–22:00 по Алматы), только капитанам с подтверждённым Telegram, один раз в сутки на команду.
  */
-const REMIND_FROM_HOUR = 11;
-const REMIND_TO_HOUR = 21;
+const REMIND_FROM_HOUR = 8;
+const REMIND_TO_HOUR = 22;
 
 function almatyNow() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Almaty", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
@@ -134,7 +134,7 @@ export async function captainLinkRemindTick() {
 }
 
 /*
- * Каждые 30 минут (11:00–21:00 по Алматы) бот публикует в теме «Матчи турнира» список участников без подтверждённого
+ * Каждые 30 минут (08:00–22:00 по Алматы) бот публикует в теме «Матчи турнира» список участников без подтверждённого
  * Telegram, с отметками @ник (ник из анкеты), и удаляет прошлое такое сообщение — в теме всегда одно, свежее.
  * Когда подтвердят все — прошлое сообщение удаляется и напоминания прекращаются.
  */
