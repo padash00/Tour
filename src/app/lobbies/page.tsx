@@ -211,7 +211,7 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                       <span>
                         {MODES[l.settings.mode].label.replace(" на ", "×")} · BO{l.settings.best_of} · {l.settings.network === "lan" ? "LAN" : t("Интернет")} ·{" "}
                         <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${pooled ? l.pool : l.players}/${total}` })}
-                          {cupTeams(l.settings.players) > 0 ? ` · ${t("{n} команд", { n: cupTeams(l.settings.players) })}` : ""}</span>
+                          {cupTeams(l.settings.players) > 0 ? ` · ${cupTeams(l.settings.players)} ${t.plural(cupTeams(l.settings.players), "команда", "команды", "команд")}` : ""}</span>
                         {l.settings.filter ? ` · ${t("фильтр")}` : ""}
                         {l.settings.pot && potBank(l.settings) > 0 ? ` · ${t("банк {sum} тг", { sum: potBank(l.settings).toLocaleString("ru-RU") })}` : ""}
                       </span>

@@ -181,7 +181,7 @@ export function CenterColumn({
       icon: Icon.swords("size-[18px]"),
       label: t("Формат"),
       value: many
-        ? `${t("{n} команд", { n: view.teams.length })} · ${settings.cup_format === "round" ? t("круговая") : t("сетка")} · BO${settings.best_of}`
+        ? `${view.teams.length} ${t.plural(view.teams.length, "команда", "команды", "команд")} · ${settings.cup_format === "round" ? t("круговая") : t("сетка")} · BO${settings.best_of}`
         : `${MODES[settings.mode].label.replace(" на ", "×")} · BO${settings.best_of}`,
     },
     { icon: Icon.signal("size-[18px]"), label: t("Сеть"), value: settings.network === "lan" ? t("LAN · клуб") : t("Интернет") },
@@ -199,7 +199,7 @@ export function CenterColumn({
     );
   } else if (canStart && snake && !potTeamsFull && !lobby.draft) {
     // пока составы не собраны, главное действие — назначить капитанов и начать выбор игроков
-    primary = <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Начать выбор игроков")} />;
+    primary = <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Назначить капитанов")} />;
   } else if (canStart && many) {
     primary = (
       <Button size="lg" block disabled={busy || !!lobby.draft} onClick={() => run(() => A.startCupMatches(code))}>
@@ -301,7 +301,7 @@ export function CenterColumn({
             ? isHost
               ? potTeamsFull
                 ? t("Команды собраны — запускайте матчи. Каждый матч откроется в своей комнате.")
-                : t("Соберите {need} игроков (сейчас {n}), назначьте капитанов и начните выбор игроков.", { need: playersNeeded(settings), n: potPlayers })
+                : t("Соберите {need} игроков (сейчас {n}), затем назначьте капитанов — они разберут игроков по командам.", { need: playersNeeded(settings), n: potPlayers })
               : t("Игроков по командам разбирают капитаны. Когда начнутся матчи, здесь появится кнопка «Мой матч».")
             : pot
             ? isHost

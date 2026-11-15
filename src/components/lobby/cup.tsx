@@ -17,7 +17,7 @@ import type { Run } from "./use-lobby-view";
  */
 
 /** Кнопка «Начать выбор игроков»: организатор назначает капитанов (по умолчанию — самые высокие по ELO) */
-export function CaptainsButton({ view, busy, run, code, label, variant = "primary" }: { view: LobbyView; busy: boolean; run: Run; code: string; label: string; variant?: "primary" | "secondary" }) {
+export function CaptainsButton({ view, busy, run, code, label, variant = "primary" }: { view: LobbyView; busy: boolean; run: Run; code: string; label: string; variant?: "primary" | "secondary" | "card" }) {
   const t = useT();
   const teams = view.teams.length;
   const need = playersNeeded(view.lobby.settings);
@@ -35,14 +35,20 @@ export function CaptainsButton({ view, busy, run, code, label, variant = "primar
 
   return (
     <>
-      <Button size={variant === "primary" ? "lg" : "md"} variant={variant} block disabled={busy} onClick={show}>
-        {label}
-      </Button>
+      {variant === "card" ? (
+        <button type="button" disabled={busy} onClick={show} className="w-full rounded-control border border-dashed border-line px-2 py-4 text-center text-meta font-medium text-accent transition-colors hover:border-accent/50 hover:bg-accent-dim/40">
+          {label}
+        </button>
+      ) : (
+        <Button size={variant === "primary" ? "lg" : "md"} variant={variant} block disabled={busy} onClick={show}>
+          {label}
+        </Button>
+      )}
       <Dialog
         open={open}
         onClose={() => setOpen(false)}
         title={t("Капитаны")}
-        description={t("Отметьте капитанов: {n}. Они по очереди разбирают игроков змейкой, первым выбирает капитан с меньшим ELO.", { n: teams })}
+        description={t("Отметьте капитанов: {n}. Каждый получает свою команду и по очереди разбирает игроков змейкой, первым выбирает капитан с меньшим ELO.", { n: teams })}
         size="lg"
         footer={
           <>
@@ -101,9 +107,11 @@ export function CaptainsButton({ view, busy, run, code, label, variant = "primar
 }
 
 /** Команды большого лобби: компактные карточки сеткой */
-export function CupTeams({ view, isHost, run, code }: { view: LobbyView; isHost: boolean; run: Run; code: string }) {
+export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string }) {
   const t = useT();
   const size = view.lobby.settings.team_size;
+  // организатор назначает капитанов и из пустой карточки команды — то же окно, что по главной кнопке
+  const canAssign = isHost && view.lobby.status === "waiting" && !view.lobby.draft;
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {view.teams.map((team, i) => {
@@ -128,7 +136,12 @@ export function CupTeams({ view, isHost, run, code }: { view: LobbyView; isHost:
               {members.map((m: ViewMember) => (
                 <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} captain={view.captains[i] === m.id} />
               ))}
-              {members.length === 0 && <div className="px-2 py-4 text-center text-meta text-fg-4">{t("Капитан ещё не назначен")}</div>}
+              {members.length === 0 &&
+                (canAssign ? (
+                  <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Назначить капитана")} variant="card" />
+                ) : (
+                  <div className="px-2 py-4 text-center text-meta text-fg-4">{t("Капитан ещё не назначен")}</div>
+                ))}
             </div>
           </section>
         );

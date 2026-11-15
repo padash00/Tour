@@ -274,7 +274,7 @@ export function LobbyRoom({
                   <CenterColumn view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
                   <div className="min-w-0 space-y-4">
                     {view.cup && <CupBracket cup={view.cup} isHost={isHost} busy={busy} run={run} code={code} />}
-                    <CupTeams view={view} isHost={isHost} run={run} code={code} />
+                    <CupTeams view={view} isHost={isHost} busy={busy} run={run} code={code} />
                   </div>
                 </div>
               </>
