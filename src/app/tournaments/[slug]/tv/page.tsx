@@ -8,6 +8,7 @@ import type { MapRounds } from "@/lib/rounds";
 import { getMatchRounds } from "@/lib/rounds-data";
 import { getTournamentRecap } from "@/lib/recap";
 import { getPlayerLeaderboard, mvpOf } from "@/lib/stats";
+import { finalistTeamIds } from "@/lib/nominations-core";
 import { db } from "@/lib/supabase";
 import { TvView, type TvData } from "@/components/tv/tv-view";
 
@@ -41,7 +42,7 @@ export default async function TournamentTvPage(props: PageProps<"/tournaments/[s
     t.status === "finished" ? getTournamentRecap(t) : Promise.resolve(null),
   ]);
 
-  const mvp = mvpOf(board);
+  const mvp = mvpOf(board, finalistTeamIds(matches));
 
   // лента раундов идущей карты каждого live-матча
   const teamSize = modeOf(t.format).size;

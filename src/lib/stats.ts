@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { db } from "./supabase";
 import { roundFacts, updateRoster, type LogEvent, type Side } from "./swing";
-import { awardMinMaps, isRifleWeapon, isSniperWeapon } from "./nominations-core";
+import { awardMinMaps, finalistTeamIds, isRifleWeapon, isSniperWeapon } from "./nominations-core";
 import type { Tables } from "./database.types";
 import type { Narrow, Player, Team } from "./types";
 
@@ -309,13 +309,28 @@ async function buildLeaderboard(rows: MapStatRow[]) {
 /**
  * MVP турнира: лучший Swing (средний вклад в шанс победы раунда) среди игроков, сыгравших
  * не меньше половины карт своей команды (минимум 2 карты). Если данных Swing нет — по F16 Rating.
+ * Когда финалисты известны — только среди игроков двух команд финала (решение владельца, 15.11.2026):
+ * до финала блок показывает лидера среди всех, после выхода пары в финал — лучшего из финалистов.
  */
 export async function getTournamentMvp(tournamentId: string, precomputed?: LeaderboardRow[]) {
-  return mvpOf(precomputed ?? (await getPlayerLeaderboard(tournamentId)));
+  const [board, finalists] = await Promise.all([precomputed ?? getPlayerLeaderboard(tournamentId), getFinalistTeamIds(tournamentId)]);
+  return mvpOf(board, finalists);
 }
 
-/** MVP по готовой таблице игроков турнира (без лишних запросов) */
-export function mvpOf(board: LeaderboardRow[]) {
+/** Команды финала турнира (пусто — финалисты ещё не известны или сетки нет). Считается один раз на запрос */
+export const getFinalistTeamIds = cache(async (tournamentId: string): Promise<string[]> => {
+  const { data, error } = await db().from("matches").select("bracket, round, team1_id, team2_id").eq("tournament_id", tournamentId);
+  if (error) console.error("stats: finalists", error);
+  return finalistTeamIds(data ?? []);
+});
+
+/** MVP по готовой таблице игроков турнира (без лишних запросов); finalists — команды финала (getFinalistTeamIds) */
+export function mvpOf(board: LeaderboardRow[], finalists: string[] = []) {
+  if (finalists.length) {
+    // пороги карт (половина карт команды, максимум сыгранных) считаются по финалистам
+    const own = board.filter((p) => p.team_id && finalists.includes(p.team_id));
+    if (own.length) board = own;
+  }
   if (board.length === 0) return null;
   const teamMaps = new Map<string, number>();
   for (const p of board) if (p.team_id) teamMaps.set(p.team_id, Math.max(teamMaps.get(p.team_id) ?? 0, p.maps));

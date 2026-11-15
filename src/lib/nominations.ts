@@ -3,7 +3,7 @@ import { cache } from "react";
 import { bestRifler, bestSniper, NOMINATIONS, type NominationDef, type NominationKey, type NominationLine } from "./nominations-core";
 import { makeT, type T } from "./i18n/core";
 import { displayFullNames } from "./person-name";
-import { getPlayerLeaderboard, getTournamentWeaponKills, mvpOf } from "./stats";
+import { getFinalistTeamIds, getPlayerLeaderboard, getTournamentWeaponKills, mvpOf } from "./stats";
 import { db } from "./supabase";
 import type { Team } from "./types";
 
@@ -89,14 +89,16 @@ async function nominationLines(tournamentId: string) {
 
 /** tx — язык подписей значений (на публичной странице турнира); без него — по-русски (пульт, дипломы) */
 export const getTournamentNominations = cache(async (tournamentId: string, tx: T = makeT("ru")): Promise<Nomination[]> => {
-  const [{ board, lines }, { data: rows }, bonuses] = await Promise.all([
+  const [{ board, lines }, { data: rows }, bonuses, finalists] = await Promise.all([
     nominationLines(tournamentId),
     db().from("tournament_nominations").select("*").eq("tournament_id", tournamentId),
     nominationBonuses(tournamentId, tx.lang),
+    getFinalistTeamIds(tournamentId),
   ]);
 
   const computed = new Map<NominationKey, { playerId: string; teamId: string | null; value: string }>();
-  const mvp = mvpOf(board);
+  // MVP — только среди игроков команд-финалистов; снайпер и рифлер — среди всех
+  const mvp = mvpOf(board, finalists);
   if (mvp?.player_id) {
     computed.set("mvp", {
       playerId: mvp.player_id,

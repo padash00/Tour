@@ -38,7 +38,7 @@ export type NominationDef = {
  * и на случай, если их вернут в регламент.
  */
 export const NOMINATIONS: NominationDef[] = [
-  { key: "mvp", title: tr("Лучший игрок (MVP)"), auto: true, rule: "Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше 3 карт за турнир и половины карт своей команды." },
+  { key: "mvp", title: tr("Лучший игрок (MVP)"), auto: true, rule: "Только игроки команд-финалистов. Лучший Swing (вклад в победу раунда), без данных Swing — F16 Rating; не меньше 3 карт за турнир и половины карт своей команды." },
   { key: "sniper", title: tr("Лучший снайпер"), auto: true, rule: "Больше всего убийств из AWP и SSG 08 за раунд по логу сервера (как в рейтингах снайперов HLTV/bo3.gg); при равенстве — больше убийств. Не меньше 3 карт за турнир." },
   { key: "rifler", title: tr("Лучший рифлер"), auto: true, rule: "Лучший F16 Rating среди игроков, у кого не меньше половины убийств — с автоматов (AK-47, M4A4, M4A1-S, FAMAS, Galil AR, AUG, SG 553) и снайперских < 30%; лучший снайпер в номинации не участвует; при равенстве — ADR. Не меньше 3 карт за турнир." },
 ];
@@ -67,6 +67,22 @@ export const MIN_AWARD_MAPS = 3;
 /** Порог карт для номинаций: половина карт своей команды и не меньше MIN_AWARD_MAPS (в маленьком турнире — максимум сыгранных) */
 export function awardMinMaps(maps: number, teamMaps: number, maxMaps: number) {
   return maps >= Math.max(1, Math.ceil(teamMaps / 2), Math.min(MIN_AWARD_MAPS, maxMaps));
+}
+
+/**
+ * Команды финала: гранд-финал (Double) или единственный матч последнего раунда верхней сетки (Single).
+ * MVP турнира выбирается только среди их игроков. Пока обе команды финала не известны (или сетки нет —
+ * только группа/швейцарка) — пусто, то есть ограничения нет.
+ */
+export function finalistTeamIds(matches: { bracket: string | null; round: number; team1_id: string | null; team2_id: string | null }[]): string[] {
+  const pair = (m: { team1_id: string | null; team2_id: string | null } | undefined) => (m?.team1_id && m.team2_id ? [m.team1_id, m.team2_id] : []);
+  const gf = matches.filter((m) => m.bracket === "grand_final");
+  if (gf.length) return pair(gf.find((m) => m.team1_id && m.team2_id));
+  const upper = matches.filter((m) => m.bracket === "upper");
+  if (!upper.length) return [];
+  const top = Math.max(...upper.map((m) => m.round));
+  const last = upper.filter((m) => m.round === top);
+  return last.length === 1 ? pair(last[0]) : [];
 }
 
 export type NominationLine = {

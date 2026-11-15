@@ -7,6 +7,7 @@ import { makeT, type T } from "./i18n/core";
 import { getTournamentRegistrations } from "./data";
 import { getStandings, getTournamentMatches, type MatchWithTeams } from "./matches";
 import { getTournamentNominations } from "./nominations";
+import { finalistTeamIds } from "./nominations-core";
 import { getPlayerLeaderboard, mvpOf } from "./stats";
 import { db } from "./supabase";
 import type { MatchMap, Player, Team, Tournament } from "./types";
@@ -135,7 +136,7 @@ export async function getTournamentRecap(t: Tournament, tx: T = makeT("ru")): Pr
   // MVP решением судей (Положение 5.5) главнее расчёта: блок MVP показывает выбранного игрока
   const judgedMvp = allNominations.find((n) => n.key === "mvp")?.decision;
   const judgedRow = judgedMvp?.playerId ? board.find((p) => p.player_id === judgedMvp.playerId) : null;
-  const mvp = judgedMvp ? (judgedRow ? { ...judgedRow, by: "rating" as const } : null) : mvpOf(board);
+  const mvp = judgedMvp ? (judgedRow ? { ...judgedRow, by: "rating" as const } : null) : mvpOf(board, finalistTeamIds(matches));
   const played = matches.filter((m) => m.status === "finished" && m.team1_id && m.team2_id);
 
   // серии и карты команды (счёт серии = выигранные карты; тех. победы — без карт)

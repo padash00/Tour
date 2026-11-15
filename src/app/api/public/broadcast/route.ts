@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { mockBroadcast, pickBroadcastTournament, shapeBroadcast, type BroadcastSource } from "@/lib/broadcast";
 import { getStandings, getTournamentMatches } from "@/lib/matches";
 import { getPlayerLeaderboard, mvpOf } from "@/lib/stats";
+import { finalistTeamIds } from "@/lib/nominations-core";
 import { db } from "@/lib/supabase";
 import type { Tournament } from "@/lib/types";
 
@@ -72,7 +73,7 @@ async function load(t: Tournament): Promise<BroadcastSource> {
     maps: p.maps,
     swing: p.swing,
   });
-  const mvp = mvpOf(board);
+  const mvp = mvpOf(board, finalistTeamIds(matches));
   return {
     tournament: { id: t.id, slug: t.slug, name: t.name, status: t.status, sponsors: t.sponsors },
     matches,
