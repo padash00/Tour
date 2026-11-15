@@ -12,6 +12,7 @@ import { Button, CriticalSurface, buttonClass as btnClass, cn } from "@/componen
 import { Icon } from "./ui";
 import { Countdown } from "./countdown";
 import { GamePanel } from "./game-panel";
+import { PotPanel } from "./pot";
 import { phaseOf, type Run } from "./use-lobby-view";
 
 // ───────────────────────── центр: статус, вето, сервер
@@ -96,7 +97,9 @@ export function StageBanner({
       <CriticalSurface tone={myDraftTurn ? "accent" : "warn"}>
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myDraftTurn ? t("Ваш ход") : t("Драфт капитанов")}</div>
+            <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">
+              {myDraftTurn ? t("Ваш ход") : lobby.draft.snake ? t("Выбор игроков змейкой") : t("Драфт капитанов")}
+            </div>
             <h2 className="mt-2 text-heading text-fg">
               {myDraftTurn ? t("Выберите следующего игрока") : t("Выбирает {name}", { name: draftCaptain?.nickname ?? t("капитан") })}
             </h2>
@@ -151,6 +154,9 @@ export function CenterColumn({
   const waiting = lobby.status === "waiting";
   const last = waiting && game?.status === "finished" ? game : null;
   const canStart = isHost && waiting && !lobby.ready_check_until;
+  const pot = settings.pot;
+  const potPlayers = view.members.filter((m) => m.slot !== "spec").length;
+  const potTeamsFull = view.members.filter((m) => m.slot === "team1").length === settings.team_size && view.members.filter((m) => m.slot === "team2").length === settings.team_size;
 
   const facts: { icon: ReactNode; label: string; value: ReactNode }[] = [
     {
@@ -171,7 +177,14 @@ export function CenterColumn({
   ];
 
   let primary: ReactNode;
-  if (canStart) {
+  if (canStart && pot && !potTeamsFull && !lobby.draft) {
+    // «Десятка»: пока составы не собраны, главное действие — выбор игроков капитанами
+    primary = (
+      <Button size="lg" block disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
+        {t("Начать выбор игроков")}
+      </Button>
+    );
+  } else if (canStart) {
     primary = (
       <Button size="lg" block disabled={busy || !!lobby.draft} onClick={() => run(() => A.startMatch(code))}>
         {last ? t("Сыграть ещё раз") : t("Начать матч")}
@@ -202,11 +215,13 @@ export function CenterColumn({
     <section aria-label={t("О матче")} className="flex flex-col gap-4">
       {primary}
 
-      {isHost && settings.player_pick === "captains" && waiting && !lobby.draft && !lobby.ready_check_until && (
+      {isHost && settings.player_pick === "captains" && waiting && !lobby.draft && !lobby.ready_check_until && (!pot || potTeamsFull) && (
         <Button variant="secondary" block disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
-          {t("Драфт капитанов")}
+          {pot ? t("Выбрать игроков заново") : t("Драфт капитанов")}
         </Button>
       )}
+
+      <PotPanel view={view} />
 
       {onInvite && (
         <button type="button" onClick={onInvite} className="mx-auto inline-flex items-center gap-2 text-[14px] font-medium text-accent transition-colors hover:text-fg">
@@ -224,7 +239,7 @@ export function CenterColumn({
         ))}
       </dl>
 
-      {waiting && isHost && !lobby.draft && (
+      {waiting && isHost && !lobby.draft && !pot && (
         <div className="grid grid-cols-4 overflow-hidden rounded-control border border-line-subtle bg-shell/60">
           {(
             [
@@ -251,7 +266,13 @@ export function CenterColumn({
 
       {waiting && (
         <p className="text-center text-meta text-fg-3">
-          {isHost
+          {pot
+            ? isHost
+              ? potTeamsFull
+                ? t("Составы собраны. Отметьте взносы и запускайте матч.")
+                : t("Соберите {need} игроков (сейчас {n}) и начните выбор: капитанами станут двое с самым высоким ELO.", { need: settings.team_size * 2, n: potPlayers })
+              : t("Игроков по командам выбирают капитаны — двое с самым высоким ELO. Взнос передайте организатору: он отметит его здесь.")
+            : isHost
             ? settings.player_pick === "captains"
               ? t("Назначьте капитанов и запустите драфт или расставьте игроков сами.")
               : t("Расставьте игроков, добавьте ботов и запускайте матч.")

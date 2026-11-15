@@ -20,6 +20,7 @@ import {
   type Slot,
 } from "./lobby";
 import type { LobbySettings } from "./lobby-settings";
+import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
 
 /** Как часто обновлять last_seen_at зрителя (мс) — с запасом меньше ONLINE_MS */
@@ -35,6 +36,9 @@ export type ViewMember = {
   slot: Slot;
   ready: boolean;
   online: boolean;
+  /** «Десятка»: тир по ELO (null — не «Десятка» или рейтинга нет) и отметка организатора о взносе */
+  tier: TierKey | null;
+  paid: boolean;
 };
 
 export type ViewGame = {
@@ -214,17 +218,26 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
     captains: captainsOf(lobby, members),
     members: hidden
       ? []
-      : members.map((m) => ({
-          id: m.player_id,
-          steam_id: m.player.steam_id,
-          nickname: m.player.nickname,
-          avatar_url: m.player.avatar_url,
-          faceit_level: m.player.faceit_level,
-          faceit_elo: m.player.faceit_elo,
-          slot: m.slot,
-          ready: m.ready,
-          online: isOnline(m),
-        })),
+      : members.map((m) => {
+          const pot = lobby.settings.pot;
+          // «Десятка»: ELO, с которым игрок допущен (зафиксированное на старте выбора), а не текущее из профиля
+          const admitted = pot ? (lobby.settings.pot_elo[m.player_id] ?? null) : null;
+          const elo = admitted ?? m.player.faceit_elo;
+          return {
+            id: m.player_id,
+            steam_id: m.player.steam_id,
+            nickname: m.player.nickname,
+            avatar_url: m.player.avatar_url,
+            faceit_level: m.player.faceit_level,
+            faceit_elo: elo,
+            slot: m.slot,
+            ready: m.ready,
+            online: isOnline(m),
+            // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе
+            tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : tierOf(elo, m.player.faceit_level),
+            paid: pot && lobby.settings.pot_paid.includes(m.player_id),
+          };
+        }),
     bans: (bans ?? []).map((b) => b.player),
     messages: (msgs ?? [])
       .reverse()

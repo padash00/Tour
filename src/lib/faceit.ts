@@ -40,6 +40,39 @@ export async function fetchFaceitBySteamId(steamId: string): Promise<FaceitProfi
   }
 }
 
+/**
+ * ELO для «Десятки»: то, что FACEIT отдаёт сейчас, даже если игрок давно не играл или проходит калибровку
+ * нового сезона — тогда это его ELO до калибровки (решение владельца, 15.11.2026). null в elo — на FACEIT
+ * нет ни одного матча CS2 (рейтинга никогда не было). Весь ответ null — FACEIT не ответил или ключ не задан.
+ */
+export async function fetchFaceitLastKnown(steamId: string): Promise<FaceitProfile | null> {
+  const key = await getSetting("FACEIT_API_KEY");
+  if (!key) return null;
+  try {
+    const res = await fetch(`https://open.faceit.com/data/v4/players?game=cs2&game_player_id=${steamId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.status === 404) return { id: "", nickname: "", level: null, elo: null };
+    if (!res.ok) return null;
+    const p = await res.json();
+    const cs2 = p?.games?.cs2;
+    let level: number | null = typeof cs2?.skill_level === "number" && cs2.skill_level > 0 ? cs2.skill_level : null;
+    let elo: number | null = typeof cs2?.faceit_elo === "number" && cs2.faceit_elo > 0 ? cs2.faceit_elo : null;
+    if (elo != null && p.player_id) {
+      const matches = await faceitMatchCount(p.player_id, key);
+      if (matches === 0 || (matches == null && elo === UNCALIBRATED_ELO)) {
+        elo = null;
+        level = null;
+      }
+    }
+    return { id: p.player_id ?? "", nickname: p.nickname ?? "", level, elo };
+  } catch {
+    return null;
+  }
+}
+
 /** ELO считается, только если игрок сыграл на FACEIT хотя бы один матч CS2 за этот срок */
 export const ACTIVE_DAYS = 90;
 

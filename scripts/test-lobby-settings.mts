@@ -61,5 +61,20 @@ for (const size of [5, 6, 7, 8, 9]) {
   check(list.length - bans === 5 && (size !== 7 || bans === 2), `вето BO5 из ${size} карт: 5 карт серии`);
 }
 
+// «Десятка»: тиры по FACEIT ELO, змейка, жёсткие правила режима
+const { tierOf, snakeTurn, normalizeTiers } = await import("../src/lib/tiers");
+const { potBank } = await import("../src/lib/lobby-settings");
+check(tierOf(3000, 10) === "S" && tierOf(2999, 10) === "A" && tierOf(2800, 10) === "A" && tierOf(2799, 10) === "B", "тиры: S от 3000, A 2800–2999");
+check(tierOf(2500, 10) === "B" && tierOf(2499, 10) === "C" && tierOf(2200, 10) === "C" && tierOf(2199, 10) === "D", "тиры: B от 2500, C от 2200, ниже — D");
+check(tierOf(1900, 9) === "D" && tierOf(1700, 8) === null && tierOf(null, 10) === null && tierOf(0, 10) === null, "тир D — с 9 уровня; ниже и без ELO тира нет");
+check([0, 1, 2, 3, 4, 5, 6, 7].map(snakeTurn).join("") === "12211221", "змейка: 1-2-2-1-1-2-2-1");
+check(normalizeTiers(["B", "S", "x", "B"]).join("") === "SB" && normalizeTiers([]).length === 5 && normalizeTiers("S").length === 5, "список тиров: только известные, по порядку; пустой — все");
+const PID = "01a99432-d7ed-47aa-a3b9-155c4774711f";
+const potS = normalizeSettings({ pot: true, pot_fee: 5000, pot_tiers: ["S"], mode: "2v2", team_size: 2, network: "lan", player_pick: "free", allow_join_team: true, pot_paid: ["x", PID], pot_elo: { [PID]: 3100.4, bad: 5 } });
+check(potS.mode === "5v5" && potS.team_size === 5 && potS.network === "internet" && potS.player_pick === "captains" && !potS.allow_join_team, "«Десятка»: всегда 5×5, интернет, выбор капитанами");
+check(potBank(potS) === 50000 && potS.pot_paid.length === 1 && Object.keys(potS.pot_elo).length === 1 && potS.pot_elo[PID] === 3100, "«Десятка»: банк 50 000, отметки и ELO — только по id игроков");
+const plain = normalizeSettings({ pot: false, pot_paid: [PID], pot_fee: 100 });
+check(!plain.pot && plain.pot_paid.length === 0 && plain.network === "lan", "обычное лобби: отметок взносов нет, правила «Десятки» не действуют");
+
 console.log(failed ? `\n${failed} ошибок` : "\nвсё верно");
 process.exit(failed ? 1 : 0);

@@ -4,6 +4,7 @@
  */
 import { MODES, type ModeKey } from "./modes";
 import { makeT, tr, type T } from "./i18n/core";
+import { normalizeTiers, TIERS, type TierKey } from "./tiers";
 
 export type LobbySettings = {
   // основные
@@ -49,6 +50,19 @@ export type LobbySettings = {
   autobhop: boolean;
   // боты
   bot_difficulty: 0 | 1 | 2 | 3;
+  /**
+   * «Десятка»: игра на банк между игроками. Взносы игроки передают организатору сами — сайт денег не принимает,
+   * только показывает банк и отметки организатора. Включает жёсткие правила (см. enforcePot).
+   */
+  pot: boolean;
+  /** тиры (по FACEIT ELO), которым открыт вход */
+  pot_tiers: TierKey[];
+  /** взнос с игрока, тг (0 — без взноса) */
+  pot_fee: number;
+  /** id игроков, у кого организатор отметил взнос. Меняется только действием togglePaid, не формой настроек */
+  pot_paid: string[];
+  /** ELO игроков на момент старта выбора капитанами: по нему капитаны и тиры до конца игры. Пишет только сервер */
+  pot_elo: Record<string, number>;
 };
 
 export const DEFAULT_SETTINGS: LobbySettings = {
@@ -88,7 +102,26 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   no_grenades: false,
   autobhop: false,
   bot_difficulty: 3,
+  pot: false,
+  pot_tiers: [...TIERS],
+  pot_fee: 0,
+  pot_paid: [],
+  pot_elo: {},
 };
+
+/** Карты «Десятки» по умолчанию — соревновательный пул, вето */
+export const POT_MAPS = ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_train"];
+export const POT_FEE_MAX = 1_000_000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Правила «Десятки», которые организатор поменять не может: 5×5 через интернет, игроков выбирают капитаны, без ботов-добивок */
+function enforcePot(s: LobbySettings): LobbySettings {
+  if (!s.pot) return { ...s, pot_paid: [], pot_elo: {} };
+  return { ...s, mode: "5v5", team_size: 5, network: "internet", player_pick: "captains", allow_join_team: false, start: "host", filter: false };
+}
+
+/** Банк «Десятки»: взнос × число игроков в двух командах */
+export const potBank = (s: Pick<LobbySettings, "pot_fee" | "team_size">) => s.pot_fee * s.team_size * 2;
 
 export const LIMITS = {
   team_size: [1, 5],
@@ -158,10 +191,23 @@ export function normalizeSettings(input: unknown, base: LobbySettings = DEFAULT_
     no_grenades: bool(s.no_grenades, d.no_grenades),
     autobhop: bool(s.autobhop, d.autobhop),
     bot_difficulty: pick(Number(s.bot_difficulty), [0, 1, 2, 3] as const, d.bot_difficulty),
+    pot: bool(s.pot, d.pot),
+    pot_tiers: normalizeTiers(s.pot_tiers, d.pot_tiers),
+    pot_fee: num(s.pot_fee, [0, POT_FEE_MAX], d.pot_fee),
+    pot_paid: Array.isArray(s.pot_paid) ? [...new Set((s.pot_paid as unknown[]).map(String).filter((x) => UUID_RE.test(x)))].slice(0, 100) : d.pot_paid,
+    pot_elo:
+      s.pot_elo && typeof s.pot_elo === "object" && !Array.isArray(s.pot_elo)
+        ? Object.fromEntries(
+            Object.entries(s.pot_elo as Record<string, unknown>)
+              .filter(([k, v]) => UUID_RE.test(k) && Number.isFinite(Number(v)) && Number(v) > 0)
+              .slice(0, 100)
+              .map(([k, v]) => [k, Math.round(Number(v))]),
+          )
+        : d.pot_elo,
   };
   if (out.filter_faceit_min > out.filter_faceit_max) out.filter_faceit_max = out.filter_faceit_min;
   if (out.start_money > out.max_money) out.start_money = out.max_money;
-  return out;
+  return enforcePot(out);
 }
 
 /** Смена режима подтягивает размер команды */

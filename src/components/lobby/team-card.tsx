@@ -9,6 +9,7 @@ import { Avatar, FaceitLevel } from "../ui";
 import { Menu, MenuItem as DsMenuItem, MenuSeparator, cn } from "@/components/ds";
 import { Icon } from "./ui";
 import type { Run } from "./use-lobby-view";
+import { PaidChip, TierBadge } from "./pot";
 import { useT } from "@/lib/i18n/client";
 
 type Slot = ViewMember["slot"];
@@ -46,7 +47,7 @@ export function TeamCard({
   const rated = members.filter((m) => m.faceit_elo);
   const avg = rated.length ? Math.round(rated.reduce((s, m) => s + (m.faceit_elo ?? 0), 0) / rated.length) : null;
   const empty = Math.max(0, size - members.length - bots.length);
-  const canAddBot = isHost && view.lobby.status === "waiting" && !view.lobby.draft;
+  const canAddBot = isHost && view.lobby.status === "waiting" && !view.lobby.draft && !view.lobby.settings.pot;
   const captain = view.captains[team === "team1" ? 0 : 1];
 
   return (
@@ -171,10 +172,12 @@ export function PlayerLine({
           </Link>
         </div>
         <div className="flex items-center gap-2 text-[12px] text-fg-3">
+          {m.tier && <TierBadge tier={m.tier} />}
           {m.faceit_elo ? <span className="num">{m.faceit_elo} ELO</span> : <span>{t("без FACEIT")}</span>}
         </div>
       </div>
-      {m.faceit_level ? <FaceitLevel level={m.faceit_level} /> : null}
+      <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />
+      {m.faceit_level && !m.tier ? <FaceitLevel level={m.faceit_level} /> : null}
       {showReady &&
         (m.ready ? (
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ok text-[#06130c] shadow-[0_0_16px_-2px_var(--color-ok)] animate-[pop_.25s_cubic-bezier(.2,.8,.2,1)]" title={t("Готов")}>

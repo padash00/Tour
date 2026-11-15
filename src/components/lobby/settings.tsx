@@ -69,9 +69,11 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
       <Row icon={Icon.layers()} label="Best of">
         <Segments value={s.best_of} disabled={ro} onChange={(v) => patch({ best_of: v })} options={[1, 3, 5].map((n) => ({ value: n as 1 | 3 | 5, label: n }))} />
       </Row>
-      <Row icon={Icon.swords()} label={t("Режим")}>
-        <Choice value={s.mode} disabled={ro} onChange={(v) => patch(withMode(s, v))} options={(Object.keys(MODES) as ModeKey[]).map((k) => ({ value: k, label: MODES[k].label.replace(" на ", "×") }))} />
-      </Row>
+      {!s.pot && (
+        <Row icon={Icon.swords()} label={t("Режим")}>
+          <Choice value={s.mode} disabled={ro} onChange={(v) => patch(withMode(s, v))} options={(Object.keys(MODES) as ModeKey[]).map((k) => ({ value: k, label: MODES[k].label.replace(" на ", "×") }))} />
+        </Row>
+      )}
       <Row icon={Icon.map()} label={t("Выбор карты")}>
         <Choice value={s.map_choice} disabled={ro} onChange={(v) => patch({ map_choice: v })} options={MAP_CHOICE} />
       </Row>
@@ -91,18 +93,26 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
           <span className="num text-[13px] text-fg-3">{s.maps.length}</span>
         </button>
       )}
-      <Row icon={Icon.signal()} label={t("Сеть")}>
-        <Choice value={s.network} disabled={ro} onChange={(v) => patch({ network: v })} options={NETWORK} />
-      </Row>
-      <Row icon={Icon.play()} label={t("Запуск матча")}>
-        <Choice value={s.start} disabled={ro} onChange={(v) => patch({ start: v })} options={START} />
-      </Row>
-      <Row icon={Icon.users()} label={t("Разрешить вход в команду")}>
-        <Toggle on={s.allow_join_team} disabled={ro} onChange={(v) => patch({ allow_join_team: v })} />
-      </Row>
-      <Row icon={Icon.bot()} label={t("Сложность ботов")}>
-        <Choice value={s.bot_difficulty} disabled={ro} onChange={(v) => patch({ bot_difficulty: v })} options={BOT_DIFFICULTY.map((l, i) => ({ value: i as 0 | 1 | 2 | 3, label: l }))} />
-      </Row>
+      {s.pot ? (
+        <div className="rounded-[10px] bg-ink/[0.03] px-4 py-3 text-meta leading-relaxed text-fg-3">
+          {t("«Десятка»: 5×5 через интернет, игроков выбирают капитаны, без ботов — эти правила не меняются. Карты, раунды и паузы настраиваются как в обычном лобби.")}
+        </div>
+      ) : (
+        <>
+          <Row icon={Icon.signal()} label={t("Сеть")}>
+            <Choice value={s.network} disabled={ro} onChange={(v) => patch({ network: v })} options={NETWORK} />
+          </Row>
+          <Row icon={Icon.play()} label={t("Запуск матча")}>
+            <Choice value={s.start} disabled={ro} onChange={(v) => patch({ start: v })} options={START} />
+          </Row>
+          <Row icon={Icon.users()} label={t("Разрешить вход в команду")}>
+            <Toggle on={s.allow_join_team} disabled={ro} onChange={(v) => patch({ allow_join_team: v })} />
+          </Row>
+          <Row icon={Icon.bot()} label={t("Сложность ботов")}>
+            <Choice value={s.bot_difficulty} disabled={ro} onChange={(v) => patch({ bot_difficulty: v })} options={BOT_DIFFICULTY.map((l, i) => ({ value: i as 0 | 1 | 2 | 3, label: l }))} />
+          </Row>
+        </>
+      )}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import { getT } from "@/lib/i18n/server";
 import { tr } from "@/lib/i18n/core";
 import { LiveRefresh } from "@/components/live-refresh";
 import { CreateLobbyButton } from "@/components/lobby/create-lobby";
+import { CreatePotButton, TierBadge } from "@/components/lobby/pot";
+import { potBank } from "@/lib/lobby-settings";
 import { MapThumb } from "@/components/lobby/settings";
 import {
   Button,
@@ -65,6 +67,7 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
       mapLabel(map),
       MODES[l.settings.mode].label,
       l.settings.network === "lan" ? "lan" : "internet",
+      l.settings.pot ? "десятка" : "",
     ].some((v) => v.toLocaleLowerCase("ru").includes(normalized));
   });
 
@@ -91,7 +94,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
               {t("Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя.")}
             </p>
           </div>
-          {!mine && <CreateLobbyButton loggedIn={!!player} />}
+          {!mine && (
+            <div className="flex flex-wrap gap-2">
+              <CreatePotButton loggedIn={!!player} />
+              <CreateLobbyButton loggedIn={!!player} />
+            </div>
+          )}
         </header>
 
         {mine && (
@@ -172,7 +180,7 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                 const total = l.settings.team_size * 2;
                 const phase = lobbyPhase(l);
                 const status = lobbyStatus[phase];
-                const full = l.players >= total;
+                const full = (l.settings.pot ? l.pool : l.players) >= total;
                 return (
                   <DataRow
                     key={l.code}
@@ -189,14 +197,19 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="num shrink-0 text-fg-3">#{l.code}</span>
                         <span className="truncate">{l.host.nickname}</span>
+                        {l.settings.pot && (
+                          <span className="shrink-0 rounded-chip bg-accent-dim px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-accent">{t("Десятка")}</span>
+                        )}
+                        {l.settings.pot && <span className="hidden shrink-0 gap-1 sm:flex">{l.settings.pot_tiers.map((tier) => <TierBadge key={tier} tier={tier} />)}</span>}
                         {l.visibility === "closed" && <Lock className="size-3.5 shrink-0 text-fg-3" aria-label={t("Вход по паролю")} />}
                       </span>
                     }
                     meta={
                       <span>
                         {MODES[l.settings.mode].label.replace(" на ", "×")} · BO{l.settings.best_of} · {l.settings.network === "lan" ? "LAN" : t("Интернет")} ·{" "}
-                        <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${l.players}/${total}` })}</span>
+                        <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${l.settings.pot ? l.pool : l.players}/${total}` })}</span>
                         {l.settings.filter ? ` · ${t("фильтр")}` : ""}
+                        {l.settings.pot && potBank(l.settings) > 0 ? ` · ${t("банк {sum} тг", { sum: potBank(l.settings).toLocaleString("ru-RU") })}` : ""}
                       </span>
                     }
                     trailing={

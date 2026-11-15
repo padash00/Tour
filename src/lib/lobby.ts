@@ -8,7 +8,8 @@ import { modeOf } from "./modes";
 import { makeT, tr, type T } from "./i18n/core";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
-import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, type LobbySettings } from "./lobby-settings";
+import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, type LobbySettings } from "./lobby-settings";
+import { snakeTurn, tierOf, tierRange, TIER_MIN_LEVEL } from "./tiers";
 import type { Tables, TablesUpdate } from "./database.types";
 import type { Narrow, Player } from "./types";
 
@@ -23,7 +24,8 @@ export type Lobby = Narrow<
     status: "waiting" | "playing" | "closed";
     settings: LobbySettings;
     bots: { team1: string[]; team2: string[] };
-    draft: { captains: [string, string]; turn: 1 | 2; deadline: string } | null;
+    /** snake — выбор змейкой 1-2-2-1 («Десятка»); n — сколько игроков уже выбрано */
+    draft: { captains: [string, string]; turn: 1 | 2; deadline: string; snake?: boolean; n?: number } | null;
   }
 >;
 
@@ -168,6 +170,29 @@ export async function filterProblem(s: LobbySettings, p: Pick<Player, "id" | "fa
   return null;
 }
 
+// ───────────────────────── «Десятка»
+
+/** ELO игрока в «Десятке»: зафиксированное на старте выбора, иначе текущее из профиля */
+export const potElo = (s: Pick<LobbySettings, "pot_elo">, p: { id: string; faceit_elo: number | null }) => s.pot_elo[p.id] ?? p.faceit_elo ?? null;
+
+/** Почему игрока не пускает «Десятка» (null — пускает): нужен FACEIT ELO и тир из допущенных организатором */
+export function potProblem(s: LobbySettings, p: { faceit_elo: number | null; faceit_level: number | null }, t: T = makeT("ru")) {
+  if (!s.pot) return null;
+  if (!p.faceit_elo) return t("В «Десятку» пускают только с рейтингом FACEIT: сыграйте на FACEIT хотя бы один матч CS2 с этого Steam-аккаунта");
+  const tier = tierOf(p.faceit_elo, p.faceit_level);
+  if (!tier) return t("В «Десятку» пускают с {n} уровня FACEIT — у вас {elo} ELO", { n: TIER_MIN_LEVEL, elo: p.faceit_elo });
+  if (!s.pot_tiers.includes(tier)) {
+    return t("Эта игра для тиров {tiers} — у вас тир {tier} ({elo} ELO)", { tiers: s.pot_tiers.join(", "), tier, elo: p.faceit_elo });
+  }
+  return null;
+}
+
+/** Подпись тира для сообщений чата: «S (3000+)» */
+export const tierText = (elo: number | null, level: number | null) => {
+  const tier = tierOf(elo, level);
+  return tier ? `${tier} (${tierRange(tier)})` : "—";
+};
+
 // ───────────────────────── хост
 
 /** Хост ушёл или пропал → хостом становится следующий игрок (сначала из команд, потом остальные). Нет никого — лобби закрывается. */
@@ -265,15 +290,21 @@ export function nextBotName(lobby: Lobby) {
 }
 
 /** Капитаны команд: первый (по времени входа) игрок команды */
-export function captainsOf(lobby: Lobby, members: LobbyMember[]): [string | null, string | null] {
+export function captainsOf(lobby: Lobby, members: (LobbyMember & { player?: { faceit_elo: number | null } })[]): [string | null, string | null] {
   if (lobby.draft) return lobby.draft.captains;
+  if (lobby.settings.pot) {
+    // «Десятка»: капитан — самый высокий по ELO в команде (он же действует в вето)
+    const elo = (m: (typeof members)[number]) => lobby.settings.pot_elo[m.player_id] ?? m.player?.faceit_elo ?? 0;
+    const top = (team: Slot) => members.filter((m) => m.slot === team).sort((a, b) => elo(b) - elo(a) || a.joined_at.localeCompare(b.joined_at))[0]?.player_id ?? null;
+    return [top("team1"), top("team2")];
+  }
   const first = (team: Slot) => members.filter((m) => m.slot === team).sort((a, b) => a.joined_at.localeCompare(b.joined_at))[0]?.player_id ?? null;
   return [first("team1"), first("team2")];
 }
 
 // ───────────────────────── драфт капитанов
 
-export async function startDraft(lobby: Lobby, captains: [string, string]) {
+export async function startDraft(lobby: Lobby, captains: [string, string], opts: { snake?: boolean; settings?: LobbySettings; teamNames?: [string, string] } = {}) {
   const members = await getMembers(lobby.id);
   // все, кроме капитанов, из команд — в ожидание
   for (const m of members) {
@@ -282,12 +313,19 @@ export async function startDraft(lobby: Lobby, captains: [string, string]) {
     else if (m.slot === "team1" || m.slot === "team2") await setSlot(lobby.id, m.player_id, "wait");
   }
   await touch(lobby.id, {
-    draft: { captains, turn: 1, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() },
+    draft: { captains, turn: 1, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString(), ...(opts.snake && { snake: true, n: 0 }) },
     bots: { team1: [], team2: [] },
     ready_check_until: null,
+    ...(opts.settings && { settings: opts.settings }),
+    ...(opts.teamNames && { team1_name: opts.teamNames[0], team2_name: opts.teamNames[1] }),
   });
   const name = (id: string) => members.find((m) => m.player_id === id)?.player.nickname ?? "капитан";
-  await systemMessage(lobby.id, `Драфт: капитаны ${name(captains[0])} и ${name(captains[1])}. Первым выбирает ${name(captains[0])}.`);
+  await systemMessage(
+    lobby.id,
+    opts.snake
+      ? `Выбор игроков: капитаны ${name(captains[0])} и ${name(captains[1])} — самые высокие по ELO. Первым выбирает ${name(captains[0])} (ELO ниже), дальше змейкой: 1-2-2-1.`
+      : `Драфт: капитаны ${name(captains[0])} и ${name(captains[1])}. Первым выбирает ${name(captains[0])}.`,
+  );
 }
 
 /** Капитан берёт игрока из ожидания. Драфт заканчивается, когда команды полные или выбирать некого. */
@@ -319,11 +357,12 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t:
     await systemMessage(lobby.id, "Драфт окончен");
     return null;
   }
-  // очередь: 1-2-2-1… упрощённо — по очереди, но полная команда пропускает ход
-  let turn: 1 | 2 = lobby.draft.turn === 1 ? 2 : 1;
+  // обычный драфт — по очереди; «Десятка» — змейкой 1-2-2-1. Полная команда пропускает ход
+  const n = (lobby.draft.n ?? 0) + 1;
+  let turn: 1 | 2 = lobby.draft.snake ? snakeTurn(n) : lobby.draft.turn === 1 ? 2 : 1;
   if (turn === 1 && t1 >= size) turn = 2;
   if (turn === 2 && t2 >= size) turn = 1;
-  await touch(lobby.id, { draft: { ...lobby.draft, turn, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } });
+  await touch(lobby.id, { draft: { ...lobby.draft, turn, ...(lobby.draft.snake && { n }), deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } });
   return null;
 }
 
@@ -338,6 +377,9 @@ export function startProblem(lobby: Lobby, members: LobbyMember[], t: T = makeT(
   const h1 = members.filter((m) => m.slot === "team1").length;
   const h2 = members.filter((m) => m.slot === "team2").length;
   if (h1 + h2 === 0) return t("В командах никого нет");
+  if (lobby.settings.pot && (h1 !== lobby.settings.team_size || h2 !== lobby.settings.team_size)) {
+    return t("В «Десятке» играют {n} на {n} — соберите составы выбором капитанов", { n: lobby.settings.team_size });
+  }
   const c1 = teamCount(lobby, members, "team1");
   const c2 = teamCount(lobby, members, "team2");
   if (c1 === 0 || c2 === 0) return t("В каждой команде должен быть хотя бы один игрок или бот");
@@ -851,6 +893,16 @@ export async function finishGame(gameId: string) {
   const lobby = await getLobby(g.lobby_id);
   if (!lobby || lobby.status === "closed") return;
   const score = `${g.team1.name} ${g.team1_score}:${g.team2_score} ${g.team2.name}`;
+  if (g.settings.pot) {
+    // «Десятка»: итог и банк — в чат; новая игра тем же составом начинается с чистых отметок взносов
+    const bank = potBank(g.settings);
+    const winner = g.winner === 1 ? g.team1.name : g.winner === 2 ? g.team2.name : null;
+    const sum = bank.toLocaleString("ru-RU");
+    const money = bank > 0 ? (winner ? ` Банк ${sum} тг — команде ${winner}: взносы победителям передаёт организатор.` : ` Ничья — банк ${sum} тг делит организатор.`) : "";
+    await touch(lobby.id, { status: "waiting", settings: { ...lobby.settings, pot_paid: [], pot_elo: {} } });
+    await systemMessage(lobby.id, `«Десятка» сыграна: ${score}.${money}`);
+    return;
+  }
   if (lobby.settings.rematch) {
     await touch(lobby.id, { status: "waiting" });
     await systemMessage(lobby.id, `Матч окончен: ${score}. Можно сыграть ещё раз тем же составом.`);
@@ -937,6 +989,8 @@ export type LobbyListItem = {
   host: { nickname: string; avatar_url: string | null };
   settings: LobbySettings;
   players: number;
+  /** все, кто собирается играть: в командах и в ожидании (без наблюдателей) */
+  pool: number;
   online: number;
   members: { nickname: string; avatar_url: string | null }[];
   game: { status: string; team1_score: number; team2_score: number; map: string | null } | null;
@@ -964,6 +1018,7 @@ export async function listOpenLobbies(): Promise<LobbyListItem[]> {
         host: r.host,
         settings: l.settings,
         players: inTeams.length + l.bots.team1.length + l.bots.team2.length,
+        pool: r.members.filter((m) => m.slot !== "spec").length,
         online: r.members.filter(isOnline).length,
         members: r.members.map((m) => m.player).slice(0, 10),
         game:
