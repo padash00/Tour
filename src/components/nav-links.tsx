@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, ChevronDown, LayoutDashboard, LogOut, Mail, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
+import { Bell, Brush, ChevronDown, LayoutDashboard, LogOut, Mail, Menu as MenuIcon, Shield, User, Users, X } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Avatar, Menu, MenuItem, MenuSeparator, cn, useModal } from "@/components/ds";
@@ -66,6 +66,7 @@ function userLinks(u: UserInfo) {
     { href: "/messages", label: tr("Сообщения"), hint: u.dmUnread ? tr("есть новые") : tr("личная переписка"), icon: <Mail />, count: u.dmUnread ?? 0 },
     { href: "/notifications", label: tr("Уведомления"), hint: u.unread ? tr("есть непрочитанные") : tr("всё прочитано"), icon: <Bell />, count: u.unread },
     { href: `/players/${u.steamId}`, label: tr("Мой профиль"), hint: tr("как вас видят другие"), icon: <User /> },
+    { href: "/me/skins", label: tr("Мои скины"), hint: tr("оружие, нож и перчатки на серверах клуба"), icon: <Brush /> },
   ];
 }
 
