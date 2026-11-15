@@ -17,6 +17,8 @@ import { Chat } from "./chat";
 import { Countdown, LobbyClock } from "./countdown";
 import { Gate, JoinGate } from "./join-gate";
 import { EmptySlot, Panel, PlayerLine, TeamCard } from "./team-card";
+import { CupBracket, CupRoomBanner, CupTeams, MyMatchBanner } from "./cup";
+import { playersNeeded } from "@/lib/lobby-settings";
 import { phaseOf, useLobbyView, type Run } from "./use-lobby-view";
 import { useT } from "@/lib/i18n/client";
 import { tr } from "@/lib/i18n/core";
@@ -138,7 +140,7 @@ export function LobbyRoom({
   const prevCheck = useRef(lobby.ready_check_until);
   const prevServer = useRef(game?.server_state);
   useEffect(() => {
-    if (lobby.ready_check_until && !prevCheck.current && (me?.slot === "team1" || me?.slot === "team2")) chime();
+    if (lobby.ready_check_until && !prevCheck.current && me?.slot?.startsWith("team")) chime();
     if (game?.server_state === "ready" && prevServer.current !== "ready" && me?.inGame) chime();
     prevCheck.current = lobby.ready_check_until;
     prevServer.current = game?.server_state;
@@ -161,7 +163,10 @@ export function LobbyRoom({
   const waiting = members.filter((m) => m.slot === "wait");
   const specs = members.filter((m) => m.slot === "spec");
   // «Десятка»: до выбора капитанами все игроки стоят в ожидании — считаем и их
-  const playersNow = s.pot ? team1.length + team2.length + waiting.length : team1.length + team2.length + lobby.bots.team1.length + lobby.bots.team2.length;
+  // несколько команд (лобби на 20–40 игроков): составы и сетка вместо двух карточек команд
+  const many = view.teams.length > 2;
+  const needPlayers = playersNeeded(s);
+  const playersNow = s.pot || many ? members.filter((m) => m.slot !== "spec").length : team1.length + team2.length + lobby.bots.team1.length + lobby.bots.team2.length;
   const draft = lobby.draft;
   const myTurnInDraft = !!draft && me?.id === draft.captains[draft.turn - 1];
   const inviteUrl = origin && lobby.invite_token ? `${origin}/lobby/${lobby.code}?t=${lobby.invite_token}` : null;
@@ -171,7 +176,7 @@ export function LobbyRoom({
   const needsReady =
     phase === "ready_check" &&
     !!meMember &&
-    (meMember.slot === "team1" || meMember.slot === "team2") &&
+    meMember.slot.startsWith("team") &&
     !meMember.ready;
 
   const join = (slot?: Slot) => run(() => A.joinLobby(code, { slot, invite: invite ?? undefined }));
@@ -210,7 +215,7 @@ export function LobbyRoom({
                     )}
                   </div>
                   <span className="num absolute left-1/2 top-0 hidden -translate-x-1/2 rounded-b-control bg-bg/80 px-4 py-2 text-[13px] font-medium text-fg-2 backdrop-blur-sm sm:block">
-                    {t("Игроков")} <span className="text-fg">{playersNow}/{s.team_size * 2}</span>
+                    {t("Игроков")} <span className="text-fg">{playersNow}/{needPlayers}</span>
                   </span>
                   {isMember ? (
                     <button
@@ -246,7 +251,7 @@ export function LobbyRoom({
                     </p>
                   </div>
                   <span className="num rounded-control bg-bg/70 px-3 py-1.5 text-meta text-fg-2 backdrop-blur-sm sm:hidden">
-                    {playersNow}/{s.team_size * 2}
+                    {playersNow}/{needPlayers}
                   </span>
                 </div>
               </div>
@@ -258,10 +263,25 @@ export function LobbyRoom({
               </div>
             )}
 
+            {s.cup_of && <CupRoomBanner parent={s.cup_of.code} />}
+            {view.cup?.myRoom && <MyMatchBanner room={view.cup.myRoom} />}
+
             <StageBanner view={view} isHost={isHost} busy={busy} run={run} code={code} />
 
+            {many && (
+              <>
+                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]">
+                  <CenterColumn view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
+                  <div className="min-w-0 space-y-4">
+                    {view.cup && <CupBracket cup={view.cup} isHost={isHost} busy={busy} run={run} code={code} />}
+                    <CupTeams view={view} isHost={isHost} run={run} code={code} />
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* составы по бокам, в центре — главное действие и сводка, как в комнате матча */}
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)_minmax(0,1fr)]">
+            <div className={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)_minmax(0,1fr)]", many && "hidden")}>
               <TeamCard
                 team="team1"
                 name={lobby.team1_name}

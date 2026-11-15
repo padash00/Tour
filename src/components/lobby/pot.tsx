@@ -7,6 +7,9 @@ import * as A from "@/app/actions/lobby";
 import type { LobbyView, ViewMember } from "@/lib/lobby-view";
 import { potBank } from "@/lib/lobby-settings";
 import { TIERS, TIER_COLOR, tierRange, type TierKey } from "@/lib/tiers";
+import type { CupFormat } from "@/lib/cup-core";
+import { playersNeeded } from "@/lib/lobby-settings";
+import { SizePicker } from "./size-picker";
 import { Button, Dialog, Field, Input, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
 import { tr } from "@/lib/i18n/core";
@@ -45,15 +48,18 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
   const [fee, setFee] = useState(String(FEE_DEFAULT));
   const [closed, setClosed] = useState(false);
   const [password, setPassword] = useState("");
+  const [players, setPlayers] = useState(0);
+  const [format, setFormat] = useState<CupFormat>("bracket");
   const [pending, start] = useTransition();
 
   const feeNum = Math.max(0, Math.round(Number(fee) || 0));
-  const bank = feeNum * 10;
+  const count = players || 10;
+  const bank = feeNum * count;
   const toggle = (tier: TierKey) => setTiers((cur) => (cur.includes(tier) ? cur.filter((x) => x !== tier) : TIERS.filter((x) => x === tier || cur.includes(x))));
 
   const submit = () =>
     start(async () => {
-      const r = await A.createPot(tiers, feeNum, closed ? "closed" : "public", password);
+      const r = await A.createPot(tiers, feeNum, closed ? "closed" : "public", password, players, format);
       if (r?.error) {
         toast.error(r.error);
         if (r.code) router.push(`/lobby/${r.code}`);
@@ -80,7 +86,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
         open={open}
         onClose={() => !pending && setOpen(false)}
         title={t("Собрать десятку")}
-        description={t("Игра 5 на 5 на банк между игроками: BO3 через интернет. Капитаны — двое с самым высоким ELO, игроков выбирают змейкой.")}
+        description={t("Игра 5 на 5 на банк между игроками: BO3 через интернет. Капитанов назначает организатор (по умолчанию — самые высокие по ELO), игроков выбирают змейкой.")}
         size="lg"
         footer={
           <>
@@ -93,7 +99,9 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
           </>
         }
       >
-        <div className="text-[14px] font-semibold text-fg">{t("Кто может играть")}</div>
+        <SizePicker players={players} format={format} onPlayers={setPlayers} onFormat={setFormat} small="10" />
+
+        <div className="mt-5 text-[14px] font-semibold text-fg">{t("Кто может играть")}</div>
         <p className="mt-1 text-meta text-fg-3">{t("Тир считается по FACEIT ELO. Игрок вне выбранных тиров в игру не попадёт — только наблюдателем.")}</p>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
           {TIERS.map((tier) => {
@@ -121,7 +129,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
         <Field
           className="mt-5"
           label={t("Взнос с игрока, тг")}
-          hint={bank > 0 ? t("Банк на 10 игроков: {sum} тг. Как его делить, решаете вы — обычно всё победившей команде.", { sum: money(bank) }) : t("Без взноса — играете на интерес.")}
+          hint={bank > 0 ? t("Банк на {n} игроков: {sum} тг. Как его делить, решаете вы — обычно всё победившей команде.", { n: count, sum: money(bank) }) : t("Без взноса — играете на интерес.")}
         >
           {(field) => (
             <Input {...field} type="number" inputMode="numeric" min={0} max={1000000} step={500} value={fee} onChange={(e) => setFee(e.target.value)} />
@@ -177,7 +185,7 @@ export function PotPanel({ view }: { view: LobbyView }) {
   const bank = potBank(s);
   const players = view.members.filter((m) => m.slot !== "spec");
   const paid = players.filter((m) => m.paid).length;
-  const need = s.team_size * 2;
+  const need = playersNeeded(s);
   return (
     <section aria-label={t("Десятка")} className="rounded-surface border border-accent/30 bg-accent-dim/40 p-4">
       <div className="flex items-center justify-between gap-3">

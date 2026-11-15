@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 // Tests listed here must never load .env.local or contact a live database.
 const env = { ...process.env, SUPABASE_URL: "http://127.0.0.1:9", SUPABASE_SERVICE_ROLE_KEY: "offline-test", SESSION_SECRET: "offline-only-session-secret" };
 const cases = [
-  "test-bracket-sizes.mts", "test-stage-formats.mts", "test-awards.mts", "test-lobby-settings.mts", "test-pot.mts",
+  "test-bracket-sizes.mts", "test-stage-formats.mts", "test-awards.mts", "test-lobby-settings.mts", "test-pot.mts", "test-skins.mts", "test-cup.mts",
   "test-agent-relay.mjs", "test-agent-relay-park.mjs", "test-agent-units.mjs", "test-reliability.mjs", "test-agent-report.mts", "test-agent-ingest.mts", "test-deployment-gate.mjs",
   "test-pure-logic.mts", "test-integrity.mts", "test-tournament-structure.mts", "test-official-logic.mts", "test-official-db.mts", "test-demo-tournament.mts", "test-overlay.mts", "test-broadcast.mts", "test-team-ranking.mts", "test-tg-moderation.mts", "test-hall.mts", "test-private-pairs.mts", "test-private-db.mts",
 ];

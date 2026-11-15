@@ -11,7 +11,8 @@ import { tr } from "@/lib/i18n/core";
 import { LiveRefresh } from "@/components/live-refresh";
 import { CreateLobbyButton } from "@/components/lobby/create-lobby";
 import { CreatePotButton, TierBadge } from "@/components/lobby/pot";
-import { potBank } from "@/lib/lobby-settings";
+import { playersNeeded, potBank } from "@/lib/lobby-settings";
+import { cupTeams } from "@/lib/cup-core";
 import { MapThumb } from "@/components/lobby/settings";
 import {
   Button,
@@ -177,10 +178,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
             <RowList>
               {filtered.map((l) => {
                 const map = l.game?.map ?? l.settings.maps[0] ?? "de_mirage";
-                const total = l.settings.team_size * 2;
+                const total = playersNeeded(l.settings);
+                // игра на банк и лобби на несколько команд: до выбора капитанами игроки стоят в ожидании — считаем всех
+                const pooled = l.settings.pot || cupTeams(l.settings.players) > 0;
                 const phase = lobbyPhase(l);
                 const status = lobbyStatus[phase];
-                const full = (l.settings.pot ? l.pool : l.players) >= total;
+                const full = (pooled ? l.pool : l.players) >= total;
                 return (
                   <DataRow
                     key={l.code}
@@ -207,7 +210,8 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                     meta={
                       <span>
                         {MODES[l.settings.mode].label.replace(" на ", "×")} · BO{l.settings.best_of} · {l.settings.network === "lan" ? "LAN" : t("Интернет")} ·{" "}
-                        <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${l.settings.pot ? l.pool : l.players}/${total}` })}</span>
+                        <span className={full ? "text-fg-3" : "text-fg-2"}>{t("{n} игроков", { n: `${pooled ? l.pool : l.players}/${total}` })}
+                          {cupTeams(l.settings.players) > 0 ? ` · ${t("{n} команд", { n: cupTeams(l.settings.players) })}` : ""}</span>
                         {l.settings.filter ? ` · ${t("фильтр")}` : ""}
                         {l.settings.pot && potBank(l.settings) > 0 ? ` · ${t("банк {sum} тг", { sum: potBank(l.settings).toLocaleString("ru-RU") })}` : ""}
                       </span>

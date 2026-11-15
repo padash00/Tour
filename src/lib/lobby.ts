@@ -9,13 +9,19 @@ import { makeT, tr, type T } from "./i18n/core";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
 import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, type LobbySettings } from "./lobby-settings";
-import { snakeTurn, tierOf, tierRange, TIER_MIN_LEVEL } from "./tiers";
+import { tierOf, tierRange, TIER_MIN_LEVEL } from "./tiers";
+import { cupTeams, snakeTurnN } from "./cup-core";
 import type { Tables, TablesUpdate } from "./database.types";
 import type { Narrow, Player } from "./types";
 
 // ───────────────────────── типы
 
-export type Slot = "team1" | "team2" | "wait" | "spec";
+/** Команды: в обычном лобби — team1 и team2; в лобби на 20–40 игроков — до восьми */
+export type TeamSlot = "team1" | "team2" | "team3" | "team4" | "team5" | "team6" | "team7" | "team8";
+export type Slot = TeamSlot | "wait" | "spec";
+export const isTeamSlot = (s: string): s is TeamSlot => /^team[1-8]$/.test(s);
+/** Слоты команд этого лобби: две или столько, на сколько игроков оно создано */
+export const teamSlotsOf = (s: Pick<LobbySettings, "players">): TeamSlot[] => Array.from({ length: cupTeams(s.players) || 2 }, (_, i) => `team${i + 1}` as TeamSlot);
 
 export type Lobby = Narrow<
   Tables<"lobbies">,
@@ -25,7 +31,7 @@ export type Lobby = Narrow<
     settings: LobbySettings;
     bots: { team1: string[]; team2: string[] };
     /** snake — выбор змейкой 1-2-2-1 («Десятка»); n — сколько игроков уже выбрано */
-    draft: { captains: [string, string]; turn: 1 | 2; deadline: string; snake?: boolean; n?: number } | null;
+    draft: { captains: string[]; turn: number; deadline: string; snake?: boolean; n?: number } | null;
   }
 >;
 
@@ -142,10 +148,12 @@ export const isOnline = (m: Pick<LobbyMember, "last_seen_at">) => Date.now() - n
 export async function playerLobby(playerId: string) {
   const { data } = await db()
     .from("lobby_members")
-    .select("lobby_id, lobby:lobbies!inner(code, status)")
+    .select("lobby_id, lobby:lobbies!inner(code, status, settings)")
     .eq("player_id", playerId)
     .neq("lobby.status", "closed");
-  const row = (data ?? [])[0];
+  // игрок большого лобби во время матча состоит и в комнате матча — ведём его туда, где он сейчас играет
+  const rows = data ?? [];
+  const row = rows.find((r) => (r.lobby.settings as { cup_of?: unknown } | null)?.cup_of) ?? rows[0];
   return row ? { id: row.lobby_id, code: row.lobby.code } : null;
 }
 
@@ -216,7 +224,7 @@ export async function passHost(lobby: Lobby, leavingId: string | null) {
   if (data?.length) await systemMessage(lobby.id, `Новый хост — ${next.player.nickname}`);
   return next.player_id;
 }
-const rankSlot = (s: Slot) => (s === "team1" || s === "team2" ? 0 : s === "wait" ? 1 : 2);
+const rankSlot = (s: Slot) => (isTeamSlot(s) ? 0 : s === "wait" ? 1 : 2);
 
 export async function closeLobby(lobby: Lobby, reason: string) {
   await touch(lobby.id, { status: "closed", closed_at: new Date().toISOString(), ready_check_until: null, draft: null });
@@ -232,6 +240,8 @@ export async function closeLobby(lobby: Lobby, reason: string) {
     if (g.server_instance) await db().from("agent_commands").insert({ instance: g.server_instance, type: "end_match", payload: {} });
     await db().from("lobby_games").update({ status: "cancelled", note: tr("лобби закрыто"), server_instance: null, server_state: null }).eq("id", g.id);
   }
+  // комната матча большого лобби закрыта, а матч не сыгран — в сетке он ждёт перезапуска
+  if (lobby.settings.cup_of) await (await import("./cup")).cupGameCancelled({ ...lobby, status: "closed" }, "комната закрыта");
 }
 
 /** Хост давно не открывал лобби — передаём хоста тому, кто на месте */
@@ -248,15 +258,16 @@ export async function checkHostAway(lobby: Lobby, members: LobbyMember[]) {
 
 // ───────────────────────── состав
 
-export function teamCount(lobby: Lobby, members: LobbyMember[], team: "team1" | "team2") {
-  return members.filter((m) => m.slot === team).length + lobby.bots[team].length;
+export function teamCount(lobby: Lobby, members: LobbyMember[], team: TeamSlot) {
+  return members.filter((m) => m.slot === team).length + (team === "team1" || team === "team2" ? lobby.bots[team].length : 0);
 }
 
 /** Можно ли поставить игрока в слот (без учёта прав) */
 export function slotProblem(lobby: Lobby, members: LobbyMember[], slot: Slot, playerId: string, t: T = makeT("ru")) {
   const s = lobby.settings;
   const others = members.filter((m) => m.player_id !== playerId);
-  if (slot === "team1" || slot === "team2") {
+  if (isTeamSlot(slot)) {
+    if (!teamSlotsOf(s).includes(slot)) return t("Такой команды в этом лобби нет");
     if (teamCount(lobby, others, slot) >= s.team_size) return t("В команде нет мест");
   } else if (slot === "wait") {
     if (others.filter((m) => m.slot === "wait").length >= s.max_waiting) return t("Список ожидания заполнен");
@@ -290,8 +301,11 @@ export function nextBotName(lobby: Lobby) {
 }
 
 /** Капитаны команд: первый (по времени входа) игрок команды */
-export function captainsOf(lobby: Lobby, members: (LobbyMember & { player?: { faceit_elo: number | null } })[]): [string | null, string | null] {
+export function captainsOf(lobby: Lobby, members: (LobbyMember & { player?: { faceit_elo: number | null } })[]): (string | null)[] {
   if (lobby.draft) return lobby.draft.captains;
+  // несколько команд: капитаны назначены перед выбором игроков и записаны в сетке (первый в составе)
+  const planned = (lobby.bracket as { rosters?: string[][] } | null)?.rosters;
+  if (cupTeams(lobby.settings.players) > 0) return teamSlotsOf(lobby.settings).map((slot, i) => (planned?.[i]?.[0] && members.some((m) => m.player_id === planned[i][0] && m.slot === slot) ? planned[i][0] : null));
   if (lobby.settings.pot) {
     // «Десятка»: капитан — самый высокий по ELO в команде (он же действует в вето)
     const elo = (m: (typeof members)[number]) => lobby.settings.pot_elo[m.player_id] ?? m.player?.faceit_elo ?? 0;
@@ -304,26 +318,30 @@ export function captainsOf(lobby: Lobby, members: (LobbyMember & { player?: { fa
 
 // ───────────────────────── драфт капитанов
 
-export async function startDraft(lobby: Lobby, captains: [string, string], opts: { snake?: boolean; settings?: LobbySettings; teamNames?: [string, string] } = {}) {
+export async function startDraft(lobby: Lobby, captains: string[], opts: { snake?: boolean; settings?: LobbySettings; teamNames?: string[] } = {}) {
   const members = await getMembers(lobby.id);
   // все, кроме капитанов, из команд — в ожидание
   for (const m of members) {
-    if (m.player_id === captains[0]) await setSlot(lobby.id, m.player_id, "team1");
-    else if (m.player_id === captains[1]) await setSlot(lobby.id, m.player_id, "team2");
-    else if (m.slot === "team1" || m.slot === "team2") await setSlot(lobby.id, m.player_id, "wait");
+    const i = captains.indexOf(m.player_id);
+    if (i >= 0) await setSlot(lobby.id, m.player_id, `team${i + 1}` as TeamSlot);
+    else if (isTeamSlot(m.slot)) await setSlot(lobby.id, m.player_id, "wait");
   }
+  // несколько команд: названия и капитаны хранятся в сетке — в лобби поля есть только для двух команд
+  const many = captains.length > 2;
+  const names = captains.map((_, i) => opts.teamNames?.[i] ?? `Команда ${i + 1}`);
   await touch(lobby.id, {
+    ...(many && { bracket: { format: (opts.settings ?? lobby.settings).cup_format, names, rosters: captains.map((id) => [id]), matches: [], state: "done", champion: null, started_at: new Date().toISOString() } }),
     draft: { captains, turn: 1, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString(), ...(opts.snake && { snake: true, n: 0 }) },
     bots: { team1: [], team2: [] },
     ready_check_until: null,
     ...(opts.settings && { settings: opts.settings }),
-    ...(opts.teamNames && { team1_name: opts.teamNames[0], team2_name: opts.teamNames[1] }),
+    ...(opts.teamNames && !many && { team1_name: opts.teamNames[0], team2_name: opts.teamNames[1] }),
   });
   const name = (id: string) => members.find((m) => m.player_id === id)?.player.nickname ?? "капитан";
   await systemMessage(
     lobby.id,
     opts.snake
-      ? `Выбор игроков: капитаны ${name(captains[0])} и ${name(captains[1])} — самые высокие по ELO. Первым выбирает ${name(captains[0])} (ELO ниже), дальше змейкой: 1-2-2-1.`
+      ? `Выбор игроков: капитаны — ${captains.map(name).join(", ")}. Первым выбирает ${name(captains[0])}, дальше змейкой.`
       : `Драфт: капитаны ${name(captains[0])} и ${name(captains[1])}. Первым выбирает ${name(captains[0])}.`,
   );
 }
@@ -344,24 +362,27 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t:
       .select("id");
     if (!data?.length) return t("Ход уже сделан — обновите страницу");
   }
-  const team = lobby.draft.turn === 1 ? "team1" : "team2";
+  const teams = lobby.draft.captains.length;
+  const team = `team${lobby.draft.turn}` as TeamSlot;
+  const names = teams > 2 ? ((lobby.bracket as { names?: string[] } | null)?.names ?? []) : [lobby.team1_name, lobby.team2_name];
   await setSlot(lobby.id, pickedId, team);
-  await systemMessage(lobby.id, `${auto ? "Время вышло — " : ""}${team === "team1" ? lobby.team1_name : lobby.team2_name} берёт ${picked.player.nickname}`);
+  await systemMessage(lobby.id, `${auto ? "Время вышло — " : ""}${names[lobby.draft.turn - 1] ?? `Команда ${lobby.draft.turn}`} берёт ${picked.player.nickname}`);
   const after = await getMembers(lobby.id);
   const size = lobby.settings.team_size;
-  const t1 = after.filter((m) => m.slot === "team1").length;
-  const t2 = after.filter((m) => m.slot === "team2").length;
+  const full = (turn: number) => after.filter((m) => m.slot === `team${turn}`).length >= size;
   const pool = after.filter((m) => m.slot === "wait").length;
-  if (pool === 0 || (t1 >= size && t2 >= size)) {
+  if (pool === 0 || Array.from({ length: teams }, (_, i) => i + 1).every(full)) {
     await touch(lobby.id, { draft: null });
     await systemMessage(lobby.id, "Драфт окончен");
     return null;
   }
   // обычный драфт — по очереди; «Десятка» — змейкой 1-2-2-1. Полная команда пропускает ход
-  const n = (lobby.draft.n ?? 0) + 1;
-  let turn: 1 | 2 = lobby.draft.snake ? snakeTurn(n) : lobby.draft.turn === 1 ? 2 : 1;
-  if (turn === 1 && t1 >= size) turn = 2;
-  if (turn === 2 && t2 >= size) turn = 1;
+  let n = (lobby.draft.n ?? 0) + 1;
+  let turn = lobby.draft.snake ? snakeTurnN(n, teams) : (lobby.draft.turn % teams) + 1;
+  for (let guard = 0; full(turn) && guard < teams * 2; guard++) {
+    n++;
+    turn = lobby.draft.snake ? snakeTurnN(n, teams) : (turn % teams) + 1;
+  }
   await touch(lobby.id, { draft: { ...lobby.draft, turn, ...(lobby.draft.snake && { n }), deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } });
   return null;
 }
@@ -372,6 +393,7 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t:
 export function startProblem(lobby: Lobby, members: LobbyMember[], t: T = makeT("ru")) {
   if (lobby.status !== "waiting") return t("Игра уже идёт");
   if (lobby.draft) return t("Сначала закончите драфт");
+  if (cupTeams(lobby.settings.players) > 0) return t("В этом лобби несколько команд — матчи запускаются кнопкой «Начать матчи»");
   const maps = mapsProblem(lobby.settings, t);
   if (maps) return maps;
   const h1 = members.filter((m) => m.slot === "team1").length;
@@ -557,7 +579,7 @@ export function lobbyHasDue(lobby: Lobby, game: LobbyGame | null) {
 
 export async function expireReadyCheck(lobby: Lobby) {
   const members = await getMembers(lobby.id);
-  const late = members.filter((m) => (m.slot === "team1" || m.slot === "team2") && !m.ready);
+  const late = members.filter((m) => isTeamSlot(m.slot) && !m.ready);
   for (const m of late) await setSlot(lobby.id, m.player_id, "wait");
   await touch(lobby.id, { ready_check_until: null });
   await db().from("lobby_members").update({ ready: false }).eq("lobby_id", lobby.id);
@@ -569,7 +591,7 @@ export async function maybeStartOnReady(lobbyId: string) {
   const lobby = await getLobby(lobbyId);
   if (!lobby || lobby.status !== "waiting") return false;
   const members = await getMembers(lobby.id);
-  const inTeams = members.filter((m) => m.slot === "team1" || m.slot === "team2");
+  const inTeams = members.filter((m) => isTeamSlot(m.slot));
   if (!inTeams.length || inTeams.some((m) => !m.ready)) return false;
   if (!lobby.ready_check_until) {
     if (lobby.settings.start !== "all_ready") return false;
@@ -892,6 +914,8 @@ export async function finishGame(gameId: string) {
   const g = data as LobbyGame;
   const lobby = await getLobby(g.lobby_id);
   if (!lobby || lobby.status === "closed") return;
+  // комната матча большого лобби: итог уходит в сетку, комната закрывается
+  if (lobby.settings.cup_of) return (await import("./cup")).cupGameFinished(lobby, g);
   const score = `${g.team1.name} ${g.team1_score}:${g.team2_score} ${g.team2.name}`;
   if (g.settings.pot) {
     // «Десятка»: итог и банк — в чат; новая игра тем же составом начинается с чистых отметок взносов
@@ -959,6 +983,7 @@ export async function cancelGame(g: LobbyGame, reason: string) {
   const lobby = await getLobby(g.lobby_id);
   if (lobby && lobby.status === "playing") await touch(lobby.id, { status: "waiting" });
   await systemMessage(g.lobby_id, `Игра отменена: ${reason}`);
+  if (lobby?.settings.cup_of && lobby.status !== "closed") await (await import("./cup")).cupGameCancelled(lobby, reason);
 }
 
 // ───────────────────────── списки
@@ -1009,7 +1034,7 @@ export async function listOpenLobbies(): Promise<LobbyListItem[]> {
   return (data ?? [])
     .map((r) => {
       const l = parseLobby(r)!;
-      const inTeams = r.members.filter((m) => m.slot === "team1" || m.slot === "team2");
+      const inTeams = r.members.filter((m) => isTeamSlot(m.slot));
       const maps = (r.game?.maps ?? []) as GameMap[];
       return {
         code: l.code,

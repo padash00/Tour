@@ -92,6 +92,51 @@ export type Database = {
           },
         ]
       }
+      player_skins: {
+        Row: {
+          data: Json
+          steam_id: string
+          synced_at: string
+        }
+        Insert: {
+          data?: Json
+          steam_id: string
+          synced_at?: string
+        }
+        Update: {
+          data?: Json
+          steam_id?: string
+          synced_at?: string
+        }
+        Relationships: []
+      }
+      skin_ops: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          error: string | null
+          id: number
+          op: Json
+          steam_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: never
+          op: Json
+          steam_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          error?: string | null
+          id?: never
+          op?: Json
+          steam_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -385,6 +430,7 @@ export type Database = {
       lobbies: {
         Row: {
           bots: Json
+          bracket: Json | null
           closed_at: string | null
           code: string
           created_at: string
@@ -404,6 +450,7 @@ export type Database = {
         }
         Insert: {
           bots?: Json
+          bracket?: Json | null
           closed_at?: string | null
           code: string
           created_at?: string
@@ -423,6 +470,7 @@ export type Database = {
         }
         Update: {
           bots?: Json
+          bracket?: Json | null
           closed_at?: string | null
           code?: string
           created_at?: string
@@ -493,6 +541,7 @@ export type Database = {
       lobby_games: {
         Row: {
           best_of: number
+          bracket_match: string | null
           created_at: string
           finished_at: string | null
           id: string
@@ -519,6 +568,7 @@ export type Database = {
         }
         Insert: {
           best_of?: number
+          bracket_match?: string | null
           created_at?: string
           finished_at?: string | null
           id?: string
@@ -545,6 +595,7 @@ export type Database = {
         }
         Update: {
           best_of?: number
+          bracket_match?: string | null
           created_at?: string
           finished_at?: string | null
           id?: string

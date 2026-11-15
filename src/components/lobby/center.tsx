@@ -13,6 +13,8 @@ import { Icon } from "./ui";
 import { Countdown } from "./countdown";
 import { GamePanel } from "./game-panel";
 import { PotPanel } from "./pot";
+import { CaptainsButton } from "./cup";
+import { playersNeeded } from "@/lib/lobby-settings";
 import { phaseOf, type Run } from "./use-lobby-view";
 
 // ───────────────────────── центр: статус, вето, сервер
@@ -34,12 +36,12 @@ export function StageBanner({
   const t = useT();
   const { lobby, game, me } = view;
   const active = game && ["veto", "waiting", "live"].includes(game.status) ? game : null;
-  const inTeam = me?.slot === "team1" || me?.slot === "team2";
+  const inTeam = !!me?.slot?.startsWith("team");
   const meReady = view.members.find((m) => m.id === me?.id)?.ready;
   const phase = phaseOf(view);
   const draftCaptain = lobby.draft ? view.members.find((m) => m.id === lobby.draft?.captains[lobby.draft.turn - 1]) : null;
   const myDraftTurn = !!lobby.draft && me?.id === lobby.draft.captains[lobby.draft.turn - 1];
-  const readyMembers = view.members.filter((m) => m.slot === "team1" || m.slot === "team2");
+  const readyMembers = view.members.filter((m) => m.slot.startsWith("team"));
   const readyCount = readyMembers.filter((m) => m.ready).length;
 
   let state: ReactNode;
@@ -149,14 +151,18 @@ export function CenterColumn({
   const t = useT();
   const { lobby, game, me } = view;
   const settings = lobby.settings;
-  const inTeam = me?.slot === "team1" || me?.slot === "team2";
+  const inTeam = !!me?.slot?.startsWith("team");
   const meReady = view.members.find((m) => m.id === me?.id)?.ready;
   const waiting = lobby.status === "waiting";
   const last = waiting && game?.status === "finished" ? game : null;
   const canStart = isHost && waiting && !lobby.ready_check_until;
   const pot = settings.pot;
   const potPlayers = view.members.filter((m) => m.slot !== "spec").length;
-  const potTeamsFull = view.members.filter((m) => m.slot === "team1").length === settings.team_size && view.members.filter((m) => m.slot === "team2").length === settings.team_size;
+  const potTeamsFull = view.teams.every((team) => view.members.filter((m) => m.slot === team.slot).length === settings.team_size);
+  // несколько команд: игроков разбирают капитаны, матчи идут сеткой в отдельных комнатах
+  const many = view.teams.length > 2;
+  const snake = pot || many;
+  const cupPlaying = many && lobby.status === "playing";
 
   const facts: { icon: ReactNode; label: string; value: ReactNode }[] = [
     {
@@ -171,17 +177,33 @@ export function CenterColumn({
               ? t("Случайно из {n}", { n: settings.maps.length })
               : t("{n} карт", { n: settings.maps.length }),
     },
-    { icon: Icon.swords("size-[18px]"), label: t("Формат"), value: `${MODES[settings.mode].label.replace(" на ", "×")} · BO${settings.best_of}` },
+    {
+      icon: Icon.swords("size-[18px]"),
+      label: t("Формат"),
+      value: many
+        ? `${t("{n} команд", { n: view.teams.length })} · ${settings.cup_format === "round" ? t("круговая") : t("сетка")} · BO${settings.best_of}`
+        : `${MODES[settings.mode].label.replace(" на ", "×")} · BO${settings.best_of}`,
+    },
     { icon: Icon.signal("size-[18px]"), label: t("Сеть"), value: settings.network === "lan" ? t("LAN · клуб") : t("Интернет") },
     { icon: Icon.user("size-[18px]"), label: t("Хост"), value: lobby.host_name },
   ];
 
   let primary: ReactNode;
-  if (canStart && pot && !potTeamsFull && !lobby.draft) {
-    // «Десятка»: пока составы не собраны, главное действие — выбор игроков капитанами
+  if (cupPlaying) {
+    primary = view.cup?.myRoom ? (
+      <Link href={`/lobby/${view.cup.myRoom}`} className={btnClass("primary", "lg", "w-full justify-center")}>
+        {t("Мой матч")}
+      </Link>
+    ) : (
+      <div className="grid h-12 place-items-center rounded-control border border-line bg-shell/60 text-[15px] font-medium text-fg-2">{t("Идут матчи")}</div>
+    );
+  } else if (canStart && snake && !potTeamsFull && !lobby.draft) {
+    // пока составы не собраны, главное действие — назначить капитанов и начать выбор игроков
+    primary = <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Начать выбор игроков")} />;
+  } else if (canStart && many) {
     primary = (
-      <Button size="lg" block disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
-        {t("Начать выбор игроков")}
+      <Button size="lg" block disabled={busy || !!lobby.draft} onClick={() => run(() => A.startCupMatches(code))}>
+        {view.cup ? t("Начать матчи заново") : t("Начать матчи")}
       </Button>
     );
   } else if (canStart) {
@@ -215,11 +237,20 @@ export function CenterColumn({
     <section aria-label={t("О матче")} className="flex flex-col gap-4">
       {primary}
 
-      {isHost && settings.player_pick === "captains" && waiting && !lobby.draft && !lobby.ready_check_until && (!pot || potTeamsFull) && (
-        <Button variant="secondary" block disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
-          {pot ? t("Выбрать игроков заново") : t("Драфт капитанов")}
+      {cupPlaying && isHost && (
+        <Button variant="secondary" block disabled={busy} onClick={() => run(() => A.stopCupMatches(code))}>
+          {t("Остановить матчи")}
         </Button>
       )}
+
+      {isHost && settings.player_pick === "captains" && waiting && !lobby.draft && !lobby.ready_check_until && (!snake || potTeamsFull) && !settings.cup_of &&
+        (snake ? (
+          <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Выбрать игроков заново")} variant="secondary" />
+        ) : (
+          <Button variant="secondary" block disabled={busy} onClick={() => run(() => A.beginDraft(code))}>
+            {t("Драфт капитанов")}
+          </Button>
+        ))}
 
       <PotPanel view={view} />
 
@@ -239,7 +270,7 @@ export function CenterColumn({
         ))}
       </dl>
 
-      {waiting && isHost && !lobby.draft && !pot && (
+      {waiting && isHost && !lobby.draft && !snake && !settings.cup_of && (
         <div className="grid grid-cols-4 overflow-hidden rounded-control border border-line-subtle bg-shell/60">
           {(
             [
@@ -266,12 +297,18 @@ export function CenterColumn({
 
       {waiting && (
         <p className="text-center text-meta text-fg-3">
-          {pot
+          {many
+            ? isHost
+              ? potTeamsFull
+                ? t("Команды собраны — запускайте матчи. Каждый матч откроется в своей комнате.")
+                : t("Соберите {need} игроков (сейчас {n}), назначьте капитанов и начните выбор игроков.", { need: playersNeeded(settings), n: potPlayers })
+              : t("Игроков по командам разбирают капитаны. Когда начнутся матчи, здесь появится кнопка «Мой матч».")
+            : pot
             ? isHost
               ? potTeamsFull
                 ? t("Составы собраны. Отметьте взносы и запускайте матч.")
-                : t("Соберите {need} игроков (сейчас {n}) и начните выбор: капитанами станут двое с самым высоким ELO.", { need: settings.team_size * 2, n: potPlayers })
-              : t("Игроков по командам выбирают капитаны — двое с самым высоким ELO. Взнос передайте организатору: он отметит его здесь.")
+                : t("Соберите {need} игроков (сейчас {n}) и начните выбор игроков: капитанов назначаете вы, по умолчанию — двое с самым высоким ELO.", { need: settings.team_size * 2, n: potPlayers })
+              : t("Игроков по командам выбирают капитаны. Взнос передайте организатору: он отметит его здесь.")
             : isHost
             ? settings.player_pick === "captains"
               ? t("Назначьте капитанов и запустите драфт или расставьте игроков сами.")

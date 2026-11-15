@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, FileText, Gamepad2, IdCard, RefreshCw, Trophy, User, Users } from "lucide-react";
+import { ArrowRight, Brush, FileText, Gamepad2, IdCard, RefreshCw, Trophy, User, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { LiveRefresh } from "@/components/live-refresh";
 import { refreshProfile } from "@/app/actions/profile";
@@ -249,6 +249,9 @@ export default async function MyGamePage() {
             ))}
             <Button href="/me/profile" variant="secondary" size="sm" icon={<IdCard />}>
               {t("Анкета игрока")}
+            </Button>
+            <Button href="/me/skins" variant="secondary" size="sm" icon={<Brush />}>
+              {t("Мои скины")}
             </Button>
             <Button href={`/players/${player.steam_id}`} variant="secondary" size="sm" icon={<User />}>
               {t("Публичный профиль")}

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { EyeOff, Globe2, LockKeyhole, Plus } from "lucide-react";
 import { useState, useTransition, type ReactNode } from "react";
 import { createLobby } from "@/app/actions/lobby";
+import type { CupFormat } from "@/lib/cup-core";
+import { SizePicker } from "./size-picker";
 import { useToast } from "../toast";
 import { Button, Dialog, Field, Input, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
@@ -54,11 +56,13 @@ export function CreateLobbyButton({
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<Visibility>("public");
   const [password, setPassword] = useState("");
+  const [players, setPlayers] = useState(0);
+  const [format, setFormat] = useState<CupFormat>("bracket");
   const [pending, start] = useTransition();
 
   const submit = () =>
     start(async () => {
-      const r = await createLobby(type, password);
+      const r = await createLobby(type, password, players, format);
       if (r?.error) {
         toast.error(r.error);
         if (r.code) router.push(`/lobby/${r.code}`);
@@ -88,7 +92,7 @@ export function CreateLobbyButton({
         open={open}
         onClose={() => !pending && setOpen(false)}
         title={t("Создать лобби")}
-        description={t("Сначала выберите доступ. Режим, карты, команды и сервер настраиваются уже внутри комнаты.")}
+        description={t("Сначала — сколько игроков и кто может войти. Режим, карты и остальное настраиваются уже внутри комнаты.")}
         size="lg"
         footer={
           <>
@@ -101,7 +105,10 @@ export function CreateLobbyButton({
           </>
         }
       >
-        <div className="grid gap-2">
+        <SizePicker players={players} format={format} onPlayers={setPlayers} onFormat={setFormat} small={t("до 10")} />
+
+        <div className="mt-5 text-[14px] font-semibold text-fg">{t("Кто может войти")}</div>
+        <div className="mt-2 grid gap-2">
           {TYPES.map((item) => {
             const selected = type === item.key;
             return (

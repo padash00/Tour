@@ -5,6 +5,7 @@
 import { MODES, type ModeKey } from "./modes";
 import { makeT, tr, type T } from "./i18n/core";
 import { normalizeTiers, TIERS, type TierKey } from "./tiers";
+import { cupFormatAllowed, cupTeams, type CupFormat } from "./cup-core";
 
 export type LobbySettings = {
   // основные
@@ -63,6 +64,15 @@ export type LobbySettings = {
   pot_paid: string[];
   /** ELO игроков на момент старта выбора капитанами: по нему капитаны и тиры до конца игры. Пишет только сервер */
   pot_elo: Record<string, number>;
+  /**
+   * Сколько игроков собирает лобби: 0 — обычное, на две команды; 20, 30 или 40 — несколько команд по пять
+   * и сетка матчей между ними (см. cup-core.ts). Задаётся при создании.
+   */
+  players: number;
+  /** лобби на несколько команд: сетка на вылет или круговая (круговая — только на 4 команды) */
+  cup_format: CupFormat;
+  /** комната одного матча большого лобби: код большого лобби и матч сетки. Пишет только сервер */
+  cup_of: { code: string; match: string } | null;
 };
 
 export const DEFAULT_SETTINGS: LobbySettings = {
@@ -107,6 +117,9 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   pot_fee: 0,
   pot_paid: [],
   pot_elo: {},
+  players: 0,
+  cup_format: "bracket",
+  cup_of: null,
 };
 
 /** Карты «Десятки» по умолчанию — соревновательный пул, вето */
@@ -115,13 +128,22 @@ export const POT_FEE_MAX = 1_000_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Правила «Десятки», которые организатор поменять не может: 5×5 через интернет, игроков выбирают капитаны, без ботов-добивок */
-function enforcePot(s: LobbySettings): LobbySettings {
+function enforcePot(input: LobbySettings): LobbySettings {
+  let s = input;
+  // несколько команд: всегда 5×5, игроков разбирают капитаны, реванша нет — после финала лобби собирается заново
+  if (cupTeams(s.players) > 0) {
+    s = { ...s, mode: "5v5", team_size: 5, player_pick: "captains", allow_join_team: false, start: "host", rematch: false, max_waiting: Math.max(s.max_waiting, s.players) };
+    if (!cupFormatAllowed(cupTeams(s.players), s.cup_format)) s = { ...s, cup_format: "bracket" };
+  }
   if (!s.pot) return { ...s, pot_paid: [], pot_elo: {} };
   return { ...s, mode: "5v5", team_size: 5, network: "internet", player_pick: "captains", allow_join_team: false, start: "host", filter: false };
 }
 
 /** Банк «Десятки»: взнос × число игроков в двух командах */
-export const potBank = (s: Pick<LobbySettings, "pot_fee" | "team_size">) => s.pot_fee * s.team_size * 2;
+export const potBank = (s: Pick<LobbySettings, "pot_fee" | "team_size"> & { players?: number }) => s.pot_fee * (cupTeams(s.players ?? 0) > 0 ? s.players! : s.team_size * 2);
+
+/** Сколько игроков нужно лобби, чтобы начать: все команды полные */
+export const playersNeeded = (s: Pick<LobbySettings, "players" | "team_size">) => (cupTeams(s.players) > 0 ? s.players : s.team_size * 2);
 
 export const LIMITS = {
   team_size: [1, 5],
@@ -204,7 +226,14 @@ export function normalizeSettings(input: unknown, base: LobbySettings = DEFAULT_
               .map(([k, v]) => [k, Math.round(Number(v))]),
           )
         : d.pot_elo,
+    players: 0,
+    cup_format: "bracket",
+    cup_of: null,
   };
+  out.players = cupTeams(Number(s.players)) > 0 ? Number(s.players) : cupTeams(d.players) > 0 && s.players === undefined ? d.players : 0;
+  out.cup_format = pick(s.cup_format, ["bracket", "round"] as const, d.cup_format);
+  const of = s.cup_of as { code?: unknown; match?: unknown } | null | undefined;
+  out.cup_of = of && typeof of === "object" && /^[A-Za-z0-9]{3,16}$/.test(String(of.code)) && /^r\d{1,2}m\d{1,2}$/.test(String(of.match)) ? { code: String(of.code), match: String(of.match) } : null;
   if (out.filter_faceit_min > out.filter_faceit_max) out.filter_faceit_max = out.filter_faceit_min;
   if (out.start_money > out.max_money) out.start_money = out.max_money;
   return enforcePot(out);

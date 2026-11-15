@@ -138,11 +138,10 @@ export function PlayerLine({
   const t = useT();
   const host = view.lobby.host_id === m.id;
   const self = view.me?.id === m.id;
-  const inTeam = m.slot === "team1" || m.slot === "team2";
+  const inTeam = m.slot.startsWith("team");
   const moves: { slot: Slot; label: string }[] = (
     [
-      { slot: "team1", label: t("В {name}", { name: view.lobby.team1_name }) },
-      { slot: "team2", label: t("В {name}", { name: view.lobby.team2_name }) },
+      ...view.teams.map((team) => ({ slot: team.slot, label: t("В {name}", { name: team.name }) })),
       { slot: "wait", label: t("В ожидание") },
       { slot: "spec", label: t("В наблюдатели") },
     ] as { slot: Slot; label: string }[]

@@ -16,9 +16,12 @@ import {
   type GameMap,
   type GameTeam,
   type GameVeto,
+  teamSlotsOf,
   type Lobby,
   type Slot,
+  type TeamSlot,
 } from "./lobby";
+import { cupTeams, roundTitle, standings, type Cup, type CupMatch } from "./cup-core";
 import type { LobbySettings } from "./lobby-settings";
 import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
@@ -86,7 +89,11 @@ export type LobbyView = {
     has_password: boolean;
     created_at: string;
   };
-  captains: [string | null, string | null];
+  captains: (string | null)[];
+  /** команды лобби по порядку: две или столько, на сколько игроков оно создано */
+  teams: { slot: TeamSlot; name: string }[];
+  /** лобби на несколько команд: сетка или круг матчей (null — обычное лобби или матчи ещё не начинались) */
+  cup: ViewCup | null;
   members: ViewMember[];
   bans: { id: string; nickname: string }[];
   messages: { id: number; player_id: string | null; nickname: string | null; avatar_url: string | null; body: string; created_at: string }[];
@@ -94,6 +101,39 @@ export type LobbyView = {
   history: { id: string; team1: string; team2: string; team1_score: number; team2_score: number; winner: 1 | 2 | null; maps: string[]; finished_at: string | null }[];
   mapImages: Record<string, string>;
 };
+
+export type ViewCup = {
+  format: Cup["format"];
+  state: Cup["state"];
+  names: string[];
+  champion: number | null;
+  rounds: { round: number; title: string; matches: (Pick<CupMatch, "id" | "a" | "b" | "state" | "winner" | "score"> & { code: string | null; mine: boolean })[] }[];
+  /** таблица круговой */
+  table: { team: number; played: number; wins: number; maps: number; mapsLost: number }[] | null;
+  /** комната матча, в котором сейчас играет зритель */
+  myRoom: string | null;
+};
+
+function viewCup(lobby: Lobby, viewerId: string | null, canOpen: boolean): ViewCup | null {
+  const cup = lobby.bracket as Cup | null;
+  if (!cup || !cup.matches?.length) return null;
+  const team = viewerId ? cup.rosters.findIndex((r) => r.includes(viewerId)) : -1;
+  const rounds = [...new Set(cup.matches.map((m) => m.round))].sort((a, b) => a - b);
+  let myRoom: string | null = null;
+  const view = rounds.map((round) => ({
+    round,
+    title: roundTitle(cup, round),
+    matches: cup.matches
+      .filter((m) => m.round === round)
+      .map((m) => {
+        const mine = team >= 0 && (m.a === team || m.b === team);
+        if (mine && m.state === "playing" && m.code) myRoom = m.code;
+        // комнату матча открывают его игроки, организатор и админ
+        return { id: m.id, a: m.a, b: m.b, state: m.state, winner: m.winner, score: m.score, code: m.state === "playing" && (mine || canOpen) ? m.code : null, mine };
+      }),
+  }));
+  return { format: cup.format, state: cup.state, names: cup.names, champion: cup.champion, rounds: view, table: cup.format === "round" ? standings(cup) : null, myRoom };
+}
 
 /** Служебные пометки игры хранятся по-русски; игроку показываем на его языке (динамические — по шаблону) */
 const NOTES = [
@@ -154,8 +194,9 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   const mine = viewer ? members.find((m) => m.player_id === viewer.id) : undefined;
   const isHost = !!viewer && lobby.host_id === viewer.id;
   // закрытое и приватное лобби постороннему — только экран входа (пароль или ссылка-приглашение)
+  // организатор большого лобби — хост и в комнатах матчей, хотя сам в них может не играть
   const access: LobbyView["access"] =
-    lobby.status === "closed" && !mine && !opts.admin ? "closed_lobby" : mine || opts.admin || lobby.visibility === "public" ? "ok" : "password";
+    lobby.status === "closed" && !mine && !opts.admin ? "closed_lobby" : mine || isHost || opts.admin || lobby.visibility === "public" ? "ok" : "password";
   // приватное лобби постороннему без ссылки-приглашения не показываем вовсе
   const hidden = access !== "ok" && lobby.visibility === "private";
   const inGame = !!viewer && !!game && [...game.team1.players, ...game.team2.players].some((p) => p.id === viewer.id);
@@ -216,6 +257,11 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
       created_at: lobby.created_at,
     },
     captains: captainsOf(lobby, members),
+    teams: teamSlotsOf(lobby.settings).map((slot, i) => ({
+      slot,
+      name: cupTeams(lobby.settings.players) > 0 ? ((lobby.bracket as Cup | null)?.names?.[i] ?? `Команда ${i + 1}`) : i === 0 ? lobby.team1_name : lobby.team2_name,
+    })),
+    cup: access === "ok" ? viewCup(lobby, viewer?.id ?? null, isHost || opts.admin) : null,
     members: hidden
       ? []
       : members.map((m) => {

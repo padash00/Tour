@@ -109,6 +109,8 @@ export function phaseOf(view: LobbyView) {
   if (game?.status === "live") return "live" as const;
   if (game?.status === "veto") return "veto" as const;
   if (game?.status === "waiting") return "server" as const;
+  // лобби на несколько команд: матчи идут в своих комнатах, своей игры у большого лобби нет
+  if (lobby.status === "playing" && view.teams.length > 2) return "live" as const;
   if (lobby.ready_check_until) return "ready_check" as const;
   if (lobby.draft) return "draft" as const;
   return "waiting" as const;

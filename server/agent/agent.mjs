@@ -41,6 +41,7 @@ import { createMatchLoader } from "./match-load.mjs";
 import { createRecovery, latestBackup } from "./recovery.mjs";
 import { createRelay } from "./relay.mjs";
 import { createSkins } from "./skins.mjs";
+import { createSkinSync } from "./skin-sync.mjs";
 import { ensureUpnp } from "./upnp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -672,10 +673,30 @@ const skins = createSkins({
   log,
 });
 
+// Скины игроков: сайт ↔ база плагина. Отдельный цикл — не задерживает приём команд.
+const skinSync = createSkinSync({ serverDir: SERVER_DIR, f16Dir: F16_DIR, api, log });
+async function skinSyncLoop() {
+  if (!skinSync.available()) return log("скины игроков: базы плагина на этом ПК нет — обмен с сайтом выключен");
+  let failed = false;
+  for (;;) {
+    let again = false;
+    try {
+      again = await skinSync.tick();
+      failed = false;
+    } catch (e) {
+      // старый сайт без /api/agent/skins или обрыв связи — пишем один раз
+      if (!failed) log(`скины игроков: ${e.message}`);
+      failed = true;
+    }
+    await sleep(again && !failed ? 500 : 10_000);
+  }
+}
+
 await relay.start();
 demos?.start();
 log(`F16 Server Agent → ${config.siteUrl} · инстансов: ${INSTANCES.length} · LAN ${config.lanIp}`);
 await refreshHostInfo(true).catch(() => {});
 for (const inst of INSTANCES) probeLoop(inst);
 housekeepingLoop();
+skinSyncLoop();
 await syncLoop();
