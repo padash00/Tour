@@ -160,7 +160,8 @@ export function LobbyRoom({
   const team2 = members.filter((m) => m.slot === "team2");
   const waiting = members.filter((m) => m.slot === "wait");
   const specs = members.filter((m) => m.slot === "spec");
-  const playersNow = team1.length + team2.length + lobby.bots.team1.length + lobby.bots.team2.length;
+  // «Десятка»: до выбора капитанами все игроки стоят в ожидании — считаем и их
+  const playersNow = s.pot ? team1.length + team2.length + waiting.length : team1.length + team2.length + lobby.bots.team1.length + lobby.bots.team2.length;
   const draft = lobby.draft;
   const myTurnInDraft = !!draft && me?.id === draft.captains[draft.turn - 1];
   const inviteUrl = origin && lobby.invite_token ? `${origin}/lobby/${lobby.code}?t=${lobby.invite_token}` : null;
