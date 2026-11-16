@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Lock, Search, Users } from "lucide-react";
-import { getCurrentPlayer } from "@/lib/auth";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { getMapImages } from "@/lib/settings";
 import { mapLabel } from "@/lib/maps";
@@ -53,7 +53,9 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 60) : "";
   const filter: Filter = sp.state === "waiting" || sp.state === "playing" ? sp.state : "all";
 
-  const [player, lobbies, images] = await Promise.all([getCurrentPlayer(), listOpenLobbies(), getMapImages()]);
+  const player = await getCurrentPlayer();
+  // приватные лобби в общем списке не показываем никому, кроме админа
+  const [lobbies, images] = await Promise.all([listOpenLobbies({ admin: isAdmin(player) }), getMapImages()]);
   const mine = player ? await playerLobby(player.id) : null;
 
   const normalized = q.toLocaleLowerCase("ru");
@@ -205,6 +207,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
                         )}
                         {l.settings.pot && <span className="hidden shrink-0 gap-1 sm:flex">{l.settings.pot_tiers.map((tier) => <TierBadge key={tier} tier={tier} />)}</span>}
                         {l.visibility === "closed" && <Lock className="size-3.5 shrink-0 text-fg-3" aria-label={t("Вход по паролю")} />}
+                        {l.visibility === "private" && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-chip bg-surface-2 px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-fg-2">
+                            <Lock className="size-3" aria-hidden />
+                            {t("Приватное")}
+                          </span>
+                        )}
                       </span>
                     }
                     meta={

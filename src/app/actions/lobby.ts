@@ -317,8 +317,10 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
   if (members.some((m) => m.player_id === player.id)) return { ok: true, code: lobby.code };
 
   const { data: banned } = await db().from("lobby_bans").select("player_id").eq("lobby_id", lobby.id).eq("player_id", player.id).maybeSingle();
-  if (banned) return { error: t("Хост запретил вам вход в это лобби") };
-  if (lobby.visibility !== "public" && !checkInvite(opts.invite, lobby)) {
+  // админ сайта заходит в любое лобби: без пароля и несмотря на запрет хоста
+  const admin = isAdmin(player);
+  if (banned && !admin) return { error: t("Хост запретил вам вход в это лобби") };
+  if (lobby.visibility !== "public" && !admin && !checkInvite(opts.invite, lobby)) {
     const throttled = await passwordThrottle(player.id, lobby.id);
     if (throttled) return { error: throttled };
     if (!(await checkPassword(opts.password ?? "", lobby.password_hash))) {

@@ -1022,13 +1022,13 @@ export type LobbyListItem = {
   created_at: string;
 };
 
-/** Открытые лобби для списка: публичные и закрытые, где кто-то есть на месте (приватные не показываем) */
-export async function listOpenLobbies(): Promise<LobbyListItem[]> {
+/** Открытые лобби для списка: публичные и закрытые, где кто-то есть на месте. Приватные видит только админ */
+export async function listOpenLobbies(opts: { admin?: boolean } = {}): Promise<LobbyListItem[]> {
   const { data } = await db()
     .from("lobbies")
     .select("*, host:players!lobbies_host_id_fkey(nickname, avatar_url), members:lobby_members(slot, last_seen_at, player:players(nickname, avatar_url)), game:lobby_games!lobbies_current_game_fkey(status, team1_score, team2_score, maps)")
     .neq("status", "closed")
-    .in("visibility", ["public", "closed"])
+    .in("visibility", opts.admin ? ["public", "closed", "private"] : ["public", "closed"])
     .order("created_at", { ascending: false })
     .limit(60);
   return (data ?? [])
