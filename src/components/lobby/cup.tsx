@@ -16,7 +16,7 @@ import type { Run } from "./use-lobby-view";
  * Каждый матч играется в своей комнате — отсюда в неё ведёт кнопка «Мой матч».
  */
 
-/** Кнопка «Начать выбор игроков»: организатор назначает капитанов (по умолчанию — самые высокие по ELO) */
+/** Кнопка «Начать выбор игроков»: капитанов назначает организатор (самых высоких по ELO можно отметить одной кнопкой) */
 export function CaptainsButton({ view, busy, run, code, label, variant = "primary" }: { view: LobbyView; busy: boolean; run: Run; code: string; label: string; variant?: "primary" | "secondary" | "card" }) {
   const t = useT();
   const teams = view.teams.length;
@@ -26,8 +26,9 @@ export function CaptainsButton({ view, busy, run, code, label, variant = "primar
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
 
+  // капитанов назначает организатор сам: окно открывается пустым, ELO — только кнопка-подсказка
   const show = () => {
-    setPicked(top);
+    setPicked([]);
     setOpen(true);
   };
   const toggle = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : cur.length < teams ? [...cur, id] : cur));
