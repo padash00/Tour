@@ -136,6 +136,27 @@ export function wearName(w: number): string {
   return "Закалённое в боях";
 }
 
+// Оружие, которое в магазине есть только у одной стороны (defindex). Остального — у обеих.
+const T_ONLY = [7, 13, 39, 11, 4, 30, 17, 29]; // AK-47, Galil, SG 553, G3SG1, Glock, Tec-9, MAC-10, Sawed-Off
+const CT_ONLY = [16, 60, 10, 8, 38, 61, 32, 3, 34, 27]; // M4A4, M4A1-S, FAMAS, AUG, SCAR-20, USP-S, P2000, Five-SeveN, MP9, MAG-7
+
+/** Сторона, у которой это оружие продаётся; null — у обеих */
+export function sideOnly(defindex: number): SkinTeam | null {
+  return T_ONLY.includes(defindex) ? 2 : CT_ONLY.includes(defindex) ? 3 : null;
+}
+
+/**
+ * Картинка по износу: три слоя (чистый, поношенный, закалённый в боях) и непрозрачность второго и третьего.
+ * Плавно: 0 — чистый, к 0.3 проступает поношенный, к 0.7 — закалённый в боях.
+ */
+export function wearBlend(w: number): [number, number] {
+  const c = (v: number) => Math.min(1, Math.max(0, v));
+  return [c(w / 0.3), c((w - 0.3) / 0.4)];
+}
+
+/** public/skins/wear/<defindex>.json: раскраска → одна или три картинки по износу */
+export type WearImages = { base: string; paints: Record<string, string[]> };
+
 // ───────────────────────── каталог (public/skins/catalog.json)
 
 export type CatalogWeapon = { d: number; w: string; name: string; g: "rifle" | "sniper" | "pistol" | "smg" | "heavy" | "knife" | "other"; paints: [number, string][] };
