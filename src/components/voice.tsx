@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Copy, Headphones } from "lucide-react";
+import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, buttonClass, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
@@ -47,12 +47,12 @@ export function VoiceCard({ address, wide, className }: { address: string; wide?
     );
   return (
     <section aria-label={t("Голосовая связь")} className={cn("rounded-surface border border-line-subtle bg-surface p-5", wide && "sm:flex sm:items-center sm:justify-between sm:gap-6", className)}>
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-control bg-accent-dim text-accent">
-          <Headphones className="size-5" aria-hidden />
-        </span>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
+        {/* логотип из официального набора TeamSpeak (teamspeak.com/en/mediakit) — без изменений, с полями вокруг */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={118} height={32} className="h-8 w-auto shrink-0" />
         <div className="min-w-0">
-          <div className="text-[15px] font-semibold text-fg">{t("Голосовая связь — TeamSpeak")}</div>
+          <div className="text-[15px] font-semibold text-fg">{t("Голосовая связь")}</div>
           <div className="mt-0.5 text-meta text-fg-2">
             {t("Сервер клуба для команд:")} <span className="num font-semibold text-fg">{address}</span>
             {online !== null && online > 0 && <span className="num text-ok"> · {t("сейчас в сети: {n}", { n: online })}</span>}
