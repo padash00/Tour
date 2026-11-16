@@ -6,6 +6,7 @@ import { mapLabel } from "@/lib/maps";
 import { MODES, type ModeKey } from "@/lib/modes";
 import { BOT_DIFFICULTY, LIMITS, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
 import { tint } from "../competition/map-tile";
+import { cupTeams } from "@/lib/cup-core";
 import { useToast } from "../toast";
 import { Choice, Icon, NewBadge, Row, Section, Segments, Slider, Toggle } from "./ui";
 import { Sheet, buttonClass as btnClass, cn } from "@/components/ds";
@@ -141,6 +142,10 @@ export function AdvancedSettings({
 }) {
   const t = useT();
   const ro = !editable;
+  // правила, которые организатор поменять не может (см. enforcePot): показываем их выключенными с пояснением
+  const cup = cupTeams(s.players) > 0;
+  const fixed = cup || s.pot;
+  const fixedHint = cup ? t("В игре на несколько команд задано правилами — поменять нельзя") : t("В «Десятке» задано правилами — поменять нельзя");
   const problem = mapsProblem(s, t);
   return (
     <Sheet
@@ -171,19 +176,19 @@ export function AdvancedSettings({
 
         <Section title={t("Основные")}>
           <Row icon={Icon.swords()} label={t("Режим")}>
-            <Choice value={s.mode} disabled={ro} onChange={(v) => patch(withMode(s, v))} options={(Object.keys(MODES) as ModeKey[]).map((k) => ({ value: k, label: MODES[k].title }))} />
+            <Choice value={s.mode} disabled={ro || fixed} onChange={(v) => patch(withMode(s, v))} options={(Object.keys(MODES) as ModeKey[]).map((k) => ({ value: k, label: MODES[k].title }))} />
           </Row>
           <Row icon={Icon.users()} label={t("Игроков в команде")}>
-            <Segments value={s.team_size} disabled={ro} onChange={(v) => patch({ team_size: v })} options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: n }))} />
+            <Segments value={s.team_size} disabled={ro || fixed} onChange={(v) => patch({ team_size: v })} options={[1, 2, 3, 4, 5].map((n) => ({ value: n, label: n }))} />
           </Row>
           <Row icon={Icon.signal()} label={t("Сеть")} hint={s.network === "lan" ? t("Игрокам выдаётся адрес сервера в клубе") : t("Внешний адрес — для игроков из дома")}>
-            <Choice value={s.network} disabled={ro} onChange={(v) => patch({ network: v })} options={NETWORK} />
+            <Choice value={s.network} disabled={ro || s.pot} onChange={(v) => patch({ network: v })} options={NETWORK} />
           </Row>
-          <Row icon={Icon.users()} label={t("Выбор игроков")} badge={<NewBadge />}>
-            <Choice value={s.player_pick} disabled={ro} onChange={(v) => patch({ player_pick: v })} options={PICK} />
+          <Row icon={Icon.users()} label={t("Выбор игроков")} badge={<NewBadge />} hint={fixed ? fixedHint : undefined}>
+            <Choice value={s.player_pick} disabled={ro || fixed} onChange={(v) => patch({ player_pick: v })} options={PICK} />
           </Row>
           <Row icon={Icon.play()} label={t("Запуск матча")}>
-            <Choice value={s.start} disabled={ro} onChange={(v) => patch({ start: v })} options={START} />
+            <Choice value={s.start} disabled={ro || fixed} onChange={(v) => patch({ start: v })} options={START} />
           </Row>
           <Row icon={Icon.tv()} label="GOTV" hint={t("Зрители смотрят матч через GOTV (порт сервера + 5)")}>
             <Toggle on={s.gotv} disabled={ro} onChange={(v) => patch({ gotv: v })} />
@@ -201,11 +206,15 @@ export function AdvancedSettings({
         </Section>
 
         <Section title={t("Лобби")}>
-          <Row icon={Icon.users()} label={t("Разрешить вход в команду")}>
-            <Toggle on={s.allow_join_team} disabled={ro} onChange={(v) => patch({ allow_join_team: v })} />
+          <Row icon={Icon.users()} label={t("Разрешить вход в команду")} hint={fixed ? t("Игроков по командам разбирают капитаны — поменять нельзя") : undefined}>
+            <Toggle on={s.allow_join_team} disabled={ro || fixed} onChange={(v) => patch({ allow_join_team: v })} />
           </Row>
-          <Row icon={Icon.rotate()} label={t("Пересоздание матча")} hint={t("После матча лобби остаётся с тем же составом — можно сыграть ещё. Выключено — лобби закрывается.")}>
-            <Toggle on={s.rematch} disabled={ro} onChange={(v) => patch({ rematch: v })} />
+          <Row
+            icon={Icon.rotate()}
+            label={t("Пересоздание матча")}
+            hint={cup ? t("После финала лобби на несколько команд собирается заново — поменять нельзя") : t("После матча лобби остаётся с тем же составом — можно сыграть ещё. Выключено — лобби закрывается.")}
+          >
+            <Toggle on={s.rematch} disabled={ro || cup} onChange={(v) => patch({ rematch: v })} />
           </Row>
           <Row icon={Icon.mic()} label={t("Голосовой чат")} badge={<NewBadge />}>
             <Choice value={s.voice} disabled={ro} onChange={(v) => patch({ voice: v })} options={VOICE} />
@@ -216,8 +225,8 @@ export function AdvancedSettings({
           <Row icon={Icon.tv()} label={t("Максимум наблюдателей")}>
             <Slider value={s.max_spectators} min={LIMITS.max_spectators[0]} max={LIMITS.max_spectators[1]} disabled={ro} onChange={(v) => patch({ max_spectators: v })} />
           </Row>
-          <Row icon={Icon.filter()} label={t("Фильтрация игроков")} badge={<NewBadge />} hint={t("Кого пускать в лобби")}>
-            <Toggle on={s.filter} disabled={ro} onChange={(v) => patch({ filter: v })} />
+          <Row icon={Icon.filter()} label={t("Фильтрация игроков")} badge={<NewBadge />} hint={s.pot ? t("В игре на банк вход — по тирам FACEIT, фильтр не нужен") : t("Кого пускать в лобби")}>
+            <Toggle on={s.filter} disabled={ro || s.pot} onChange={(v) => patch({ filter: v })} />
           </Row>
           {s.filter && (
             <>
