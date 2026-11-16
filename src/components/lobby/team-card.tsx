@@ -163,19 +163,21 @@ export function PlayerLine({
         <span className={cn("absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface", m.online ? "bg-ok" : "bg-fg-4")} title={m.online ? t("в лобби") : t("не на странице")} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {host && <span className="text-warn" title={t("Хост")}>{Icon.crown("size-3.5")}</span>}
           {captain && !host && <span className="text-accent" title={t("Капитан")}>★</span>}
           <Link href={`/players/${m.steam_id}`} className="truncate text-[14px] font-medium text-fg hover:text-accent">
             {m.nickname}
           </Link>
         </div>
-        <div className="flex items-center gap-2 text-[12px] text-fg-3">
+        {/* в узкой карточке отметка о взносе уходит во вторую строку и переносится — иначе она наезжает на ник и ELO */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">
           {m.tier && <TierBadge tier={m.tier} />}
-          {m.faceit_elo ? <span className="num">{m.faceit_elo} ELO</span> : <span>{t("без FACEIT")}</span>}
+          {m.faceit_elo ? <span className="num whitespace-nowrap">{m.faceit_elo} ELO</span> : <span className="whitespace-nowrap">{t("без FACEIT")}</span>}
+          {!big && <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />}
         </div>
       </div>
-      <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />
+      {big && <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />}
       {m.faceit_level && !m.tier ? <FaceitLevel level={m.faceit_level} /> : null}
       {showReady &&
         (m.ready ? (
