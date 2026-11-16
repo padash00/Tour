@@ -126,8 +126,8 @@ export function SiteSidebar() {
       {activity && <MyMatchCard activity={activity} more={moreActivity} />}
 
       {GROUPS.map((g) => (
-        <nav key={g.title} className="flex flex-col gap-0.5" aria-label={t(g.title)}>
-          <div className="px-3 pb-1.5 text-[12px] font-bold uppercase tracking-[0.06em] text-fg-4">{t(g.title)}</div>
+        <nav key={g.title} className="flex flex-col gap-px" aria-label={t(g.title)}>
+          <div className="px-3 pb-1 text-[11.5px] font-bold uppercase tracking-[0.08em] text-fg-4">{t(g.title)}</div>
           {g.items.map((item) => {
             const active = navActive(pathname, item);
             return (
@@ -135,15 +135,18 @@ export function SiteSidebar() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                title={t(item.hint)}
                 className={cn(
-                  "flex items-center gap-3 rounded-control px-3 py-2 transition-colors duration-[var(--dur-hover)]",
-                  active ? "bg-accent-dim text-fg" : "text-fg-2 hover:bg-surface-2 hover:text-fg",
+                  // одна строка на пункт: всё меню помещается в экран без прокрутки; пояснение — в подсказке и у открытого раздела
+                  "relative flex items-center gap-3 rounded-control px-3 transition-colors duration-[var(--dur-hover)]",
+                  active ? "bg-accent-dim py-2 text-fg" : "py-[9px] text-fg-2 hover:bg-surface-2 hover:text-fg",
                 )}
               >
-                <item.Icon className={cn("size-[22px] shrink-0", active ? "text-accent" : "text-fg-3")} />
+                {active && <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-accent" />}
+                <item.Icon className={cn("size-5 shrink-0", active ? "text-accent" : "text-fg-3")} />
                 <span className="min-w-0">
-                  <span className="block text-[15.5px] font-semibold leading-tight">{t(item.label)}</span>
-                  <span className="block truncate text-[12.5px] leading-snug text-fg-3">{t(item.hint)}</span>
+                  <span className="block truncate text-[15px] font-semibold leading-tight">{t(item.label)}</span>
+                  {active && <span className="mt-0.5 block text-[12px] leading-snug text-fg-3">{t(item.hint)}</span>}
                 </span>
               </Link>
             );
