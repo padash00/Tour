@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentPlayer } from "@/lib/auth";
 import { cupTeams } from "@/lib/cup-core";
+import { playersNeeded } from "@/lib/lobby-settings";
 import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
@@ -33,7 +34,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
   const player = await getCurrentPlayer();
   const [{ rows, evenings, matches }, lobbies, mine] = await Promise.all([twentyRating({ code }), listOpenLobbies(), player ? playerLobby(player.id) : null]);
-  const open = lobbies.filter((l) => cupTeams(l.settings.players) > 0);
+  // игры на банк («Десятка») и большие лобби; комнаты отдельных матчей сетки не показываем — в них ведёт само лобби
+  const open = lobbies.filter((l) => (l.settings.pot || cupTeams(l.settings.players) > 0) && !l.settings.cup_of);
   const king = rows[0];
 
   return (
@@ -44,7 +46,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
           <p className="mt-1 max-w-read text-meta text-fg-3">
             {code
               ? t("Все игроки этого вечера по сыгранным картам. Рейтинг 1.00 — средний игрок.")
-              : t("Большие лобби на 20, 30 и 40 игроков: капитаны разбирают игроков, команды играют сетку. Здесь общий рейтинг всех таких игр — кто король.")}
+              : t("Игры на банк: «Десятка» и большие лобби на 20, 30 и 40 игроков. Капитаны разбирают игроков, команды играют между собой. Здесь такие игры создаются, и здесь общий рейтинг — кто король.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -67,7 +69,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
                     <span className="num text-fg-3">#{l.code}</span> {l.host.nickname}
                   </span>
                   <span className="block text-meta text-fg-3">
-                    {t("{n} игроков", { n: l.settings.players })} · BO{l.settings.best_of} · {l.status === "playing" ? t("идёт игра") : t("набор: {have} из {need}", { have: l.pool, need: l.settings.players })}
+                    {t("{n} игроков", { n: playersNeeded(l.settings) })} · BO{l.settings.best_of} · {l.status === "playing" ? t("идёт игра") : t("набор: {have} из {need}", { have: l.pool, need: playersNeeded(l.settings) })}
                   </span>
                 </span>
                 <span className={cn("shrink-0 text-meta font-medium", l.status === "playing" ? "text-live" : "text-accent")}>{l.status === "playing" ? t("Смотреть") : t("Войти")}</span>

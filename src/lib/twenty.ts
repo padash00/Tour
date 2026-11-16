@@ -1,7 +1,7 @@
 import { db } from "./supabase";
 
 /*
- * «Двадцатка»: общий рейтинг игроков по матчам больших лобби (20, 30 и 40 игроков — сетка команд по пять).
+ * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
  * Считается по всем сыгранным картам таких лобби; с кодом лобби — только по одному вечеру.
  * Формула — та же база, что у рейтинга турниров (аппроксимация HLTV 2.0): средний игрок ≈ 1.00.
  */
@@ -52,7 +52,7 @@ type GameRow = { id: string; winner: number | null; finished_at: string | null; 
 type StatRow = { game_id: string; steam_id: string; name: string | null; team: number; kills: number; deaths: number; assists: number; damage: number; headshot_kills: number; rounds_played: number; kast: number; mvp: number; clutch_wins: number };
 
 export async function twentyRating(opts: { code?: string } = {}): Promise<{ rows: TwentyRow[]; evenings: TwentyEvening[]; matches: number }> {
-  let q = db().from("lobby_games").select("id, winner, finished_at, settings").eq("status", "finished").not("settings->>cup_of", "is", null).order("finished_at", { ascending: false }).limit(600);
+  let q = db().from("lobby_games").select("id, winner, finished_at, settings").eq("status", "finished").or("settings->>pot.eq.true,settings->>cup_of.not.is.null").order("finished_at", { ascending: false }).limit(600);
   if (opts.code) q = q.eq("settings->cup_of->>code", opts.code);
   const { data } = await q;
   const games = (data ?? []) as unknown as GameRow[];

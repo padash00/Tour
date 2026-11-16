@@ -10,7 +10,7 @@ import { getT } from "@/lib/i18n/server";
 import { tr } from "@/lib/i18n/core";
 import { LiveRefresh } from "@/components/live-refresh";
 import { CreateLobbyButton } from "@/components/lobby/create-lobby";
-import { CreatePotButton, TierBadge } from "@/components/lobby/pot";
+import { TierBadge } from "@/components/lobby/pot";
 import { playersNeeded, potBank } from "@/lib/lobby-settings";
 import { cupTeams } from "@/lib/cup-core";
 import { MapThumb } from "@/components/lobby/settings";
@@ -25,6 +25,7 @@ import {
   Status,
   lobbyStatus,
   cn,
+  buttonClass,
 } from "@/components/ds";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,10 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
 
   const player = await getCurrentPlayer();
   // приватные лобби в общем списке не показываем никому, кроме админа
-  const [lobbies, images] = await Promise.all([listOpenLobbies({ admin: isAdmin(player) }), getMapImages()]);
+  const [allLobbies, images] = await Promise.all([listOpenLobbies({ admin: isAdmin(player) }), getMapImages()]);
+  // здесь только обычные игры: игры на банк и большие лобби с их матчами живут в разделе «Двадцатка»
+  const lobbies = allLobbies.filter((l) => !l.settings.pot && cupTeams(l.settings.players) === 0 && !l.settings.cup_of);
+  const twentyOpen = allLobbies.length - lobbies.length;
   const mine = player ? await playerLobby(player.id) : null;
 
   const normalized = q.toLocaleLowerCase("ru");
@@ -94,12 +98,14 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
           <div>
             <PageTitle>{t("Лобби")}</PageTitle>
             <p className="mt-1 max-w-read text-meta text-fg-3">
-              {t("Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя.")}
+              {t("Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя. Игры на банк и большие лобби на 20–40 игроков — в разделе «Двадцатка».")}
             </p>
           </div>
           {!mine && (
             <div className="flex flex-wrap gap-2">
-              <CreatePotButton loggedIn={!!player} />
+              <Link href="/twenty" className={buttonClass("secondary", "md")}>
+                {twentyOpen > 0 ? t("Двадцатка · идёт: {n}", { n: twentyOpen }) : t("Двадцатка")}
+              </Link>
               <CreateLobbyButton loggedIn={!!player} />
             </div>
           )}
