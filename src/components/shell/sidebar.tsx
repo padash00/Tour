@@ -30,7 +30,7 @@ export const GROUPS: { title: string; items: SideItem[] }[] = [
       { href: "/tournaments", label: tr("Турниры"), hint: tr("заявки, сетка, итоги"), match: ["/tournaments"], Icon: Trophy },
       { href: "/matches", label: tr("Матчи"), hint: tr("счёт и расписание"), match: ["/matches"], Icon: Crosshair },
       { href: "/lobbies", label: tr("Лобби"), hint: tr("сыграть без турнира"), match: ["/lobbies", "/lobby"], Icon: Users },
-      { href: "/twenty", label: tr("Двадцатка"), hint: tr("большие лобби и рейтинг игроков"), match: ["/twenty"], Icon: Crown },
+      { href: "/twenty", label: tr("Двадцатка"), hint: tr("игры на банк и рейтинг"), match: ["/twenty"], Icon: Crown },
       { href: "/analysis", label: tr("Разбор игры"), hint: tr("повторы, как играют про, ИИ-тренер"), match: ["/analysis"], Icon: ScanSearch },
     ],
   },
