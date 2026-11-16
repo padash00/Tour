@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Copy, Headphones } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, buttonClass, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
 import { useToast } from "./toast";
@@ -12,12 +12,30 @@ import { useToast } from "./toast";
  * «Войти» открывает программу TeamSpeak сразу на нашем сервере (ссылка ts3server://), рядом — копирование адреса.
  */
 
+/** Сколько человек сейчас на сервере — отдаёт сам сервер TeamSpeak клуба (обновляется раз в полминуты) */
+const STATUS_URL = "https://ts.f16-arena.kz/status.json";
+
 export const teamspeakLink = (address: string) => `ts3server://${address}`;
 
 export function VoiceCard({ address, wide, className }: { address: string; wide?: boolean; className?: string }) {
   const t = useT();
   const toast = useToast();
   const [copied, setCopied] = useState(false);
+  const [online, setOnline] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetch(STATUS_URL, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((s: { online?: unknown } | null) => alive && typeof s?.online === "number" && setOnline(s.online))
+        .catch(() => {});
+    load();
+    const id = setInterval(load, 30000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
   const copy = () =>
     navigator.clipboard.writeText(address).then(
       () => {
@@ -37,6 +55,7 @@ export function VoiceCard({ address, wide, className }: { address: string; wide?
           <div className="text-[15px] font-semibold text-fg">{t("Голосовая связь — TeamSpeak")}</div>
           <div className="mt-0.5 text-meta text-fg-2">
             {t("Сервер клуба для команд:")} <span className="num font-semibold text-fg">{address}</span>
+            {online !== null && online > 0 && <span className="num text-ok"> · {t("сейчас в сети: {n}", { n: online })}</span>}
           </div>
         </div>
       </div>
