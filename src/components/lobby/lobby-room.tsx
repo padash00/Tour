@@ -247,10 +247,11 @@ export function LobbyRoom({
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="num text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">{t("Лобби #{code}", { code: lobby.code })}</h1>
+                      {/* заголовок лежит на фото карты под тёмной подложкой — он всегда белый, иначе в светлой теме его не прочитать */}
+                      <h1 className="num text-[24px] font-bold tracking-[-0.02em] text-white [text-shadow:0_1px_8px_rgb(0_0_0/0.6)] sm:text-[30px]">{t("Лобби #{code}", { code: lobby.code })}</h1>
                       <Status info={lobbyStatus[phase]} size="sm" />
                     </div>
-                    <p className="mt-1 truncate text-meta text-fg-2">
+                    <p className="mt-1 truncate text-meta font-medium text-white/85 [text-shadow:0_1px_6px_rgb(0_0_0/0.6)]">
                       {mapLabel(headMap)} · {lobby.visibility === "public" ? t("открытое") : lobby.visibility === "closed" ? t("по паролю") : t("приватное")}
                     </p>
                   </div>
