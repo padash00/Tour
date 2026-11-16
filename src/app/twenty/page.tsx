@@ -7,10 +7,10 @@ import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { TWENTY_MIN_MAPS, twentyRating } from "@/lib/twenty";
-import { Avatar, Button, Container, EmptyState, PageTitle, Panel, Section, cn } from "@/components/ds";
+import { Avatar, Button, Container, EmptyState, PageTitle, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { CreatePotButton } from "@/components/lobby/pot";
-import { DATA_TABLE, NUM_CELL, RankBadge, RatingBar } from "@/components/public/data-table";
+import { DATA_TABLE, NUM_CELL, RankBadge, tableBox } from "@/components/public/data-table";
 
 export const dynamic = "force-dynamic";
 
@@ -138,58 +138,73 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             </div>
           </div>
 
-          <Section title={t("Все игроки")} description={code ? t("Матчей в лобби: {n}", { n: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}>
-            <Panel padded={false} className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className={cn(DATA_TABLE, "min-w-[720px]")}>
-                  <thead>
-                    <tr>
-                      <th className="w-14">#</th>
-                      <th>{t("Игрок")}</th>
-                      {[t("Карт"), t("Побед"), "K/D", "ADR", "HS%", "MVP"].map((h) => (
-                        <th key={h} className="w-[84px] !text-right">
-                          {h}
-                        </th>
-                      ))}
-                      <th className="w-[120px] !text-right">{t("Рейтинг")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r, i) => {
-                      const me = player?.steam_id === r.steam_id;
-                      return (
-                        <tr key={r.steam_id} className={cn(me && "bg-accent-dim/60")}>
-                          <td>
-                            <RankBadge n={i + 1} />
-                          </td>
-                          <td>
-                            <Link href={`/players/${r.steam_id}`} className="flex min-w-0 items-center gap-3 font-medium text-fg hover:text-accent">
-                              <Avatar src={r.avatar_url} name={r.nickname} size="sm" />
-                              <span className="truncate">{r.nickname}</span>
-                              {i === 0 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
-                              {me && <span className="shrink-0 rounded-chip bg-accent px-1.5 py-0.5 text-micro font-semibold text-accent-ink">{t("вы")}</span>}
-                            </Link>
-                          </td>
-                          <td className={NUM_CELL}>{r.maps}</td>
-                          <td className={NUM_CELL}>
-                            {r.wins}/{r.matches}
-                          </td>
-                          <td className={cn(NUM_CELL, r.kd >= 1 ? "text-ok" : "text-fg-2")}>{r.kd.toFixed(2)}</td>
-                          <td className={NUM_CELL}>{Math.round(r.adr)}</td>
-                          <td className={NUM_CELL}>{Math.round(r.hsPct)}%</td>
-                          <td className={NUM_CELL}>{r.mvp}</td>
-                          <td className={cn(NUM_CELL, r.rating >= 1.15 ? "text-ok" : r.rating < 0.9 ? "text-fg-3" : "text-fg")}>
-                            <span className="text-[16px] font-extrabold">{r.rating.toFixed(2)}</span>
-                            <RatingBar value={r.rating} className="mt-1" />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-          </Section>
+          <section aria-label={t("Все игроки")}>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-title text-fg">{t("Все игроки")}</h2>
+              <p className="text-meta text-fg-3">{code ? t("Матчей в лобби: {n}", { n: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}</p>
+            </div>
+            {/* одна белая карточка, как в «Рейтинге»: без серой подложки внутри, первые три места подсвечены */}
+            <div className={tableBox()}>
+              <table className={cn(DATA_TABLE, "min-w-[820px]")}>
+                <thead>
+                  <tr>
+                    <th className="w-14">#</th>
+                    <th>{t("Игрок")}</th>
+                    {[t("Карт"), t("Побед"), t("У–С"), "±", "K/D", "ADR", "HS%", "MVP"].map((h) => (
+                      <th key={h} className="w-[78px] !text-right">
+                        {h}
+                      </th>
+                    ))}
+                    <th className="w-[104px] !text-right">{t("Рейтинг")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const me = player?.steam_id === r.steam_id;
+                    const diff = r.kills - r.deaths;
+                    return (
+                      <tr key={r.steam_id} className={cn(me ? "bg-accent-dim/70" : i === 0 ? "bg-gold/[0.07]" : i < 3 ? "bg-ink/[0.02]" : undefined)}>
+                        <td>
+                          <RankBadge n={i + 1} />
+                        </td>
+                        <td>
+                          <Link href={`/players/${r.steam_id}`} className="flex min-w-0 items-center gap-3 text-fg hover:text-accent">
+                            <Avatar src={r.avatar_url} name={r.nickname} size="sm" />
+                            <span className={cn("truncate", i < 3 ? "text-[16px] font-bold" : "font-semibold")}>{r.nickname}</span>
+                            {i === 0 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
+                            {me && <span className="shrink-0 rounded-chip bg-accent px-1.5 py-0.5 text-micro font-semibold text-accent-ink">{t("вы")}</span>}
+                          </Link>
+                        </td>
+                        <td className={NUM_CELL}>{r.maps}</td>
+                        <td className={NUM_CELL}>
+                          <span className={cn(r.wins > 0 && "font-semibold text-fg")}>{r.wins}</span>
+                          <span className="text-fg-4">/{r.matches}</span>
+                        </td>
+                        <td className={NUM_CELL}>
+                          {r.kills}–{r.deaths}
+                        </td>
+                        <td className={cn(NUM_CELL, "font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "text-fg-3")}>{diff > 0 ? `+${diff}` : diff}</td>
+                        <td className={cn(NUM_CELL, r.kd >= 1 ? "text-fg" : "text-fg-3")}>{r.kd.toFixed(2)}</td>
+                        <td className={NUM_CELL}>{Math.round(r.adr)}</td>
+                        <td className={NUM_CELL}>{Math.round(r.hsPct)}%</td>
+                        <td className={NUM_CELL}>{r.mvp}</td>
+                        <td className="text-right">
+                          <span
+                            className={cn(
+                              "num inline-flex min-w-[60px] justify-center rounded-chip px-2.5 py-1 text-[15px] font-extrabold",
+                              r.rating >= 1.15 ? "bg-ok/15 text-ok" : r.rating >= 1 ? "bg-accent-dim text-fg" : "bg-ink/[0.05] text-fg-3",
+                            )}
+                          >
+                            {r.rating.toFixed(2)}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       ) : (
         <>
