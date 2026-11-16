@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, Home, MessagesSquare, ScanSearch, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
+import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, Headphones, Home, MessagesSquare, ScanSearch, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
@@ -41,6 +41,7 @@ export const GROUPS: { title: string; items: SideItem[] }[] = [
       { href: "/teams", label: tr("Команды"), hint: tr("составы и капитаны"), match: ["/teams", "/team", "/join"], Icon: Shield },
       { href: "/find", label: tr("Поиск команды"), hint: tr("найти тиммейтов"), match: ["/find"], Icon: Search },
       { href: "/chat", label: tr("Чат"), hint: tr("общение игроков"), match: ["/chat"], Icon: MessagesSquare },
+      { href: "/teamspeak", label: "TeamSpeak", hint: tr("голосовая связь команд"), match: ["/teamspeak"], Icon: Headphones },
       { href: "/players", label: tr("Игроки"), hint: tr("все игроки сайта"), match: ["/players"], Icon: UserRound },
     ],
   },

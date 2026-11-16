@@ -21,6 +21,7 @@ export const SECONDARY_NAV: { href: string; label: string }[] = [
   { href: "/find", label: tr("Поиск команды") },
   { href: "/chat", label: tr("Чат") },
   { href: "/tg", label: tr("Telegram-чат") },
+  { href: "/teamspeak", label: "TeamSpeak" },
   { href: "/about", label: tr("О платформе") },
   { href: "/help", label: tr("Как это работает") },
   { href: "/rules", label: tr("Правила") },

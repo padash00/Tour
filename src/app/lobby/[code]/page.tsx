@@ -7,6 +7,7 @@ import { siteOrigin } from "@/lib/origin";
 import { lobbyMapCatalog } from "@/lib/lobby";
 import { buildLobbyView } from "@/lib/lobby-view";
 import { LobbyRoom } from "@/components/lobby/lobby-room";
+import { getVoiceAddress } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function LobbyPage(props: PageProps<"/lobby/[code]">) {
   const invite = typeof sp.t === "string" ? sp.t : null;
   const player = await getCurrentPlayer();
   const [view, maps, templates] = await Promise.all([buildLobbyView(code, player, { admin: isAdmin(player) }), lobbyMapCatalog(), myTemplates()]);
+  const voice = await getVoiceAddress();
   if (!view) notFound();
-  return <LobbyRoom code={view.lobby.code} initial={view} maps={maps} templates={templates} invite={invite} origin={await siteOrigin()} />;
+  return <LobbyRoom code={view.lobby.code} initial={view} maps={maps} templates={templates} invite={invite} origin={await siteOrigin()} voice={voice} />;
 }

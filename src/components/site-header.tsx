@@ -46,6 +46,9 @@ export async function SiteFooter() {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Logo height={22} />
             <span className="text-meta text-fg-3">{t("Турниры и лобби по CS2 на серверах клуба F16 Arena")} · © {new Date().getFullYear()}</span>
+            <Link href="/teamspeak" className="text-meta text-fg-3 transition-colors hover:text-fg">
+              {t("Голосовая связь — TeamSpeak")}
+            </Link>
           </div>
           <nav aria-label={t("Помощь")} className="flex flex-wrap gap-x-5 gap-y-1">
             {SECONDARY_NAV.map((i) => (

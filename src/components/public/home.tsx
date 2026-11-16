@@ -8,6 +8,7 @@ import { modeOf } from "@/lib/modes";
 import { tr, type T } from "@/lib/i18n/core";
 import { getT } from "@/lib/i18n/server";
 import { tournamentForLang } from "@/lib/tournament-kk";
+import { VoiceBlock } from "@/components/voice-block";
 import type { Tournament } from "@/lib/types";
 import { Button, CARD_SECTION, Container, Status, cn, tournamentStatus } from "@/components/ds";
 import { HomeMyMatch } from "./home-my-match";
@@ -290,6 +291,8 @@ export async function HomeView({ featured, approved, isFirst, upcoming, live = [
           <TeamCta />
         </div>
       </section>
+
+      <VoiceBlock wide />
 
       {live.length > 0 && (
         <section className={CARD_SECTION}>

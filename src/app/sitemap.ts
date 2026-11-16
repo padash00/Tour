@@ -19,6 +19,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ["/find", 0.5, "daily"],
       ["/rules", 0.5, "monthly"],
       ["/help", 0.5, "monthly"],
+      ["/teamspeak", 0.4, "monthly"],
       ["/about", 0.4, "monthly"],
     ] as const
   ).map(([p, priority, changeFrequency]) => ({ url: `${SITE_URL}${p}`, lastModified: now, priority, changeFrequency }));

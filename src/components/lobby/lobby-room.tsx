@@ -8,6 +8,7 @@ import type { LobbyView, ViewMember } from "@/lib/lobby-view";
 import type { LobbySettings } from "@/lib/lobby-settings";
 import { mapLabel } from "@/lib/maps";
 import { useToast } from "../toast";
+import { VoiceCard } from "../voice";
 import { AdvancedSettings, MapThumb, QuickSettings, type MapOption, type Template } from "./settings";
 import { Button, Status, Steps, lobbyStatus, buttonClass as btnClass, cn } from "@/components/ds";
 import { Icon } from "./ui";
@@ -81,6 +82,7 @@ export function LobbyRoom({
   templates: initialTemplates,
   invite,
   origin,
+  voice,
 }: {
   code: string;
   initial: LobbyView;
@@ -89,6 +91,8 @@ export function LobbyRoom({
   invite: string | null;
   /** адрес сайта для ссылки-приглашения (с сервера — разметка совпадает) */
   origin: string;
+  /** адрес сервера TeamSpeak клуба; null — блок голосовой связи скрыт */
+  voice?: string | null;
 }) {
   const t = useT();
   const router = useRouter();
@@ -433,6 +437,7 @@ export function LobbyRoom({
                 )}
               </div>
             )}
+            {voice && <VoiceCard address={voice} className="mt-5" />}
           </aside>
         </div>
       </div>

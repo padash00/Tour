@@ -33,6 +33,11 @@ export const SETTINGS = {
     secret: false,
     hint: "Публичный адрес пересылки (VPS 185.113.132.3), без порта. Лобби с сетью «Интернет» и онлайн-турниры дают игрокам этот адрес, LAN-лобби и турниры в клубе — адрес выше. Пусто — интернет-лобби тоже получают адрес клуба.",
   },
+  TEAMSPEAK_ADDRESS: {
+    label: "Адрес сервера TeamSpeak",
+    secret: false,
+    hint: "Имя или IP сервера голосовой связи, без порта и без ts3server:// — например, f16-arena.kz. Показывается в комнате лобби, на странице матча, на главной и на странице «TeamSpeak». Пусто — блок голосовой связи скрыт.",
+  },
   BACKUP_RETENTION_DAYS: {
     label: "Сколько дней хранить бэкапы раундов",
     secret: false,
@@ -83,6 +88,12 @@ export async function getSettingsStatus() {
       preview: !value ? "" : SETTINGS[key].secret ? `••••${value.slice(-4)}` : value,
     };
   });
+}
+
+/** Адрес сервера TeamSpeak клуба для блока «Голосовая связь»; null — блок скрыт */
+export async function getVoiceAddress(): Promise<string | null> {
+  const v = ((await getSetting("TEAMSPEAK_ADDRESS")) ?? "").trim();
+  return /^[a-z0-9.-]{1,253}$/i.test(v) ? v : null;
 }
 
 /** Сколько турнирных матчей может идти на серверах одновременно (места в зале). null — без ограничения */

@@ -33,6 +33,7 @@ import { MatchHero } from "@/components/competition/match-hero";
 import { MatchExplain } from "@/components/competition/match-explain";
 import { MatchServerPanel, VetoSummary } from "@/components/competition/match-side";
 import { CopyConnect } from "@/components/copy-connect";
+import { VoiceBlock } from "@/components/voice-block";
 import { VetoBoard } from "@/components/competition/veto-board";
 import { MatchProgress } from "@/components/competition/match-progress";
 import { MobileStickyCta } from "@/components/public/callout";
@@ -508,6 +509,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
           </div>
           <aside className="flex flex-col gap-4 lg:sticky lg:top-[calc(var(--shell-h)+16px)]" aria-label={t("Сервер и карта")}>
             <MatchServerPanel m={m} participant={participant} serverNow={serverNow} />
+            {!["finished", "cancelled"].includes(m.status) && <VoiceBlock />}
             {m.status !== "veto" && <VetoSummary m={m} />}
             <section className="rounded-surface border border-line-subtle bg-surface p-5" aria-label={t("О матче")}>
               <h2 className="text-heading text-fg">{t("О матче")}</h2>
