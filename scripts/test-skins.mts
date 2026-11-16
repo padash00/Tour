@@ -107,6 +107,14 @@ try {
   assert.deepEqual(rows.get(ME), { skins: [{ t: 3, d: 7, p: 1449, w: 0.01, s: 0, n: null, st: 0 }], knife: {}, gloves: { 2: 5030 } });
   ok("Plugin database rows: wear is rounded, default knife and unpainted weapons are skipped, junk rows ignored");
 
+  // известный пример: M4A1-S (60), раскраска 440, шаблон 353, износ ≈0.00541, редкость 5
+  const bits = 0x69 + 0x23 * 2 ** 7 + 0x45 * 2 ** 14 + 0x5d * 2 ** 21 + 0x03 * 2 ** 28;
+  const wearF = new Float32Array(new Uint32Array([bits]).buffer)[0];
+  assert.equal(core.inspectHex({ d: 60, p: 440, w: wearF, s: 353, rarity: 5 }), "00183C20B803280538E9A3C5DD0340E102C246A0D1");
+  assert.ok(core.inspectLink({ d: 7, p: 302, w: 0.5, s: 1, st: 1, n: "F16" }).startsWith("steam://rungame/730/76561202255233023/+csgo_econ_action_preview%2000"));
+  assert.deepEqual([core.sideOnly(7), core.sideOnly(16), core.sideOnly(9)], [2, 3, null]);
+  ok("In-game inspect link matches the known example; AK-47 is T only, M4A4 is CT only, AWP is for both");
+
   console.log(`\n${checks} skin checks passed`);
 } finally {
   await sql.close();

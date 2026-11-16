@@ -154,6 +154,57 @@ export function wearBlend(w: number): [number, number] {
   return [c(w / 0.3), c((w - 0.3) / 0.4)];
 }
 
+// ───────────────────────── осмотр в игре
+// CS2 открывает осмотр любого предмета по ссылке с его описанием (CEconItemPreviewDataBlock, protobuf):
+// байт-ключ 00, поля, контрольная сумма. Формат проверен тестом на известном примере.
+
+function varint(n: number): number[] {
+  const out: number[] = [];
+  let v = Math.floor(n);
+  while (v >= 128) {
+    out.push((v % 128) | 128);
+    v = Math.floor(v / 128);
+  }
+  out.push(v);
+  return out;
+}
+
+function crc32(bytes: number[]): number {
+  let c = 0xffffffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let i = 0; i < 8; i++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+export type InspectItem = { d: number; p: number; w: number; s: number; st?: 0 | 1; n?: string | null; rarity?: number; quality?: number };
+
+/** Описание предмета для осмотра — шестнадцатеричная строка */
+export function inspectHex(item: InspectItem): string {
+  const bits = new Uint32Array(new Float32Array([item.w]).buffer)[0];
+  const field = (no: number, v: number) => [...varint(no * 8), ...varint(v)];
+  const proto: number[] = [...field(3, item.d), ...field(4, item.p)];
+  if (item.rarity) proto.push(...field(5, item.rarity));
+  if (item.quality) proto.push(...field(6, item.quality));
+  proto.push(...field(7, bits), ...field(8, item.s));
+  if (item.st) proto.push(...field(9, 0), ...field(10, 0));
+  if (item.n) {
+    const name = [...new TextEncoder().encode(item.n)];
+    proto.push(...varint(11 * 8 + 2), ...varint(name.length), ...name);
+  }
+  const buf = [0, ...proto];
+  const crc = crc32(buf);
+  const sum = (((crc & 0xffff) ^ ((proto.length * crc) % 4294967296)) >>> 0);
+  const tail = [sum >>> 24, (sum >>> 16) & 255, (sum >>> 8) & 255, sum & 255];
+  return [...buf, ...tail].map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+/** Ссылка, по которой Steam открывает CS2 на осмотре этого предмета */
+export function inspectLink(item: InspectItem): string {
+  return `steam://rungame/730/76561202255233023/+csgo_econ_action_preview%20${inspectHex(item)}`;
+}
+
 /** public/skins/wear/<defindex>.json: раскраска → одна или три картинки по износу */
 export type WearImages = { base: string; paints: Record<string, string[]> };
 

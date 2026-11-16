@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { Check, Crosshair, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition, type PointerEvent, type ReactNode } from "react";
 import { resetAllSkins, saveSkins } from "@/app/actions/skins";
-import { Button, Callout, Checkbox, ConfirmDialog, Dialog, Field, Input, SearchInput, Segmented, Select, Toggle, cn } from "@/components/ds";
+import { buttonClass, Button, Callout, Checkbox, ConfirmDialog, Dialog, Field, Input, SearchInput, Segmented, Select, Toggle, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
 import {
   DEFAULT_KNIFE,
   NAMETAG_MAX,
   SEED_MAX,
   WEAR_DEFAULT,
+  inspectLink,
   sideOnly,
   wearBlend,
   wearName,
@@ -337,14 +338,30 @@ function Picker({
         </>
       }
     >
-      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="flex min-h-[220px] flex-col rounded-surface border border-line-subtle bg-shell bg-[radial-gradient(circle,var(--color-line)_1px,transparent_1px)] bg-[length:18px_18px] p-4 md:min-h-[320px]">
-          <div className="relative min-h-0 flex-1">
-            {paint > 0 && layers ? <WearShot layers={layers} wear={wear} alt={picked?.name ?? ""} /> : baseImage ? <div className="absolute inset-0"><Shot src={baseImage} alt={picked?.name ?? ""} dim={paint === 0 && slot.kind === "weapon"} /></div> : null}
-          </div>
-          <div className="mt-3 flex items-baseline justify-between gap-3">
-            <div className="min-w-0 truncate text-[15px] font-semibold text-fg">{paint > 0 && picked ? picked.name : slot.kind === "weapon" ? t("Выберите раскраску ниже") : (weapon?.name ?? glove?.name ?? "")}</div>
-            {paint > 0 && <div className="num shrink-0 text-meta text-fg-2">{t(wearName(wear))}</div>}
+      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-h-[260px] flex-col rounded-surface border border-line-subtle bg-shell bg-[radial-gradient(circle,var(--color-line)_1px,transparent_1px)] bg-[length:18px_18px] p-4 md:min-h-[420px]">
+          <Stage>
+            {paint > 0 && layers ? <WearShot layers={layers} wear={wear} alt={picked?.name ?? ""} /> : baseImage ? <Shot src={baseImage} alt={picked?.name ?? ""} dim={paint === 0 && slot.kind === "weapon"} /> : null}
+          </Stage>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-[17px] font-semibold text-fg">{paint > 0 && picked ? picked.name : slot.kind === "weapon" ? t("Выберите раскраску ниже") : (weapon?.name ?? glove?.name ?? "")}</div>
+              {paint > 0 && (
+                <div className="num mt-0.5 text-meta text-fg-2">
+                  {t(wearName(wear))} · {wear.toFixed(3)}
+                </div>
+              )}
+            </div>
+            {paint > 0 && slot.kind !== "glove" && (
+              <a
+                href={inspectLink({ d: model, p: paint, w: wear, s: seedNum, st: stattrak ? 1 : 0, n: nametag.trim() || null, quality: slot.kind === "knife" ? 3 : stattrak ? 9 : 4 })}
+                title={t("Откроется CS2 с этим скином: там его можно вращать и рассматривать со всех сторон")}
+                className={buttonClass("secondary", "md")}
+              >
+                <Crosshair className="size-4" />
+                {t("Осмотреть в игре")}
+              </a>
+            )}
           </div>
         </div>
 
@@ -381,12 +398,26 @@ function Picker({
               className="absolute inset-0 w-full cursor-pointer appearance-none bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-elevated [&::-moz-range-thumb]:bg-fg [&::-moz-range-track]:bg-transparent [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-elevated [&::-webkit-slider-thumb]:bg-fg [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_var(--color-line-strong)]"
             />
           </div>
-          <div className="num mt-1 flex text-micro text-fg-3">
-            {WEAR_BANDS.map((b) => (
-              <span key={b.k} style={{ width: `${b.w}%` }} className={cn("truncate", wearShort(wear) === b.k && "font-semibold text-fg")}>
-                {b.k}
-              </span>
-            ))}
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
+            {WEAR_BANDS.map((b) => {
+              const on = wearShort(wear) === b.k;
+              return (
+                <button
+                  key={b.k}
+                  type="button"
+                  title={t(wearName(b.at))}
+                  aria-pressed={on}
+                  onClick={() => setWear(b.at)}
+                  className={cn(
+                    "num flex h-9 flex-col items-center justify-center rounded-control border text-micro font-semibold transition-[border-color,background-color,color]",
+                    on ? "border-line-strong bg-shell text-fg" : "border-line-subtle text-fg-3 hover:border-line-strong hover:text-fg",
+                  )}
+                >
+                  <span className="mb-1 h-1 w-5 rounded-full" style={{ background: b.c }} />
+                  {b.k}
+                </button>
+              );
+            })}
           </div>
 
           <div className="mt-4 grid gap-3">
@@ -426,7 +457,7 @@ function Picker({
       {paints.length > 0 && (
         <div className="mt-5">
           <SearchInput value={search} onChange={setSearch} placeholder={t("Поиск раскраски")} />
-          <div className="mt-3 grid max-h-[264px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-5 md:grid-cols-6">
+          <div className="mt-3 grid max-h-[300px] grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-2 overflow-y-auto p-0.5 pr-1.5">
             {slot.kind === "knife" && !q && (
               <PaintCard name={t("Без раскраски")} image={weapon ? `${img}${weapon.w}.png` : ""} on={paint === 0} onClick={() => setPaint(0)} />
             )}
@@ -445,11 +476,11 @@ function Picker({
 
 // полоса износа как в игре: доли шкалы 0…1 по названиям
 const WEAR_BANDS = [
-  { k: "FN", w: 7, c: "#2ebd85" },
-  { k: "MW", w: 8, c: "#8fce3f" },
-  { k: "FT", w: 23, c: "#f2c230" },
-  { k: "WW", w: 7, c: "#f08a34" },
-  { k: "BS", w: 55, c: "#e5484d" },
+  { k: "FN", w: 7, c: "#2ebd85", at: 0.01 },
+  { k: "MW", w: 8, c: "#8fce3f", at: 0.1 },
+  { k: "FT", w: 23, c: "#f2c230", at: 0.25 },
+  { k: "WW", w: 7, c: "#f08a34", at: 0.41 },
+  { k: "BS", w: 55, c: "#e5484d", at: 0.7 },
 ];
 
 /** Картинка, которая стареет вместе с float: слои «поношенный» и «закалённый в боях» проступают поверх чистого */
@@ -475,16 +506,44 @@ function WearShot({ layers, wear, alt }: { layers: string[]; wear: number; alt: 
   );
 }
 
+/** Сцена: оружие наклоняется за курсором — видно объём. Настоящее вращение — в игре, по кнопке «Осмотреть в игре» */
+function Stage({ children }: { children: ReactNode }) {
+  const [tilt, setTilt] = useState<{ x: number; y: number } | null>(null);
+  const move = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTilt({ x: (e.clientX - r.left) / r.width - 0.5, y: (e.clientY - r.top) / r.height - 0.5 });
+  };
+  return (
+    <div className="relative min-h-0 flex-1" style={{ perspective: 900 }} onPointerMove={move} onPointerLeave={() => setTilt(null)}>
+      <div
+        className="absolute inset-2 transition-transform duration-200 ease-out will-change-transform motion-reduce:!transform-none"
+        style={{ transform: tilt ? `rotateY(${(tilt.x * 34).toFixed(1)}deg) rotateX(${(-tilt.y * 22).toFixed(1)}deg) scale(1.05)` : undefined, filter: "drop-shadow(0 18px 18px rgb(0 0 0 / 0.18))" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function PaintCard({ name, image, on, onClick }: { name: string; image: string; on: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={cn("rounded-control border p-2 text-left transition-[border-color,background-color]", on ? "border-accent/60 bg-accent-dim" : "border-line-subtle bg-surface hover:border-line-strong")}
+      className={cn(
+        "group relative rounded-control border p-2 text-left transition-[border-color,background-color,box-shadow]",
+        on ? "border-accent bg-accent-dim shadow-[0_0_0_1px_var(--color-accent)]" : "border-line-subtle bg-surface hover:border-line-strong hover:bg-shell",
+      )}
     >
-      <div className="h-[56px]">{image ? <Shot src={image} alt="" /> : null}</div>
-      <div className="mt-1 truncate text-micro text-fg-2">{name}</div>
+      {on && (
+        <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-accent text-white">
+          <Check className="size-3" strokeWidth={3} />
+        </span>
+      )}
+      <div className="h-[68px] transition-transform duration-150 group-hover:scale-[1.06]">{image ? <Shot src={image} alt="" /> : null}</div>
+      <div className={cn("mt-1.5 truncate text-micro", on ? "font-semibold text-fg" : "text-fg-2")}>{name}</div>
     </button>
   );
 }

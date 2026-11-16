@@ -130,7 +130,7 @@ export function Dialog({
   const descriptionId = useId();
   const t = useT();
   if (!open || typeof document === "undefined") return null;
-  const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]", xl: "sm:max-w-[960px]" }[size];
+  const max = { sm: "sm:max-w-[400px]", md: "sm:max-w-[480px]", lg: "sm:max-w-[640px]", xl: "sm:max-w-[1180px]" }[size];
   return (
     <ModalLayer onClose={close} align="center">
       <div
