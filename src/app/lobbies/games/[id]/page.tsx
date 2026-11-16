@@ -44,13 +44,21 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
   if (!UUID.test(id)) notFound();
   const game = await getGame(id);
   if (!game) notFound();
+  const sp = await props.searchParams;
+  // какую карту показываем: 0 — весь матч
+  const mapParam = typeof sp.map === "string" ? Number(sp.map) : 0;
+  const onlyMap = Number.isInteger(mapParam) && mapParam >= 1 && mapParam <= game.maps.length ? mapParam : 0;
 
   const [{ data: lobby }, { data: rows }, images] = await Promise.all([
     db().from("lobbies").select("code").eq("id", game.lobby_id).maybeSingle(),
     db().from("lobby_player_stats").select("*").eq("game_id", game.id),
     getMapImages(),
   ]);
-  const stats = (rows ?? []) as Stat[];
+  const allStats = (rows ?? []) as Stat[];
+  // номера карт в статистике идут с нуля или с единицы — приводим к порядку карт серии
+  const base = allStats.length ? Math.min(...allStats.map((row) => row.map_number)) : 0;
+  const stats = onlyMap ? allStats.filter((row) => row.map_number - base + 1 === onlyMap) : allStats;
+  const cup = game.settings.cup_of;
 
   const total = new Map<string, Stat>();
   for (const row of stats) {
@@ -95,14 +103,31 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
       </div>
 
       <Container width="wide" className="space-y-10 py-10 sm:py-12">
-        <Section title={t("Карты")}>
+        <Section title={t("Карты")} description={game.maps.length > 1 ? t("Нажмите на карту — статистика только за неё") : undefined}>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {game.maps.map((map, i) => (
-              <MapThumb key={i} map={map.map} image={images[map.map]} className="h-24 rounded-surface border border-line-subtle">
-                <span className="absolute bottom-2 left-3 text-[14px] font-semibold">{mapLabel(map.map)}</span>
-                <span className="num absolute right-3 top-2 text-[18px] font-semibold">{map.team1_score}:{map.team2_score}</span>
-              </MapThumb>
+              <Link key={i} href={onlyMap === i + 1 ? `/lobbies/games/${game.id}` : `/lobbies/games/${game.id}?map=${i + 1}`} scroll={false} aria-current={onlyMap === i + 1 ? "true" : undefined}>
+                <MapThumb map={map.map} image={images[map.map]} className={cn("h-24 rounded-surface border transition-colors", onlyMap === i + 1 ? "border-accent" : "border-line-subtle hover:border-line-strong")}>
+                  <span className="absolute bottom-2 left-3 text-[14px] font-semibold">{mapLabel(map.map)}</span>
+                  <span className="num absolute right-3 top-2 text-[18px] font-semibold">{map.team1_score}:{map.team2_score}</span>
+                </MapThumb>
+              </Link>
             ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button href={`/lobbies/games/${game.id}`} variant={onlyMap ? "secondary" : "primary"} size="sm">
+              {t("Весь матч")}
+            </Button>
+            {game.maps.map((map, i) => (
+              <Button key={i} href={`/lobbies/games/${game.id}?map=${i + 1}`} variant={onlyMap === i + 1 ? "primary" : "secondary"} size="sm">
+                {mapLabel(map.map)}
+              </Button>
+            ))}
+            {cup?.code && (
+              <Button href={`/twenty?lobby=${cup.code}`} variant="ghost" size="sm" className="ml-auto">
+                {t("Рейтинг игроков этого лобби")}
+              </Button>
+            )}
           </div>
         </Section>
 

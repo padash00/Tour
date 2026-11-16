@@ -160,7 +160,12 @@ export function CupBracket({ cup, isHost, busy, run, code }: { cup: ViewCup; isH
   return (
     <section aria-label={t("Матчи")} className="rounded-surface border border-line-subtle bg-surface p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-title text-fg">{cup.format === "round" ? t("Круговая") : t("Сетка")}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-title text-fg">{cup.format === "round" ? t("Круговая") : t("Сетка")}</h2>
+          <Link href={`/twenty?lobby=${code}`} className={btnClass("quiet", "sm")}>
+            {t("Рейтинг игроков")}
+          </Link>
+        </div>
         {cup.state === "done" && cup.champion !== null && (
           <span className="rounded-control bg-accent-dim px-3 py-1.5 text-[14px] font-semibold text-accent">{t("Победитель — {name}", { name: cup.names[cup.champion] })}</span>
         )}
