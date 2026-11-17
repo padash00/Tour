@@ -24,13 +24,13 @@ export function heroMap(m: MatchFull) {
 }
 
 const STATUS: Record<MatchFull["status"], { label: string; cls: string }> = {
-  pending: { label: tr("Ждём соперника"), cls: "bg-white/90 text-fg-2" },
-  upcoming: { label: tr("Матч назначен"), cls: "bg-white/90 text-fg-2" },
-  veto: { label: tr("Выбор карт"), cls: "bg-white text-accent" },
-  ready: { label: tr("Ждём сервер"), cls: "bg-white text-warn" },
-  live: { label: tr("Идёт игра"), cls: "bg-white text-live" },
-  finished: { label: tr("Матч окончен"), cls: "bg-white/90 text-fg" },
-  cancelled: { label: tr("Матч отменён"), cls: "bg-white/90 text-danger" },
+  pending: { label: tr("Ждём соперника"), cls: "bg-surface/90 text-fg-2" },
+  upcoming: { label: tr("Матч назначен"), cls: "bg-surface/90 text-fg-2" },
+  veto: { label: tr("Выбор карт"), cls: "bg-surface text-accent" },
+  ready: { label: tr("Ждём сервер"), cls: "bg-surface text-warn" },
+  live: { label: tr("Идёт игра"), cls: "bg-surface text-live" },
+  finished: { label: tr("Матч окончен"), cls: "bg-surface/90 text-fg" },
+  cancelled: { label: tr("Матч отменён"), cls: "bg-surface/90 text-danger" },
 };
 
 export async function MatchHero({
@@ -50,7 +50,7 @@ export async function MatchHero({
   const map = heroMap(m);
   const liveMap = live ? m.maps.find((x) => x.status === "live") : undefined;
   const image = (map && mapImages[map.map_name]) || "/home/tournament.jpg";
-  const status = m.status === "ready" && m.server_state === "ready" ? { label: tr("Сервер готов"), cls: "bg-white text-ok" } : STATUS[m.status];
+  const status = m.status === "ready" && m.server_state === "ready" ? { label: tr("Сервер готов"), cls: "bg-surface text-ok" } : STATUS[m.status];
   // BO1 в игре — счёт раундов текущей карты; иначе — счёт серии по картам
   const roundsMain = live && m.best_of === 1 && !!liveMap;
   const s1 = roundsMain ? liveMap.team1_score : m.team1_score;
@@ -138,7 +138,7 @@ function Side({ team, align, winner, dim, t }: { team: Team | null; align: "left
     <div className={cn("flex min-w-0 flex-col items-center gap-2 text-center sm:flex-row sm:gap-5", align === "left" ? "sm:text-left" : "sm:flex-row-reverse sm:text-right")}>
       {team ? (
         <span className={cn("rounded-[18px] bg-white/15 p-1", winner && "ring-[3px] ring-brand-from")}>
-          <TeamLogo src={team.logo_url} tag={team.tag} size="lg" className="bg-white text-fg max-sm:!size-12 lg:!size-20" />
+          <TeamLogo src={team.logo_url} tag={team.tag} size="lg" className="bg-surface text-fg max-sm:!size-12 lg:!size-20" />
         </span>
       ) : (
         <span className="size-12 shrink-0 rounded-[16px] border border-dashed border-white/40 sm:size-16" />

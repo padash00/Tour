@@ -154,7 +154,7 @@ export function Lifecycle({ steps, current, cancelled }: { steps: LifeStep[]; cu
                   : done
                     ? "border-accent bg-accent text-accent-ink"
                     : now
-                      ? "border-accent bg-white text-accent ring-4 ring-accent/15"
+                      ? "border-accent bg-surface text-accent ring-4 ring-accent/15"
                       : "border-line-strong bg-shell text-fg-3",
               )}
             >

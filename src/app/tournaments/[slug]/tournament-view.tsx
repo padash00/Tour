@@ -73,7 +73,7 @@ async function StatusWord({ status }: { status: Tournament["status"] }) {
   const s = STATUS_WORD[status];
   const color = { live: "text-live", ok: "text-ok", warn: "text-warn", muted: "text-fg-2" }[s.tone];
   return (
-    <span className={`inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[13.5px] font-bold ${color}`}>
+    <span className={`inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1 text-[13.5px] font-bold ${color}`}>
       {s.tone !== "muted" && <span className={`size-2 rounded-full bg-current ${s.tone === "live" ? "animate-pulse" : ""}`} aria-hidden />}
       {tx(s.text)}
     </span>
