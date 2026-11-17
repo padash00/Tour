@@ -351,7 +351,13 @@ export function LobbyRoom({
                 right={
                   draft ? (
                     <span className="text-meta text-accent">
-                      {t("выбирает {name}", { name: byId.get(draft.captains[draft.turn - 1])?.nickname ?? t("капитан") })} · <Countdown deadline={draft.deadline} /> {t("с")}
+                      {t("выбирает {name}", { name: byId.get(draft.captains[draft.turn - 1])?.nickname ?? t("капитан") })}
+                      {s.pick_seconds > 0 && (
+                        <>
+                          {" · "}
+                          <Countdown deadline={draft.deadline} /> {t("с")}
+                        </>
+                      )}
                     </span>
                   ) : (
                     s.filter && <span className="text-meta text-fg-3">{t("Фильтр игроков включён")}</span>

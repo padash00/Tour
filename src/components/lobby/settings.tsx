@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { deleteTemplate, lookupWorkshop, saveTemplate } from "@/app/actions/lobby";
 import { mapLabel } from "@/lib/maps";
 import { MODES, type ModeKey } from "@/lib/modes";
-import { BOT_DIFFICULTY, LIMITS, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
+import { BOT_DIFFICULTY, LIMITS, PICK_SECONDS, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
 import { tint } from "../competition/map-tile";
 import { cupTeams } from "@/lib/cup-core";
 import { useToast } from "../toast";
@@ -187,6 +187,16 @@ export function AdvancedSettings({
           <Row icon={Icon.users()} label={t("Выбор игроков")} badge={<NewBadge />} hint={fixed ? fixedHint : undefined}>
             <Choice value={s.player_pick} disabled={ro || fixed} onChange={(v) => patch({ player_pick: v })} options={PICK} />
           </Row>
+          {s.player_pick === "captains" && (
+            <Row icon={Icon.clock()} label={t("Время на выбор игрока")} hint={s.pick_seconds ? t("Не успел — игрока выберет сайт случайно") : t("Капитан думает сколько нужно, авто-выбора нет")}>
+              <Segments
+                value={s.pick_seconds}
+                disabled={ro}
+                onChange={(v) => patch({ pick_seconds: v })}
+                options={PICK_SECONDS.map((n) => ({ value: n, label: n === 0 ? t("без ограничения") : n < 60 ? t("{n} с", { n }) : t("{n} мин", { n: n / 60 }) }))}
+              />
+            </Row>
+          )}
           <Row icon={Icon.play()} label={t("Запуск матча")}>
             <Choice value={s.start} disabled={ro || fixed} onChange={(v) => patch({ start: v })} options={START} />
           </Row>

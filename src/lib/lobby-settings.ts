@@ -13,6 +13,8 @@ export type LobbySettings = {
   team_size: number; // игроков в команде (1–5), по умолчанию — как в режиме
   network: "lan" | "internet";
   player_pick: "free" | "captains";
+  /** сколько секунд у капитана на выбор игрока; 0 — без ограничения (авто-выбора нет) */
+  pick_seconds: PickSeconds;
   start: "host" | "all_ready";
   gotv: boolean;
   // карты
@@ -75,11 +77,15 @@ export type LobbySettings = {
   cup_of: { code: string; match: string } | null;
 };
 
+export const PICK_SECONDS = [30, 60, 120, 300, 0] as const;
+export type PickSeconds = (typeof PICK_SECONDS)[number];
+
 export const DEFAULT_SETTINGS: LobbySettings = {
   mode: "5v5",
   team_size: 5,
   network: "lan",
   player_pick: "free",
+  pick_seconds: 60,
   start: "host",
   gotv: false,
   best_of: 1,
@@ -181,6 +187,7 @@ export function normalizeSettings(input: unknown, base: LobbySettings = DEFAULT_
     team_size: num(s.team_size, LIMITS.team_size, MODES[mode].size),
     network: pick(s.network, ["lan", "internet"] as const, d.network),
     player_pick: pick(s.player_pick, ["free", "captains"] as const, d.player_pick),
+    pick_seconds: pick(s.pick_seconds === undefined ? undefined : Number(s.pick_seconds), PICK_SECONDS, d.pick_seconds),
     start: pick(s.start, ["host", "all_ready"] as const, d.start),
     gotv: bool(s.gotv, d.gotv),
     best_of: pick(Number(s.best_of), [1, 3, 5] as const, d.best_of),

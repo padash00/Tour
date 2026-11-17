@@ -161,7 +161,7 @@ async function lobbyActivity(playerId: string, tx: T): Promise<Activity[]> {
   const me = members.find((m) => m.player_id === playerId);
 
   if (lobby.draft && lobby.draft.captains[lobby.draft.turn - 1] === playerId) {
-    out.push({ kind: "lobby_draft_turn", priority: 1, label: tx("Ваш ход · драфт"), detail: tx("Лобби #{code} — выберите игрока", { code: lobby.code }), href, deadline: lobby.draft.deadline, tone: "accent", connect: null, key: `draft:${lobby.id}:${lobby.draft.deadline}` });
+    out.push({ kind: "lobby_draft_turn", priority: 1, label: tx("Ваш ход · драфт"), detail: tx("Лобби #{code} — выберите игрока", { code: lobby.code }), href, deadline: lobby.settings.pick_seconds ? lobby.draft.deadline : null, tone: "accent", connect: null, key: `draft:${lobby.id}:${lobby.draft.deadline}` });
   }
   if (lobby.ready_check_until && me && (me.slot === "team1" || me.slot === "team2") && !me.ready) {
     out.push({ kind: "lobby_ready_check", priority: 2, label: tx("Проверка готовности"), detail: tx("Лобби #{code} — подтвердите, что вы на месте", { code: lobby.code }), href, deadline: lobby.ready_check_until, tone: "warn", connect: null, key: `ready-check:${lobby.id}:${lobby.ready_check_until}` });

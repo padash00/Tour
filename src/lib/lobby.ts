@@ -61,7 +61,8 @@ const HOST_AWAY_MS = 3 * 60_000; // хост пропал — хост пере�
 /** Лобби в ожидании, где ни у кого не открыта страница столько времени, закрывается само */
 export const ABANDONED_MS = 2 * 60_000;
 export const READY_CHECK_SECONDS = 30;
-export const DRAFT_STEP_SECONDS = 30;
+/** Срок хода капитана. «Без ограничения» — срок через год: авто-выбор не сработает, а метка хода всё равно меняется на каждом шаге */
+const draftDeadline = (s: LobbySettings, from = Date.now()) => new Date(from + (s.pick_seconds || 365 * 86400) * 1000).toISOString();
 export const LOBBY_VETO_SECONDS = 30;
 
 // ───────────────────────── мелочи
@@ -331,7 +332,7 @@ export async function startDraft(lobby: Lobby, captains: string[], opts: { snake
   const names = captains.map((_, i) => opts.teamNames?.[i] ?? `Команда ${i + 1}`);
   await touch(lobby.id, {
     ...(many && { bracket: { format: (opts.settings ?? lobby.settings).cup_format, names, rosters: captains.map((id) => [id]), matches: [], state: "done", champion: null, started_at: new Date().toISOString() } }),
-    draft: { captains, turn: 1, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString(), ...(opts.snake && { snake: true, n: 0 }) },
+    draft: { captains, turn: 1, deadline: draftDeadline(opts.settings ?? lobby.settings), ...(opts.snake && { snake: true, n: 0 }) },
     bots: { team1: [], team2: [] },
     ready_check_until: null,
     ...(opts.settings && { settings: opts.settings }),
@@ -356,7 +357,7 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t:
     // забираем ход условным обновлением: двойной клик или авто-пик в ту же секунду не возьмут двух игроков
     const { data } = await db()
       .from("lobbies")
-      .update({ draft: { ...lobby.draft, deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } })
+      .update({ draft: { ...lobby.draft, deadline: draftDeadline(lobby.settings) } })
       .eq("id", lobby.id)
       .eq("draft->>deadline", lobby.draft.deadline)
       .select("id");
@@ -383,7 +384,7 @@ export async function draftPick(lobby: Lobby, pickedId: string, auto = false, t:
     n++;
     turn = lobby.draft.snake ? snakeTurnN(n, teams) : (turn % teams) + 1;
   }
-  await touch(lobby.id, { draft: { ...lobby.draft, turn, ...(lobby.draft.snake && { n }), deadline: new Date(Date.now() + DRAFT_STEP_SECONDS * 1000).toISOString() } });
+  await touch(lobby.id, { draft: { ...lobby.draft, turn, ...(lobby.draft.snake && { n }), deadline: draftDeadline(lobby.settings) } });
   return null;
 }
 
@@ -542,7 +543,7 @@ export async function lobbyTimeouts(lobby: Lobby) {
   if (lobby.draft && new Date(lobby.draft.deadline).getTime() <= now) {
     const { data } = await db()
       .from("lobbies")
-      .update({ draft: { ...lobby.draft, deadline: new Date(now + DRAFT_STEP_SECONDS * 1000).toISOString() } })
+      .update({ draft: { ...lobby.draft, deadline: draftDeadline(lobby.settings, now) } })
       .eq("id", lobby.id)
       .eq("draft->>deadline", lobby.draft.deadline)
       .select("id");

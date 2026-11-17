@@ -111,7 +111,11 @@ export function StageBanner({
           </div>
           <div className="text-right">
             <div className="text-micro text-fg-3">{t("На выбор")}</div>
-            <div className="num mt-1 text-[36px] font-semibold leading-none"><Countdown deadline={lobby.draft.deadline} /> {t("с")}</div>
+            {lobby.settings.pick_seconds ? (
+              <div className="num mt-1 text-[36px] font-semibold leading-none"><Countdown deadline={lobby.draft.deadline} /> {t("с")}</div>
+            ) : (
+              <div className="mt-1 text-[20px] font-semibold leading-none">{t("без ограничения")}</div>
+            )}
           </div>
         </div>
       </CriticalSurface>
