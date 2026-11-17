@@ -64,6 +64,10 @@ export const READY_CHECK_SECONDS = 30;
 /** Срок хода капитана. «Без ограничения» — срок через год: авто-выбор не сработает, а метка хода всё равно меняется на каждом шаге */
 const draftDeadline = (s: LobbySettings, from = Date.now()) => new Date(from + (s.pick_seconds || 365 * 86400) * 1000).toISOString();
 export const LOBBY_VETO_SECONDS = 30;
+/** Срок хода в вето карт — по настройкам игры (у старых игр настройки нет — 30 с). «Без ограничения» — срок через год, как в выборе игроков */
+const vetoDeadline = (s: Pick<LobbySettings, "veto_seconds">) => new Date(Date.now() + (s.veto_seconds === 0 ? 365 * 86400 : s.veto_seconds || LOBBY_VETO_SECONDS) * 1000).toISOString();
+/** Идёт ли вето этой игры без таймера */
+export const vetoUntimed = (g: { settings: Pick<LobbySettings, "veto_seconds"> }) => g.settings?.veto_seconds === 0;
 
 // ───────────────────────── мелочи
 
@@ -446,7 +450,7 @@ export async function createGame(lobby: Lobby) {
       team1: team("team1", lobby.team1_name, lobby.bots.team1),
       team2: team("team2", lobby.team2_name, lobby.bots.team2),
       veto_pool: status === "veto" ? s.maps : [],
-      veto_deadline: status === "veto" ? new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() : null,
+      veto_deadline: status === "veto" ? vetoDeadline(s) : null,
       maps,
       note: status === "veto" ? null : tr("ждём свободный сервер"),
     })
@@ -480,7 +484,7 @@ export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: 
   if (!state.remaining.includes(map)) return t("Эта карта уже выбрана");
   const veto = [...g.veto, { step: state.current.step, team: state.current.team, action: state.current.action, map, auto }];
   const next = vetoState(g.best_of, g.veto_pool, toVeto({ ...g, veto }));
-  const patch: TablesUpdate<"lobby_games"> = { veto, veto_deadline: new Date(Date.now() + LOBBY_VETO_SECONDS * 1000).toISOString() };
+  const patch: TablesUpdate<"lobby_games"> = { veto, veto_deadline: vetoDeadline(g.settings ?? { veto_seconds: 30 }) };
   if (next.current?.action === "decider") {
     veto.push({ step: next.current.step, team: null, action: "decider", map: next.remaining[0], auto: true });
     const maps = veto

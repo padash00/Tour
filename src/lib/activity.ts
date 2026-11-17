@@ -5,7 +5,7 @@ import { checkinWindowError } from "./data";
 import { vetoState } from "./veto";
 import { getT } from "./i18n/server";
 import type { T } from "./i18n/core";
-import { getGame, getLobby, getMembers, lobbyVetoState, playerLobby } from "./lobby";
+import { getGame, getLobby, getMembers, lobbyVetoState, playerLobby, vetoUntimed } from "./lobby";
 
 /**
  * Глобальная активность шапки — ОДНО самое срочное действие игрока прямо сейчас (не центр уведомлений).
@@ -175,7 +175,7 @@ async function lobbyActivity(playerId: string, tx: T): Promise<Activity[]> {
       const team = st.current?.team === 1 ? game.team1 : st.current?.team === 2 ? game.team2 : null;
       const captain = team ? (team.players[0]?.id ?? lobby.host_id) : null;
       if (captain === playerId && st.current?.action !== "decider") {
-        out.push({ kind: "lobby_veto_turn", priority: 1, label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"), detail: tx("Вето в лобби #{code}", { code: lobby.code }), href, deadline: game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
+        out.push({ kind: "lobby_veto_turn", priority: 1, label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"), detail: tx("Вето в лобби #{code}", { code: lobby.code }), href, deadline: vetoUntimed(game) ? null : game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
       }
     } else if (inGame && game.status === "waiting" && game.server_state === "ready" && game.server_address) {
       out.push({ kind: "lobby_server_ready", priority: 3, label: tx("Сервер готов"), detail: tx("Лобби #{code}", { code: lobby.code }), href, deadline: null, tone: "ok", connect: game.server_address, key: `lobby-ready:${game.id}` });

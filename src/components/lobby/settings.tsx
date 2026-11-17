@@ -212,6 +212,16 @@ export function AdvancedSettings({
           <Row icon={Icon.map()} label={t("Выбор карты")}>
             <Choice value={s.map_choice} disabled={ro} onChange={(v) => patch({ map_choice: v })} options={MAP_CHOICE} />
           </Row>
+          {s.map_choice === "veto" && (
+            <Row icon={Icon.clock()} label={t("Время на бан и пик карты")} hint={s.veto_seconds ? t("Не успел — карту выберет сайт случайно") : t("Капитан думает сколько нужно, авто-выбора нет")}>
+              <Segments
+                value={s.veto_seconds}
+                disabled={ro}
+                onChange={(v) => patch({ veto_seconds: v })}
+                options={PICK_SECONDS.map((n) => ({ value: n, label: n === 0 ? t("без ограничения") : n < 60 ? t("{n} с", { n }) : t("{n} мин", { n: n / 60 }) }))}
+              />
+            </Row>
+          )}
           <MapGrid s={s} ro={ro} patch={patch} maps={maps} images={images} />
         </Section>
 

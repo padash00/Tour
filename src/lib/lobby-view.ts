@@ -13,6 +13,7 @@ import {
   lobbyHasDue,
   lobbyTimeouts,
   lobbyVetoState,
+  vetoUntimed,
   type GameMap,
   type GameTeam,
   type GameVeto,
@@ -299,7 +300,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             maps: game.maps,
             veto: game.veto,
             veto_pool: game.veto_pool,
-            veto_deadline: game.veto_deadline,
+            // без ограничения по времени — срока нет, таймер в комнате не показывается
+            veto_deadline: vetoUntimed(game) ? null : game.veto_deadline,
             veto_turn: vstate?.current && vstate.current.action !== "decider" ? vstate.current.team : null,
             veto_action: vstate?.current && vstate.current.action !== "decider" ? vstate.current.action : null,
             team1_score: game.team1_score,
