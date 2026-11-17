@@ -128,14 +128,14 @@ export function UserMenu({ user }: { user: UserInfo }) {
                 type="button"
                 role="menuitem"
                 onClick={() => router.push("/admin")}
-                className="flex w-full items-center gap-3 rounded-control bg-fg px-2.5 py-2.5 text-left text-white outline-none transition-opacity hover:opacity-90 focus-visible:opacity-90"
+                className="flex w-full items-center gap-3 rounded-control bg-fg px-2.5 py-2.5 text-left text-bg outline-none transition-opacity hover:opacity-90 focus-visible:opacity-90"
               >
-                <span className="grid size-9 shrink-0 place-items-center rounded-control bg-white/15 [&>svg]:size-[18px]">
+                <span className="grid size-9 shrink-0 place-items-center rounded-control bg-bg/15 [&>svg]:size-[18px]">
                   <Shield />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] font-bold leading-tight">{t("Пульт организатора")}</span>
-                  <span className="mt-0.5 block text-[12.5px] leading-snug text-white/70">{t("F16 Control: турниры, матчи, серверы")}</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-snug text-bg/70">{t("F16 Control: турниры, матчи, серверы")}</span>
                 </span>
               </button>
             </>

@@ -89,7 +89,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         logo={
           <Link href="/admin" aria-label="F16 Control — главная пульта" className="flex items-center gap-3">
             <BrandLogo height={28} />
-            <span className="rounded-full bg-fg px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.06em] text-white">Пульт</span>
+            <span className="rounded-full bg-fg px-2.5 py-1 text-[12px] font-bold uppercase tracking-[0.06em] text-bg">Пульт</span>
           </Link>
         }
         profile={

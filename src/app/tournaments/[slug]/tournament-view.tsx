@@ -146,9 +146,10 @@ export async function TournamentView({ t: raw }: { t: Tournament }) {
             {tx("Страницу видят только администраторы. Откройте регистрацию, чтобы опубликовать турнир.")}
           </Callout>
         )}
-        <section className="relative isolate mt-3 overflow-hidden rounded-feature bg-ink text-white">
+        {/* подложка под фото всегда тёмная: цвет ink в тёмной теме белый и засвечивал бы обложку */}
+        <section className="relative isolate mt-3 overflow-hidden rounded-feature bg-[#121417] text-white">
           <Image src={t.cover_url ?? "/home/tournament.jpg"} alt="" fill priority sizes="(min-width: 1024px) 1100px, 100vw" className="-z-20 object-cover object-[60%_30%]" unoptimized={!!t.cover_url} />
-          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-ink/95 via-ink/75 to-ink/25" aria-hidden />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#121417]/95 via-[#121417]/75 to-[#121417]/25" aria-hidden />
           <div className="flex min-h-[260px] flex-col justify-end gap-5 p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">

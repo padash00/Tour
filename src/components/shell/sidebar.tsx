@@ -88,7 +88,7 @@ export function MyMatchCard({ activity, more }: { activity: Activity; more: numb
           {t("Осталось")} <Timer deadline={activity.deadline} urgentAt={activity.priority === 4 ? 300 : 10} className="font-bold text-fg" />
         </span>
       )}
-      <Link href={activity.href} className="mt-1 inline-flex h-11 items-center justify-center rounded-control bg-fg text-[15px] font-bold text-white transition-opacity hover:opacity-90">
+      <Link href={activity.href} className="mt-1 inline-flex h-11 items-center justify-center rounded-control bg-fg text-[15px] font-bold text-bg transition-opacity hover:opacity-90">
         {t("Открыть")}
       </Link>
       {activity.connect && (
@@ -192,7 +192,7 @@ export function SiteSidebar() {
       ) : (
         <Link
           href={`/login?next=${encodeURIComponent(pathname)}`}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-control bg-fg text-[15px] font-bold text-white transition-opacity hover:opacity-90"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-control bg-fg text-[15px] font-bold text-bg transition-opacity hover:opacity-90"
         >
           <SteamMark className="size-5" />
           {t("Войти через Steam")}
