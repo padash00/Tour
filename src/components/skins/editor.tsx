@@ -538,7 +538,7 @@ function PaintCard({ name, image, on, onClick }: { name: string; image: string; 
       )}
     >
       {on && (
-        <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-accent text-white">
+        <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-accent text-accent-ink">
           <Check className="size-3" strokeWidth={3} />
         </span>
       )}

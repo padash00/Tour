@@ -8,6 +8,7 @@ import { SearchTrigger } from "./shell/search";
 import { MessagesIcon, MobileMenu, NotificationsBell, UserMenu } from "./nav-links";
 import { ViewerSync, useViewer } from "./viewer";
 import { LangSwitch } from "./lang-switch";
+import { ThemeSwitch } from "./theme-switch";
 import { useT } from "@/lib/i18n/client";
 
 /**
@@ -27,6 +28,7 @@ export function HeaderUser() {
       <GlobalActivity />
       <SearchTrigger />
       <LangSwitch className="lg:hidden" />
+      <ThemeSwitch />
       {status === "loading" ? (
         // место под профиль того же размера — без прыжка вёрстки
         <span aria-hidden className="hidden h-10 w-[150px] rounded-control bg-ink/[0.04] lg:block" />

@@ -14,6 +14,8 @@ import { SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from "@/lib/seo";
 import { LangProvider } from "@/lib/i18n/client";
 import { getLang } from "@/lib/i18n/server";
 import { makeT } from "@/lib/i18n/core";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import "./globals.css";
 
 // Inter Tight — чёткий гротеск с кириллицей: весь интерфейс
@@ -75,8 +77,10 @@ d.innerHTML="Ваш браузер устарел — сайт может раб
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const lang = await getLang();
   const t = makeT(lang);
+  const themeCookie = (await cookies()).get(THEME_COOKIE)?.value;
+  const theme = isTheme(themeCookie) ? themeCookie : "light";
   return (
-    <html lang={lang} translate="no" className={`notranslate ${interTight.variable} ${jetbrains.variable} h-full`}>
+    <html lang={lang} data-theme={theme} translate="no" className={`notranslate ${interTight.variable} ${jetbrains.variable} h-full`}>
       <body className="min-h-full flex flex-col">
         {/* Очень старый браузер (iOS < 16.2): стили сайта ему не по силам — сразу говорим, что делать */}
         <script dangerouslySetInnerHTML={{ __html: OLD_BROWSER_NOTICE }} />

@@ -1627,6 +1627,7 @@ export type Database = {
           is_admin: boolean
           is_banned: boolean
           lang: string | null
+          theme: string | null
           last_login_at: string | null
           nickname: string
           profile_refreshed_at: string | null
@@ -1648,6 +1649,7 @@ export type Database = {
           is_admin?: boolean
           is_banned?: boolean
           lang?: string | null
+          theme?: string | null
           last_login_at?: string | null
           nickname: string
           profile_refreshed_at?: string | null
@@ -1669,6 +1671,7 @@ export type Database = {
           is_admin?: boolean
           is_banned?: boolean
           lang?: string | null
+          theme?: string | null
           last_login_at?: string | null
           nickname?: string
           profile_refreshed_at?: string | null

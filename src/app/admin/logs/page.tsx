@@ -108,7 +108,7 @@ export default async function LogsPage(props: PageProps<"/admin/logs">) {
                 href={href({ f: f.key === "all" ? null : f.key })}
                 className={cn(
                   "h-10 px-4 inline-flex items-center rounded-control text-[14px] font-semibold transition",
-                  filter === f.key ? "bg-accent text-white" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
+                  filter === f.key ? "bg-accent text-accent-ink" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
                 )}
               >
                 {f.label}

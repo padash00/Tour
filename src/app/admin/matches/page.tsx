@@ -52,7 +52,7 @@ export default async function AdminMatchesPage(props: PageProps<"/admin/matches"
             href={`/admin/matches?f=${f.key}`}
             className={cn(
               "inline-flex h-11 items-center rounded-control px-5 text-[15px] font-semibold transition-colors",
-              filter.key === f.key ? "bg-accent text-white" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
+              filter.key === f.key ? "bg-accent text-accent-ink" : "bg-surface text-fg-2 shadow-[inset_0_0_0_1px_var(--color-line-subtle)] hover:bg-surface-2",
             )}
           >
             {f.label}

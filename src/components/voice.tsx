@@ -50,7 +50,7 @@ export function VoiceCard({ address, wide, className }: { address: string; wide?
       <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
         {/* логотип из официального набора TeamSpeak (teamspeak.com/en/mediakit) — без изменений, с полями вокруг */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={118} height={32} className="h-8 w-auto shrink-0" />
+        <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={118} height={32} className="h-8 w-auto shrink-0 [[data-theme=dark]_&]:brightness-0 [[data-theme=dark]_&]:invert" />
         <div className="min-w-0">
           <div className="text-[15px] font-semibold text-fg">{t("Голосовая связь")}</div>
           <div className="mt-0.5 text-meta text-fg-2">

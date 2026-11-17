@@ -5,7 +5,7 @@ export type HallTone = "mine" | "rival" | "busy" | "wait";
 export type HallMark = { tone: HallTone; label?: string };
 
 const TONE: Record<HallTone | "free", string> = {
-  mine: "border-accent bg-accent text-white",
+  mine: "border-accent bg-accent text-accent-ink",
   rival: "border-danger/50 bg-danger/20 text-danger",
   busy: "border-accent/45 bg-accent/15 text-fg",
   wait: "border-warn/50 bg-warn/20 text-fg",

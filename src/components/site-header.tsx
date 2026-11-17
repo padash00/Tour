@@ -49,7 +49,7 @@ export async function SiteFooter() {
             <Link href="/teamspeak" className="inline-flex items-center gap-2 text-meta text-fg-3 transition-colors hover:text-fg">
               {t("Голосовая связь")}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={74} height={20} className="h-5 w-auto" />
+              <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={74} height={20} className="h-5 w-auto [[data-theme=dark]_&]:brightness-0 [[data-theme=dark]_&]:invert" />
             </Link>
           </div>
           <nav aria-label={t("Помощь")} className="flex flex-wrap gap-x-5 gap-y-1">

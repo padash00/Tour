@@ -128,7 +128,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
                 key={t.key}
                 href={href(t.key)}
                 aria-current={tab === t.key ? "page" : undefined}
-                className={`relative flex h-11 items-center justify-between gap-3 rounded-control px-4 text-[15px] font-semibold whitespace-nowrap transition ${tab === t.key ? "bg-accent text-white" : "text-fg-2 hover:bg-surface-2"}`}
+                className={`relative flex h-11 items-center justify-between gap-3 rounded-control px-4 text-[15px] font-semibold whitespace-nowrap transition ${tab === t.key ? "bg-accent text-accent-ink" : "text-fg-2 hover:bg-surface-2"}`}
               >
                                 {t.label}
                 {warn && <span className={`size-1.5 rounded-full ${t.key === "workshop" && broken ? "bg-danger" : "bg-warn"}`} />}

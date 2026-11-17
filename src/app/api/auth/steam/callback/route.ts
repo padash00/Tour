@@ -7,6 +7,7 @@ import { safeNext } from "@/lib/redirect";
 import { db } from "@/lib/supabase";
 import { markLoginRefreshed } from "@/lib/profile-sync";
 import { LANG_COOKIE, isLang } from "@/lib/i18n/core";
+import { THEME_COOKIE, isTheme } from "@/lib/theme";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -56,12 +57,30 @@ export async function GET(request: NextRequest) {
 
   if (profile.ok) await markLoginRefreshed(player.id);
   await syncLang(player.id, request.cookies.get(LANG_COOKIE)?.value);
+  await syncTheme(player.id, request.cookies.get(THEME_COOKIE)?.value);
   await createSession({ playerId: player.id, steamId: player.steam_id });
   const next = safeNext(url.searchParams.get("next"));
   if (await firstProfilePrompt(player.id)) {
     return NextResponse.redirect(new URL(`/me/profile?welcome=1&next=${encodeURIComponent(next)}`, url.origin));
   }
   return NextResponse.redirect(new URL(next, url.origin));
+}
+
+/**
+ * Тема при входе: если игрок уже выбирал тему — она открывается и на этом устройстве;
+ * если в профиле пусто — туда записывается выбор, сделанный здесь гостем. Ошибка базы вход не ломает.
+ */
+async function syncTheme(playerId: string, deviceTheme: string | undefined) {
+  try {
+    const { data } = await db().from("players").select("theme").eq("id", playerId).maybeSingle();
+    if (isTheme(data?.theme)) {
+      if (data.theme !== deviceTheme) (await cookies()).set(THEME_COOKIE, data.theme, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    } else if (isTheme(deviceTheme)) {
+      await db().from("players").update({ theme: deviceTheme }).eq("id", playerId);
+    }
+  } catch {
+    // тема не критична
+  }
 }
 
 /**
