@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -325,6 +326,33 @@ export function Menu({
       document.removeEventListener("keydown", onKey);
     };
   }, [open, triggerId]);
+
+  // внизу экрана меню раскрывается вверх, а не уезжает за край; не влезает никуда — прокручивается.
+  // Стили ставим прямо на узел до отрисовки: список создаётся заново при каждом открытии.
+  useLayoutEffect(() => {
+    const el = list.current;
+    const anchor = root.current;
+    if (!open || !el || !anchor) return;
+    const GAP = 8;
+    const EDGE = 12;
+    const rect = anchor.getBoundingClientRect();
+    // сверху место занято закреплённой шапкой сайта
+    const top = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+    const below = window.innerHeight - rect.bottom - GAP - EDGE;
+    const above = rect.top - Math.max(0, top) - GAP - EDGE;
+    const up = el.offsetHeight > below && above > below;
+    if (up) {
+      el.style.top = "auto";
+      el.style.bottom = "100%";
+      el.style.marginTop = "0";
+      el.style.marginBottom = `${GAP}px`;
+    }
+    const room = Math.max(160, up ? above : below);
+    if (el.offsetHeight > room) {
+      el.style.maxHeight = `${room}px`;
+      el.style.overflowY = "auto";
+    }
+  }, [open]);
 
   // состояние меню — на самой кнопке, которую получает фокус и читает скринридер
   const own = trigger.props;
