@@ -208,7 +208,9 @@ async function probeInstance(inst) {
   let running = procs ? isRunning(procs, inst) : null;
   if (running === false) {
     openJoinApplied.delete(inst.name);
-    recovery.track(inst, false, null);
+    // идёт обслуживание хоста (обновление CS2/плагинов, перезапуск) — серверы остановлены нарочно, это не падение:
+    // автоподъём посреди обновления запускает cs2.exe и блокирует файлы SteamCMD и install.ps1
+    if (!busy) recovery.track(inst, false, null);
     snapshots[inst.name] = { at: Date.now(), report: { name: inst.name, running: false } };
     return;
   }
