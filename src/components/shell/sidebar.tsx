@@ -6,7 +6,6 @@ import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, 
 import type { ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
-import { SteamMark } from "@/components/ds/icons";
 import { useToast } from "../toast";
 import { useViewer, type Activity } from "../viewer";
 import { isActive, noChrome, type NavItem } from "./nav";
@@ -189,15 +188,7 @@ export function SiteSidebar() {
           </span>
           <ChevronRight className="size-4 shrink-0 text-fg-4" />
         </Link>
-      ) : (
-        <Link
-          href={`/login?next=${encodeURIComponent(pathname)}`}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-control bg-fg text-[15px] font-bold text-bg transition-opacity hover:opacity-90"
-        >
-          <SteamMark className="size-5" />
-          {t("Войти через Steam")}
-        </Link>
-      )}
+      ) : null /* гостю кнопка входа — в шапке справа, рядом с переключателем темы */}
     </aside>
   );
 }

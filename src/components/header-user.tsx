@@ -41,7 +41,7 @@ export function HeaderUser() {
       ) : (
         <Link
           href={`/login?next=${encodeURIComponent(pathname)}`}
-          className="hidden h-10 items-center gap-2 rounded-control border border-line bg-ink/[0.03] px-3.5 text-[14px] font-semibold text-fg transition-colors duration-[var(--dur-hover)] hover:border-line-strong hover:bg-ink/[0.06] sm:inline-flex lg:hidden"
+          className="hidden h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-control bg-fg px-3.5 text-[14px] font-bold text-bg transition-opacity duration-[var(--dur-hover)] hover:opacity-90 sm:inline-flex"
         >
           <SteamMark className="size-4" />
           {t("Войти через Steam")}
