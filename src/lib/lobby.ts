@@ -9,7 +9,7 @@ import { makeT, tr, type T } from "./i18n/core";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
 import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, type LobbySettings } from "./lobby-settings";
-import { tierOf, tierRange, TIER_MIN_LEVEL } from "./tiers";
+import { tierOf, tierRange, TIER_MIN_ELO } from "./tiers";
 import { cupTeams, snakeTurnN } from "./cup-core";
 import type { Tables, TablesUpdate } from "./database.types";
 import type { Narrow, Player } from "./types";
@@ -193,7 +193,7 @@ export function potProblem(s: LobbySettings, p: { faceit_elo: number | null; fac
   if (!s.pot) return null;
   if (!p.faceit_elo) return t("В «Десятку» пускают только с рейтингом FACEIT: сыграйте на FACEIT хотя бы один матч CS2 с этого Steam-аккаунта");
   const tier = tierOf(p.faceit_elo, p.faceit_level);
-  if (!tier) return t("В «Десятку» пускают с {n} уровня FACEIT — у вас {elo} ELO", { n: TIER_MIN_LEVEL, elo: p.faceit_elo });
+  if (!tier) return t("В «Десятку» пускают от {n} ELO FACEIT — у вас {elo} ELO", { n: TIER_MIN_ELO, elo: p.faceit_elo });
   if (!s.pot_tiers.includes(tier)) {
     return t("Эта игра для тиров {tiers} — у вас тир {tier} ({elo} ELO)", { tiers: s.pot_tiers.join(", "), tier, elo: p.faceit_elo });
   }

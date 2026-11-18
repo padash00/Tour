@@ -30,7 +30,7 @@ export function TierBadge({ tier, className }: { tier: TierKey; className?: stri
     <span
       className={cn("num inline-grid h-5 min-w-5 place-items-center rounded-[5px] border px-1 text-[11px] font-bold leading-none", className)}
       style={{ borderColor: TIER_COLOR[tier], color: TIER_COLOR[tier] }}
-      title={t("Тир {tier}: {range} ELO", { tier, range: tierRange(tier, t("ур.")) })}
+      title={t("Тир {tier}: {range} ELO", { tier, range: tierRange(tier) })}
     >
       {tier}
     </span>
@@ -120,7 +120,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
                 <span className="num block text-[18px] font-bold leading-none" style={{ color: TIER_COLOR[tier] }}>
                   {tier}
                 </span>
-                <span className="num mt-1.5 block text-micro text-fg-3">{tierRange(tier, t("ур."))}</span>
+                <span className="num mt-1.5 block text-micro text-fg-3">{tierRange(tier)}</span>
               </button>
             );
           })}

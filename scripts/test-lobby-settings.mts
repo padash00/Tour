@@ -66,7 +66,7 @@ const { tierOf, snakeTurn, normalizeTiers } = await import("../src/lib/tiers");
 const { potBank } = await import("../src/lib/lobby-settings");
 check(tierOf(3000, 10) === "S" && tierOf(2999, 10) === "A" && tierOf(2800, 10) === "A" && tierOf(2799, 10) === "B", "тиры: S от 3000, A 2800–2999");
 check(tierOf(2500, 10) === "B" && tierOf(2499, 10) === "C" && tierOf(2200, 10) === "C" && tierOf(2199, 10) === "D", "тиры: B от 2500, C от 2200, ниже — D");
-check(tierOf(1900, 9) === "D" && tierOf(1700, 8) === null && tierOf(null, 10) === null && tierOf(0, 10) === null, "тир D — с 9 уровня; ниже и без ELO тира нет");
+check(tierOf(1900, 9) === "D" && tierOf(1700, 8) === "D" && tierOf(1000, 3) === "D" && tierOf(999, 10) === null && tierOf(null, 10) === null && tierOf(0, 10) === null, "тир D — от 1000 ELO; ниже и без ELO тира нет");
 check([0, 1, 2, 3, 4, 5, 6, 7].map(snakeTurn).join("") === "12211221", "змейка: 1-2-2-1-1-2-2-1");
 check(normalizeTiers(["B", "S", "x", "B"]).join("") === "SB" && normalizeTiers([]).length === 5 && normalizeTiers("S").length === 5, "список тиров: только известные, по порядку; пустой — все");
 const PID = "01a99432-d7ed-47aa-a3b9-155c4774711f";
