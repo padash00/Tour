@@ -24,7 +24,7 @@ export default async function VoiceLinkPage(props: PageProps<"/voice/link">) {
     <div className="flex min-h-[calc(100dvh-var(--header-h))] items-center justify-center px-4 py-12">
       <VoiceLinkCard
         token={token}
-        tsNick={link?.nick ?? null}
+        valid={!!link}
         player={player ? { nickname: player.nickname, avatar_url: player.avatar_url } : null}
         // профиль уже привязан к другому подключению — предупредим, что оно заменится
         replaces={current && link && current.ts_uid !== link.uid ? current.ts_nick || "TeamSpeak" : null}

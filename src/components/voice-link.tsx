@@ -12,14 +12,14 @@ import { useT } from "@/lib/i18n/client";
  */
 export function VoiceLinkCard({
   token,
-  tsNick,
+  valid,
   player,
   replaces,
   already,
 }: {
   token: string;
-  /** ник в TeamSpeak из ссылки; null — ссылка неверная или устарела */
-  tsNick: string | null;
+  /** false — ссылка неверная или устарела */
+  valid: boolean;
   player: { nickname: string; avatar_url: string | null } | null;
   replaces: string | null;
   already: boolean;
@@ -44,7 +44,7 @@ export function VoiceLinkCard({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/teamspeak.svg" alt="TeamSpeak" width={118} height={32} className="h-8 w-auto [[data-theme=dark]_&]:brightness-0 [[data-theme=dark]_&]:invert" />
 
-      {tsNick === null || !player ? (
+      {!valid || !player ? (
         <>
           <h1 className="mt-8 text-page text-fg">{t("Ссылка устарела")}</h1>
           <p className="mt-2 text-[15px] leading-relaxed text-fg-2">{t("Ссылка привязки действует 10 минут. Зайдите в канал «Привязка» на сервере TeamSpeak ещё раз — бот пришлёт новую.")}</p>
@@ -66,8 +66,8 @@ export function VoiceLinkCard({
               <span className="grid size-14 place-items-center rounded-full bg-ink/[0.06] text-fg-2">
                 <Headphones className="size-6" aria-hidden />
               </span>
-              <span className="w-full truncate text-[15px] font-semibold text-fg">{tsNick || "TeamSpeak"}</span>
-              <span className="text-meta text-fg-3">{t("вы в TeamSpeak")}</span>
+              <span className="w-full truncate text-[15px] font-semibold text-fg">TeamSpeak</span>
+              <span className="text-meta text-fg-3">{t("ваше подключение")}</span>
             </div>
             <span className={`grid w-8 shrink-0 place-items-center ${state === "done" ? "text-ok" : "text-fg-3"}`} aria-hidden>
               {state === "done" ? <Check className="size-6" /> : <ArrowLeftRight className="size-5" />}

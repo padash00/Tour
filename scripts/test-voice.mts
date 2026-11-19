@@ -12,14 +12,14 @@ const UID = "qRVW2tX5c1PmBGLk0v0aJ3X6m9E=";
 check(isTsUid(UID) && !isTsUid("короткий") && !isTsUid(""), "идентификатор TeamSpeak: base64, не короче 20 знаков");
 
 // ссылка привязки
-const token = voiceToken(UID, "  altx_f4\n ");
-const read = readVoiceToken(token);
-check(read?.uid === UID && read.nick === "altx_f4", "ссылка читается обратно: идентификатор и ник без переводов строк");
-check(readVoiceToken(token.slice(0, -2) + "xx") === null, "чужая подпись — ссылка не принимается");
-const [body, mac] = token.split(".");
-const forged = Buffer.from(JSON.stringify({ u: "AAAAAAAAAAAAAAAAAAAAAAAAAAA=", n: "x", e: Date.now() + 60_000 })).toString("base64url");
-check(readVoiceToken(`${forged}.${mac}`) === null, "подмена идентификатора при старой подписи — не принимается");
-check(readVoiceToken("") === null && readVoiceToken(null) === null && readVoiceToken(body) === null, "пустая и обрезанная ссылка — не принимается");
+const token = voiceToken(UID)!;
+check(readVoiceToken(token)?.uid === UID, "ссылка читается обратно: тот же идентификатор");
+check(`[URL]https://tournament.f16-arena.kz/v/${token}[/URL]`.length <= 100, "ссылка с разметкой помещается во всплывающее предупреждение TeamSpeak (100 знаков)");
+check(readVoiceToken(token.slice(0, -2) + (token.endsWith("AA") ? "BB" : "AA")) === null, "чужая подпись — ссылка не принимается");
+const other = voiceToken("AAAAAAAAAAAAAAAAAAAAAAAAAAA=")!;
+check(readVoiceToken(other.slice(0, 32) + token.slice(32)) === null, "подмена идентификатора при старой подписи — не принимается");
+check(readVoiceToken("") === null && readVoiceToken(null) === null && readVoiceToken(token.slice(0, 30)) === null, "пустая и обрезанная ссылка — не принимается");
+check(voiceToken("короткий") === null && voiceToken("AAAA") === null, "идентификатор не того вида — ссылка не выдаётся");
 const realNow = Date.now;
 Date.now = () => realNow() + 11 * 60_000;
 check(readVoiceToken(token) === null, "через 11 минут ссылка устарела");

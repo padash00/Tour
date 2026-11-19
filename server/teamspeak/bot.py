@@ -371,6 +371,15 @@ class Bot:
                         r = self.site("token", uid=uid, nick=c["client_nickname"])
                         if r and r.get("url"):
                             self.pm(clid, PM_LINK % r["url"])
+                            # ссылку — ещё и всплывающим предупреждением: вкладку личных сообщений легко не заметить.
+                            # В предупреждение помещается 100 знаков, поэтому там только сама ссылка
+                            poke = "[URL]%s[/URL]" % r["url"]
+                            if len(poke) > 100:
+                                poke = "Ссылка привязки — во вкладке «F16 Bot» внизу окна"
+                            try:
+                                self.ts.cmd("clientpoke clid=%s msg=%s" % (clid, esc(poke)))
+                            except Exception as e:
+                                log("poke", e)
                             self.bind_sent[clid] = time.time()
                             log("link sent", c["client_nickname"])
                 if c["cid"] == tele and uid in room_of:

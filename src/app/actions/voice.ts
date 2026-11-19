@@ -12,7 +12,7 @@ export async function confirmVoiceLink(token: string): Promise<{ ok: true } | { 
   if (player.is_banned) return { ok: false, error: t("Профиль заблокирован") };
   const link = readVoiceToken(token);
   if (!link) return { ok: false, error: t("Ссылка устарела. Зайдите в канал «Привязка» ещё раз — бот пришлёт новую.") };
-  if (!(await linkVoice(player.id, link.uid, link.nick))) return { ok: false, error: t("Не удалось сохранить привязку. Попробуйте через минуту.") };
+  if (!(await linkVoice(player.id, link.uid, ""))) return { ok: false, error: t("Не удалось сохранить привязку. Попробуйте через минуту.") };
   return { ok: true };
 }
 

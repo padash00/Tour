@@ -32,28 +32,32 @@ const UID = /^[A-Za-z0-9+/=]{20,64}$/;
 export const isTsUid = (v: unknown): v is string => typeof v === "string" && UID.test(v);
 const cleanNick = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40) : "");
 
-const sign = (body: string) => createHmac("sha256", env.sessionSecret).update(`voice-link.${body}`).digest("base64url");
+/*
+ * Ссылка привязки. Бот шлёт её игроку всплывающим предупреждением TeamSpeak, а туда помещается 100 знаков,
+ * поэтому ссылка короткая: 20 байт идентификатора (он — base64 от SHA-1) + срок (4 байта, секунды) + 10 байт подписи.
+ */
+const UID_BYTES = 20;
+const MAC_BYTES = 10;
+const sign = (body: Buffer) => createHmac("sha256", env.sessionSecret).update("voice-link.").update(body).digest().subarray(0, MAC_BYTES);
 
-/** Одноразовая по смыслу ссылка привязки: идентификатор и ник TeamSpeak, срок, подпись сайта */
-export function voiceToken(uid: string, nick: string) {
-  const body = Buffer.from(JSON.stringify({ u: uid, n: cleanNick(nick), e: Date.now() + TOKEN_MS })).toString("base64url");
-  return `${body}.${sign(body)}`;
+/** Ссылка привязки для идентификатора TeamSpeak; null — идентификатор не того вида (у клиентов TeamSpeak он всегда 20 байт) */
+export function voiceToken(uid: string): string | null {
+  const raw = Buffer.from(uid, "base64");
+  if (raw.length !== UID_BYTES || raw.toString("base64") !== uid) return null;
+  const exp = Buffer.alloc(4);
+  exp.writeUInt32BE(Math.floor((Date.now() + TOKEN_MS) / 1000));
+  const body = Buffer.concat([raw, exp]);
+  return Buffer.concat([body, sign(body)]).toString("base64url");
 }
 
-export function readVoiceToken(token: string | null | undefined): { uid: string; nick: string } | null {
-  if (!token || token.length > 600) return null;
-  const [body, mac] = token.split(".");
-  if (!body || !mac) return null;
-  const want = Buffer.from(sign(body));
-  const got = Buffer.from(mac);
-  if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
-  try {
-    const p = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { u?: unknown; n?: unknown; e?: unknown };
-    if (!isTsUid(p.u) || typeof p.e !== "number" || p.e < Date.now()) return null;
-    return { uid: p.u, nick: cleanNick(p.n) };
-  } catch {
-    return null;
-  }
+export function readVoiceToken(token: string | null | undefined): { uid: string } | null {
+  if (!token || !/^[A-Za-z0-9_-]{46}$/.test(token)) return null;
+  const buf = Buffer.from(token, "base64url");
+  if (buf.length !== UID_BYTES + 4 + MAC_BYTES) return null;
+  const body = buf.subarray(0, UID_BYTES + 4);
+  if (!timingSafeEqual(sign(body), buf.subarray(UID_BYTES + 4))) return null;
+  if (body.readUInt32BE(UID_BYTES) * 1000 < Date.now()) return null;
+  return { uid: body.subarray(0, UID_BYTES).toString("base64") };
 }
 
 export type VoiceLink = { ts_uid: string; ts_nick: string; seen_at: string };
