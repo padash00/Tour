@@ -2718,6 +2718,38 @@ export type Database = {
           },
         ]
       }
+      voice_links: {
+        Row: {
+          linked_at: string
+          player_id: string
+          seen_at: string
+          ts_nick: string
+          ts_uid: string
+        }
+        Insert: {
+          linked_at?: string
+          player_id: string
+          seen_at?: string
+          ts_nick?: string
+          ts_uid: string
+        }
+        Update: {
+          linked_at?: string
+          player_id?: string
+          seen_at?: string
+          ts_nick?: string
+          ts_uid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_links_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

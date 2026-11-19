@@ -1,0 +1,180 @@
+import "server-only";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { db } from "./supabase";
+import { env } from "./env";
+import { isTeamSlot, type Lobby, type TeamSlot } from "./lobby";
+import { cupTeams } from "./cup-core";
+
+/*
+ * Голосовая связь: привязка подключения TeamSpeak к профилю и комнаты команд.
+ *
+ * Бот сервера TeamSpeak (F16 Bot) каждые несколько секунд присылает, кто сейчас на сервере, и получает в ответ:
+ * кто из них привязан к профилю и какие комнаты команд должны существовать. Сам бот ничего не решает —
+ * он создаёт комнаты и переносит игроков по этому ответу.
+ *
+ * Привязка: игрок заходит в канал «Привязка», бот просит у сайта одноразовую ссылку и шлёт её игроку в личку.
+ * Игрок открывает её в браузере, где он вошёл через Steam, и подтверждает — сайт запоминает пару
+ * «идентификатор TeamSpeak — профиль». Привязка живёт, пока игрок на сервере TeamSpeak: на ПК клуба
+ * идентификатор общий для всех, кто садится за компьютер, поэтому надолго её хранить нельзя.
+ */
+
+/** Ссылка привязки действует столько (мс) */
+const TOKEN_MS = 10 * 60_000;
+/** Игрок ушёл с сервера TeamSpeak дольше этого — привязка снимается (обрыв связи и перезапуск клиента в это укладываются) */
+const LINK_GONE_MS = 5 * 60_000;
+/** Как часто обновлять «видели на сервере» (бот опрашивает чаще) */
+const SEEN_WRITE_MS = 20_000;
+/** «В голосе» в лобби: бот видел игрока на сервере за это время */
+export const VOICE_ONLINE_MS = 60_000;
+
+/** Идентификатор клиента TeamSpeak — base64 от хеша ключа, до 28 знаков; с запасом */
+const UID = /^[A-Za-z0-9+/=]{20,64}$/;
+export const isTsUid = (v: unknown): v is string => typeof v === "string" && UID.test(v);
+const cleanNick = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40) : "");
+
+const sign = (body: string) => createHmac("sha256", env.sessionSecret).update(`voice-link.${body}`).digest("base64url");
+
+/** Одноразовая по смыслу ссылка привязки: идентификатор и ник TeamSpeak, срок, подпись сайта */
+export function voiceToken(uid: string, nick: string) {
+  const body = Buffer.from(JSON.stringify({ u: uid, n: cleanNick(nick), e: Date.now() + TOKEN_MS })).toString("base64url");
+  return `${body}.${sign(body)}`;
+}
+
+export function readVoiceToken(token: string | null | undefined): { uid: string; nick: string } | null {
+  if (!token || token.length > 600) return null;
+  const [body, mac] = token.split(".");
+  if (!body || !mac) return null;
+  const want = Buffer.from(sign(body));
+  const got = Buffer.from(mac);
+  if (want.length !== got.length || !timingSafeEqual(want, got)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { u?: unknown; n?: unknown; e?: unknown };
+    if (!isTsUid(p.u) || typeof p.e !== "number" || p.e < Date.now()) return null;
+    return { uid: p.u, nick: cleanNick(p.n) };
+  } catch {
+    return null;
+  }
+}
+
+export type VoiceLink = { ts_uid: string; ts_nick: string; seen_at: string };
+
+/** Привязка игрока (null — не привязан или таблицы ещё нет) */
+export async function getVoiceLink(playerId: string): Promise<VoiceLink | null> {
+  const { data } = await db().from("voice_links").select("ts_uid, ts_nick, seen_at").eq("player_id", playerId).maybeSingle();
+  return data ?? null;
+}
+
+/** Привязывает подключение TeamSpeak к профилю. У профиля одна привязка, у идентификатора — один профиль */
+export async function linkVoice(playerId: string, uid: string, nick: string): Promise<boolean> {
+  const now = new Date().toISOString();
+  // идентификатор был за другим профилем (ПК клуба: сел следующий игрок) — прежняя привязка снимается
+  await db().from("voice_links").delete().eq("ts_uid", uid).neq("player_id", playerId);
+  const { error } = await db().from("voice_links").upsert({ player_id: playerId, ts_uid: uid, ts_nick: cleanNick(nick), linked_at: now, seen_at: now }, { onConflict: "player_id" });
+  return !error;
+}
+
+export async function unlinkVoice(by: { playerId: string } | { uid: string }) {
+  const q = db().from("voice_links").delete();
+  await ("playerId" in by ? q.eq("player_id", by.playerId) : q.eq("ts_uid", by.uid));
+}
+
+/** Кто из игроков сейчас на сервере TeamSpeak с привязкой — для отметки «в голосе» в лобби */
+export async function voiceOnline(playerIds: string[]): Promise<Set<string>> {
+  if (!playerIds.length) return new Set();
+  const { data } = await db()
+    .from("voice_links")
+    .select("player_id")
+    .in("player_id", playerIds)
+    .gt("seen_at", new Date(Date.now() - VOICE_ONLINE_MS).toISOString());
+  return new Set((data ?? []).map((r) => r.player_id));
+}
+
+export type VoiceRoom = {
+  /** постоянный ключ комнаты: код лобби и слот команды — по нему бот узнаёт свою комнату после перезапуска */
+  key: string;
+  name: string;
+  /** идентификаторы TeamSpeak игроков команды (только привязанные) */
+  uids: string[];
+};
+
+/** Название канала TeamSpeak — до 40 знаков */
+export function roomName(team: string, code: string) {
+  const tail = ` · ${code}`;
+  return `${team.trim().slice(0, 40 - tail.length) || "Команда"}${tail}`;
+}
+
+/** Комната на каждую команду лобби, в котором идёт игра. Матч большого лобби играется в своей комнате-лобби, но команды сидят в комнатах общего */
+export function roomsOf(
+  lobbies: Pick<Lobby, "id" | "code" | "settings" | "team1_name" | "team2_name" | "bracket">[],
+  members: { lobby_id: string; player_id: string; slot: string }[],
+  uidOf: Map<string, string>,
+): VoiceRoom[] {
+  const rooms: VoiceRoom[] = [];
+  for (const lobby of lobbies) {
+    if (lobby.settings?.cup_of) continue;
+    const many = cupTeams(lobby.settings?.players ?? 0) > 0;
+    const names = many ? ((lobby.bracket as { names?: string[] } | null)?.names ?? []) : [lobby.team1_name, lobby.team2_name];
+    const bySlot = new Map<TeamSlot, string[]>();
+    for (const m of members) {
+      if (m.lobby_id !== lobby.id || !isTeamSlot(m.slot)) continue;
+      const list = bySlot.get(m.slot) ?? [];
+      const uid = uidOf.get(m.player_id);
+      if (uid) list.push(uid);
+      bySlot.set(m.slot, list);
+    }
+    const used = new Set<string>();
+    for (const slot of [...bySlot.keys()].sort()) {
+      const i = Number(slot.slice(4)) - 1;
+      let name = roomName(names[i] || `Команда ${i + 1}`, lobby.code);
+      // две команды с одним названием — каналы TeamSpeak должны различаться
+      if (used.has(name)) name = roomName(`${i + 1}. ${names[i] || "Команда"}`, lobby.code);
+      used.add(name);
+      rooms.push({ key: `${lobby.code}:${slot}`, name, uids: bySlot.get(slot)! });
+    }
+  }
+  return rooms;
+}
+
+export type VoiceSync = {
+  /** привязанные игроки из присланного списка */
+  links: { uid: string; nickname: string }[];
+  rooms: VoiceRoom[];
+};
+
+/**
+ * Опрос бота: отмечает привязанных игроков «на сервере», снимает привязки ушедших
+ * и отвечает, кто привязан и какие комнаты команд нужны сейчас.
+ * Ошибка базы — исключение, а не пустой ответ: по пустому ответу бот распустил бы комнаты посреди матча.
+ */
+export async function voiceSync(clients: { uid: string; nick: string }[]): Promise<VoiceSync> {
+  const online = [...new Set(clients.map((c) => c.uid))];
+  const now = Date.now();
+  if (online.length) {
+    await db()
+      .from("voice_links")
+      .update({ seen_at: new Date(now).toISOString() })
+      .in("ts_uid", online)
+      .lt("seen_at", new Date(now - SEEN_WRITE_MS).toISOString())
+      .throwOnError();
+  }
+  await db().from("voice_links").delete().lt("seen_at", new Date(now - LINK_GONE_MS).toISOString()).throwOnError();
+
+  const { data: rows } = await db().from("voice_links").select("player_id, ts_uid, player:players(nickname)").throwOnError();
+  const here = new Set(online);
+  const linked = (rows ?? []).filter((r) => here.has(r.ts_uid));
+  const links = linked.map((r) => ({ uid: r.ts_uid, nickname: r.player?.nickname ?? "" }));
+
+  const { data: lobbies } = await db().from("lobbies").select("id, code, settings, team1_name, team2_name, bracket").eq("status", "playing").throwOnError();
+  if (!lobbies?.length) return { links, rooms: [] };
+  const { data: members } = await db()
+    .from("lobby_members")
+    .select("lobby_id, player_id, slot")
+    .in(
+      "lobby_id",
+      lobbies.map((l) => l.id),
+    )
+    .like("slot", "team%")
+    .throwOnError();
+  const uidOf = new Map(linked.map((r) => [r.player_id, r.ts_uid]));
+  return { links, rooms: roomsOf(lobbies as unknown as Parameters<typeof roomsOf>[0], members ?? [], uidOf) };
+}

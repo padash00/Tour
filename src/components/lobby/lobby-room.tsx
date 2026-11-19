@@ -444,7 +444,7 @@ export function LobbyRoom({
                 )}
               </div>
             )}
-            {voice && <VoiceCard address={voice} className="mt-5" />}
+            {voice && <VoiceCard address={voice} className="mt-5" linked={me ? !!view.members.find((m) => m.id === me.id)?.voice : undefined} />}
           </aside>
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Headphones } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import * as A from "@/app/actions/lobby";
 import type { LobbyView, ViewMember } from "@/lib/lobby-view";
@@ -169,6 +170,11 @@ export function PlayerLine({
           <Link href={`/players/${m.steam_id}`} className="truncate text-[14px] font-medium text-fg hover:text-accent">
             {m.nickname}
           </Link>
+          {m.voice && (
+            <span className="shrink-0 text-ok" title={t("В TeamSpeak — бот переведёт в комнату команды")}>
+              <Headphones className="size-3.5" aria-label={t("в голосе")} />
+            </span>
+          )}
         </div>
         {/* в узкой карточке отметка о взносе уходит во вторую строку и переносится — иначе она наезжает на ник и ELO */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">

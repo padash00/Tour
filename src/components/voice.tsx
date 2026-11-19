@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Copy } from "lucide-react";
+import { Copy, Headphones } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, buttonClass, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
@@ -17,7 +17,18 @@ const STATUS_URL = "https://ts.f16-arena.kz/status.json";
 
 export const teamspeakLink = (address: string) => `ts3server://${address}`;
 
-export function VoiceCard({ address, wide, className }: { address: string; wide?: boolean; className?: string }) {
+export function VoiceCard({
+  address,
+  wide,
+  className,
+  linked,
+}: {
+  address: string;
+  wide?: boolean;
+  className?: string;
+  /** лобби: привязан ли зритель к своему подключению TeamSpeak (не передан — подсказка о привязке не нужна) */
+  linked?: boolean;
+}) {
   const t = useT();
   const toast = useToast();
   const [copied, setCopied] = useState(false);
@@ -57,6 +68,16 @@ export function VoiceCard({ address, wide, className }: { address: string; wide?
             {t("Сервер клуба для команд:")} <span className="num font-semibold text-fg">{address}</span>
             {online !== null && online > 0 && <span className="num text-ok"> · {t("сейчас в сети: {n}", { n: online })}</span>}
           </div>
+          {linked !== undefined && (
+            <div className={cn("mt-1.5 flex items-start gap-1.5 text-meta", linked ? "text-ok" : "text-fg-3")}>
+              <Headphones className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                {linked
+                  ? t("Вы в голосе. Зайдите в канал «Телепорт» — с началом игры бот переведёт вас в комнату команды.")
+                  : t("Чтобы попасть в комнату своей команды, зайдите в TeamSpeak в канал «Привязка» — бот пришлёт ссылку.")}
+              </span>
+            </div>
+          )}
         </div>
       </div>
       <div className={cn("mt-4 flex flex-wrap items-center gap-2", wide && "sm:mt-0 sm:shrink-0")}>

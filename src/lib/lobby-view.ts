@@ -26,6 +26,7 @@ import { cupTeams, roundTitle, standings, type Cup, type CupMatch } from "./cup-
 import type { LobbySettings } from "./lobby-settings";
 import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
+import { voiceOnline } from "./voice";
 
 /** Как часто обновлять last_seen_at зрителя (мс) — с запасом меньше ONLINE_MS */
 const SEEN_WRITE_MS = 10_000;
@@ -40,6 +41,8 @@ export type ViewMember = {
   slot: Slot;
   ready: boolean;
   online: boolean;
+  /** на сервере TeamSpeak клуба с привязкой к профилю — бот переведёт его в комнату команды */
+  voice: boolean;
   /** «Десятка»: тир по ELO (null — не «Десятка» или рейтинга нет) и отметка организатора о взносе */
   tier: TierKey | null;
   paid: boolean;
@@ -203,7 +206,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   const inGame = !!viewer && !!game && [...game.team1.players, ...game.team2.players].some((p) => p.id === viewer.id);
   const seesAddress = opts.admin || inGame || mine?.slot === "spec";
 
-  const [{ data: msgs }, { data: bans }, { data: past }, mapImages] = await Promise.all([
+  const [inVoice, { data: msgs }, { data: bans }, { data: past }, mapImages] = await Promise.all([
+    hidden ? new Set<string>() : voiceOnline(members.map((m) => m.player_id)),
     access === "ok"
       ? db()
           .from("lobby_messages")
@@ -280,6 +284,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             slot: m.slot,
             ready: m.ready,
             online: isOnline(m),
+            voice: inVoice.has(m.player_id),
             // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе
             tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : tierOf(elo, m.player.faceit_level),
             paid: pot && lobby.settings.pot_paid.includes(m.player_id),

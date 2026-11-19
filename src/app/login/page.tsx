@@ -25,6 +25,7 @@ function returnHint(next: string, t: T): string | null {
   if (/^\/tournaments\/[^/]+\/checkin/.test(next)) return t("После входа вернём вас к check-in.");
   if (next.startsWith("/lobby/")) return t("После входа вернём вас в лобби.");
   if (next.startsWith("/matches/")) return t("После входа вернём вас к матчу.");
+  if (next.startsWith("/voice/link")) return t("После входа привяжем TeamSpeak к вашему профилю.");
   if (next.startsWith("/team")) return t("После входа откроем вашу команду.");
   return null;
 }
