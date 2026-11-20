@@ -175,7 +175,7 @@ export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; i
  * Доска выбора игроков: команды столбцами слева и справа, посередине — главное действие (или чей сейчас ход)
  * и свободные игроки. Капитан выбирает, не прокручивая страницу до блока «В ожидании».
  */
-export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInvite }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string; actions: ReactNode; onJoin: () => void; onInvite: (() => void) | null }) {
+export function CupBoard({ view, isHost, busy, run, code, actions, below, onJoin, onInvite }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string; actions: ReactNode; below?: ReactNode; onJoin: () => void; onInvite: (() => void) | null }) {
   const t = useT();
   const { lobby, me } = view;
   const draft = lobby.draft;
@@ -195,7 +195,9 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInv
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_minmax(0,1fr)]">
       {column(0, half)}
-      <section aria-label={t("Свободные игроки")} className={cn("@container order-first min-w-0 rounded-surface border bg-surface lg:order-none", myTurn ? "border-accent/70" : "border-line-subtle")}>
+      {/* середина: свободные игроки, под ними — сведения о матче (место под списком иначе пустует) */}
+      <div className="order-first min-w-0 space-y-4 lg:order-none">
+      <section aria-label={t("Свободные игроки")} className={cn("@container min-w-0 rounded-surface border bg-surface", myTurn ? "border-accent/70" : "border-line-subtle")}>
         <div className="border-b border-line-subtle p-4">
           {draft ? (
             <div className="flex items-end justify-between gap-4">
@@ -251,6 +253,8 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInv
           {!draft && <EmptySlot onClick={onJoin} />}
         </div>
       </section>
+      {below}
+      </div>
       {column(half, view.teams.length)}
     </div>
   );

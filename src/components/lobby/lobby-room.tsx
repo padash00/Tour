@@ -201,7 +201,7 @@ export function LobbyRoom({
   const board = many && lobby.status === "waiting";
   const spectatorsPanel = (
     <Panel title={t("Наблюдатели")} count={`${specs.length}/${s.max_spectators}`}>
-                <div className="grid gap-2">
+                <div className={cn("grid gap-2", board && "sm:grid-cols-2 lg:grid-cols-4")}>
                   {specs.map((m) => (
                     <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} />
                   ))}
@@ -296,6 +296,7 @@ export function LobbyRoom({
                     busy={busy}
                     run={run}
                     code={code}
+                    below={<CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={board || !lobby.invite_token ? null : copyInvite} />}
                     onJoin={() => clickEmpty("wait")}
                     onInvite={lobby.invite_token ? copyInvite : null}
                     actions={<CenterColumn part="actions" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={null} />}
@@ -309,10 +310,14 @@ export function LobbyRoom({
                   </>
                 )}
                 {/* нижний ряд: банк, сведения о матче и наблюдатели — карточками одной ширины, а не полосами на весь экран */}
-                <div className={cn("grid items-start gap-4 md:grid-cols-2", s.pot && "xl:grid-cols-3")}>
-                  <CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={board || !lobby.invite_token ? null : copyInvite} />
-                  {spectatorsPanel}
-                </div>
+                {board ? (
+                  spectatorsPanel
+                ) : (
+                  <div className={cn("grid items-start gap-4 md:grid-cols-2", s.pot && "xl:grid-cols-3")}>
+                    <CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={board || !lobby.invite_token ? null : copyInvite} />
+                    {spectatorsPanel}
+                  </div>
+                )}
               </>
             )}
 
