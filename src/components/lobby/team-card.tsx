@@ -52,7 +52,7 @@ export function TeamCard({
   const captain = view.captains[team === "team1" ? 0 : 1];
 
   return (
-    <div className="overflow-hidden rounded-surface border border-line-subtle bg-surface">
+    <div className="rounded-surface border border-line-subtle bg-surface">
       <div className="flex items-center gap-3 border-b border-line-subtle px-4 py-3">
         <span className={cn("grid size-9 shrink-0 place-items-center rounded-control", team === "team1" ? "bg-warn/15 text-warn" : "bg-steel/15 text-steel")}>{Icon.crown("size-5")}</span>
         <div className="min-w-0 flex-1">
@@ -82,7 +82,8 @@ export function TeamCard({
           {members.length + bots.length}/{size}
         </span>
       </div>
-      <div className="divide-y divide-line-subtle">
+      {/* карточка не обрезает содержимое: меню игрока выходит за её край; низ последней строки скругляем сами */}
+      <div className="divide-y divide-line-subtle [&>*:last-child]:rounded-b-surface">
         {members.map((m) => (
           <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} big captain={m.id === captain} />
         ))}

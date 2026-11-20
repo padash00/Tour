@@ -121,7 +121,7 @@ export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; i
         const avg = rated.length ? Math.round(rated.reduce((s, m) => s + (m.faceit_elo ?? 0), 0) / rated.length) : null;
         const champion = view.cup?.state === "done" && view.cup.champion === i;
         return (
-          <section key={team.slot} className={cn("overflow-hidden rounded-surface border bg-surface", champion ? "border-accent/60" : "border-line-subtle")}>
+          <section key={team.slot} className={cn("rounded-surface border bg-surface", champion ? "border-accent/60" : "border-line-subtle")}>
             <header className="flex items-center gap-2 border-b border-line-subtle px-3 py-2.5">
               <span className="num grid size-7 shrink-0 place-items-center rounded-control bg-ink/[0.06] text-[13px] font-semibold text-fg-2">{i + 1}</span>
               <div className="min-w-0 flex-1">
