@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import * as A from "@/app/actions/lobby";
 import type { LobbyView } from "@/lib/lobby-view";
 import { mapLabel } from "@/lib/maps";
@@ -18,6 +19,23 @@ function ConnectBox({ address, label }: { address: string; label?: string }) {
       <CopyConnect address={address} label={label ? t("Скопировать {label}", { label }) : t("Скопировать IP")} />
       <code className="num select-all rounded-control border border-line bg-shell px-3 py-2.5 text-[14px] text-fg-2">connect {address}</code>
     </div>
+  );
+}
+
+/** Хост: выбор карт заново — пока игре не назначен сервер. Галочка снимает ограничение времени на ход */
+function RestartVeto({ code, busy, run, untimedNow }: { code: string; busy: boolean; run: Run; untimedNow: boolean }) {
+  const t = useT();
+  const [untimed, setUntimed] = useState(untimedNow);
+  return (
+    <>
+      <Button variant="secondary" size="sm" disabled={busy} onClick={() => run(() => A.restartLobbyVeto(code, untimed))}>
+        {t("Выбрать карты заново")}
+      </Button>
+      <label className="flex cursor-pointer items-center gap-2 text-meta text-fg-2">
+        <input type="checkbox" className="size-4 accent-accent" checked={untimed} onChange={(e) => setUntimed(e.target.checked)} />
+        {t("без ограничения времени")}
+      </label>
+    </>
   );
 }
 
@@ -91,7 +109,8 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         </div>
 
         {isHost && (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <RestartVeto code={code} busy={busy} run={run} untimedNow={!game.veto_deadline} />
             <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
               {t("Отменить игру")}
             </Button>
@@ -164,7 +183,8 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         {t("Ожидание агента")}
       </div>
       {isHost && (
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          {game.veto_pool.length > 0 && !game.server_state && <RestartVeto code={code} busy={busy} run={run} untimedNow={false} />}
           <Button variant="danger" size="sm" disabled={busy} onClick={() => run(() => A.cancelCurrentGame(code))}>
             {t("Отменить игру")}
           </Button>

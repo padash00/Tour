@@ -88,7 +88,7 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   network: "lan",
   player_pick: "free",
   pick_seconds: 60,
-  veto_seconds: 30,
+  veto_seconds: 60,
   start: "host",
   gotv: false,
   best_of: 1,

@@ -32,6 +32,7 @@ import {
   playerLobby,
   potProblem,
   READY_CHECK_SECONDS,
+  restartVeto,
   setSlot,
   slotProblem,
   startDraft,
@@ -864,6 +865,22 @@ export async function lobbyVeto(code: string, map: string): Promise<LobbyResult>
   if (captain !== player.id) return { error: team.players.length ? t("Сейчас выбирает капитан {name}", { name: team.name }) : t("За команду ботов выбирает хост") };
   const err = await lobbyVetoAct(g, map, false, t);
   return err ? { error: err } : { ok: true };
+}
+
+/** Хост (или админ сайта) запускает выбор карт заново — пока игре не назначен сервер */
+export async function restartLobbyVeto(code: string, untimed: boolean): Promise<LobbyResult> {
+  const t = await getT();
+  const bad = invalid([Code, code], [z.boolean(), untimed]);
+  if (bad) return bad;
+  const ctx = await asHost(code);
+  if ("error" in ctx) return ctx;
+  const g = ctx.lobby.current_game_id ? await getGame(ctx.lobby.current_game_id) : null;
+  if (!g || !["veto", "waiting"].includes(g.status)) return { error: t("Вето сейчас не идёт") };
+  const err = await restartVeto(g, untimed, t);
+  if (err) return { error: err };
+  await systemMessage(ctx.lobby.id, untimed ? `${ctx.player.nickname} начал выбор карт заново — без ограничения времени` : `${ctx.player.nickname} начал выбор карт заново`);
+  await audit(ctx.player.id, "lobby.veto_restart", { type: "lobby", id: ctx.lobby.id }, { game: g.id, untimed, steps: g.veto.length });
+  return { ok: true };
 }
 
 // ───────────────────────── лобби на несколько команд: матчи сетки

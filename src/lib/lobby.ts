@@ -500,6 +500,25 @@ export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: 
   return null;
 }
 
+/**
+ * Выбор карт заново: шаги стираются, пул карт тот же. Только пока игре не назначен сервер — условие стоит
+ * в самом запросе, поэтому с назначением сервера (assign_game_server) не пересекается.
+ * untimed — дальше без ограничения времени на ход.
+ */
+export async function restartVeto(g: LobbyGame, untimed: boolean, t: T = makeT("ru")) {
+  if (!g.veto_pool.length) return t("В этой игре карты задаёт хост — выбора капитанов нет");
+  const settings: LobbySettings = untimed ? { ...g.settings, veto_seconds: 0 } : g.settings;
+  const { data } = await db()
+    .from("lobby_games")
+    .update({ status: "veto", veto: [], maps: [], note: null, settings, veto_deadline: vetoDeadline(settings ?? { veto_seconds: LOBBY_VETO_SECONDS }) })
+    .eq("id", g.id)
+    .in("status", ["veto", "waiting"])
+    .is("server_instance", null)
+    .select("id");
+  if (!data?.length) return t("Сервер уже назначен — карты не перевыбрать. Отмените игру и начните заново");
+  return null;
+}
+
 // ───────────────────────── фоновые задачи (на каждой синхронизации агента)
 
 export async function lobbyTick() {
