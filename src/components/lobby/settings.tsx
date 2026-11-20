@@ -4,7 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import { deleteTemplate, lookupWorkshop, saveTemplate } from "@/app/actions/lobby";
 import { mapLabel } from "@/lib/maps";
 import { MODES, type ModeKey } from "@/lib/modes";
-import { BOT_DIFFICULTY, LIMITS, PICK_SECONDS, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
+import { BOT_DIFFICULTY, LIMITS, PICK_SECONDS, POT_FEE_MAX, mapsProblem, PRESETS, withMode, type LobbySettings } from "@/lib/lobby-settings";
+import { TIERS, TIER_COLOR, tierRange } from "@/lib/tiers";
 import { tint } from "../competition/map-tile";
 import { cupTeams } from "@/lib/cup-core";
 import { useToast } from "../toast";
@@ -60,6 +61,69 @@ export function MapThumb({ map, image, className, children }: { map: string; ima
   );
 }
 
+/**
+ * Игра на банк: какие тиры пускать и какой взнос. Раньше задавалось только при создании лобби.
+ * Уже вошедших игроков смена тиров не выгоняет — она действует на тех, кто заходит после.
+ */
+function PotSettings({ s, ro, patch }: { s: LobbySettings; ro: boolean; patch: Patch }) {
+  const t = useT();
+  const [fee, setFee] = useState(String(s.pot_fee));
+  const [feeFor, setFeeFor] = useState(s.pot_fee);
+  // взнос поменял кто-то ещё (или сервер поправил значение) — показываем его
+  if (feeFor !== s.pot_fee) {
+    setFeeFor(s.pot_fee);
+    setFee(String(s.pot_fee));
+  }
+  const commitFee = () => {
+    const n = Math.min(POT_FEE_MAX, Math.max(0, Math.round(Number(fee) || 0)));
+    setFee(String(n));
+    if (n !== s.pot_fee) patch({ pot_fee: n });
+  };
+  return (
+    <>
+      <div className="rounded-[10px] bg-ink/[0.03] px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[14px]">{t("Кто может играть")}</span>
+          <div className="flex gap-1">
+            {TIERS.map((tier) => {
+              const on = s.pot_tiers.includes(tier);
+              return (
+                <button
+                  key={tier}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={ro || (on && s.pot_tiers.length === 1)}
+                  title={t("Тир {tier}: {range} ELO", { tier, range: tierRange(tier) })}
+                  onClick={() => patch({ pot_tiers: TIERS.filter((x) => (x === tier ? !on : s.pot_tiers.includes(x))) })}
+                  className={cn("num grid size-8 place-items-center rounded-[7px] border text-[13px] font-bold transition-opacity disabled:cursor-default", on ? "bg-ink/[0.06]" : "opacity-35 hover:opacity-70")}
+                  style={{ borderColor: TIER_COLOR[tier], color: TIER_COLOR[tier] }}
+                >
+                  {tier}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <Row icon={Icon.users()} label={t("Взнос с игрока, тг")}>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={POT_FEE_MAX}
+          step={500}
+          value={fee}
+          disabled={ro}
+          onChange={(e) => setFee(e.target.value)}
+          onBlur={commitFee}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          className="num h-9 w-28 rounded-control border border-line bg-surface px-2 text-right text-[14px] text-fg outline-none focus:border-accent/60 disabled:opacity-60"
+        />
+      </Row>
+    </>
+  );
+}
+
 /** Короткая панель настроек справа (как в лобби CyberShoke) */
 export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: { s: LobbySettings; editable: boolean; patch: Patch; maps: MapOption[]; images: Record<string, string>; onAdvanced: () => void }) {
   const t = useT();
@@ -94,6 +158,7 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
           <span className="num text-[13px] text-fg-3">{s.maps.length}</span>
         </button>
       )}
+      {s.pot && <PotSettings s={s} ro={ro} patch={patch} />}
       {s.pot ? (
         <div className="rounded-[10px] bg-ink/[0.03] px-4 py-3 text-meta leading-relaxed text-fg-3">
           {t("«Десятка»: 5×5 через интернет, игроков выбирают капитаны, без ботов — эти правила не меняются. Карты, раунды и паузы настраиваются как в обычном лобби.")}
