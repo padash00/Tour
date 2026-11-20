@@ -20,7 +20,7 @@ from tsq import TS, QueryError, esc, parse  # noqa: E402
 STATE = "/opt/teamspeak/state.json"
 PUBLIC = "/opt/teamspeak/www/status.json"
 RANKS_FILE = "/opt/teamspeak/ranks.json"
-FAST, SLOW = 2, 15
+FAST, SLOW = 1, 15
 
 LOBBY, AFK_NAME, ROOMS, CREATE = "Лобби", "AFK", "Свои комнаты", "+ Создать комнату"
 SKIP_CHANNELS = {"AFK", "Администрация"}
@@ -41,7 +41,7 @@ SITE_ENV = "/opt/sites/tour/web.env"   # токен сайта (AGENT_TOKEN) ч�
 ICON_IDS = "/opt/teamspeak/icons/ids.json"
 ROOM_TOPIC = "f16room:"                # тема канала-комнаты: по ней бот узнаёт свои комнаты после перезапуска
 ROOM_JOIN_POWER = 50                   # сами в комнату команды зайдут только модераторы и админы; игроков переносит бот
-SYNC, SYNC_FAST = 5, 2                 # опрос сайта; чаще — пока кто-то ждёт в «Привязке»
+SYNC, SYNC_FAST = 5, 1                 # опрос сайта; каждую секунду — пока кто-то ждёт в «Привязке» или «Телепорте»
 LINK_TTL = 9 * 60                      # ссылка привязки живёт 10 минут — новую шлём чуть раньше
 SILENT_TALK_POWER = 100                # «Привязка» и «Телепорт» немые: такой силы голоса нет ни у кого, включая админов
 ROOM_GRACE = 12                        # столько опросов подряд комнаты нет в ответе сайта — только тогда удаляем (≈ минута)
@@ -69,6 +69,7 @@ TELEPORT_DESC = (
     "В этом канале не разговаривают — голос включится в комнате команды."
 )
 ROOM_DESC = "Комната команды на время матча в лобби. Игроков переносит бот из канала «Телепорт». Удалится после игры."
+# комнаты команд создаются внизу, под «Свои комнаты» — там же, где комнаты игроков (нет такого канала — под «Телепортом»)
 PM_LINK = ("[b]Привязка профиля F16 Arena[/b]\n"
            "Открой ссылку и подтверди, что это ты: [url=%s]привязать TeamSpeak к профилю[/url]\n"
            "Ссылка действует 10 минут. После привязки перенесу тебя в «Телепорт».")
@@ -277,7 +278,8 @@ class Bot:
         c["cid"] = cid
 
     def sync_rooms(self, rooms, clients, tele):
-        """Комнаты команд под «Телепортом» — по списку сайта. Возвращает {идентификатор игрока: канал его команды}."""
+        """Комнаты команд под «Свои комнаты» — по списку сайта. Возвращает {идентификатор игрока: канал его команды}."""
+        parent = self.cid.get(ROOMS) or tele
         want = {r["key"]: r for r in rooms if r.get("key") and r.get("name")}
         have = {}
         for ch in self.chans:
@@ -311,7 +313,7 @@ class Bot:
             if not cid:
                 try:
                     cid = self.ts.cmd("channelcreate channel_name=%s cpid=%s channel_flag_permanent=1 channel_codec=4 channel_codec_quality=10"
-                                      " channel_topic=%s channel_description=%s" % (esc(name), tele, esc(ROOM_TOPIC + key), esc(ROOM_DESC)))[0]["cid"]
+                                      " channel_topic=%s channel_description=%s" % (esc(name), parent, esc(ROOM_TOPIC + key), esc(ROOM_DESC)))[0]["cid"]
                 except QueryError as e:
                     log("room create", name, e)
                     continue
@@ -566,8 +568,8 @@ class Bot:
                         self.refresh()
 
             # привязка профиля и комнаты команд — по ответу сайта
-            bind = self.cid.get(BIND)
-            if now - last_voice >= (SYNC_FAST if any(c["cid"] == bind for c in clients) else SYNC):
+            waiting = {self.cid.get(BIND), self.cid.get(TELEPORT)} - {None}
+            if now - last_voice >= (SYNC_FAST if any(c["cid"] in waiting for c in clients) else SYNC):
                 last_voice = now
                 try:
                     self.voice_tick(clients)
