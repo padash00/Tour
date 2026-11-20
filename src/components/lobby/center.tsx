@@ -265,28 +265,29 @@ export function CenterColumn({
       );
   const info = part !== "actions";
 
+  // большое лобби: банк и сведения — отдельными карточками одного ряда (рядом с ними встают наблюдатели)
   if (part === "info") {
     return (
-      <section aria-label={t("О матче")} className={cn("grid items-start gap-4", pot && "md:grid-cols-[minmax(0,340px)_minmax(0,1fr)]")}>
+      <>
         <PotPanel view={view} />
-        <div className="flex min-w-0 flex-col gap-4">
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section aria-label={t("О матче")} className="rounded-surface border border-line-subtle bg-surface p-4 sm:p-5">
+          <h2 className="mb-2 text-title text-fg">{t("О матче")}</h2>
+          <dl className="divide-y divide-line-subtle">
             {facts.map((f) => (
-              <div key={f.label} className="min-w-0 rounded-control border border-line-subtle bg-surface px-3 py-2.5">
-                <dt className="flex items-center gap-2 text-meta text-fg-3">
-                  {f.icon} {f.label}
-                </dt>
-                <dd className="mt-1 truncate text-[14px] font-medium text-fg">{f.value}</dd>
+              <div key={f.label} className="flex items-center gap-3 py-2.5">
+                <span className="text-fg-3">{f.icon}</span>
+                <dt className="text-[14px] text-fg-2">{f.label}</dt>
+                <dd className="ml-auto min-w-0 truncate text-right text-[14px] font-medium text-fg">{f.value}</dd>
               </div>
             ))}
           </dl>
           {onInvite && (
-            <button type="button" onClick={onInvite} className="inline-flex items-center gap-2 self-start text-[14px] font-medium text-accent transition-colors hover:text-fg">
+            <button type="button" onClick={onInvite} className="mt-3 inline-flex items-center gap-2 text-[14px] font-medium text-accent transition-colors hover:text-fg">
               {Icon.users("size-4")} {t("Пригласить игроков")}
             </button>
           )}
-        </div>
-      </section>
+        </section>
+      </>
     );
   }
 
