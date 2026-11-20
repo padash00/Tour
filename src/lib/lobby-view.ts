@@ -285,8 +285,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             ready: m.ready,
             online: isOnline(m),
             voice: inVoice.has(m.player_id),
-            // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе
-            tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : tierOf(elo, m.player.faceit_level),
+            // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе; без рейтинга FACEIT — тоже D
+            tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : !elo ? "D" : tierOf(elo, m.player.faceit_level),
             paid: pot && lobby.settings.pot_paid.includes(m.player_id),
           };
         }),

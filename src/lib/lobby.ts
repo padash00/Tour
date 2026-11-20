@@ -188,10 +188,13 @@ export async function filterProblem(s: LobbySettings, p: Pick<Player, "id" | "fa
 /** ELO игрока в «Десятке»: зафиксированное на старте выбора, иначе текущее из профиля */
 export const potElo = (s: Pick<LobbySettings, "pot_elo">, p: { id: string; faceit_elo: number | null }) => s.pot_elo[p.id] ?? p.faceit_elo ?? null;
 
-/** Почему игрока не пускает «Десятка» (null — пускает): нужен FACEIT ELO и тир из допущенных организатором */
+/**
+ * Почему игрока не пускает «Десятка» (null — пускает): тир должен быть из допущенных организатором.
+ * Игрок без рейтинга FACEIT считается тиром D (с 20.11.2026 — раньше без рейтинга не пускали вовсе).
+ */
 export function potProblem(s: LobbySettings, p: { faceit_elo: number | null; faceit_level: number | null }, t: T = makeT("ru")) {
   if (!s.pot) return null;
-  if (!p.faceit_elo) return t("В «Десятку» пускают только с рейтингом FACEIT: сыграйте на FACEIT хотя бы один матч CS2 с этого Steam-аккаунта");
+  if (!p.faceit_elo) return s.pot_tiers.includes("D") ? null : t("Эта игра для тиров {tiers} — без рейтинга FACEIT пускают только в игры с тиром D", { tiers: s.pot_tiers.join(", ") });
   const tier = tierOf(p.faceit_elo, p.faceit_level);
   if (!tier) return t("В «Десятку» пускают от {n} ELO FACEIT — у вас {elo} ELO", { n: TIER_MIN_ELO, elo: p.faceit_elo });
   if (!s.pot_tiers.includes(tier)) {

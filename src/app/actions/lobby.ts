@@ -817,9 +817,7 @@ async function beginSnakeDraft(lobby: Lobby, members: Awaited<ReturnType<typeof 
       return { m, elo: fresh?.elo ?? lobby.settings.pot_elo[m.player_id] ?? m.player.faceit_elo ?? null };
     }),
   );
-  // рейтинг обязателен только в игре на банк: по нему считаются тиры
-  const unrated = lobby.settings.pot ? rated.filter((r) => !r.elo) : [];
-  if (unrated.length) return { error: t("Нет рейтинга FACEIT: {names} — замените игрока", { names: unrated.map((r) => r.m.player.nickname).join(", ") }) };
+  // игрок без рейтинга FACEIT играет как тир D и в порядке по ELO стоит последним
   const order = [...rated].sort((a, b) => (b.elo ?? 0) - (a.elo ?? 0) || a.m.joined_at.localeCompare(b.m.joined_at));
   let caps = order.slice(0, teams);
   if (chosen?.length) {
