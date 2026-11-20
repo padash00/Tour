@@ -108,6 +108,9 @@ export function CaptainsButton({ view, busy, run, code, label, variant = "primar
   );
 }
 
+/** Цвет номера команды — чтобы команды различались с одного взгляда (после восьмой повторяются) */
+const TEAM_TONE = ["bg-warn/15 text-warn", "bg-steel/15 text-steel", "bg-ok/15 text-ok", "bg-danger/15 text-danger"];
+
 /** Карточка одной команды большого лобби. slots — показывать свободные места (на доске выбора игроков) */
 function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyView; index: number; isHost: boolean; busy: boolean; run: Run; code: string; slots?: boolean }) {
   const t = useT();
@@ -122,12 +125,13 @@ function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyV
   const avg = rated.length ? Math.round(rated.reduce((sum, m) => sum + (m.faceit_elo ?? 0), 0) / rated.length) : null;
   const champion = view.cup?.state === "done" && view.cup.champion === index;
   const picking = !!draft && draft.turn - 1 === index;
-  const free = slots && members.length > 0 ? Math.max(0, size - members.length) : 0;
+  // на доске выбора у команды всегда видны все места: первое — капитан, остальные ждут выбора
+  const free = slots ? Math.max(0, size - Math.max(members.length, 1)) : 0;
   return (
     // без overflow-hidden: меню игрока (три точки) выходит за край карточки
     <section className={cn("rounded-surface border bg-surface transition-[border-color,box-shadow]", picking ? "border-accent/70 shadow-[0_0_0_1px_var(--color-accent)]" : champion ? "border-accent/60" : "border-line-subtle")}>
       <header className="flex items-center gap-2.5 border-b border-line-subtle px-3 py-2.5">
-        <span className={cn("num grid size-7 shrink-0 place-items-center rounded-control text-[13px] font-semibold", picking ? "bg-accent text-accent-ink" : "bg-ink/[0.06] text-fg-2")}>{index + 1}</span>
+        <span className={cn("num grid size-7 shrink-0 place-items-center rounded-control text-[13px] font-semibold", picking ? "bg-accent text-accent-ink" : TEAM_TONE[index % TEAM_TONE.length])}>{index + 1}</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-semibold text-fg">{team.name}</div>
           <div className="num text-micro text-fg-3">
@@ -142,15 +146,15 @@ function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyV
         {members.map((m: ViewMember) => (
           <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} captain={captain === m.id} />
         ))}
-        {Array.from({ length: free }, (_, i) => (
-          <div key={i} className="h-11 rounded-control border border-dashed border-line-subtle" aria-hidden />
-        ))}
         {members.length === 0 &&
           (canAssign ? (
             <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Назначить капитана")} variant="card" />
           ) : (
             <div className="px-2 py-4 text-center text-meta text-fg-4">{t("Капитан ещё не назначен")}</div>
           ))}
+        {Array.from({ length: free }, (_, i) => (
+          <div key={i} className="h-11 rounded-control border border-dashed border-line" aria-hidden />
+        ))}
       </div>
     </section>
   );
@@ -171,7 +175,7 @@ export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; i
  * Доска выбора игроков: команды столбцами слева и справа, посередине — главное действие (или чей сейчас ход)
  * и свободные игроки. Капитан выбирает, не прокручивая страницу до блока «В ожидании».
  */
-export function CupBoard({ view, isHost, busy, run, code, actions, onJoin }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string; actions: ReactNode; onJoin: () => void }) {
+export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInvite }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string; actions: ReactNode; onJoin: () => void; onInvite: (() => void) | null }) {
   const t = useT();
   const { lobby, me } = view;
   const draft = lobby.draft;
@@ -179,6 +183,8 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin }: { v
   const pool = view.members.filter((m) => m.slot === "wait").sort((x, y) => (y.faceit_elo ?? 0) - (x.faceit_elo ?? 0));
   const picker = draft ? view.members.find((m) => m.id === draft.captains[draft.turn - 1]) : null;
   const myTurn = !!draft && me?.id === draft.captains[draft.turn - 1];
+  const need = playersNeeded(lobby.settings);
+  const gathered = view.members.filter((m) => m.slot !== "spec").length;
   const column = (from: number, to: number) => (
     <div className="min-w-0 space-y-3">
       {view.teams.slice(from, to).map((team, i) => (
@@ -210,7 +216,20 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin }: { v
               </div>
             </div>
           ) : (
-            actions
+            <>
+              {actions}
+              <div className="mt-4 flex items-center gap-3">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/[0.08]">
+                  <div className={cn("h-full rounded-full transition-[width]", gathered >= need ? "bg-ok" : "bg-accent")} style={{ width: `${Math.min(100, (gathered / need) * 100)}%` }} />
+                </div>
+                <span className="num shrink-0 text-meta text-fg-2">{t("Игроков")} {gathered}/{need}</span>
+                {onInvite && (
+                  <button type="button" onClick={onInvite} className="inline-flex shrink-0 items-center gap-1.5 text-meta font-medium text-accent transition-colors hover:text-fg">
+                    {Icon.users("size-4")} {t("Пригласить")}
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
         <div className="flex items-center gap-3 px-4 pt-4">

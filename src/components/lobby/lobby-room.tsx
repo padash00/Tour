@@ -287,6 +287,7 @@ export function LobbyRoom({
                     run={run}
                     code={code}
                     onJoin={() => clickEmpty("wait")}
+                    onInvite={lobby.invite_token ? copyInvite : null}
                     actions={<CenterColumn part="actions" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={null} />}
                   />
                 ) : (
@@ -297,7 +298,7 @@ export function LobbyRoom({
                     <CupTeams view={view} isHost={isHost} busy={busy} run={run} code={code} />
                   </>
                 )}
-                <CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
+                <CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={board || !lobby.invite_token ? null : copyInvite} />
               </>
             )}
 
