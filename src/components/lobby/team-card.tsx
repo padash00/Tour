@@ -126,6 +126,7 @@ export function PlayerLine({
   code,
   big,
   captain,
+  slim,
   children,
 }: {
   m: ViewMember;
@@ -135,6 +136,8 @@ export function PlayerLine({
   code: string;
   big?: boolean;
   captain?: boolean;
+  /** узкая ячейка (свободные игроки в две колонки): без значка уровня FACEIT — ELO и так написан */
+  slim?: boolean;
   children?: ReactNode;
 }) {
   const t = useT();
@@ -185,7 +188,7 @@ export function PlayerLine({
         </div>
       </div>
       {big && <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />}
-      {m.faceit_level && !m.tier ? <FaceitLevel level={m.faceit_level} /> : null}
+      {m.faceit_level && !m.tier && !slim ? <FaceitLevel level={m.faceit_level} /> : null}
       {showReady &&
         (m.ready ? (
           <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ok text-[#06130c] shadow-[0_0_16px_-2px_var(--color-ok)] animate-[pop_.25s_cubic-bezier(.2,.8,.2,1)]" title={t("Готов")}>

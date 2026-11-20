@@ -193,9 +193,9 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInv
     </div>
   );
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_minmax(0,1fr)]">
       {column(0, half)}
-      <section aria-label={t("Свободные игроки")} className={cn("order-first min-w-0 rounded-surface border bg-surface lg:order-none", myTurn ? "border-accent/70" : "border-line-subtle")}>
+      <section aria-label={t("Свободные игроки")} className={cn("@container order-first min-w-0 rounded-surface border bg-surface lg:order-none", myTurn ? "border-accent/70" : "border-line-subtle")}>
         <div className="border-b border-line-subtle p-4">
           {draft ? (
             <div className="flex items-end justify-between gap-4">
@@ -237,9 +237,9 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInv
           <span className="num rounded-chip bg-ink/[0.06] px-2 py-0.5 text-micro text-fg-2">{pool.length}</span>
           {lobby.settings.filter && <span className="ml-auto text-meta text-fg-3">{t("Фильтр игроков включён")}</span>}
         </div>
-        <div className="grid gap-1.5 p-4 pt-3">
+        <div className="grid gap-1.5 p-4 pt-3 @[560px]:grid-cols-2">
           {pool.map((m) => (
-            <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code}>
+            <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} slim>
               {myTurn && (
                 <Button size="sm" disabled={busy} onClick={() => run(() => A.pickInDraft(code, m.id))}>
                   {t("Выбрать")}
@@ -247,7 +247,7 @@ export function CupBoard({ view, isHost, busy, run, code, actions, onJoin, onInv
               )}
             </PlayerLine>
           ))}
-          {pool.length === 0 && <p className="py-3 text-center text-meta text-fg-3">{draft ? t("Все игроки разобраны по командам") : t("Свободных игроков нет")}</p>}
+          {pool.length === 0 && <p className="py-3 text-center text-meta text-fg-3 @[560px]:col-span-2">{draft ? t("Все игроки разобраны по командам") : t("Свободных игроков нет")}</p>}
           {!draft && <EmptySlot onClick={onJoin} />}
         </div>
       </section>
