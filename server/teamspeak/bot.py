@@ -1,7 +1,7 @@
 """F16 Bot для TeamSpeak F16 Arena.
 
 - «+ Создать комнату»: зашёл — бот создаёт личную временную комнату и переносит туда;
-- команды в чате сервера / лобби / в личке: !помощь, !комната, !5x5, !онлайн, !ранг, !бронь, !турнир, !музыка, !afk;
+- команды в чате сервера / лобби / в личке: !помощь, !комната, !5x5, !онлайн, !ранг, !бронь, !турнир, !afk;
 - ранги за часы в TeamSpeak (Свой → Завсегдатай → Легенда);
 - приветствие новичков, перенос отошедших в AFK;
 - «Привязка»: зашёл — бот шлёт в личку ссылку на сайт, по ней подключение привязывается к профилю игрока;
@@ -24,10 +24,7 @@ FAST, SLOW = 1, 15
 
 LOBBY, AFK_NAME, ROOMS, CREATE = "Лобби", "AFK", "Свои комнаты", "+ Создать комнату"
 SKIP_CHANNELS = {"AFK", "Администрация"}
-MUSIC_BOT, MUSIC_CHANNEL = "F16 Music", "Музыка"
-MUSIC_API = "http://127.0.0.1:58913/api/bot/use/0/("
-YTDLP = "/opt/teamspeak/musicbot/bin/yt-dlp.pyz"
-SKIP_NICKS = {MUSIC_BOT}  # музыкальный бот молчит между треками — не трогать
+SKIP_NICKS = set()  # ники, которых бот не трогает (музыкального бота больше нет)
 AWAY_AFTER = 2 * 60          # статус «отошёл» — через 2 минуты
 MUTED_AFTER = 10 * 60        # выключен звук и молчит — через 10 минут
 IDLE_AFTER = 60 * 60         # просто молчит — через час
@@ -98,12 +95,9 @@ HELP = (
     "[b]!ранг[/b] — твои часы на сервере и следующий ранг\n"
     "[b]!бронь[/b] — забронировать ПК в клубе\n"
     "[b]!турнир[/b] — турниры F16 Arena\n"
-    "[b]!музыка[/b] — как включить музыку\n"
     "[b]!afk[/b] — уйти в AFK"
 )
-MUSIC = ("Зайди в канал «Музыка» и напиши в чат канала: [b]!p название[/b] — найду на YouTube и включу,\n"
-         "или [b]!play ссылка[/b] (YouTube или радио).\n"
-         "Ещё: [b]!q название[/b] — в очередь, !next, !pause, !stop, !volume 40, !song — что играет.")
+
 
 
 def log(*a):
@@ -161,43 +155,6 @@ class Bot:
         for ev in ("textserver", "textprivate"):
             self.ts.cmd("servernotifyregister event=" + ev)
         self.ts.cmd("servernotifyregister event=textchannel id=" + self.cid[LOBBY])
-        # второе query-соединение сидит в «Музыке» и слушает её чат (query видит чат только своего канала)
-        self.dj = TS()
-        self.dj_me = self.dj.cmd("whoami")[0]["client_id"]
-        self.dj.cmd("clientmove clid=%s cid=%s" % (self.dj_me, self.cid[MUSIC_CHANNEL]))
-        self.dj.cmd("servernotifyregister event=textchannel id=" + self.cid[MUSIC_CHANNEL])
-        self.dj_out = []  # ответы из потоков поиска — отправляет основной цикл
-
-    # ── поиск музыки по названию: !p / !q ──
-    def music_search(self, text, nick, queue):
-        try:
-            out = subprocess.run(
-                ["python3", YTDLP, "--no-warnings", "--flat-playlist", "--print", "%(id)s|%(title)s|%(duration)s",
-                 "ytsearch1:" + text], capture_output=True, text=True, timeout=25).stdout.strip()
-            if not out:
-                self.dj_out.append("Ничего не нашёл по запросу «%s»." % text); return
-            vid, title, dur = (out.split("|") + ["", ""])[:3]
-            url = "https://www.youtube.com/watch?v=" + vid
-            api = "%s/%s/%s" % (MUSIC_API, "add" if queue else "play", urllib.parse.quote(url, safe=""))
-            with urllib.request.urlopen(api, timeout=60) as r:
-                r.read()
-            d = int(float(dur)) if dur and dur not in ("NA", "None") else 0
-            ln = " (%d:%02d)" % (d // 60, d % 60) if d else ""
-            self.dj_out.append("%s [b]%s[/b]%s — по просьбе %s" % ("В очередь:" if queue else "Включаю:", title, ln, nick))
-            log("music", "add" if queue else "play", title, "by", nick)
-        except Exception as e:
-            log("music search error", e)
-            self.dj_out.append("Не получилось включить «%s». Попробуй ссылкой: !play ссылка" % text)
-
-    def on_music_text(self, ev):
-        msg = ev.get("msg", "").strip()
-        if ev.get("invokerid") in (self.me, self.dj_me):
-            return
-        m = re.match(r"!(p|q)\s+(.+)", msg, re.I | re.S)
-        if m and not re.match(r"\[?url|https?://", m.group(2), re.I):
-            threading.Thread(target=self.music_search, daemon=True,
-                             args=(m.group(2).strip()[:120], ev.get("invokername", ""), m.group(1).lower() == "q")).start()
-
     # ── данные сервера ──
     def refresh(self):
         self.chans = self.ts.cmd("channellist -topic")
@@ -484,13 +441,10 @@ class Bot:
             self.pm(clid, "Бронь ПК и PlayStation: [url=%s]f16-arena.kz[/url] → «Забронировать». Клуб работает 24/7." % SITE)
         elif cmd in ("!турнир", "!турниры", "!tournament"):
             self.pm(clid, "Турниры F16 Arena: [url=https://tournament.f16-arena.kz]tournament.f16-arena.kz[/url]")
-        elif cmd in ("!музыка", "!music"):
-            self.pm(clid, MUSIC)
         elif cmd == "!afk" and self.cid.get(AFK_NAME):
             self.ts.cmd("clientmove clid=%s cid=%s" % (clid, self.cid[AFK_NAME]))
         else:
-            if self.cname.get(client["cid"]) != "Музыка":  # команды музыки — боту F16 Music
-                self.pm(clid, "Не знаю такую команду. Напиши [b]!помощь[/b].")
+            self.pm(clid, "Не знаю такую команду. Напиши [b]!помощь[/b].")
 
     # ── ранги ──
     def load_ranks(self):
@@ -538,29 +492,10 @@ class Bot:
                     except Exception as e:
                         log("command error", e)
 
-            # чат «Музыки»: !p / !q
-            self.dj.cmd("whoami")  # прокачивает накопившиеся notify-события
-            while self.dj.events:
-                line = self.dj.events.pop(0)
-                if line.startswith("notifytextmessage"):
-                    self.on_music_text(parse(line.partition(" ")[2])[0])
-            while self.dj_out:
-                self.dj.cmd("sendtextmessage targetmode=2 target=%s msg=%s" % (self.cid[MUSIC_CHANNEL], esc(self.dj_out.pop(0))))
-
-            # F16 Music живёт только в «Музыке»
-            music = self.cid.get(MUSIC_CHANNEL)
-            for c in clients:
-                if c["client_nickname"] == MUSIC_BOT and music and c["cid"] != music:
-                    try:
-                        self.ts.cmd("clientmove clid=%s cid=%s" % (c["clid"], music))
-                        log("music bot returned from", self.cname.get(c["cid"]))
-                    except Exception as e:
-                        log("music bot move", e)
-
             # «+ Создать комнату»
             create = self.cid.get(CREATE)
             for c in clients:
-                if create and c["cid"] == create and c["client_nickname"] != MUSIC_BOT:
+                if create and c["cid"] == create:
                     try:
                         self.make_room(c, "Комната " + c["client_nickname"])
                     except Exception as e:
