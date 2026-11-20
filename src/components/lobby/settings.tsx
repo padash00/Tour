@@ -114,6 +114,10 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
           </Row>
         </>
       )}
+      {/* наблюдатели по умолчанию выключены: блок в комнате появляется, только когда хост их включил */}
+      <Row icon={Icon.tv()} label={t("Наблюдатели")}>
+        <Toggle on={s.max_spectators > 0} disabled={ro} onChange={(v) => patch({ max_spectators: v ? LIMITS.max_spectators[1] : 0 })} />
+      </Row>
     </div>
   );
 }

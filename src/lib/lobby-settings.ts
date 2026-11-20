@@ -98,7 +98,7 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   rematch: true,
   voice: "team",
   max_waiting: 50,
-  max_spectators: 10,
+  max_spectators: 0, // наблюдатели выключены, пока хост не включит их в настройках
   filter: false,
   filter_faceit_min: 0,
   filter_faceit_max: 10,

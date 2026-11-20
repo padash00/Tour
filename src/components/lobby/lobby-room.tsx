@@ -199,7 +199,8 @@ export function LobbyRoom({
   const showProgress = phase !== "waiting" && phase !== "draft" && phase !== "closed";
   // большое лобби до матчей: доска выбора — команды по бокам, свободные игроки посередине
   const board = many && lobby.status === "waiting";
-  const spectatorsPanel = (
+  // наблюдатели выключены (и никого там нет) — блока нет вовсе
+  const spectatorsPanel = s.max_spectators > 0 || specs.length > 0 ? (
     <Panel title={t("Наблюдатели")} count={`${specs.length}/${s.max_spectators}`}>
                 <div className={cn("grid gap-2", board && "sm:grid-cols-2 lg:grid-cols-4")}>
                   {specs.map((m) => (
@@ -208,7 +209,7 @@ export function LobbyRoom({
                   {specs.length < s.max_spectators && <EmptySlot onClick={() => clickEmpty("spec")} />}
                 </div>
               </Panel>
-  );
+  ) : null;
 
   return (
     <LobbyClock value={offset}>
@@ -380,7 +381,7 @@ export function LobbyRoom({
               </section>
             ) : null}
 
-            {!board && <div className={cn("grid gap-4", !many && "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]")}>
+            {!board && <div className={cn("grid gap-4", !many && spectatorsPanel && "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]")}>
               {!board && <Panel
                 title={t("В ожидании")}
                 count={waiting.length}

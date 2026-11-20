@@ -150,7 +150,7 @@ export function PlayerLine({
       { slot: "wait", label: t("В ожидание") },
       { slot: "spec", label: t("В наблюдатели") },
     ] as { slot: Slot; label: string }[]
-  ).filter((x) => x.slot !== m.slot);
+  ).filter((x) => x.slot !== m.slot && (x.slot !== "spec" || view.lobby.settings.max_spectators > 0));
   // готовность видна, пока идёт проверка или в режиме «когда все готовы»
   const showReady = big && inTeam && view.lobby.status === "waiting" && (!!view.lobby.ready_check_until || view.lobby.settings.start === "all_ready");
 
