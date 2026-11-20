@@ -132,7 +132,7 @@ export const DEFAULT_SETTINGS: LobbySettings = {
 };
 
 /** Карты «Десятки» по умолчанию — соревновательный пул, вето */
-export const POT_MAPS = ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_train"];
+export const POT_MAPS = ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_cache"];
 export const POT_FEE_MAX = 1_000_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -329,7 +329,7 @@ export const PRESETS: { key: string; name: string; text: string; settings: Parti
     key: "classic",
     name: tr("Классика 5×5"),
     text: tr("MR24, нож, овертаймы, вето карт"),
-    settings: { mode: "5v5", team_size: 5, max_rounds: 24, knife: true, overtime: true, map_choice: "veto", maps: ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_train"] },
+    settings: { mode: "5v5", team_size: 5, max_rounds: 24, knife: true, overtime: true, map_choice: "veto", maps: ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_cache"] },
   },
   {
     key: "wingman",

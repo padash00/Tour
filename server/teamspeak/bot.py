@@ -41,7 +41,7 @@ SITE_ENV = "/opt/sites/tour/web.env"   # токен сайта (AGENT_TOKEN) ч�
 ICON_IDS = "/opt/teamspeak/icons/ids.json"
 ROOM_TOPIC = "f16room:"                # тема канала-комнаты: по ней бот узнаёт свои комнаты после перезапуска
 ROOM_JOIN_POWER = 50                   # сами в комнату команды зайдут только модераторы и админы; игроков переносит бот
-SYNC, SYNC_FAST = 5, 1                 # опрос сайта; каждую секунду — пока кто-то ждёт в «Привязке» или «Телепорте»
+SYNC, SYNC_TELE, SYNC_FAST = 5, 2, 1   # опрос сайта: обычно раз в 5 с; раз в 2 с — пока кто-то ждёт в «Телепорте»; каждую секунду — в «Привязке»
 LINK_TTL = 9 * 60                      # ссылка привязки живёт 10 минут — новую шлём чуть раньше
 SILENT_TALK_POWER = 100                # «Привязка» и «Телепорт» немые: такой силы голоса нет ни у кого, включая админов
 ROOM_GRACE = 12                        # столько опросов подряд комнаты нет в ответе сайта — только тогда удаляем (≈ минута)
@@ -568,8 +568,9 @@ class Bot:
                         self.refresh()
 
             # привязка профиля и комнаты команд — по ответу сайта
-            waiting = {self.cid.get(BIND), self.cid.get(TELEPORT)} - {None}
-            if now - last_voice >= (SYNC_FAST if any(c["cid"] in waiting for c in clients) else SYNC):
+            bind, tele = self.cid.get(BIND), self.cid.get(TELEPORT)
+            every = SYNC_FAST if any(c["cid"] == bind for c in clients) else SYNC_TELE if any(c["cid"] == tele for c in clients) else SYNC
+            if now - last_voice >= every:
                 last_voice = now
                 try:
                     self.voice_tick(clients)
