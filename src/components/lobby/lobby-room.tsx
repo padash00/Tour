@@ -18,7 +18,7 @@ import { Chat } from "./chat";
 import { Countdown, LobbyClock } from "./countdown";
 import { Gate, JoinGate } from "./join-gate";
 import { EmptySlot, Panel, PlayerLine, TeamCard } from "./team-card";
-import { CupBracket, CupRoomBanner, CupTeams, MyMatchBanner } from "./cup";
+import { CupBoard, CupBracket, CupRoomBanner, CupTeams, MyMatchBanner } from "./cup";
 import { playersNeeded } from "@/lib/lobby-settings";
 import { phaseOf, useLobbyView, type Run } from "./use-lobby-view";
 import { useT } from "@/lib/i18n/client";
@@ -197,10 +197,12 @@ export function LobbyRoom({
           .then(() => toast.success(lobby.visibility === "public" ? t("Ссылка скопирована") : t("Ссылка скопирована — по ней можно войти без пароля")))
     : null;
   const showProgress = phase !== "waiting" && phase !== "draft" && phase !== "closed";
+  // большое лобби до матчей: доска выбора — команды по бокам, свободные игроки посередине
+  const board = many && lobby.status === "waiting";
 
   return (
     <LobbyClock value={offset}>
-      <div className="mx-auto w-full max-w-wide px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      <div className={cn("mx-auto w-full px-4 pb-16 pt-6 sm:px-6 lg:px-8", many ? "max-w-[1840px]" : "max-w-wide")}>
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="min-w-0 space-y-5">
             {/* баннер карты: навигация, число игроков, выход */}
@@ -271,17 +273,31 @@ export function LobbyRoom({
             {s.cup_of && <CupRoomBanner parent={s.cup_of.code} />}
             {view.cup?.myRoom && <MyMatchBanner room={view.cup.myRoom} />}
 
-            <StageBanner view={view} isHost={isHost} busy={busy} run={run} code={code} />
+            {/* на доске выбора ход капитана показан прямо над свободными игроками */}
+            {!(board && phase === "draft") && <StageBanner view={view} isHost={isHost} busy={busy} run={run} code={code} />}
 
             {many && (
               <>
-                <div className="grid gap-4 lg:grid-cols-[minmax(220px,300px)_minmax(0,1fr)]">
-                  <CenterColumn view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
-                  <div className="min-w-0 space-y-4">
-                    {view.cup && <CupBracket cup={view.cup} isHost={isHost} busy={busy} run={run} code={code} />}
+                {view.cup && <CupBracket cup={view.cup} isHost={isHost} busy={busy} run={run} code={code} />}
+                {board ? (
+                  <CupBoard
+                    view={view}
+                    isHost={isHost}
+                    busy={busy}
+                    run={run}
+                    code={code}
+                    onJoin={() => clickEmpty("wait")}
+                    actions={<CenterColumn part="actions" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={null} />}
+                  />
+                ) : (
+                  <>
+                    <div className="mx-auto w-full max-w-md">
+                      <CenterColumn part="actions" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={null} />
+                    </div>
                     <CupTeams view={view} isHost={isHost} busy={busy} run={run} code={code} />
-                  </div>
-                </div>
+                  </>
+                )}
+                <CenterColumn part="info" view={view} isHost={isHost} busy={busy} run={run} code={code} onInvite={lobby.invite_token ? copyInvite : null} />
               </>
             )}
 
@@ -344,8 +360,8 @@ export function LobbyRoom({
               </section>
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <Panel
+            <div className={cn("grid gap-4", !board && "lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]")}>
+              {!board && <Panel
                 title={t("В ожидании")}
                 count={waiting.length}
                 right={
@@ -376,10 +392,10 @@ export function LobbyRoom({
                   ))}
                   <EmptySlot onClick={() => clickEmpty("wait")} />
                 </div>
-              </Panel>
+              </Panel>}
 
               <Panel title={t("Наблюдатели")} count={`${specs.length}/${s.max_spectators}`}>
-                <div className="grid gap-2">
+                <div className={cn("grid gap-2", board && "sm:grid-cols-2 lg:grid-cols-3")}>
                   {specs.map((m) => (
                     <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} />
                   ))}

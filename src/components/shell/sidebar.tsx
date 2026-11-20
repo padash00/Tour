@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, Crown, Headphones, Home, MessagesSquare, ScanSearch, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy } from "lucide-react";
-import type { ReactNode } from "react";
+import { BarChart3, BookOpen, Medal, ChevronRight, CircleHelp, Copy, Crosshair, Crown, Headphones, Home, MessagesSquare, ScanSearch, Search, Shield, Trophy, User, UserRound, Users, type LucideIcon, LifeBuoy, Menu as MenuIcon } from "lucide-react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { BrandLogo } from "../brand";
 import { Avatar, Timer, cn } from "@/components/ds";
 import { useToast } from "../toast";
@@ -55,11 +55,42 @@ export const HELP = [
 
 const navActive = (pathname: string, item: NavItem) => (item.href === "/" ? pathname === "/" : isActive(pathname, item));
 
+/**
+ * Комната лобби занимает всю ширину экрана: боковое меню там скрыто и открывается кнопкой в шапке поверх страницы.
+ * Открыто ли меню — помним вместе с адресом страницы: переход по ссылке закрывает его сам.
+ */
+const wideRoom = (pathname: string) => /^\/lobby\/[^/]+/.test(pathname);
+let menuOpenAt: string | null = null;
+const menuSubs = new Set<() => void>();
+const setMenuOpenAt = (pathname: string | null) => {
+  menuOpenAt = pathname;
+  menuSubs.forEach((f) => f());
+};
+const subscribeMenu = (f: () => void) => {
+  menuSubs.add(f);
+  return () => {
+    menuSubs.delete(f);
+  };
+};
+const useMenuOpen = (pathname: string) => useSyncExternalStore(subscribeMenu, () => menuOpenAt, () => null) === pathname;
+
+/** Кнопка «меню сайта» в шапке — только там, где боковое меню скрыто */
+export function SidebarToggle() {
+  const pathname = usePathname();
+  const t = useT();
+  if (!wideRoom(pathname)) return null;
+  return (
+    <button type="button" onClick={() => setMenuOpenAt(pathname)} aria-label={t("Меню сайта")} title={t("Меню сайта")} className="hidden size-10 shrink-0 place-items-center rounded-control text-fg-2 transition-colors hover:bg-surface-2 hover:text-fg lg:grid">
+      <MenuIcon className="size-5" />
+    </button>
+  );
+}
+
 /** Отступ под боковое меню и нижнюю панель — только на страницах с оболочкой сайта */
 export function ShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   if (noChrome(pathname)) return <>{children}</>;
-  return <div className="flex min-h-full flex-1 flex-col pb-[calc(68px+env(safe-area-inset-bottom,0px))] lg:pb-0 lg:pl-[var(--sidebar-w)]">{children}</div>;
+  return <div className={cn("flex min-h-full flex-1 flex-col pb-[calc(68px+env(safe-area-inset-bottom,0px))] lg:pb-0", !wideRoom(pathname) && "lg:pl-[var(--sidebar-w)]")}>{children}</div>;
 }
 
 const TONE: Record<Activity["tone"], { box: string; dot: string }> = {
@@ -114,9 +145,13 @@ export function SiteSidebar() {
   const pathname = usePathname();
   const { status, player, activity, moreActivity } = useViewer();
   const t = useT();
+  const hidden = wideRoom(pathname);
+  const open = useMenuOpen(pathname);
   if (noChrome(pathname)) return null;
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-w)] flex-col gap-4 overflow-y-auto border-r border-line-subtle bg-shell px-3.5 py-4 lg:flex" aria-label={t("Меню сайта")}>
+    <>
+    {hidden && open && <div className="fixed inset-0 z-40 hidden bg-bg/60 lg:block" onClick={() => setMenuOpenAt(null)} aria-hidden />}
+    <aside className={cn("fixed inset-y-0 left-0 z-40 hidden w-[var(--sidebar-w)] flex-col gap-4 overflow-y-auto border-r border-line-subtle bg-shell px-3.5 py-4", hidden ? open && "shadow-[var(--shadow-pop)] lg:flex" : "lg:flex")} aria-label={t("Меню сайта")}>
       <Link href="/" className="mx-2 mb-1 mt-1 block w-fit rounded-control" aria-label={t("F16 Arena — главная")}>
         <BrandLogo height={30} />
       </Link>
@@ -190,6 +225,7 @@ export function SiteSidebar() {
         </Link>
       ) : null /* гостю кнопка входа — в шапке справа, рядом с переключателем темы */}
     </aside>
+    </>
   );
 }
 

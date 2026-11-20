@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import * as A from "@/app/actions/lobby";
 import type { LobbyView, ViewCup, ViewMember } from "@/lib/lobby-view";
 import { playersNeeded } from "@/lib/lobby-settings";
 import { Button, Dialog, buttonClass as btnClass, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
 import { Icon } from "./ui";
-import { PlayerLine } from "./team-card";
+import { EmptySlot, PlayerLine } from "./team-card";
+import { Countdown } from "./countdown";
 import type { Run } from "./use-lobby-view";
 
 /*
@@ -107,46 +108,131 @@ export function CaptainsButton({ view, busy, run, code, label, variant = "primar
   );
 }
 
-/** Команды большого лобби: компактные карточки сеткой */
-export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string }) {
+/** Карточка одной команды большого лобби. slots — показывать свободные места (на доске выбора игроков) */
+function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyView; index: number; isHost: boolean; busy: boolean; run: Run; code: string; slots?: boolean }) {
   const t = useT();
+  const team = view.teams[index];
   const size = view.lobby.settings.team_size;
+  const draft = view.lobby.draft;
   // организатор назначает капитанов и из пустой карточки команды — то же окно, что по главной кнопке
-  const canAssign = isHost && view.lobby.status === "waiting" && !view.lobby.draft;
+  const canAssign = isHost && view.lobby.status === "waiting" && !draft;
+  const captain = view.captains[index];
+  const members = view.members.filter((m) => m.slot === team.slot).sort((x, y) => Number(y.id === captain) - Number(x.id === captain));
+  const rated = members.filter((m) => m.faceit_elo);
+  const avg = rated.length ? Math.round(rated.reduce((sum, m) => sum + (m.faceit_elo ?? 0), 0) / rated.length) : null;
+  const champion = view.cup?.state === "done" && view.cup.champion === index;
+  const picking = !!draft && draft.turn - 1 === index;
+  const free = slots && members.length > 0 ? Math.max(0, size - members.length) : 0;
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {view.teams.map((team, i) => {
-        const members = view.members.filter((m) => m.slot === team.slot);
-        const rated = members.filter((m) => m.faceit_elo);
-        const avg = rated.length ? Math.round(rated.reduce((s, m) => s + (m.faceit_elo ?? 0), 0) / rated.length) : null;
-        const champion = view.cup?.state === "done" && view.cup.champion === i;
-        return (
-          <section key={team.slot} className={cn("rounded-surface border bg-surface", champion ? "border-accent/60" : "border-line-subtle")}>
-            <header className="flex items-center gap-2 border-b border-line-subtle px-3 py-2.5">
-              <span className="num grid size-7 shrink-0 place-items-center rounded-control bg-ink/[0.06] text-[13px] font-semibold text-fg-2">{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-semibold text-fg">{team.name}</div>
-                <div className="num text-micro text-fg-3">
-                  {members.length}/{size}
-                  {avg ? ` · ${t("средний ELO {n}", { n: avg })}` : ""}
-                </div>
+    // без overflow-hidden: меню игрока (три точки) выходит за край карточки
+    <section className={cn("rounded-surface border bg-surface transition-[border-color,box-shadow]", picking ? "border-accent/70 shadow-[0_0_0_1px_var(--color-accent)]" : champion ? "border-accent/60" : "border-line-subtle")}>
+      <header className="flex items-center gap-2.5 border-b border-line-subtle px-3 py-2.5">
+        <span className={cn("num grid size-7 shrink-0 place-items-center rounded-control text-[13px] font-semibold", picking ? "bg-accent text-accent-ink" : "bg-ink/[0.06] text-fg-2")}>{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-semibold text-fg">{team.name}</div>
+          <div className="num text-micro text-fg-3">
+            {members.length}/{size}
+            {avg ? ` · ${t("средний ELO {n}", { n: avg })}` : ""}
+          </div>
+        </div>
+        {picking && <span className="shrink-0 rounded-chip bg-accent-dim px-2 py-0.5 text-micro font-semibold text-accent">{t("выбирает")}</span>}
+        {champion && <span className="text-accent" title={t("Победитель")}>{Icon.crown("size-5")}</span>}
+      </header>
+      <div className="space-y-1.5 p-2">
+        {members.map((m: ViewMember) => (
+          <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} captain={captain === m.id} />
+        ))}
+        {Array.from({ length: free }, (_, i) => (
+          <div key={i} className="h-11 rounded-control border border-dashed border-line-subtle" aria-hidden />
+        ))}
+        {members.length === 0 &&
+          (canAssign ? (
+            <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Назначить капитана")} variant="card" />
+          ) : (
+            <div className="px-2 py-4 text-center text-meta text-fg-4">{t("Капитан ещё не назначен")}</div>
+          ))}
+      </div>
+    </section>
+  );
+}
+
+/** Команды большого лобби сеткой — когда идут матчи и выбирать уже некого */
+export function CupTeams({ view, isHost, busy, run, code }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string }) {
+  return (
+    <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {view.teams.map((team, i) => (
+        <TeamBox key={team.slot} view={view} index={i} isHost={isHost} busy={busy} run={run} code={code} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Доска выбора игроков: команды столбцами слева и справа, посередине — главное действие (или чей сейчас ход)
+ * и свободные игроки. Капитан выбирает, не прокручивая страницу до блока «В ожидании».
+ */
+export function CupBoard({ view, isHost, busy, run, code, actions, onJoin }: { view: LobbyView; isHost: boolean; busy: boolean; run: Run; code: string; actions: ReactNode; onJoin: () => void }) {
+  const t = useT();
+  const { lobby, me } = view;
+  const draft = lobby.draft;
+  const half = Math.ceil(view.teams.length / 2);
+  const pool = view.members.filter((m) => m.slot === "wait").sort((x, y) => (y.faceit_elo ?? 0) - (x.faceit_elo ?? 0));
+  const picker = draft ? view.members.find((m) => m.id === draft.captains[draft.turn - 1]) : null;
+  const myTurn = !!draft && me?.id === draft.captains[draft.turn - 1];
+  const column = (from: number, to: number) => (
+    <div className="min-w-0 space-y-3">
+      {view.teams.slice(from, to).map((team, i) => (
+        <TeamBox key={team.slot} view={view} index={from + i} isHost={isHost} busy={busy} run={run} code={code} slots />
+      ))}
+    </div>
+  );
+  return (
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
+      {column(0, half)}
+      <section aria-label={t("Свободные игроки")} className={cn("order-first min-w-0 rounded-surface border bg-surface lg:order-none", myTurn ? "border-accent/70" : "border-line-subtle")}>
+        <div className="border-b border-line-subtle p-4">
+          {draft ? (
+            <div className="flex items-end justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{myTurn ? t("Ваш ход") : t("Выбор игроков змейкой")}</div>
+                <h2 className="mt-1.5 truncate text-heading text-fg">{myTurn ? t("Выберите следующего игрока") : t("Выбирает {name}", { name: picker?.nickname ?? t("капитан") })}</h2>
+                <div className="mt-1 truncate text-meta text-fg-3">{view.teams[draft.turn - 1]?.name}</div>
               </div>
-              {champion && <span className="text-accent" title={t("Победитель")}>{Icon.crown("size-5")}</span>}
-            </header>
-            <div className="space-y-1.5 p-2">
-              {members.map((m: ViewMember) => (
-                <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} captain={view.captains[i] === m.id} />
-              ))}
-              {members.length === 0 &&
-                (canAssign ? (
-                  <CaptainsButton view={view} busy={busy} run={run} code={code} label={t("Назначить капитана")} variant="card" />
+              <div className="shrink-0 text-right">
+                <div className="text-micro text-fg-3">{t("На выбор")}</div>
+                {lobby.settings.pick_seconds ? (
+                  <div className="num mt-1 text-[32px] font-semibold leading-none">
+                    <Countdown deadline={draft.deadline} /> {t("с")}
+                  </div>
                 ) : (
-                  <div className="px-2 py-4 text-center text-meta text-fg-4">{t("Капитан ещё не назначен")}</div>
-                ))}
+                  <div className="mt-1 text-[16px] font-semibold leading-none">{t("без ограничения")}</div>
+                )}
+              </div>
             </div>
-          </section>
-        );
-      })}
+          ) : (
+            actions
+          )}
+        </div>
+        <div className="flex items-center gap-3 px-4 pt-4">
+          <h2 className="text-title text-fg">{t("Свободные игроки")}</h2>
+          <span className="num rounded-chip bg-ink/[0.06] px-2 py-0.5 text-micro text-fg-2">{pool.length}</span>
+          {lobby.settings.filter && <span className="ml-auto text-meta text-fg-3">{t("Фильтр игроков включён")}</span>}
+        </div>
+        <div className="grid gap-1.5 p-4 pt-3">
+          {pool.map((m) => (
+            <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code}>
+              {myTurn && (
+                <Button size="sm" disabled={busy} onClick={() => run(() => A.pickInDraft(code, m.id))}>
+                  {t("Выбрать")}
+                </Button>
+              )}
+            </PlayerLine>
+          ))}
+          {pool.length === 0 && <p className="py-3 text-center text-meta text-fg-3">{draft ? t("Все игроки разобраны по командам") : t("Свободных игроков нет")}</p>}
+          {!draft && <EmptySlot onClick={onJoin} />}
+        </div>
+      </section>
+      {column(half, view.teams.length)}
     </div>
   );
 }

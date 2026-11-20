@@ -4,6 +4,7 @@ import { HeaderUser } from "./header-user";
 import { HeaderShell, PublicOnly } from "./nav-links";
 import { SECONDARY_NAV } from "./shell/nav";
 import { MobileActivityBar } from "./shell/activity";
+import { SidebarToggle } from "./shell/sidebar";
 import { getT } from "@/lib/i18n/server";
 
 /** Логотип-ссылка на главную: утверждённый горизонтальный логотип */
@@ -28,6 +29,7 @@ export function SiteHeader() {
         <span className="lg:hidden">
           <Logo height={26} />
         </span>
+        <SidebarToggle />
         <HeaderUser />
       </div>
       {/* на телефоне срочное действие — отдельной строкой под шапкой (на десктопе — внутри шапки) */}

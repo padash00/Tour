@@ -144,6 +144,7 @@ export function CenterColumn({
   run,
   code,
   onInvite,
+  part = "all",
 }: {
   view: LobbyView;
   isHost: boolean;
@@ -151,6 +152,8 @@ export function CenterColumn({
   run: Run;
   code: string;
   onInvite: (() => void) | null;
+  /** большое лобби делит колонку на две: действия стоят над свободными игроками, сведения — полосой под командами */
+  part?: "all" | "actions" | "info";
 }) {
   const t = useT();
   const { lobby, game, me } = view;
@@ -237,6 +240,56 @@ export function CenterColumn({
     );
   }
 
+  const hint = waiting && (
+        <p className="text-center text-meta text-fg-3">
+          {many
+            ? isHost
+              ? potTeamsFull
+                ? t("Команды собраны — запускайте матчи. Каждый матч откроется в своей комнате.")
+                : t("Соберите {need} игроков (сейчас {n}), затем назначьте капитанов — они разберут игроков по командам.", { need: playersNeeded(settings), n: potPlayers })
+              : t("Игроков по командам разбирают капитаны. Когда начнутся матчи, здесь появится кнопка «Мой матч».")
+            : pot
+            ? isHost
+              ? potTeamsFull
+                ? t("Составы собраны. Отметьте взносы и запускайте матч.")
+                : t("Соберите {need} игроков (сейчас {n}) и начните выбор игроков: капитанов назначаете вы, по умолчанию — двое с самым высоким ELO.", { need: settings.team_size * 2, n: potPlayers })
+              : t("Игроков по командам выбирают капитаны. Взнос передайте организатору: он отметит его здесь.")
+            : isHost
+            ? settings.player_pick === "captains"
+              ? t("Назначьте капитанов и запустите драфт или расставьте игроков сами.")
+              : t("Расставьте игроков, добавьте ботов и запускайте матч.")
+            : settings.start === "all_ready"
+              ? t("Займите место и нажмите «Готов» — матч стартует, когда готовы все.")
+              : t("Займите место в команде — матч запускает хост.")}
+        </p>
+      );
+  const info = part !== "actions";
+
+  if (part === "info") {
+    return (
+      <section aria-label={t("О матче")} className={cn("grid items-start gap-4", pot && "md:grid-cols-[minmax(0,340px)_minmax(0,1fr)]")}>
+        <PotPanel view={view} />
+        <div className="flex min-w-0 flex-col gap-4">
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {facts.map((f) => (
+              <div key={f.label} className="min-w-0 rounded-control border border-line-subtle bg-surface px-3 py-2.5">
+                <dt className="flex items-center gap-2 text-meta text-fg-3">
+                  {f.icon} {f.label}
+                </dt>
+                <dd className="mt-1 truncate text-[14px] font-medium text-fg">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {onInvite && (
+            <button type="button" onClick={onInvite} className="inline-flex items-center gap-2 self-start text-[14px] font-medium text-accent transition-colors hover:text-fg">
+              {Icon.users("size-4")} {t("Пригласить игроков")}
+            </button>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section aria-label={t("О матче")} className="flex flex-col gap-4">
       {primary}
@@ -256,15 +309,15 @@ export function CenterColumn({
           </Button>
         ))}
 
-      <PotPanel view={view} />
+      {info && <PotPanel view={view} />}
 
-      {onInvite && (
+      {info && onInvite && (
         <button type="button" onClick={onInvite} className="mx-auto inline-flex items-center gap-2 text-[14px] font-medium text-accent transition-colors hover:text-fg">
           {Icon.users("size-4")} {t("Пригласить игроков")}
         </button>
       )}
 
-      <dl className="divide-y divide-line-subtle border-y border-line-subtle">
+      {info && <dl className="divide-y divide-line-subtle border-y border-line-subtle">
         {facts.map((f) => (
           <div key={f.label} className="flex items-center gap-3 py-3">
             <span className="text-fg-3">{f.icon}</span>
@@ -272,7 +325,7 @@ export function CenterColumn({
             <dd className="ml-auto min-w-0 truncate text-right text-[14px] font-medium text-fg">{f.value}</dd>
           </div>
         ))}
-      </dl>
+      </dl>}
 
       {waiting && isHost && !lobby.draft && !snake && !settings.cup_of && (
         <div className="grid grid-cols-4 overflow-hidden rounded-control border border-line-subtle bg-shell/60">
@@ -299,31 +352,9 @@ export function CenterColumn({
         </div>
       )}
 
-      {waiting && (
-        <p className="text-center text-meta text-fg-3">
-          {many
-            ? isHost
-              ? potTeamsFull
-                ? t("Команды собраны — запускайте матчи. Каждый матч откроется в своей комнате.")
-                : t("Соберите {need} игроков (сейчас {n}), затем назначьте капитанов — они разберут игроков по командам.", { need: playersNeeded(settings), n: potPlayers })
-              : t("Игроков по командам разбирают капитаны. Когда начнутся матчи, здесь появится кнопка «Мой матч».")
-            : pot
-            ? isHost
-              ? potTeamsFull
-                ? t("Составы собраны. Отметьте взносы и запускайте матч.")
-                : t("Соберите {need} игроков (сейчас {n}) и начните выбор игроков: капитанов назначаете вы, по умолчанию — двое с самым высоким ELO.", { need: settings.team_size * 2, n: potPlayers })
-              : t("Игроков по командам выбирают капитаны. Взнос передайте организатору: он отметит его здесь.")
-            : isHost
-            ? settings.player_pick === "captains"
-              ? t("Назначьте капитанов и запустите драфт или расставьте игроков сами.")
-              : t("Расставьте игроков, добавьте ботов и запускайте матч.")
-            : settings.start === "all_ready"
-              ? t("Займите место и нажмите «Готов» — матч стартует, когда готовы все.")
-              : t("Займите место в команде — матч запускает хост.")}
-        </p>
-      )}
+      {hint}
 
-      {last && (
+      {info && last && (
         <Link href={`/lobbies/games/${last.id}`} className={btnClass("quiet", "sm", "self-center")}>
           {t("Последний матч")} · {last.team1_score}:{last.team2_score} →
         </Link>
