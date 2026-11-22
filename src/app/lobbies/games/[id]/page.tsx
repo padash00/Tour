@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/supabase";
 import { getGame } from "@/lib/lobby";
+import { getMatchDemos } from "@/lib/demos";
 import { mapLabel } from "@/lib/maps";
 import { MODES } from "@/lib/modes";
 import { getT } from "@/lib/i18n/server";
@@ -49,11 +50,14 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
   const mapParam = typeof sp.map === "string" ? Number(sp.map) : 0;
   const onlyMap = Number.isInteger(mapParam) && mapParam >= 1 && mapParam <= game.maps.length ? mapParam : 0;
 
-  const [{ data: lobby }, { data: rows }, images] = await Promise.all([
+  const [{ data: lobby }, { data: rows }, images, demoInfo] = await Promise.all([
     db().from("lobbies").select("code").eq("id", game.lobby_id).maybeSingle(),
     db().from("lobby_player_stats").select("*").eq("game_id", game.id),
     getMapImages(),
+    // демо сыгранных карт лежат на серверном ПК — ссылки как на странице турнирного матча
+    getMatchDemos(game.matchzy_id).catch(() => ({ demos: [], online: false })),
   ]);
+  const demos = demoInfo.demos.filter((d) => game.maps[d.mapNumber - 1]?.status === "finished");
   const allStats = (rows ?? []) as Stat[];
   // номера карт в статистике идут с нуля или с единицы — приводим к порядку карт серии
   const base = allStats.length ? Math.min(...allStats.map((row) => row.map_number)) : 0;
@@ -129,6 +133,28 @@ export default async function LobbyGamePage(props: PageProps<"/lobbies/games/[id
               </Button>
             )}
           </div>
+          {demos.length > 0 && (
+            <div className="mt-5 border-t border-line-subtle pt-4">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-meta">
+                <span className="font-semibold text-fg">{t("Скачать демо")}</span>
+                {demos.map((d) => {
+                  const label = `${mapLabel(game.maps[d.mapNumber - 1].map)}${d.parts > 1 ? ` · ${t("ч. {n}", { n: d.part })}` : ""}`;
+                  return demoInfo.online ? (
+                    <a key={d.file} href={`/lobbies/games/${game.id}/demo?f=${encodeURIComponent(d.file)}`} rel="nofollow" className="text-accent hover:underline">
+                      {label} · {t("{n} МБ", { n: Math.max(1, Math.round(d.size / 1e6)) })}
+                    </a>
+                  ) : (
+                    <span key={d.file} className="text-fg-4">{label} — {t("сервер выключен")}</span>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-meta text-fg-3">
+                {t("Демо хранятся 7 дней после игры.")}{" "}
+                {t("Демо скачивается прямо с сервера клуба. Если браузер предупредит о небезопасной загрузке — выберите «Сохранить».")}{" "}
+                {t("Открыть в CS2: положите файл в папку game\\csgo и введите в консоли playdemo имя_файла.")}
+              </p>
+            </div>
+          )}
         </Section>
 
         {([1, 2] as const).map((team) => {
