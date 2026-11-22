@@ -2,14 +2,14 @@
  * Тиры игроков по FACEIT ELO — для «Десятки» (игра на банк между игроками).
  * Общие для сервера и браузера. Границы задал владелец клуба (15.11.2026):
  *   S — от 3000, A — 2800–2999, B — 2500–2799, C — 2200–2499,
- *   D — 1000–2199 (с 18.11.2026; до этого — от 9 уровня FACEIT). Ниже 1000 ELO тира нет — в «Десятку» не попадают.
+ *   D — всё, что ниже 2200 (с 23.11.2026 нижней границы нет; 18–22.11 — от 1000 ELO, до этого — от 9 уровня FACEIT).
  */
 
 export const TIERS = ["S", "A", "B", "C", "D"] as const;
 export type TierKey = (typeof TIERS)[number];
 
-/** Минимальный FACEIT ELO для тира D — ниже в «Десятку» не пускают */
-export const TIER_MIN_ELO = 1000;
+/** Минимальный FACEIT ELO для тира D. 0 — ограничения нет: любой рейтинг ниже 2200 — тир D */
+export const TIER_MIN_ELO = 0;
 
 /** Нижняя граница ELO тира */
 export const TIER_FROM: Record<TierKey, number | null> = { S: 3000, A: 2800, B: 2500, C: 2200, D: TIER_MIN_ELO };
@@ -25,7 +25,7 @@ export function tierOf(elo: number | null | undefined, level?: number | null): T
   return elo >= TIER_MIN_ELO ? "D" : null;
 }
 
-/** Диапазон тира для подписи: «3000+», «2800–2999», «1000–2199» */
+/** Диапазон тира для подписи: «3000+», «2800–2999», «0–2199» */
 export function tierRange(tier: TierKey): string {
   if (tier === "S") return "3000+";
   if (tier === "A") return "2800–2999";

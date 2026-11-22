@@ -31,13 +31,15 @@ try {
   // ── допуск
   const settings = normalizeSettings({ ...DEFAULT_SETTINGS, pot: true, pot_tiers: ["S", "A", "B", "C"], pot_fee: 5000, best_of: 3, map_choice: "veto", maps: POT_MAPS, rematch: false });
   assert.equal(L.potProblem(settings, { faceit_elo: 3000, faceit_level: 10 }), null);
-  assert.match(L.potProblem(settings, { faceit_elo: null, faceit_level: null }) ?? "", /рейтингом FACEIT/);
-  assert.match(L.potProblem(settings, { faceit_elo: 900, faceit_level: 3 }) ?? "", /от 1000 ELO/);
+  assert.match(L.potProblem(settings, { faceit_elo: null, faceit_level: null }) ?? "", /без рейтинга FACEIT/);
+  // нижней границы ELO нет: 900 — тир D, а он в этой игре не допущен; в игре с тиром D такой игрок проходит
+  assert.match(L.potProblem(settings, { faceit_elo: 900, faceit_level: 3 }) ?? "", /тир D/);
+  assert.equal(L.potProblem({ ...settings, pot_tiers: ["D"] }, { faceit_elo: 1, faceit_level: 1 }), null);
   assert.match(L.potProblem(settings, { faceit_elo: 1500, faceit_level: 7 }) ?? "", /тир D/);
   assert.match(L.potProblem(settings, { faceit_elo: 2100, faceit_level: 10 }) ?? "", /тир D/);
   assert.match(L.potProblem({ ...settings, pot_tiers: ["S"] }, { faceit_elo: 2900, faceit_level: 10 }) ?? "", /тир A/);
   assert.equal(L.potProblem({ ...settings, pot: false }, { faceit_elo: null, faceit_level: null }), null);
-  ok("Entry: needs a FACEIT rating, 1000+ ELO, and a tier the organizer allowed; a plain lobby has no such rule");
+  ok("Entry: needs a tier the organizer allowed (no lower ELO bound); a plain lobby has no such rule");
 
   // ── комната: все десять в ожидании, отметки взносов у восьми
   const lobbyRow = await one<{ id: string }>(
