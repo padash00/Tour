@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { onlineRosterCount, rosterIds } from "../server/agent/autostart.mjs";
 import { installBundle, localBundleVersion, missingImports, rejectedBundleVersion, rollbackBundle } from "../server/agent/bundle.mjs";
+import { createRecorder, demoFileName } from "../server/agent/recorder.mjs";
 import { CommandJournal } from "../server/agent/command-journal.mjs";
 import { createEnforce } from "../server/agent/enforce.mjs";
 import { encodePacket, parseGet5, rcon, rconSession, steamIdsFromStatus, takePackets } from "../server/agent/lib.mjs";
@@ -255,6 +256,34 @@ try {
     sent.length = 0;
     await enforce.apply(inst, { matchid: 7, gamestate: "live", map_number: 0 });
     assert.deepEqual(sent, ["mp_maxmoney 16000;mp_freezetime 20;sv_alltalk 1"]);
+  });
+
+  await test("запись демо: агент даёт tv_record с путём от game/csgo на начале карты и tv_stoprecord в конце", async () => {
+    const sent = [];
+    const recorder = createRecorder({ rc: async (_inst, command) => (sent.push(command), command === "tv_stoprecord" ? 'Completed SourceTV demo "x"' : ""), log: () => {} });
+    const inst = { name: "CS2-01" };
+    const a = { matchid: 1000057 };
+    const info = { map: "de_mirage" };
+    assert.match(demoFileName(1000057, 0, "de_mirage", new Date(2026, 10, 22, 18, 27, 53)), /^2026-11-22_18-27-53_1000057_map0_de_mirage\.dem$/);
+    await recorder.tick(inst, a, { matchid: 1000057, gamestate: "warmup", map_number: 0 }, info);
+    assert.deepEqual(sent, []);
+    await recorder.tick(inst, a, { matchid: 1000057, gamestate: "knife", map_number: 0 }, info);
+    assert.equal(sent.length, 1);
+    assert.match(sent[0], /^tv_record MatchZy\/\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_1000057_map0_de_mirage\.dem$/);
+    // та же карта — второй tv_record не шлём (он оборвал бы запись); сервер молчит — запись не трогаем
+    await recorder.tick(inst, a, { matchid: 1000057, gamestate: "live", map_number: 0 }, info);
+    await recorder.tick(inst, a, null, info);
+    assert.equal(sent.length, 1);
+    // следующая карта: разминка — стоп, игра — новый файл с её номером
+    await recorder.tick(inst, a, { matchid: 1000057, gamestate: "warmup", map_number: 1 }, { map: "de_nuke" });
+    assert.equal(sent[1], "tv_stoprecord");
+    await recorder.tick(inst, a, { matchid: 1000057, gamestate: "live", map_number: 1 }, { map: "de_nuke" });
+    assert.match(sent[2], /_1000057_map1_de_nuke\.dem$/);
+    await recorder.tick(inst, a, { matchid: null, gamestate: "none", map_number: null }, info);
+    assert.equal(sent[3], "tv_stoprecord");
+    // чужой матч на сервере (без назначения) не пишем
+    await recorder.tick(inst, undefined, { matchid: 5, gamestate: "live", map_number: 0 }, info);
+    assert.equal(sent.length, 4);
   });
 } finally {
   rmSync(dir, { recursive: true, force: true });

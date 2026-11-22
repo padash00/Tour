@@ -28,6 +28,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAutostart } from "./autostart.mjs";
+import { createRecorder } from "./recorder.mjs";
 import { createDemos } from "./demos.mjs";
 import { UPDATE_EXIT_CODE, applyBundle, localBundleVersion, rejectedBundleVersion } from "./bundle.mjs";
 import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
@@ -115,6 +116,8 @@ const recovery = createRecovery({
 });
 const hud = createHud({ serverDir: SERVER_DIR, stateDir: STATE_DIR, siteUrl: config.siteUrl, instances: INSTANCES, rc, log });
 const autostart = createAutostart({ stateDir: STATE_DIR, rc, log, hud });
+// запись демо карт ведёт агент: tv_record от MatchZy с полным путём CS2 не принимает (recorder.mjs)
+const recorder = config.demos === false ? null : createRecorder({ rc, log });
 const housekeeping = createHousekeeping({
   serverDir: SERVER_DIR,
   f16Dir: F16_DIR,
@@ -208,6 +211,7 @@ async function probeInstance(inst) {
   let running = procs ? isRunning(procs, inst) : null;
   if (running === false) {
     openJoinApplied.delete(inst.name);
+    recorder?.forget(inst.name); // процесса нет — запись оборвалась; после подъёма карта пишется новой частью
     // идёт обслуживание хоста (обновление CS2/плагинов, перезапуск) — серверы остановлены нарочно, это не падение:
     // автоподъём посреди обновления запускает cs2.exe и блокирует файлы SteamCMD и install.ps1
     if (!busy) recovery.track(inst, false, null);
@@ -231,6 +235,7 @@ async function probeInstance(inst) {
   if (!quiet) await applyOpenJoin(inst).catch(() => {});
   recovery.track(inst, true, get5);
   if (!quiet) await autostart.tick(inst, recovery.assignments[inst.name], info, get5).catch((e) => log(`автостарт ${inst.name}: ${e.message}`));
+  if (!quiet && recorder) await recorder.tick(inst, recovery.assignments[inst.name], get5, info).catch((e) => log(`демо ${inst.name}: ${e.message}`));
   snapshots[inst.name] = {
     at: Date.now(),
     report: {
@@ -433,6 +438,7 @@ async function execute(cmd) {
   const forget = () => {
     recovery.forget(inst);
     autostart.forget(inst.name);
+    recorder?.forget(inst.name);
     hud.forget(inst.name);
   };
 
