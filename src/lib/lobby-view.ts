@@ -111,14 +111,37 @@ export type ViewCup = {
   state: Cup["state"];
   names: string[];
   champion: number | null;
-  rounds: { round: number; title: string; matches: (Pick<CupMatch, "id" | "a" | "b" | "state" | "winner" | "score"> & { code: string | null; mine: boolean })[] }[];
+  rounds: { round: number; title: string; matches: (Pick<CupMatch, "id" | "a" | "b" | "state" | "winner" | "score"> & { code: string | null; mine: boolean; maps: CupMapScore[] })[] }[];
   /** таблица круговой */
   table: { team: number; played: number; wins: number; maps: number; mapsLost: number }[] | null;
   /** комната матча, в котором сейчас играет зритель */
   myRoom: string | null;
 };
 
-function viewCup(lobby: Lobby, viewerId: string | null, canOpen: boolean): ViewCup | null {
+/** Карта матча сетки: счёт по раундам (a — первая команда матча); live — карта идёт сейчас */
+export type CupMapScore = { map: string; a: number; b: number; live: boolean };
+
+/**
+ * Счёт по картам матчей сетки — из игр их комнат (один запрос на все комнаты). В комнате команда a — team1.
+ * У перезапущенного матча берём последнюю неотменённую игру. Ключ — код комнаты.
+ */
+async function cupMapScores(lobby: Lobby): Promise<Map<string, CupMapScore[]>> {
+  const out = new Map<string, CupMapScore[]>();
+  const cup = lobby.bracket as Cup | null;
+  const codes = (cup?.matches ?? []).filter((m) => m.code && (m.state === "playing" || m.state === "done")).map((m) => m.code!);
+  if (!codes.length) return out;
+  const { data } = await db().from("lobbies").select("code, games:lobby_games!lobby_games_lobby_id_fkey(status, maps, created_at)").in("code", codes);
+  for (const room of data ?? []) {
+    const games = ((room.games ?? []) as unknown as { status: string; maps: GameMap[] | null; created_at: string }[])
+      .filter((g) => g.status !== "cancelled")
+      .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
+    const maps = (games[0]?.maps ?? []).filter((m) => m.status !== "pending");
+    out.set(room.code, maps.map((m) => ({ map: m.map, a: m.team1_score, b: m.team2_score, live: m.status === "live" })));
+  }
+  return out;
+}
+
+function viewCup(lobby: Lobby, viewerId: string | null, canOpen: boolean, mapScores: Map<string, CupMapScore[]>): ViewCup | null {
   const cup = lobby.bracket as Cup | null;
   if (!cup || !cup.matches?.length) return null;
   const team = viewerId ? cup.rosters.findIndex((r) => r.includes(viewerId)) : -1;
@@ -133,7 +156,11 @@ function viewCup(lobby: Lobby, viewerId: string | null, canOpen: boolean): ViewC
         const mine = team >= 0 && (m.a === team || m.b === team);
         if (mine && m.state === "playing" && m.code) myRoom = m.code;
         // комнату матча открывают его игроки, организатор и админ
-        return { id: m.id, a: m.a, b: m.b, state: m.state, winner: m.winner, score: m.score, code: m.state === "playing" && (mine || canOpen) ? m.code : null, mine };
+        const maps = (m.code && mapScores.get(m.code)) || [];
+        // идущий матч: счёт серии — по уже сыгранным картам
+        const played = maps.filter((x) => !x.live);
+        const score = m.score ?? (m.state === "playing" && maps.length ? ([played.filter((x) => x.a > x.b).length, played.filter((x) => x.b > x.a).length] as [number, number]) : null);
+        return { id: m.id, a: m.a, b: m.b, state: m.state, winner: m.winner, score, maps, code: m.state === "playing" && (mine || canOpen) ? m.code : null, mine };
       }),
   }));
   return { format: cup.format, state: cup.state, names: cup.names, champion: cup.champion, rounds: view, table: cup.format === "round" ? standings(cup) : null, myRoom };
@@ -266,7 +293,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
       slot,
       name: cupTeams(lobby.settings.players) > 0 ? ((lobby.bracket as Cup | null)?.names?.[i] ?? `Команда ${i + 1}`) : i === 0 ? lobby.team1_name : lobby.team2_name,
     })),
-    cup: access === "ok" ? viewCup(lobby, viewer?.id ?? null, isHost || opts.admin) : null,
+    cup: access === "ok" ? viewCup(lobby, viewer?.id ?? null, isHost || opts.admin, await cupMapScores(lobby).catch(() => new Map())) : null,
     members: hidden
       ? []
       : members.map((m) => {

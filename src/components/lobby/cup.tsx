@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import * as A from "@/app/actions/lobby";
 import type { LobbyView, ViewCup, ViewMember } from "@/lib/lobby-view";
 import { playersNeeded } from "@/lib/lobby-settings";
+import { mapLabel } from "@/lib/maps";
 import { Button, Dialog, buttonClass as btnClass, cn } from "@/components/ds";
 import { useT } from "@/lib/i18n/client";
 import { Icon } from "./ui";
@@ -292,6 +293,17 @@ export function CupBracket({ cup, isHost, busy, run, code }: { cup: ViewCup; isH
                       <span className="num shrink-0 text-[14px] font-semibold text-fg">{m.score ? m.score[side] : ""}</span>
                     </div>
                   ))}
+                  {/* счёт по картам: сыгранные и идущая (её счёт по раундам обновляется по ходу) */}
+                  {m.maps.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 border-t border-line-subtle pt-1.5 text-micro text-fg-3">
+                      {m.maps.map((x, i) => (
+                        <span key={i} className={cn("num whitespace-nowrap", x.live && "font-semibold text-live")}>
+                          {x.live && <span className="mr-1 inline-block size-1.5 rounded-full bg-live align-middle animate-pulse" />}
+                          {mapLabel(x.map)} {x.a}:{x.b}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className={cn("text-micro", m.state === "playing" ? "text-live" : m.state === "cancelled" ? "text-danger" : "text-fg-3")}>{t(stateLabel[m.state])}</span>
                     {m.code ? (
