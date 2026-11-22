@@ -79,13 +79,13 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
   return (
     <>
       <Button variant="secondary" onClick={trigger} icon={<Trophy />} className={className}>
-        {t("Собрать десятку")}
+        {t("Собрать микс 5×5")}
       </Button>
 
       <Dialog
         open={open}
         onClose={() => !pending && setOpen(false)}
-        title={t("Собрать десятку")}
+        title={t("Собрать микс 5×5")}
         description={t("Игра 5 на 5 на банк между игроками: BO3 через интернет. Капитанов назначает организатор (по умолчанию — самые высокие по ELO), игроков выбирают змейкой.")}
         size="lg"
         footer={
@@ -94,7 +94,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
               {t("Отмена")}
             </Button>
             <Button onClick={submit} loading={pending} disabled={tiers.length === 0 || (closed && password.trim().length < 4)} data-autofocus>
-              {t("Собрать десятку")}
+              {t("Собрать микс 5×5")}
             </Button>
           </>
         }

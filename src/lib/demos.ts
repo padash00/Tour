@@ -8,7 +8,7 @@ import { AGENT_OFFLINE_AFTER_MS } from "./server/state";
 // записей (app_settings.AGENT_DEMOS), а файл игрок качает прямо с ПК по ссылке, подписанной токеном агента
 // (server/agent/demos.mjs проверяет ту же подпись). Через Vercel демо не идут: предел тела 4.5 МБ.
 
-export const DEMO_DAYS_DEFAULT = 30;
+export const DEMO_DAYS_DEFAULT = 7;
 const LINK_TTL_S = 6 * 3600; // докачка обрыва — в пределах срока ссылки
 
 export type AgentDemoFile = { file: string; matchzy_id: number; map: number; size: number; at: string };

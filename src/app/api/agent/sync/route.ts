@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   // срок хранения бэкапов раундов на серверном ПК (дней), по умолчанию 1
   const days = Number(retention ?? "");
   const backup_days = Number.isFinite(days) && days >= 1 ? Math.min(90, Math.floor(days)) : 1;
-  // демо скачивают со страницы матча — храним дольше, по умолчанию 30 дней
+  // демо скачивают со страницы матча — храним дольше бэкапов, по умолчанию 7 дней
   const demoDays = Number(demoRetention ?? "");
   const demo_days = Number.isFinite(demoDays) && demoDays >= 1 ? Math.min(365, Math.floor(demoDays)) : DEMO_DAYS_DEFAULT;
   // Claim last: work done above cannot consume the delivery lease.
