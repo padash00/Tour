@@ -124,6 +124,9 @@ function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyV
   const members = view.members.filter((m) => m.slot === team.slot).sort((x, y) => Number(y.id === captain) - Number(x.id === captain));
   const rated = members.filter((m) => m.faceit_elo);
   const avg = rated.length ? Math.round(rated.reduce((sum, m) => sum + (m.faceit_elo ?? 0), 0) / rated.length) : null;
+  // средний рейтинг команды в «Миксе» — по тем, кто там играл: видно, равны ли составы
+  const mixed = members.filter((m) => m.mix);
+  const mixAvg = mixed.length ? (mixed.reduce((sum, m) => sum + (m.mix?.rating ?? 0), 0) / mixed.length).toFixed(2) : null;
   const champion = view.cup?.state === "done" && view.cup.champion === index;
   const picking = !!draft && draft.turn - 1 === index;
   // на доске выбора у команды всегда видны все места: первое — капитан, остальные ждут выбора
@@ -138,6 +141,7 @@ function TeamBox({ view, index, isHost, busy, run, code, slots }: { view: LobbyV
           <div className="num text-micro text-fg-3">
             {members.length}/{size}
             {avg ? ` · ${t("средний ELO {n}", { n: avg })}` : ""}
+            {mixAvg && <span title={t("Средний рейтинг состава в Миксе — по {n} игрокам, которые там играли", { n: mixed.length })}> · {t("Микс {n}", { n: mixAvg })}</span>}
           </div>
         </div>
         {picking && <span className="shrink-0 rounded-chip bg-accent-dim px-2 py-0.5 text-micro font-semibold text-accent">{t("выбирает")}</span>}

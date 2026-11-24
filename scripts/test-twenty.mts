@@ -1,6 +1,6 @@
 // «Двадцатка» без базы: рейтинг по картам, коронная карта, роли, форма, номинации, рекорды, связки, перевес для вето.
 // Запуск: npx tsx scripts/test-twenty.mts
-import { buildTwenty, mapEdge, ratingOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
+import { ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -83,6 +83,39 @@ const edge = mapEdge(t.rows, ["ACE", "BUD"], ["X", "NOBODY"], ["de_mirage", "de_
 check(edge.de_mirage.team1!.known === 2 && edge.de_mirage.team2!.known === 1 && edge.de_train.team1 === null, "перевес для вето: средний рейтинг команды на карте; где никто не играл — пусто");
 
 check(buildTwenty([], []).rows.length === 0 && buildTwenty([], []).nominations.length === 0, "пустые данные не ломают расчёт");
+
+// ───────────────────────── достижения и история
+const ach = (id: string, key: string) => t.achievements(id).find((x) => x.key === key)!;
+check(t.achievements("ACE").length === ACHIEVEMENTS_TOTAL && ACHIEVEMENTS_TOTAL >= 40, "у каждого игрока полный список достижений — полученные и нет");
+check(ach("ACE", "map30").earned && !ach("ACE", "map40").earned && ach("ACE", "map40").have === "30" && ach("ACE", "map40").need === "40" && ach("ACE", "map40").progress === 0.75, "достижение «30 убийств за карту» получено, до «40» — прогресс 30 из 40");
+check(ach("CLU", "clutchMap3").earned && !ach("ACE", "clutchMap3").earned, "достижение за три клатча на карте — только у того, кто их сделал");
+check(ach("ACE", "record").earned && ach("ACE", "eveningKing").earned && !ach("BUD", "eveningKing").earned, "звания: рекордсмен и король вечера");
+check(!ach("ACE", "champion").earned, "чемпионом сезона нельзя стать, пока сезон идёт");
+check(t.achievementBoard().find((x) => x.key === "map30")!.holders.join() === "ACE", "доска достижений: у кого какое есть");
+const hist = t.history("ACE");
+check(hist.length === 2 && hist[0].day === "2026-11-10" && hist[1].day === "2026-11-12" && hist[0].maps === 5 && hist[0].rating > hist[1].rating, "история рейтинга — по игровым дням, старые первыми");
+
+// ───────────────────────── сезоны
+check(seasonOf("2026-12-01T00:30:00Z") === "2026-11" && seasonOf("2026-12-01T02:00:00Z") === "2026-12", "сезон — месяц игрового дня: игра до 6 утра первого числа относится к прошлому месяцу");
+check(currentSeason(Date.parse("2026-11-24T12:00:00Z")) === "2026-11", "текущий сезон — по сегодняшней дате");
+const NOV = Date.parse("2026-11-24T12:00:00Z");
+const nov = buildTwenty(games, stats, { season: "2026-11", now: NOV });
+check(nov.rows.length === 6 && nov.rows.every((r) => !r.qualified && r.prize === null), `в сезоне меньше ${SEASON_MIN_MAPS} карт — вне зачёта и без приза`);
+check(nov.seasons.length === 1 && !nov.seasons[0].finished && nov.seasons[0].podium.length === 0, "идущий сезон не завершён, призёров ещё нет");
+
+// декабрь: две серии по пять карт — у четверых по 10 карт, они в зачёте
+game("d1", "2026-12-05T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 1], ["de_dust2", 2], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 22, 12), p("BUD", 14, 15)], [p("X", 16, 16), p("Y", 11, 18)]);
+game("d2", "2026-12-06T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 2], ["de_dust2", 1], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 21, 13), p("BUD", 15, 15)], [p("X", 17, 15), p("Y", 12, 19)]);
+const DEC = Date.parse("2026-12-20T12:00:00Z");
+const dec = buildTwenty(games, stats, { season: "2026-12", now: DEC });
+check(dec.rows.length === 4 && dec.rows.every((r) => r.qualified) && dec.rows[0].steam_id === "ACE", "сезон считается только по своим играм: четверо в зачёте, лидер — ACE");
+check(dec.rows.map((r) => r.prize).join() === [...SEASON_PRIZES, ""].join(), "призы: 15 000, 10 000 и 5 000 за первые три места, четвёртому — ничего");
+check(dec.seasons.map((x) => x.key).join() === "2026-12,2026-11" && dec.seasons[1].finished && !dec.seasons[0].finished, "сезоны идут свежим первым; прошлый месяц завершён");
+check(dec.records.length > 0 && dec.achievements("ACE").find((x) => x.key === "maps10")!.earned, "рекорды и достижения считаются по всем играм, а не по сезону");
+const jan = buildTwenty(games, stats, { now: Date.parse("2027-01-10T12:00:00Z") });
+check(jan.seasons[0].finished && jan.seasons[0].podium.map((x) => x.steam_id)[0] === "ACE" && jan.seasons[0].podium[0].prize === SEASON_PRIZES[0], "после конца месяца у сезона есть призёры");
+check(jan.achievements("ACE").find((x) => x.key === "champion")!.earned && jan.achievements("X").find((x) => x.key === "podium")!.earned && !jan.achievements("X").find((x) => x.key === "champion")!.earned, "достижения «чемпион сезона» и «призёр сезона» выдаются по завершённым сезонам");
+check(jan.rows.every((r) => r.qualified && r.prize === null), "за всё время зачёта и призов нет");
 
 if (failed) {
   console.error(`\nне прошло проверок: ${failed}`);

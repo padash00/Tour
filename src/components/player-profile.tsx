@@ -240,7 +240,7 @@ export async function PlayerProfile({
 
       <Container width="wide" className="py-10 sm:py-12">
         <div className="grid gap-10 lg:grid-cols-[1.7fr_1fr] lg:items-start">
-          <Section title={t("Последние матчи")}>
+          <Section title={t("Последние матчи")} className="min-w-0">
             {history.length === 0 ? (
               <EmptyState compact title={t("Матчей пока нет")} text={t("История появится после первого участия в турнире.")} />
             ) : (
@@ -280,7 +280,7 @@ export async function PlayerProfile({
             )}
           </Section>
 
-          <div className="space-y-10">
+          <div className="min-w-0 space-y-10">
             <Section title={t("Лучшие карты")}>
               {maps.length === 0 ? (
                 <p className="text-[14px] text-fg-3">{t("Появятся после первых сыгранных карт.")}</p>

@@ -16,5 +16,6 @@ import info from "./info";
 import actions from "./actions";
 import lib from "./lib";
 import twenty from "./twenty";
+import twentySeason from "./twenty-season";
 
-export const KK: Record<string, string> = { ...common, ...shell, ...home, ...tournaments, ...matches, ...team, ...profile, ...players, ...lobby, ...info, ...actions, ...lib, ...twenty };
+export const KK: Record<string, string> = { ...common, ...shell, ...home, ...tournaments, ...matches, ...team, ...profile, ...players, ...lobby, ...info, ...actions, ...lib, ...twenty, ...twentySeason };

@@ -3,9 +3,11 @@ import { Avatar, Button, Container, Section, cn } from "@/components/ds";
 import { FormStrip } from "@/components/public/form-strip";
 import { getT } from "@/lib/i18n/server";
 import { mapLabel } from "@/lib/maps";
-import { getTwentyProfile, MAP_MIN } from "@/lib/twenty";
+import { getTwentyProfile, MAP_MIN, SEASON_MIN_MAPS } from "@/lib/twenty";
 import type { Versus } from "@/lib/twenty-core";
 import { Radar, RoleChip, Streak, Trend, ratingTone } from "./bits";
+import { money } from "./money";
+import { PlayerAchievements, RatingChart, seasonLabel } from "./season";
 import { whoOf } from "./tabs";
 
 /** Игрок в «Миксе»: место и рейтинг, роль и паутинка, карты, напарник и неудобный соперник. Нет игр — блока нет */
@@ -13,7 +15,7 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
   const profile = await getTwentyProfile(steamId);
   if (!profile) return null;
   const t = await getT();
-  const { row, relations: rel } = profile;
+  const { row, relations: rel, season } = profile;
   const who = whoOf(profile.players);
   const top = Math.max(1.3, ...row.byMap.map((c) => c.rating));
 
@@ -43,8 +45,8 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
           </Button>
         }
       >
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,1fr)]">
-          <div>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <span className={cn("num rounded-control px-3 py-1.5 text-[30px] font-extrabold leading-none", ratingTone(row.rating))}>{row.rating.toFixed(2)}</span>
               <div className="min-w-0">
@@ -65,7 +67,7 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
             )}
           </div>
 
-          <div>
+          <div className="min-w-0">
             <h3 className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("По картам")}</h3>
             <div className="mt-3 divide-y divide-line-subtle">
               {row.byMap.map((c) => (
@@ -87,7 +89,7 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
             <p className="mt-2 text-micro text-fg-3">{t("Бледные строки — одна игра на карте.")}</p>
           </div>
 
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             <div>
               <h3 className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("Последние матчи")}</h3>
               <FormStrip results={row.form} size="sm" className="mt-3" />
@@ -102,6 +104,16 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
                 </div>
               </div>
             )}
+            {season && (
+              <Link href="/twenty" className="block rounded-control border border-line-subtle bg-shell/60 px-3 py-2.5 transition-colors hover:border-line-strong">
+                <span className="block text-micro font-semibold uppercase tracking-[0.1em] text-fg-3">{t("Сезон · {name}", { name: seasonLabel(season.key, t) })}</span>
+                <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[14px] font-semibold text-fg">
+                  {season.qualified ? t("{n} место", { n: season.place }) : t("вне зачёта — до него карт: {n}", { n: SEASON_MIN_MAPS - season.maps })}
+                  <span className="num text-fg-3">{season.rating.toFixed(2)}</span>
+                  {season.prize != null && <span className="num rounded-chip bg-gold/20 px-1.5 py-0.5 text-micro font-bold text-gold">{money(season.prize, t)}</span>}
+                </span>
+              </Link>
+            )}
             <dl className="grid grid-cols-3 gap-3 text-center">
               {[
                 [t("Клатчи"), row.clutches],
@@ -115,6 +127,17 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
               ))}
             </dl>
           </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-8 border-t border-line-subtle pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="min-w-0">
+            <h3 className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("Рейтинг по игровым дням")}</h3>
+            <div className="mt-3">
+              <RatingChart points={profile.history} t={t} />
+            </div>
+            <p className="mt-1 text-micro text-fg-3">{t("Пунктир — средний игрок, 1.00.")}</p>
+          </div>
+          <PlayerAchievements items={profile.achievements} t={t} />
         </div>
       </Section>
     </Container>

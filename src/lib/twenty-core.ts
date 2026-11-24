@@ -54,6 +54,10 @@ export const MAP_MIN = 2;
 export const ROLE_MIN_MAPS = 3;
 /** Связка считается от стольких матчей вместе */
 export const DUO_MIN = 3;
+/** Сезон — календарный месяц. Призы за 1–3 места сезона, тенге */
+export const SEASON_PRIZES = [15000, 10000, 5000];
+/** В зачёт сезона (и на призы) — сыгравшие за сезон не меньше стольких карт: две удачные карты приз не приносят */
+export const SEASON_MIN_MAPS = 10;
 /** Рекорды «за карту» — только полноценные карты (не обрывки по 5 раундов) */
 const RECORD_MIN_ROUNDS = 12;
 /** Насколько должен отличаться рейтинг последнего игрового дня, чтобы показать стрелку */
@@ -185,6 +189,9 @@ export type TwentyRow = {
   /** идущая серия побед и лучшая за всё время */
   streak: number;
   bestStreak: number;
+  /** сезон: набрал карты для зачёта (вне сезона — всегда true) и сколько тенге сейчас причитается за место */
+  qualified: boolean;
+  prize: number | null;
 };
 
 export type MapBoard = {
@@ -235,7 +242,20 @@ export type RecordItem = { key: RecordKey; steam_id: string; name: string | null
 export type Duo = { a: string; b: string; games: number; wins: number };
 export type Versus = { steam_id: string; games: number; wins: number };
 
+export type Season = {
+  /** «2026-11» */
+  key: string;
+  matches: number;
+  mapsPlayed: number;
+  /** месяц уже закончился — места окончательные */
+  finished: boolean;
+  /** первые три места среди набравших карты для зачёта */
+  podium: { steam_id: string; name: string | null; rating: number; maps: number; prize: number }[];
+};
+
 export type Twenty = {
+  /** сезоны, свежий первым */
+  seasons: Season[];
   rows: TwentyRow[];
   boards: MapBoard[];
   nominations: Nomination[];
@@ -248,13 +268,18 @@ export type Twenty = {
 
 // ───────────────────────── подготовка
 
-type Line = CoreStat & { game: CoreGame; map: string | null; mapWon: boolean; rating: number; at: number };
+type Line = CoreStat & { game: CoreGame; map: string | null; mapWon: boolean; rating: number; at: number; scoreFor: number; scoreAgainst: number };
 
 /** Игровой день: игры после полуночи относятся к вечеру накануне (Казахстан, UTC+5; граница — 6 утра) */
 function playDay(iso: string | null) {
   const ts = iso ? Date.parse(iso) : 0;
   return Math.floor((ts - 3_600_000) / 86_400_000);
 }
+const dayIso = (day: number) => new Date(day * 86_400_000).toISOString().slice(0, 10);
+/** Сезон игры — месяц её игрового дня: «2026-11» */
+export const seasonOf = (iso: string | null) => dayIso(playDay(iso)).slice(0, 7);
+/** Сезон, который идёт сейчас */
+export const currentSeason = (now = Date.now()) => seasonOf(new Date(now).toISOString());
 
 function toLines(games: CoreGame[], stats: CoreStat[]): Line[] {
   const byId = new Map(games.map((g) => [g.id, g]));
@@ -267,7 +292,8 @@ function toLines(games: CoreGame[], stats: CoreStat[]): Line[] {
     if (!game || !s.rounds_played) continue;
     const m = game.maps[s.map_number - (base.get(s.game_id) ?? 0)] ?? null;
     const winner = m ? (m.winner ?? (m.team1_score > m.team2_score ? 1 : m.team2_score > m.team1_score ? 2 : null)) : null;
-    out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
+    const [scoreFor, scoreAgainst] = m ? (s.team === 1 ? [m.team1_score, m.team2_score] : [m.team2_score, m.team1_score]) : [0, 0];
+    out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
   }
   return out;
 }
@@ -423,9 +449,9 @@ function styles(players: Player[]) {
   return out;
 }
 
-function rowsOf(players: Player[], minMaps: number): TwentyRow[] {
+function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[] {
   const style = styles(players);
-  return players
+  const rows: TwentyRow[] = players
     .filter((p) => p.sum.maps >= minMaps)
     .map((p) => {
       const a = p.sum;
@@ -461,11 +487,16 @@ function rowsOf(players: Player[], minMaps: number): TwentyRow[] {
         role: st?.role ?? null,
         radar: st?.radar ?? null,
         trend: trendOf(p),
-        form: p.games.slice(-5).reverse().map((g) => (g.won ? "W" : "L")),
+        form: p.games.slice(-5).reverse().map((g): "W" | "L" => (g.won ? "W" : "L")),
         ...streaks(p.games),
+        qualified: !season || a.maps >= SEASON_MIN_MAPS,
+        prize: null,
       };
     })
-    .sort((x, y) => y.rating - x.rating || y.maps - x.maps);
+    // в сезоне сначала идут набравшие карты для зачёта: места и призы считаются среди них
+    .sort((x, y) => Number(y.qualified) - Number(x.qualified) || y.rating - x.rating || y.maps - x.maps);
+  if (season) rows.forEach((r, i) => (r.prize = r.qualified ? (SEASON_PRIZES[i] ?? null) : null));
+  return rows;
 }
 
 function boardsOf(rows: TwentyRow[], games: CoreGame[]): MapBoard[] {
@@ -646,29 +677,194 @@ function relationsOf(pairs: Pairs, steamId: string): Relations {
   };
 }
 
+// ───────────────────────── сезоны
+
+function seasonsOf(games: CoreGame[], lines: Line[], now: number): Season[] {
+  const current = currentSeason(now);
+  const keys = [...new Set(games.map((g) => seasonOf(g.finished_at)))].sort().reverse();
+  return keys.map((key) => {
+    const own = games.filter((g) => seasonOf(g.finished_at) === key);
+    const players = collect(lines.filter((l) => seasonOf(l.game.finished_at) === key));
+    const podium = players
+      .filter((p) => p.sum.maps >= SEASON_MIN_MAPS)
+      .map((p) => ({ steam_id: p.steam_id, name: p.name, rating: ratingOf(p.sum), maps: p.sum.maps }))
+      .sort((x, y) => y.rating - x.rating || y.maps - x.maps)
+      .slice(0, SEASON_PRIZES.length)
+      .map((x, i) => ({ ...x, prize: SEASON_PRIZES[i] }));
+    return { key, matches: own.length, mapsPlayed: own.reduce((n, g) => n + g.maps.filter((m) => m.status === "finished").length, 0), finished: key < current, podium };
+  });
+}
+
+// ───────────────────────── достижения
+
+export type Tier = "bronze" | "silver" | "gold";
+/** как показывать число достижения: целое, рейтинг с двумя знаками или проценты */
+type AchFormat = "int" | "r2" | "pct";
+type AchContext = { pairs: Pairs; owners: Set<string>; recordHolders: Set<string>; eveningKings: Map<string, number>; podiums: Map<string, number>; champions: Map<string, number> };
+type AchDef = { key: string; label: string; hint: string; tier: Tier; need: number; format?: AchFormat; have: (p: Player, c: AchContext) => number };
+
+const best = (p: Player, f: (l: Line) => number, ok: (l: Line) => boolean = () => true) => p.lines.reduce((m, l) => (ok(l) ? Math.max(m, f(l)) : m), 0);
+const count = (p: Player, ok: (l: Line) => boolean) => p.lines.filter(ok).length;
+const full = (l: Line) => l.rounds_played >= RECORD_MIN_ROUNDS;
+const days = (p: Player) => new Set(p.lines.map((l) => playDay(l.game.finished_at))).size;
+const won = (p: Player) => p.games.filter((g) => g.won).length;
+const mateMax = (p: Player, c: AchContext, f: (v: Versus) => number) => Math.max(0, ...[...(c.pairs.mates.get(p.steam_id)?.values() ?? [])].map(f));
+
+const ACHIEVEMENTS: AchDef[] = [
+  // сколько сыграно
+  { key: "maps10", label: tr("Втянулся"), hint: tr("Сыграть 10 карт"), tier: "bronze", need: 10, have: (p) => p.sum.maps },
+  { key: "maps25", label: tr("Завсегдатай"), hint: tr("Сыграть 25 карт"), tier: "silver", need: 25, have: (p) => p.sum.maps },
+  { key: "maps50", label: tr("Ветеран"), hint: tr("Сыграть 50 карт"), tier: "gold", need: 50, have: (p) => p.sum.maps },
+  { key: "maps100", label: tr("Легенда Микса"), hint: tr("Сыграть 100 карт"), tier: "gold", need: 100, have: (p) => p.sum.maps },
+  { key: "days3", label: tr("Свой человек"), hint: tr("Прийти на игры в 3 разных дня"), tier: "bronze", need: 3, have: days },
+  { key: "days10", label: tr("Старожил"), hint: tr("Прийти на игры в 10 разных дней"), tier: "silver", need: 10, have: days },
+  { key: "pool5", label: tr("Путешественник"), hint: tr("Сыграть на 5 разных картах"), tier: "bronze", need: 5, have: (p) => new Set(p.lines.map((l) => l.map).filter(Boolean)).size },
+  // победы
+  { key: "wins5", label: tr("Победитель"), hint: tr("Выиграть 5 матчей"), tier: "bronze", need: 5, have: won },
+  { key: "wins15", label: tr("Привык побеждать"), hint: tr("Выиграть 15 матчей"), tier: "silver", need: 15, have: won },
+  { key: "wins30", label: tr("Машина побед"), hint: tr("Выиграть 30 матчей"), tier: "gold", need: 30, have: won },
+  { key: "streak3", label: tr("На ходу"), hint: tr("Выиграть 3 матча подряд"), tier: "bronze", need: 3, have: (p) => streaks(p.games).bestStreak },
+  { key: "streak5", label: tr("Не остановить"), hint: tr("Выиграть 5 матчей подряд"), tier: "silver", need: 5, have: (p) => streaks(p.games).bestStreak },
+  { key: "streak7", label: tr("Непобедимый"), hint: tr("Выиграть 7 матчей подряд"), tier: "gold", need: 7, have: (p) => streaks(p.games).bestStreak },
+  { key: "blowout", label: tr("Разгром"), hint: tr("Выиграть карту, отдав сопернику не больше 3 раундов"), tier: "bronze", need: 1, have: (p) => count(p, (l) => l.mapWon && full(l) && l.scoreAgainst <= 3) },
+  { key: "overtime", label: tr("Герой овертайма"), hint: tr("Выиграть карту в овертайме"), tier: "bronze", need: 1, have: (p) => count(p, (l) => l.mapWon && l.scoreFor > 13 && l.scoreAgainst >= 12) },
+  // стрельба
+  { key: "kills250", label: tr("Стрелок"), hint: tr("Сделать 250 убийств"), tier: "bronze", need: 250, have: (p) => p.sum.kills },
+  { key: "kills500", label: tr("Охотник"), hint: tr("Сделать 500 убийств"), tier: "silver", need: 500, have: (p) => p.sum.kills },
+  { key: "kills1000", label: tr("Тысячник"), hint: tr("Сделать 1000 убийств"), tier: "gold", need: 1000, have: (p) => p.sum.kills },
+  { key: "map30", label: tr("Тридцатка"), hint: tr("Сделать 30 убийств за одну карту"), tier: "silver", need: 30, have: (p) => best(p, (l) => l.kills) },
+  { key: "map40", label: tr("Сорокет"), hint: tr("Сделать 40 убийств за одну карту"), tier: "gold", need: 40, have: (p) => best(p, (l) => l.kills) },
+  { key: "rating15", label: tr("Отличная карта"), hint: tr("Сыграть карту с рейтингом 1.50 и выше"), tier: "bronze", need: 1.5, format: "r2", have: (p) => best(p, (l) => l.rating, full) },
+  { key: "rating20", label: tr("Карта жизни"), hint: tr("Сыграть карту с рейтингом 2.00 и выше"), tier: "gold", need: 2, format: "r2", have: (p) => best(p, (l) => l.rating, full) },
+  { key: "adr120", label: tr("Бульдозер"), hint: tr("Сыграть карту с ADR 120 и выше"), tier: "silver", need: 120, have: (p) => Math.floor(best(p, (l) => l.damage / l.rounds_played, full)) },
+  { key: "hs70", label: tr("Только в голову"), hint: tr("Сыграть карту с 70% убийств в голову (от 15 убийств)"), tier: "silver", need: 70, format: "pct", have: (p) => Math.floor(best(p, (l) => (100 * l.headshot_kills) / l.kills, (l) => l.kills >= 15)) },
+  { key: "ace1", label: tr("Эйс"), hint: tr("Убить всю команду соперника за раунд"), tier: "silver", need: 1, have: (p) => p.sum.k5 },
+  { key: "ace3", label: tr("Коллекционер эйсов"), hint: tr("Сделать 3 эйса"), tier: "gold", need: 3, have: (p) => p.sum.k5 },
+  { key: "multi25", label: tr("Серийный"), hint: tr("25 раундов с тремя и более убийствами"), tier: "bronze", need: 25, have: (p) => p.sum.k3 + p.sum.k4 + p.sum.k5 },
+  { key: "multi75", label: tr("Мясорубка"), hint: tr("75 раундов с тремя и более убийствами"), tier: "silver", need: 75, have: (p) => p.sum.k3 + p.sum.k4 + p.sum.k5 },
+  { key: "mvp50", label: tr("Звезда раунда"), hint: tr("Получить 50 звёзд MVP"), tier: "bronze", need: 50, have: (p) => p.sum.mvp },
+  { key: "mvp150", label: tr("Суперзвезда"), hint: tr("Получить 150 звёзд MVP"), tier: "gold", need: 150, have: (p) => p.sum.mvp },
+  { key: "carry", label: tr("Тащил один"), hint: tr("Сыграть с рейтингом 1.50 и выше на проигранной карте"), tier: "silver", need: 1, have: (p) => count(p, (l) => !l.mapWon && full(l) && l.rating >= 1.5) },
+  { key: "ghost", label: tr("Неуловимый"), hint: tr("Выиграть полную карту, умерев не больше 5 раз"), tier: "silver", need: 1, have: (p) => count(p, (l) => l.mapWon && l.rounds_played >= 16 && l.deaths <= 5) },
+  { key: "allround", label: tr("Универсальный солдат"), hint: tr("Рейтинг 1.10 и выше на 3 разных картах (от 2 игр на каждой)"), tier: "silver", need: 3, have: (p) => mapCells(p).filter((c) => c.maps >= MAP_MIN && c.rating >= 1.1).length },
+  // клатчи и поддержка
+  { key: "clutchMap3", label: tr("Хладнокровный"), hint: tr("Выиграть 3 клатча за одну карту"), tier: "silver", need: 3, have: (p) => best(p, (l) => l.clutch_wins) },
+  { key: "clutch10", label: tr("Клатч-мастер"), hint: tr("Выиграть 10 клатчей"), tier: "silver", need: 10, have: (p) => p.sum.clutches },
+  { key: "clutch25", label: tr("Один в поле воин"), hint: tr("Выиграть 25 клатчей"), tier: "gold", need: 25, have: (p) => p.sum.clutches },
+  { key: "flash20", label: tr("Светошумовой"), hint: tr("Ослепить 20 соперников за одну карту"), tier: "bronze", need: 20, have: (p) => best(p, (l) => l.enemies_flashed) },
+  { key: "nade300", label: tr("Пиротехник"), hint: tr("Нанести 300 урона гранатами за одну карту"), tier: "silver", need: 300, have: (p) => best(p, (l) => l.utility_damage) },
+  { key: "defuse10", label: tr("Сапёр"), hint: tr("Обезвредить 10 бомб"), tier: "bronze", need: 10, have: (p) => p.sum.defuses },
+  { key: "plant25", label: tr("Бомбер"), hint: tr("Заложить 25 бомб"), tier: "bronze", need: 25, have: (p) => p.sum.plants },
+  // с кем играет
+  { key: "mate5", label: tr("Неразлучные"), hint: tr("Сыграть 5 матчей в одной команде с одним и тем же игроком"), tier: "bronze", need: 5, have: (p, c) => mateMax(p, c, (v) => v.games) },
+  { key: "duo5", label: tr("Связка"), hint: tr("Выиграть 5 матчей с одним и тем же напарником"), tier: "silver", need: 5, have: (p, c) => mateMax(p, c, (v) => v.wins) },
+  // звания
+  { key: "eveningKing", label: tr("Король вечера"), hint: tr("Стать лучшим игроком вечера в большом лобби"), tier: "gold", need: 1, have: (p, c) => c.eveningKings.get(p.steam_id) ?? 0 },
+  { key: "mapOwner", label: tr("Хозяин карты"), hint: tr("Держать лучший рейтинг на одной из карт"), tier: "gold", need: 1, have: (p, c) => Number(c.owners.has(p.steam_id)) },
+  { key: "record", label: tr("Рекордсмен"), hint: tr("Держать один из рекордов Микса"), tier: "gold", need: 1, have: (p, c) => Number(c.recordHolders.has(p.steam_id)) },
+  { key: "podium", label: tr("Призёр сезона"), hint: tr("Закончить сезон в тройке лучших"), tier: "silver", need: 1, have: (p, c) => c.podiums.get(p.steam_id) ?? 0 },
+  { key: "champion", label: tr("Чемпион сезона"), hint: tr("Закончить сезон на первом месте"), tier: "gold", need: 1, have: (p, c) => c.champions.get(p.steam_id) ?? 0 },
+];
+
+export type Achievement = { key: string; label: string; hint: string; tier: Tier; earned: boolean; have: string; need: string; progress: number };
+export type AchievementBoard = { key: string; label: string; hint: string; tier: Tier; holders: string[] };
+export const ACHIEVEMENTS_TOTAL = ACHIEVEMENTS.length;
+
+const achShow = (v: number, f?: AchFormat) => (f === "r2" ? v.toFixed(2) : f === "pct" ? `${Math.round(v)}%` : String(Math.round(v)));
+
+function achievementsOf(p: Player, c: AchContext): Achievement[] {
+  return ACHIEVEMENTS.map((d) => {
+    const have = d.have(p, c);
+    const earned = have >= d.need;
+    return { key: d.key, label: d.label, hint: d.hint, tier: d.tier, earned, have: achShow(have, d.format), need: achShow(d.need, d.format), progress: Math.max(0, Math.min(1, have / d.need)) };
+  });
+}
+
+/** Лучший по рейтингу в каждом вечере большого лобби (от двух карт): steam_id → сколько раз */
+function eveningKingsOf(lines: Line[]) {
+  const out = new Map<string, number>();
+  const codes = new Set(lines.map((l) => l.game.code).filter(Boolean));
+  for (const code of codes) {
+    const top = collect(lines.filter((l) => l.game.code === code))
+      .filter((p) => p.sum.maps >= 2)
+      .sort((x, y) => ratingOf(y.sum) - ratingOf(x.sum))[0];
+    if (top) out.set(top.steam_id, (out.get(top.steam_id) ?? 0) + 1);
+  }
+  return out;
+}
+
+// ───────────────────────── график формы
+
+export type HistoryPoint = { day: string; rating: number; maps: number };
+
+/** Рейтинг игрока по игровым дням, старые первыми */
+function historyOf(p: Player): HistoryPoint[] {
+  const by = new Map<number, Sum>();
+  for (const l of p.lines) {
+    const d = playDay(l.game.finished_at);
+    let a = by.get(d);
+    if (!a) by.set(d, (a = zero()));
+    add(a, l);
+  }
+  return [...by.entries()].sort((x, y) => x[0] - y[0]).map(([d, a]) => ({ day: dayIso(d), rating: ratingOf(a), maps: a.maps }));
+}
+
 // ───────────────────────── сборка
 
+export type TwentyScope = { code?: string; season?: string; now?: number };
+
 /**
- * Всё про «Двадцатку» по сыгранным играм. С кодом лобби — только один вечер
- * (рекорды и связки при этом считаются по всем играм: они не про вечер).
+ * Всё про «Микс» по сыгранным играм. С кодом лобби — только один вечер, с сезоном — только его месяц
+ * (рекорды, связки, достижения и история считаются по всем играм: они не про отрезок).
  */
-export function buildTwenty(games: CoreGame[], stats: CoreStat[], opts: { code?: string } = {}): Twenty & { relations: (steamId: string) => Relations } {
-  const all = collect(toLines(games, stats));
+export function buildTwenty(games: CoreGame[], stats: CoreStat[], opts: TwentyScope = {}) {
+  const lines = toLines(games, stats);
+  const all = collect(lines);
   const evening = !!opts.code;
-  const scopeGames = evening ? games.filter((g) => g.code === opts.code) : games;
+  const season = !evening && !!opts.season;
+  const scopeGames = evening ? games.filter((g) => g.code === opts.code) : season ? games.filter((g) => seasonOf(g.finished_at) === opts.season) : games;
   const ids = new Set(scopeGames.map((g) => g.id));
-  const scope = evening ? collect(toLines(scopeGames, stats.filter((s) => ids.has(s.game_id)))) : all;
-  const rows = rowsOf(scope, evening ? 1 : TWENTY_MIN_MAPS);
+  const scope = evening || season ? collect(lines.filter((l) => ids.has(l.game_id))) : all;
+  const rows = rowsOf(scope, evening ? 1 : TWENTY_MIN_MAPS, season);
   const pairs = pairsOf(all);
-  return {
+  const records = recordsOf(all);
+  const seasons = seasonsOf(games, lines, opts.now ?? Date.now());
+
+  // звания считаются по всем играм, а не по выбранному отрезку
+  const allRows = evening || season ? rowsOf(all, TWENTY_MIN_MAPS) : rows;
+  const tally = (list: string[]) => list.reduce((m, id) => m.set(id, (m.get(id) ?? 0) + 1), new Map<string, number>());
+  const done = seasons.filter((x) => x.finished);
+  const context: AchContext = {
+    pairs,
+    owners: new Set(boardsOf(allRows, games).filter((b) => b.minMaps >= MAP_MIN && b.rows[0]).map((b) => b.rows[0].steam_id)),
+    recordHolders: new Set(records.map((r) => r.steam_id)),
+    eveningKings: eveningKingsOf(lines),
+    podiums: tally(done.flatMap((x) => x.podium.map((p) => p.steam_id))),
+    champions: tally(done.flatMap((x) => x.podium.slice(0, 1).map((p) => p.steam_id))),
+  };
+  const byId = new Map(all.map((p) => [p.steam_id, p]));
+  const earned = new Map(all.map((p) => [p.steam_id, achievementsOf(p, context)]));
+
+  const twenty: Twenty = {
+    seasons,
     rows,
     boards: boardsOf(rows, scopeGames),
     nominations: scope.length ? nominationsOf(scope, all, evening) : [],
-    records: recordsOf(all),
+    records,
     duos: duosOf(pairs),
     matches: scopeGames.length,
     mapsPlayed: scopeGames.reduce((n, g) => n + g.maps.filter((m) => m.status === "finished").length, 0),
-    relations: (steamId) => relationsOf(pairs, steamId),
+  };
+  return {
+    ...twenty,
+    relations: (steamId: string) => relationsOf(pairs, steamId),
+    /** все достижения игрока: полученные и нет, с прогрессом */
+    achievements: (steamId: string): Achievement[] => earned.get(steamId) ?? [],
+    /** история рейтинга по игровым дням — для графика в профиле */
+    history: (steamId: string): HistoryPoint[] => (byId.has(steamId) ? historyOf(byId.get(steamId)!) : []),
+    /** доска достижений: у кого какое есть */
+    achievementBoard: (): AchievementBoard[] =>
+      ACHIEVEMENTS.map((d) => ({ key: d.key, label: d.label, hint: d.hint, tier: d.tier, holders: [...earned.entries()].filter(([, list]) => list.find((x) => x.key === d.key)?.earned).map(([id]) => id) })),
   };
 }
 

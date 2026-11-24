@@ -49,6 +49,9 @@ export function TeamCard({
   const [draftName, setDraftName] = useState(name);
   const rated = members.filter((m) => m.faceit_elo);
   const avg = rated.length ? Math.round(rated.reduce((s, m) => s + (m.faceit_elo ?? 0), 0) / rated.length) : null;
+  // средний рейтинг команды в «Миксе» — по тем, кто там играл: видно, равны ли составы
+  const mixed = members.filter((m) => m.mix);
+  const mixAvg = mixed.length ? (mixed.reduce((sum, m) => sum + (m.mix?.rating ?? 0), 0) / mixed.length).toFixed(2) : null;
   const empty = Math.max(0, size - members.length - bots.length);
   const canAddBot = isHost && view.lobby.status === "waiting" && !view.lobby.draft && !view.lobby.settings.pot;
   const captain = view.captains[team === "team1" ? 0 : 1];
@@ -78,7 +81,10 @@ export function TeamCard({
               )}
             </div>
           )}
-          <div className="num text-[12px] text-fg-3">{t("AVG ELO: {n}", { n: avg ?? "—" })}</div>
+          <div className="num text-[12px] text-fg-3">
+            {t("AVG ELO: {n}", { n: avg ?? "—" })}
+            {mixAvg && <span title={t("Средний рейтинг состава в Миксе — по {n} игрокам, которые там играли", { n: mixed.length })}> · {t("Микс {n}", { n: mixAvg })}</span>}
+          </div>
         </div>
         <span className="num rounded-[6px] bg-ink/[0.05] px-2 py-1 text-[13px] text-fg-2">
           {members.length + bots.length}/{size}

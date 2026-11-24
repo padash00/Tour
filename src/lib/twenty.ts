@@ -1,14 +1,14 @@
 import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
-import { buildTwenty, mapEdge, type CoreGame, type CoreStat, type RoleKey } from "./twenty-core";
+import { buildTwenty, currentSeason, mapEdge, type CoreGame, type CoreStat, type RoleKey, type TwentyScope } from "./twenty-core";
 
 /*
  * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
  * Здесь только чтение из базы; сами расчёты (рейтинг, карты, роли, номинации, рекорды) — в twenty-core.ts.
  */
 
-export { TWENTY_MIN_MAPS, MAP_MIN, ROLE_MIN_MAPS, DUO_MIN } from "./twenty-core";
-export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relations, RoleKey } from "./twenty-core";
+export { TWENTY_MIN_MAPS, MAP_MIN, ROLE_MIN_MAPS, DUO_MIN, SEASON_MIN_MAPS, SEASON_PRIZES, ACHIEVEMENTS_TOTAL, currentSeason } from "./twenty-core";
+export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relations, RoleKey, Season, Achievement, AchievementBoard, HistoryPoint } from "./twenty-core";
 
 export type TwentyEvening = { code: string; finished_at: string; matches: number };
 export type TwentyPlayer = { nickname: string; avatar_url: string | null };
@@ -63,11 +63,24 @@ export const getTwentyProfile = unstable_cache(
     const place = twenty.rows.findIndex((r) => r.steam_id === steamId);
     if (place < 0) return null;
     const relations = twenty.relations(steamId);
+    // место в сезоне, который идёт сейчас (null — в этом месяце не играл)
+    const season = buildTwenty(data.games, data.stats, { season: currentSeason() });
+    const seasonPlace = season.rows.findIndex((r) => r.steam_id === steamId);
+    const seasonRow = seasonPlace >= 0 ? season.rows[seasonPlace] : null;
     const players: Record<string, TwentyPlayer> = {};
     for (const id of [steamId, relations.partner?.steam_id, relations.nemesis?.steam_id, relations.victim?.steam_id]) if (id && data.players[id]) players[id] = data.players[id];
-    return { place: place + 1, total: twenty.rows.length, row: twenty.rows[place], relations, players };
+    return {
+      place: place + 1,
+      total: twenty.rows.length,
+      row: twenty.rows[place],
+      relations,
+      players,
+      achievements: twenty.achievements(steamId),
+      history: twenty.history(steamId),
+      season: seasonRow ? { key: currentSeason(), place: seasonPlace + 1, rating: seasonRow.rating, maps: seasonRow.maps, qualified: seasonRow.qualified, prize: seasonRow.prize } : null,
+    };
   },
-  ["twenty-profile", "v1"],
+  ["twenty-profile", "v2"],
   { revalidate: 120 },
 );
 
@@ -83,8 +96,8 @@ export function eveningsOf(games: CoreGame[]): TwentyEvening[] {
   return [...byCode.values()].slice(0, 12);
 }
 
-/** Рейтинг и всё остальное для страницы «Двадцатка»; с кодом лобби — только один вечер */
-export async function getTwenty(opts: { code?: string } = {}) {
+/** Рейтинг и всё остальное для страницы «Микс»: за сезон, за один вечер (код лобби) или за всё время */
+export async function getTwenty(opts: TwentyScope = {}) {
   const data = await loadTwentyData();
   return { ...buildTwenty(data.games, data.stats, opts), players: data.players, evenings: eveningsOf(data.games) };
 }

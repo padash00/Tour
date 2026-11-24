@@ -3,13 +3,14 @@ import { Fragment, type ReactNode } from "react";
 import { Avatar, EmptyState, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { MapThumb } from "@/components/lobby/settings";
-import { DATA_TABLE, NUM_CELL, RankBadge, tableBox } from "@/components/public/data-table";
+import { DATA_TABLE, NUM_CELL, RankBadge, SortedHead, tableBox } from "@/components/public/data-table";
 import { SelectNav } from "@/components/public/select-nav";
 import { formatDate } from "@/lib/format";
 import type { T } from "@/lib/i18n/core";
 import { mapLabel } from "@/lib/maps";
-import { DUO_MIN, MAP_MIN, NOMINATIONS, RADAR_AXES, RECORDS, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type Duo, type MapBoard, type Nomination, type RecordItem, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
+import { SEASON_MIN_MAPS, DUO_MIN, MAP_MIN, NOMINATIONS, RADAR_AXES, RECORDS, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type Duo, type MapBoard, type Nomination, type RecordItem, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
 import type { TwentyPlayer } from "@/lib/twenty";
+import { money } from "./money";
 import { BestMapChip, Radar, RatingPill, RoleChip, Streak, Trend, heatTone } from "./bits";
 
 /* Вкладки раздела «Микс». Все — серверные: данные и переводчик приходят со страницы. */
@@ -71,7 +72,38 @@ export function Nominations({ items, who, t, evening }: { items: Nomination[]; w
   );
 }
 
-export function RatingTable({ rows, who, t, meSteamId }: { rows: TwentyRow[]; who: Who; t: T; meSteamId: string | null }) {
+export const SORTS = ["rating", "maps", "wins", "kills", "diff", "kd", "adr", "hs", "mvp"] as const;
+export type SortKey = (typeof SORTS)[number];
+const SORT_VALUE: Record<SortKey, (r: TwentyRow) => number> = {
+  rating: (r) => r.rating,
+  maps: (r) => r.maps,
+  wins: (r) => r.wins,
+  kills: (r) => r.kills,
+  diff: (r) => r.kills - r.deaths,
+  kd: (r) => r.kd,
+  adr: (r) => r.adr,
+  hs: (r) => r.hsPct,
+  mvp: (r) => r.mvp,
+};
+
+/**
+ * Таблица рейтинга. Место игрока — всегда его место по рейтингу, как бы таблица ни была отсортирована.
+ * В сезоне места есть только у набравших карты для зачёта; остальные идут ниже с пометкой, сколько карт осталось.
+ */
+export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref, season = false }: { rows: TwentyRow[]; who: Who; t: T; meSteamId: string | null; sort?: SortKey; sortHref?: (key: SortKey) => string; season?: boolean }) {
+  const place = new Map(rows.map((r, i) => [r.steam_id, r.qualified ? i + 1 : null]));
+  const list = sort === "rating" ? rows : [...rows].sort((x, y) => SORT_VALUE[sort](y) - SORT_VALUE[sort](x) || y.rating - x.rating);
+  const columns: [SortKey, string][] = [["maps", t("Карт")], ["wins", t("Побед")], ["kills", t("У–С")], ["diff", "±"], ["kd", "K/D"], ["adr", "ADR"], ["hs", "HS%"], ["mvp", "MVP"]];
+  const head = (key: SortKey, label: string) => {
+    const inner = sort === key ? <SortedHead>{label}</SortedHead> : label;
+    return sortHref ? (
+      <Link href={sortHref(key)} scroll={false} title={t("Сортировать по столбцу «{name}»", { name: label })} className="inline-flex items-center hover:text-fg">
+        {inner}
+      </Link>
+    ) : (
+      inner
+    );
+  };
   return (
     <div className={tableBox()}>
       <table className={cn(DATA_TABLE, "min-w-[900px]")}>
@@ -79,35 +111,36 @@ export function RatingTable({ rows, who, t, meSteamId }: { rows: TwentyRow[]; wh
           <tr>
             <th className="w-14">#</th>
             <th>{t("Игрок")}</th>
-            {[t("Карт"), t("Побед"), t("У–С"), "±", "K/D", "ADR", "HS%", "MVP"].map((h) => (
-              <th key={h} className="w-[74px] !text-right">
-                {h}
+            {columns.map(([key, label]) => (
+              <th key={key} className="w-[74px] !text-right">
+                {head(key, label)}
               </th>
             ))}
-            <th className="w-[150px] !text-right">{t("Рейтинг")}</th>
+            <th className="w-[150px] !text-right">{head("rating", t("Рейтинг"))}</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {list.map((r) => {
             const p = who(r.steam_id, r.name);
             const me = meSteamId === r.steam_id;
             const diff = r.kills - r.deaths;
+            const n = place.get(r.steam_id) ?? null;
             return (
-              <tr key={r.steam_id} className={cn(me ? "bg-accent-dim/70" : i === 0 ? "bg-gold/[0.07]" : i < 3 ? "bg-ink/[0.02]" : undefined)}>
-                <td>
-                  <RankBadge n={i + 1} />
-                </td>
+              <tr key={r.steam_id} className={cn(me ? "bg-accent-dim/70" : n === 1 ? "bg-gold/[0.07]" : n != null && n <= 3 ? "bg-ink/[0.02]" : undefined)}>
+                <td>{n != null ? <RankBadge n={n} /> : <span className="inline-grid size-8 place-items-center text-fg-4" title={t("Вне зачёта сезона")}>—</span>}</td>
                 <td className="!h-auto py-2">
                   <div className="flex min-w-0 items-center gap-3">
                     <Avatar src={p.avatar_url} name={p.nickname} size="sm" />
                     <div className="min-w-0">
                       <Link href={`/players/${r.steam_id}`} className="flex min-w-0 items-center gap-2 text-fg hover:text-accent">
-                        <span className={cn("truncate", i < 3 ? "text-[16px] font-bold" : "font-semibold")}>{p.nickname}</span>
-                        {i === 0 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
+                        <span className={cn("truncate", n != null && n <= 3 ? "text-[16px] font-bold" : "font-semibold")}>{p.nickname}</span>
+                        {n === 1 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
                         {me && <span className="shrink-0 rounded-chip bg-accent px-1.5 py-0.5 text-micro font-semibold text-accent-ink">{t("вы")}</span>}
                       </Link>
-                      {(r.role || r.best || r.streak >= 3) && (
+                      {(r.role || r.best || r.streak >= 3 || r.prize != null || !r.qualified) && (
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          {r.prize != null && <span className="num shrink-0 rounded-chip bg-gold/20 px-1.5 py-0.5 text-micro font-bold text-gold">{money(r.prize, t)}</span>}
+                          {season && !r.qualified && <span className="shrink-0 rounded-chip bg-ink/[0.06] px-1.5 py-0.5 text-micro font-semibold text-fg-3">{t("до зачёта карт: {n}", { n: SEASON_MIN_MAPS - r.maps })}</span>}
                           <RoleChip role={r.role} t={t} />
                           <BestMapChip cell={r.best} t={t} />
                           <Streak n={r.streak} t={t} />
@@ -408,7 +441,7 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
                   </span>
                   <span className="num mt-2 block text-meta text-fg-3">{t("Карт: {maps} · побед {wins} из {matches}", { maps: r.maps, wins: r.wins, matches: r.matches })}</span>
                 </span>
-                <span className={cn("num shrink-0 text-[40px] font-extrabold leading-none", SIDE[i].text)}>{r.rating.toFixed(2)}</span>
+                <span className={cn("num shrink-0 text-[28px] font-extrabold leading-none sm:text-[40px]", SIDE[i].text)}>{r.rating.toFixed(2)}</span>
               </Link>
             );
           })}
@@ -499,12 +532,12 @@ export function RecordsTab({ records, duos, who, t }: { records: RecordItem[]; d
         {duos.length === 0 ? (
           <p className="rounded-surface border border-line-subtle bg-surface p-5 text-meta text-fg-3">{t("Пока никто не сыграл вместе {n} матча.", { n: DUO_MIN })}</p>
         ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {duos.map((d, i) => {
               const pa = who(d.a);
               const pb = who(d.b);
               return (
-                <div key={`${d.a}:${d.b}`} className="flex items-center gap-3 rounded-surface border border-line-subtle bg-surface px-4 py-3">
+                <div key={`${d.a}:${d.b}`} className="flex min-w-0 items-center gap-3 rounded-surface border border-line-subtle bg-surface px-4 py-3">
                   <RankBadge n={i + 1} />
                   <span className="flex shrink-0 -space-x-2">
                     <Avatar src={pa.avatar_url} name={pa.nickname} size="sm" className="ring-2 ring-surface" />
@@ -515,7 +548,7 @@ export function RecordsTab({ records, duos, who, t }: { records: RecordItem[]; d
                     <span className="text-fg-3"> + </span>
                     <Link href={`/players/${d.b}`} className="hover:text-accent">{pb.nickname}</Link>
                   </span>
-                  <span className="num shrink-0 text-meta text-fg-3">{t("{wins} из {games}", { wins: d.wins, games: d.games })}</span>
+                  <span className="num hidden shrink-0 text-meta text-fg-3 sm:inline">{t("{wins} из {games}", { wins: d.wins, games: d.games })}</span>
                   <span className={cn("num w-14 shrink-0 text-right text-[18px] font-extrabold", pct(d.wins, d.games) >= 60 ? "text-ok" : "text-fg")}>{pct(d.wins, d.games)}%</span>
                 </div>
               );

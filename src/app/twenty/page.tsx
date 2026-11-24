@@ -7,20 +7,24 @@ import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { getMapImages } from "@/lib/settings";
-import { TWENTY_MIN_MAPS, getTwenty } from "@/lib/twenty";
+import { SEASON_MIN_MAPS, TWENTY_MIN_MAPS, currentSeason, getTwenty } from "@/lib/twenty";
 import { Avatar, Button, Container, ContextNav, EmptyState, PageTitle, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { CreatePotButton } from "@/components/lobby/pot";
 import { RankBadge } from "@/components/public/data-table";
 import { BestMapChip, RoleChip, Streak, Trend } from "@/components/twenty/bits";
-import { MapsTab, Nominations, RatingTable, RecordsTab, StyleTab, whoOf } from "@/components/twenty/tabs";
+import { SelectNav } from "@/components/public/select-nav";
+import { money } from "@/components/twenty/money";
+import { AchievementsTab, HallOfFame, SeasonBanner, seasonLabel } from "@/components/twenty/season";
+import { MapsTab, Nominations, RatingTable, RecordsTab, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
 
 export const dynamic = "force-dynamic";
 
 const CODE = /^[A-Z0-9]{4,10}$/;
 const STEAM = /^\d{17}$/;
 const MAP = /^[a-z0-9_]{3,40}$/;
-const TABS = ["rating", "maps", "style", "records"] as const;
+const SEASON = /^\d{4}-(0[1-9]|1[0-2])$/;
+const TABS = ["rating", "maps", "style", "records", "awards"] as const;
 type Tab = (typeof TABS)[number];
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -46,9 +50,14 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
   const map = MAP.test(str(sp.map)) ? str(sp.map) : null;
   const a = STEAM.test(str(sp.a)) ? str(sp.a) : null;
   const b = STEAM.test(str(sp.b)) ? str(sp.b) : null;
+  const sort: SortKey = (SORTS as readonly string[]).includes(str(sp.sort)) ? (str(sp.sort) as SortKey) : "rating";
+  // по умолчанию — сезон, который идёт сейчас; «all» — за всё время; вечер (код лобби) сезон не учитывает
+  const nowSeason = currentSeason();
+  const allTime = str(sp.season) === "all";
+  const season = code || allTime ? undefined : SEASON.test(str(sp.season)) ? str(sp.season) : nowSeason;
 
   const player = await getCurrentPlayer();
-  const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code }), listOpenLobbies(), player ? playerLobby(player.id) : null, tab === "maps" ? getMapImages() : {}]);
+  const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code, season }), listOpenLobbies(), player ? playerLobby(player.id) : null, tab === "maps" ? getMapImages() : {}]);
   const { rows, evenings, matches } = twenty;
   const who = whoOf(twenty.players);
   // игры на банк («Десятка») и большие лобби; комнаты отдельных матчей сетки не показываем — в них ведёт само лобби
@@ -61,6 +70,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
     const q = new URLSearchParams();
     if (target !== "rating") q.set("tab", target);
     if (code) q.set("lobby", code);
+    else if (allTime) q.set("season", "all");
+    else if (season && season !== nowSeason) q.set("season", season);
     for (const [k, v] of Object.entries(params)) q.set(k, v);
     const s = q.toString();
     return s ? `/twenty?${s}` : "/twenty";
@@ -83,6 +94,17 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
               {t("Общий рейтинг")}
             </Button>
           )}
+          {!code && (
+            <SelectNav
+              label={t("Сезон")}
+              value={allTime ? "all" : season!}
+              options={[
+                // сезон, который идёт, есть в списке всегда — даже если в нём ещё не играли
+                ...[...new Set([nowSeason, ...twenty.seasons.map((x) => x.key)])].map((key) => ({ value: key, label: key === nowSeason ? t("Сезон: {name}", { name: seasonLabel(key, t) }) : seasonLabel(key, t), href: key === nowSeason ? "/twenty" : `/twenty?season=${key}` })),
+                { value: "all", label: t("За всё время"), href: "/twenty?season=all" },
+              ]}
+            />
+          )}
           {!mine && !code && <CreatePotButton loggedIn={!!player} />}
           {/* кто уже сидит в лобби, новую игру собрать не может — показываем, куда вернуться, а не пустое место */}
           {mine && !code && (
@@ -94,7 +116,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </div>
       </header>
 
-      {king && (
+      {(king || twenty.seasons.length > 0) && (
         <ContextNav
           match="tab"
           items={[
@@ -102,9 +124,12 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             { key: "maps", label: t("Карты"), href: href("maps") },
             { key: "style", label: t("Стиль игры"), href: href("style") },
             { key: "records", label: t("Рекорды"), href: href("records") },
+            { key: "awards", label: t("Достижения"), href: href("awards") },
           ]}
         />
       )}
+
+      {season && tab === "rating" && <SeasonBanner season={season} rows={rows} who={who} t={t} live={season === nowSeason} />}
 
       {king && kingWho && tab === "rating" && (
         <>
@@ -112,7 +137,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <section aria-label={t("Король")} className="relative overflow-hidden rounded-surface border border-gold/40 bg-gradient-to-br from-gold/[0.14] via-gold/[0.05] to-transparent p-6 sm:p-8">
               <div className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.14em] text-gold">
-                {Icon.crown("size-4")} {code ? t("Лучший игрок вечера") : t("Король микса")}
+                {Icon.crown("size-4")} {code ? t("Лучший игрок вечера") : !season ? t("Король микса") : season === nowSeason ? t("Лидер сезона") : t("Чемпион сезона")}
+                {king.prize != null && <span className="num rounded-chip bg-gold/25 px-2 py-0.5 normal-case tracking-normal">{money(king.prize, t)}</span>}
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-5">
                 <span className="rounded-full p-1 ring-2 ring-gold/60">
@@ -192,10 +218,12 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
           <section aria-label={t("Все игроки")}>
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-title text-fg">{t("Все игроки")}</h2>
-              <p className="text-meta text-fg-3">{code ? t("Матчей в лобби: {n}", { n: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}</p>
+              <p className="text-meta text-fg-3">
+                {code ? t("Матчей в лобби: {n}", { n: matches }) : season ? t("Места и призы — среди сыгравших за сезон от {n} карт. Матчей в сезоне: {m}", { n: SEASON_MIN_MAPS, m: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}
+              </p>
             </div>
-            <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} />
-            <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")}</p>
+            <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} season={!!season} sort={sort} sortHref={(key) => href("rating", key === "rating" ? {} : { sort: key })} />
+            <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")} {t("Нажмите на заголовок столбца, чтобы отсортировать по нему.")}</p>
           </section>
         </>
       )}
@@ -204,14 +232,17 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
       {king && tab === "style" && <StyleTab rows={rows} who={who} t={t} a={a ?? player?.steam_id ?? null} b={b} href={(params) => href("style", params)} />}
 
-      {king && tab === "records" && (
+      {tab === "records" && twenty.records.length > 0 && (
         <>
-          {code && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному вечеру.")}</p>}
+          {(code || season) && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному сезону или вечеру.")}</p>}
+          <HallOfFame seasons={twenty.seasons} who={who} t={t} />
           <RecordsTab records={twenty.records} duos={twenty.duos} who={who} t={t} />
         </>
       )}
 
-      {!king && (
+      {tab === "awards" && twenty.records.length > 0 && <AchievementsTab board={twenty.achievementBoard()} who={who} t={t} players={Object.keys(twenty.players).length} />}
+
+      {!king && (tab === "rating" || twenty.records.length === 0) && (
         <>
           {!code && open.length > 0 && (
             <Section title={t("Идут сейчас")}>
@@ -228,8 +259,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             </Section>
           )}
           <EmptyState
-            title={code ? t("В этом лобби ещё нет сыгранных матчей") : t("Рейтинга пока нет")}
-            text={code ? t("Таблица появится после первой сыгранной карты.") : t("Он появится после первых сыгранных матчей.")}
+            title={code ? t("В этом лобби ещё нет сыгранных матчей") : season ? t("В этом сезоне ещё не играли") : t("Рейтинга пока нет")}
+            text={code ? t("Таблица появится после первой сыгранной карты.") : season ? t("Таблица сезона появится после первой сыгранной игры. Прошлые сезоны — в списке сверху.") : t("Он появится после первых сыгранных матчей.")}
           />
         </>
       )}
