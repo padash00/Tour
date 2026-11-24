@@ -154,7 +154,7 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
 
   return Promise.all(commands.map(async (c) => {
     if (c.type === "load_match" && c.payload.lobby) {
-      // игра лобби: HTTP-лог нужен для статистики раундов (первые убийства, KAST, оружие, стороны); cvars — из настроек лобби
+      // игра лобби: cvars — из настроек лобби; HTTP-лог (статистика раундов) — только если включён, см. ниже
       return {
         ...c,
         payload: {
@@ -163,7 +163,9 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
           header_key: MATCHZY_HEADER,
           header_value: token,
           events_url: `${siteOrigin}/api/matchzy/events`,
-          log_url: `${siteOrigin}/api/cs2/log?${signedLogQuery(String(c.payload.matchzy_id), token)}`,
+          // журнал раундов для игр лобби выключен: в первой же игре с ним (24.11.2026) игроки пожаловались на лаги.
+          // Причина не установлена — включается переменной LOBBY_ROUND_LOG=1 для проверки на тестовой игре
+          ...(process.env.LOBBY_ROUND_LOG === "1" && { log_url: `${siteOrigin}/api/cs2/log?${signedLogQuery(String(c.payload.matchzy_id), token)}` }),
           post_cmds: [],
           enforce: await lobbyEnforce(String(c.payload.match_id)),
         },
