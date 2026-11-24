@@ -34,6 +34,13 @@ export type LobbySettings = {
   filter_faceit_max: number; // 10 — любой
   filter_min_matches: number; // сыгранных матчей на сайте (турниры + лобби)
   // геймплей
+  /**
+   * Кто за какую сторону начинает карту: knife — ножевой раунд на каждой карте; swap — без ножа, команды
+   * чередуются; pick — как на турнирах: на карте, которую пикнула команда, сторону выбирает соперник,
+   * решающая карта — ножевой (нужен бан-пик капитанов и серия от BO3, иначе работает как knife).
+   */
+  sides: "knife" | "swap" | "pick";
+  /** ножевой раунд есть (sides не swap) — производное от sides, оставлено для старых записей и шаблонов */
   knife: boolean;
   max_rounds: 16 | 24 | 30 | 60;
   backups: boolean;
@@ -103,6 +110,7 @@ export const DEFAULT_SETTINGS: LobbySettings = {
   filter_faceit_min: 0,
   filter_faceit_max: 10,
   filter_min_matches: 0,
+  sides: "knife",
   knife: true,
   max_rounds: 24,
   backups: true,
@@ -185,6 +193,9 @@ export function normalizeSettings(input: unknown, base: LobbySettings = DEFAULT_
   const d = base;
   const mode = pick(s.mode, Object.keys(MODES) as ModeKey[], d.mode);
   const maps = Array.isArray(s.maps) ? (s.maps as unknown[]).map(String).filter((m) => MAP_RE.test(m)).slice(0, 30) : d.maps;
+  // старые записи без sides: по переключателю «Ножевой раунд»
+  const fallbackSides = typeof s.knife === "boolean" ? (s.knife ? "knife" : "swap") : (d.sides ?? (d.knife === false ? "swap" : "knife"));
+  const sides = pick(s.sides, ["knife", "swap", "pick"] as const, fallbackSides);
   const out: LobbySettings = {
     mode,
     team_size: num(s.team_size, LIMITS.team_size, MODES[mode].size),
@@ -206,7 +217,8 @@ export function normalizeSettings(input: unknown, base: LobbySettings = DEFAULT_
     filter_faceit_min: num(s.filter_faceit_min, LIMITS.filter_faceit_min, d.filter_faceit_min),
     filter_faceit_max: num(s.filter_faceit_max, LIMITS.filter_faceit_max, d.filter_faceit_max),
     filter_min_matches: num(s.filter_min_matches, LIMITS.filter_min_matches, d.filter_min_matches),
-    knife: bool(s.knife, d.knife),
+    sides,
+    knife: sides !== "swap",
     max_rounds: pick(Number(s.max_rounds), [16, 24, 30, 60] as const, d.max_rounds),
     backups: bool(s.backups, d.backups),
     overtime: bool(s.overtime, d.overtime),
@@ -329,25 +341,25 @@ export const PRESETS: { key: string; name: string; text: string; settings: Parti
     key: "classic",
     name: tr("Классика 5×5"),
     text: tr("MR24, нож, овертаймы, вето карт"),
-    settings: { mode: "5v5", team_size: 5, max_rounds: 24, knife: true, overtime: true, map_choice: "veto", maps: ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_cache"] },
+    settings: { mode: "5v5", team_size: 5, max_rounds: 24, sides: "knife", overtime: true, map_choice: "veto", maps: ["de_ancient", "de_anubis", "de_dust2", "de_inferno", "de_mirage", "de_nuke", "de_cache"] },
   },
   {
     key: "wingman",
     name: tr("Wingman 2×2"),
     text: tr("MR16, компактные карты"),
-    settings: { mode: "2v2", team_size: 2, max_rounds: 16, knife: true, overtime: true, map_choice: "host", best_of: 1, maps: ["de_inferno"] },
+    settings: { mode: "2v2", team_size: 2, max_rounds: 16, sides: "knife", overtime: true, map_choice: "host", best_of: 1, maps: ["de_inferno"] },
   },
   {
     key: "duel",
     name: tr("Дуэль 1×1"),
     text: tr("Один на один, без ножа"),
-    settings: { mode: "1v1", team_size: 1, max_rounds: 24, knife: false, overtime: false, map_choice: "host", best_of: 1, maps: ["de_dust2"] },
+    settings: { mode: "1v1", team_size: 1, max_rounds: 24, sides: "swap", overtime: false, map_choice: "host", best_of: 1, maps: ["de_dust2"] },
   },
   {
     key: "fun",
     name: tr("Фан"),
     text: tr("Только в голову, низкая гравитация, автобхоп"),
-    settings: { headshot_only: true, low_gravity: true, autobhop: true, knife: false, max_rounds: 16, start_money: 16000, max_money: 16000 },
+    settings: { headshot_only: true, low_gravity: true, autobhop: true, sides: "swap", max_rounds: 16, start_money: 16000, max_money: 16000 },
   },
 ];
 
@@ -357,3 +369,10 @@ export const BOT_NAMES = [
 ];
 
 export const BOT_DIFFICULTY = [tr("Лёгкие"), tr("Нормальные"), tr("Сложные"), tr("Эксперт")] as const;
+
+/** Как на деле решаются стороны: «по пикам» работает только с бан-пиком капитанов и серией от BO3 */
+export function sideMode(s: Pick<LobbySettings, "sides" | "knife" | "map_choice" | "best_of">): "knife" | "swap" | "pick" {
+  const sides = s.sides ?? (s.knife === false ? "swap" : "knife");
+  if (sides === "pick") return s.map_choice === "veto" && s.best_of > 1 ? "pick" : "knife";
+  return sides;
+}

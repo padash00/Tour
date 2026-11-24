@@ -14,7 +14,7 @@ import { formatDateTime, mapName } from "@/lib/format";
 import { applyVetoTimeouts, getMatch, getMatchRosters, getVisibleMatch } from "@/lib/matches";
 import { getStageRounds } from "@/lib/match-stage";
 import { aggregatePlayers, getStatRows } from "@/lib/stats";
-import { vetoState } from "@/lib/veto";
+import { vetoState, vetoTurn } from "@/lib/veto";
 import { modeOf } from "@/lib/modes";
 import { getMatchRounds } from "@/lib/rounds-data";
 import { RoundTimeline } from "@/components/competition/round-timeline";
@@ -112,8 +112,10 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
   const inRoster = [...rosters.team1, ...rosters.team2].some((r) => r.player.id === player?.id);
   const admin = isAdmin(player);
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
-  const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
-  const myTurn = m.status === "veto" && isCaptain && turnTeam?.id === myTeam?.id;
+  // ход — бан, пик или выбор стороны на только что пикнутой карте (стороны «по пикам»)
+  const turn = vetoTurn(m.best_of, m.tournament.map_pool, m.veto, { sideChoice: m.tournament.side_choice, team1: m.team1_id, team2: m.team2_id });
+  const turnTeam = turn?.teamId === m.team1_id ? m.team1 : turn?.teamId === m.team2_id ? m.team2 : null;
+  const myTurn = m.status === "veto" && isCaptain && !!turnTeam && turnTeam.id === myTeam?.id;
   const stage = matchStage(m, stageRounds, t);
   const bestOfText = m.best_of === 1 ? t("до 1 победы") : t("до {n} побед", { n: Math.ceil(m.best_of / 2) });
   const serverPhase = ["ready", "live"].includes(m.status);
@@ -490,6 +492,7 @@ export default async function MatchPage(props: PageProps<"/matches/[id]">) {
             m={m}
             turnTeam={turnTeam?.name ?? null}
             myTurn={myTurn}
+            choosingSide={turn?.action === "side"}
             participant={participant}
             next={nextStage}
             winsToMap={winsToMap}

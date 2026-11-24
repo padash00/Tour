@@ -3,6 +3,7 @@ import type { MatchFull } from "@/lib/matches";
 import { CopyConnect } from "../copy-connect";
 import { Timer, cn } from "@/components/ds";
 import { getT } from "@/lib/i18n/server";
+import { ctTeamOf } from "@/lib/veto";
 
 /*
  * Правая колонка Match Room: «Сервер» и «Как выбрали карту».
@@ -56,11 +57,15 @@ export async function MatchServerPanel({ m, participant, serverNow }: { m: Match
           <ol className="grid gap-1.5 text-[14.5px] text-fg-2">
             <li>1. {t("Нажмите «Скопировать адрес» и вставьте его в консоль CS2 (клавиша ~).")}</li>
             <li>2. {t.rich("В разминке напишите <c>.ready</c>.", { c: (x) => <span className="num-code text-fg">{x}</span> })}</li>
-            {m.tournament.knife_round && (
+            {m.tournament.side_choice && m.best_of > 1 ? (
+              <li>
+                3. {t.rich("Стороны на пикнутых картах уже выбраны. На решающей карте — нож: выиграли — напишите <c>.stay</c> или <c>.switch</c>.", { c: (x) => <span className="num-code text-fg">{x}</span> })}
+              </li>
+            ) : m.tournament.knife_round ? (
               <li>
                 3. {t.rich("Выиграли нож — напишите <c>.stay</c> или <c>.switch</c>.", { c: (x) => <span className="num-code text-fg">{x}</span> })}
               </li>
-            )}
+            ) : null}
           </ol>
         </div>
       ) : (
@@ -114,6 +119,9 @@ export async function VetoSummary({ m }: { m: MatchFull }) {
             )}
           >
             {mapName(s.map_name)}
+            {ctTeamOf(s, { team1: m.team1_id, team2: m.team2_id }) && (
+              <span className="ml-1.5 rounded-full bg-side-ct/15 px-1.5 py-px text-[11px] font-bold text-side-ct">CT {tag(ctTeamOf(s, { team1: m.team1_id, team2: m.team2_id }))}</span>
+            )}
           </li>
         ))}
       </ul>

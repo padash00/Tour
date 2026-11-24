@@ -194,7 +194,7 @@ export default async function AdminTournamentPage(props: PageProps<"/admin/tourn
           <Panel title="Правила игры в матче" className="lg:col-span-2">
             <div className={`${CARD} grid grid-cols-2 md:grid-cols-5 divide-x divide-ink/[0.06]`}>
               <BarCell label="Карт в матче" value={`BO${t.default_best_of}`} hint={`в финале BO${t.final_best_of}`} />
-              <BarCell label="Выбор сторон" value={t.knife_round ? "Нож" : "Заданы"} />
+              <BarCell label="Выбор сторон" value={t.side_choice ? "По пикам" : t.knife_round ? "Нож" : "Заданы"} />
               <BarCell label="Овертайм" value={t.overtime ? "Есть" : "Нет"} />
               <BarCell label="Тактические паузы" value={t.timeouts_per_team} hint={`по ${t.timeout_seconds} с`} />
               <BarCell label="Технические паузы" value={t.tech_pauses} hint={`по ${Math.round(t.tech_pause_seconds / 60)} мин`} />

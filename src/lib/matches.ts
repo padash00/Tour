@@ -18,7 +18,7 @@ import {
 import { db } from "./supabase";
 import type { LiveMap } from "./maps";
 import type { BracketSyncRow, Match, MatchMap, SeriesResult, StageCreateMode, SyncBracketResult, Team, Tournament, VetoActionRow } from "./types";
-import { VETO_STEP_SECONDS, vetoState } from "./veto";
+import { SIDE_STEP_SECONDS, VETO_STEP_SECONDS, sidePending, vetoState } from "./veto";
 
 export type MatchWithTeams = Match & { team1: Team | null; team2: Team | null; live_maps?: LiveMap[] };
 
@@ -451,6 +451,10 @@ export async function applyVetoTimeouts(matchId: string) {
     if (!m || m.status !== "veto" || !m.veto_deadline) return;
     const deadline = new Date(m.veto_deadline).getTime();
     if (deadline > Date.now()) return;
+    if (sidePending(m.veto, m.tournament.side_choice)) {
+      if (!(await setVetoSide(m, "ct", new Date(deadline + VETO_STEP_SECONDS * 1000)))) return;
+      continue;
+    }
     const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
     if (!state.current || state.current.action === "decider") {
       await completeVeto(m);
@@ -483,6 +487,8 @@ export async function insertVetoAction(
   auto: boolean,
   nextDeadline: Date,
 ): Promise<boolean> {
+  // стороны «по пикам»: пока соперник не выбрал сторону на пикнутой карте, следующей карты нет
+  if (sidePending(m.veto, m.tournament.side_choice)) return false;
   const state = vetoState(m.best_of, m.tournament.map_pool, m.veto);
   if (!state.current || state.current.action === "decider") return false;
   const { error } = await db().from("veto_actions").insert({
@@ -496,13 +502,33 @@ export async function insertVetoAction(
   });
   if (error) return false; // кто-то успел раньше
 
-  const fresh = (await fetchMatch(m.id))!;
+  await afterVetoStep((await fetchMatch(m.id))!, nextDeadline);
+  return true;
+}
+
+/** После шага: ждём выбор стороны, следующий ход или завершаем вето */
+async function afterVetoStep(fresh: MatchFull, nextDeadline: Date) {
   const next = vetoState(fresh.best_of, fresh.tournament.map_pool, fresh.veto);
-  if (next.current?.action === "decider" || next.complete) {
+  if (sidePending(fresh.veto, fresh.tournament.side_choice)) {
+    const sideDeadline = new Date(nextDeadline.getTime() - (VETO_STEP_SECONDS - SIDE_STEP_SECONDS) * 1000);
+    await db().from("matches").update({ veto_deadline: sideDeadline.toISOString() }).eq("id", fresh.id).eq("status", "veto");
+  } else if (next.current?.action === "decider" || next.complete) {
     await completeVeto(fresh);
   } else {
-    await db().from("matches").update({ veto_deadline: nextDeadline.toISOString() }).eq("id", m.id).eq("status", "veto");
+    await db().from("matches").update({ veto_deadline: nextDeadline.toISOString() }).eq("id", fresh.id).eq("status", "veto");
   }
+}
+
+/**
+ * Сторона на только что пикнутой карте (её выбирает соперник пикнувшего; по таймеру — CT).
+ * Пишется только в пик без стороны — параллельный выбор (капитан и таймер) пройдёт один раз.
+ */
+export async function setVetoSide(m: MatchFull, side: "ct" | "t", nextDeadline: Date): Promise<boolean> {
+  const pending = sidePending(m.veto, m.tournament.side_choice);
+  if (!pending) return false;
+  const { data } = await db().from("veto_actions").update({ side }).eq("id", pending.id).is("side", null).select("id");
+  if (!data?.length) return false;
+  await afterVetoStep((await fetchMatch(m.id))!, nextDeadline);
   return true;
 }
 

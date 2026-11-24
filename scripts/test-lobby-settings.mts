@@ -76,5 +76,38 @@ check(potBank(potS) === 50000 && potS.pot_paid.length === 1 && Object.keys(potS.
 const plain = normalizeSettings({ pot: false, pot_paid: [PID], pot_fee: 100 });
 check(!plain.pot && plain.pot_paid.length === 0 && plain.network === "lan", "обычное лобби: отметок взносов нет, правила «Десятки» не действуют");
 
+// стороны: старые записи, три режима, выбор стороны после пика
+{
+  const { sideMode } = await import("../src/lib/lobby-settings");
+  const { sidePending, vetoTurn, seriesSides, ctTeamOf } = await import("../src/lib/veto");
+  check(normalizeSettings({ knife: false }).sides === "swap" && normalizeSettings({ knife: true }).sides === "knife", "стороны: старая запись без sides читается по переключателю ножа");
+  const pickS = normalizeSettings({ sides: "pick", knife: false, map_choice: "veto", best_of: 3, maps: ["de_a", "de_b", "de_c", "de_d", "de_e", "de_f", "de_g"] });
+  check(pickS.sides === "pick" && pickS.knife === true, "стороны: sides главнее старого переключателя, нож при «по пикам» есть");
+  check(sideMode(pickS) === "pick" && sideMode({ ...pickS, best_of: 1 }) === "knife" && sideMode({ ...pickS, map_choice: "host" }) === "knife", "стороны «по пикам» работают только с бан-пиком и серией от BO3, иначе нож");
+  check(normalizeSettings({ sides: "мусор" }).sides === DEFAULT_SETTINGS.sides, "стороны: мусор → по умолчанию");
+
+  const pool = ["de_a", "de_b", "de_c", "de_d", "de_e", "de_f", "de_g"];
+  const o = { sideChoice: true, team1: "A", team2: "B" };
+  type Act = { step: number; team_id: string | null; action: "ban" | "pick" | "decider"; map_name: string; side?: string | null };
+  const acts: Act[] = [
+    { step: 1, team_id: "A", action: "ban", map_name: "de_a" },
+    { step: 2, team_id: "B", action: "ban", map_name: "de_b" },
+    { step: 3, team_id: "A", action: "pick", map_name: "de_c", side: null },
+  ];
+  check(sidePending(acts, true)?.map_name === "de_c" && sidePending(acts, false) === null, "после пика вето ждёт выбор стороны — только в режиме «по пикам»");
+  const t1 = vetoTurn(3, pool, acts, o);
+  check(t1?.action === "side" && t1.teamId === "B" && t1.map === "de_c", "сторону на карте выбирает соперник пикнувшего");
+  acts[2].side = "t";
+  const t2 = vetoTurn(3, pool, acts, o);
+  check(t2?.action === "pick" && t2.teamId === "B", "сторона выбрана — ход переходит к следующему пику");
+  check(ctTeamOf(acts[2], o) === "A", "соперник взял T — за CT начинает пикнувший");
+  acts.push({ step: 4, team_id: "B", action: "pick", map_name: "de_d", side: "ct" });
+  check(ctTeamOf(acts[3], o) === "A", "соперник взял CT — он и начинает за CT");
+  const all: Act[] = [...acts, { step: 5, team_id: "A", action: "ban", map_name: "de_e" }, { step: 6, team_id: "B", action: "ban", map_name: "de_f" }, { step: 7, team_id: null, action: "decider", map_name: "de_g" }];
+  check(seriesSides(["de_c", "de_d", "de_g"], all, { ...o, knife: true }).join() === "team1_ct,team1_ct,knife", "MatchZy: стороны пикнутых карт заданы, решающая — нож");
+  check(seriesSides(["de_c", "de_d", "de_g"], all, { ...o, sideChoice: false, knife: false }).join() === "team1_ct,team2_ct,team1_ct", "без режима «по пикам» стороны как раньше: чередование или нож");
+  check(vetoTurn(3, pool, all, o) === null, "вето закончено — хода нет");
+}
+
 console.log(failed ? `\n${failed} ошибок` : "\nвсё верно");
 process.exit(failed ? 1 : 0);

@@ -194,6 +194,8 @@ export function TournamentForm({
   const [cover, setCover] = useState<string | null>(t?.cover_url ?? null);
   const [overtime, setOvertime] = useState(t?.overtime ?? true);
   const [knife, setKnife] = useState(t?.knife_round ?? true);
+  // стороны «по пикам»: на пикнутой карте сторону выбирает соперник, решающая — нож
+  const [sideChoice, setSideChoice] = useState(t?.side_choice ?? false);
   const [timeouts, setTimeouts] = useState(t?.timeouts_per_team ?? 4);
   const [timeoutSec, setTimeoutSec] = useState(t?.timeout_seconds ?? 30);
   const [techPauses, setTechPauses] = useState(t?.tech_pauses ?? 2);
@@ -312,6 +314,7 @@ export function TournamentForm({
       <input type="hidden" name="checkin_closes_at" value={checkinClose} />
       {overtime && <input type="hidden" name="overtime" value="on" />}
       {knife && <input type="hidden" name="knife_round" value="on" />}
+      {sideChoice && <input type="hidden" name="side_choice" value="on" />}
       <input type="hidden" name="timeouts_per_team" value={timeouts} />
       <input type="hidden" name="timeout_seconds" value={timeoutSec} />
       <input type="hidden" name="tech_pauses" value={techPauses} />
@@ -618,12 +621,15 @@ export function TournamentForm({
                 <div>
                   <Label>Кто за какую сторону играет</Label>
                   <Segmented
-                    value={knife ? "knife" : "fixed"}
-                    onChange={(v) => setKnife(v === "knife")}
-                    options={[{ value: "knife", label: "Решает ножевой раунд" }, { value: "fixed", label: "Заранее заданы" }]}
+                    value={sideChoice ? "pick" : knife ? "knife" : "fixed"}
+                    onChange={(v) => {
+                      setSideChoice(v === "pick");
+                      setKnife(v !== "fixed");
+                    }}
+                    options={[{ value: "knife", label: "Ножевой раунд" }, { value: "pick", label: "По пикам" }, { value: "fixed", label: "Заранее заданы" }]}
                   />
                   <p className="mt-1.5 text-[13.5px] text-fg-3">
-                    {knife ? "Команды сыграют раунд на ножах — победитель выбирает сторону" : "Первая команда начинает за CT, на следующей карте стороны меняются"}
+                    {sideChoice ? "Как на крупных турнирах: на карте, которую пикнула команда, сторону выбирает соперник (30 секунд, иначе CT). Решающая карта и матчи до одной победы — ножевой раунд" : knife ? "Команды сыграют раунд на ножах — победитель выбирает сторону" : "Первая команда начинает за CT, на следующей карте стороны меняются"}
                   </p>
                 </div>
               )}
@@ -665,6 +671,7 @@ export function TournamentForm({
                 bo,
                 finalBo,
                 knife,
+                sideChoice,
                 overtime,
                 timeouts,
                 timeoutSec,
@@ -1087,7 +1094,7 @@ export function TournamentForm({
             <SummaryRow label={format === "1v1" ? "Участников" : "Команд"} value={maxTeams} />
             <SummaryRow label="Серии" value={`BO${bo} · финал BO${finalBo}`} />
             <SummaryRow label="Карты" value={maps.length} warn={!!mapWarning} />
-            <SummaryRow label="Стороны" value={knife ? "нож" : "фиксированные"} />
+            <SummaryRow label="Стороны" value={sideChoice ? "по пикам, решающая — нож" : knife ? "нож" : "фиксированные"} />
             <SummaryRow label="Место" value={isLan ? `LAN · ${location || "—"}` : "Онлайн"} />
             <SummaryRow label="Старт" value={human(start)} warn={!start} />
             <SummaryRow label="Призовой" value={prizePool || "—"} />

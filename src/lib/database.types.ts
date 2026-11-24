@@ -2512,6 +2512,7 @@ export type Database = {
           is_private: boolean
           kk: Json
           knife_round: boolean
+          side_choice: boolean
           location: string | null
           map_pool: string[]
           match_format: string | null
@@ -2570,6 +2571,7 @@ export type Database = {
           is_private?: boolean
           kk?: Json
           knife_round?: boolean
+          side_choice?: boolean
           location?: string | null
           map_pool?: string[]
           match_format?: string | null
@@ -2628,6 +2630,7 @@ export type Database = {
           is_private?: boolean
           kk?: Json
           knife_round?: boolean
+          side_choice?: boolean
           location?: string | null
           map_pool?: string[]
           match_format?: string | null
@@ -2669,6 +2672,7 @@ export type Database = {
           id: string
           map_name: string
           match_id: string
+          side: string | null
           step: number
           team_id: string | null
         }
@@ -2680,6 +2684,7 @@ export type Database = {
           id?: string
           map_name: string
           match_id: string
+          side?: string | null
           step: number
           team_id?: string | null
         }
@@ -2691,6 +2696,7 @@ export type Database = {
           id?: string
           map_name?: string
           match_id?: string
+          side?: string | null
           step?: number
           team_id?: string | null
         }

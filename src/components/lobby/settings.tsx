@@ -333,8 +333,29 @@ export function AdvancedSettings({
         </Section>
 
         <Section title={t("Геймплей")}>
-          <Row icon={Icon.knife()} label={t("Ножевой раунд")}>
-            <Toggle on={s.knife} disabled={ro} onChange={(v) => patch({ knife: v })} />
+          <Row
+            icon={Icon.knife()}
+            label={t("Стороны")}
+            hint={
+              s.sides === "pick"
+                ? s.map_choice === "veto" && s.best_of > 1
+                  ? t("Как на турнирах: на карте, которую пикнула команда, сторону выбирает соперник. Решающая карта — ножевой раунд")
+                  : t("Нужны бан-пик капитанов и серия от BO3. Сейчас — ножевой раунд на каждой карте")
+                : s.sides === "swap"
+                  ? t("Без ножа: первая команда начинает за CT, на следующей карте — вторая")
+                  : t("Ножевой раунд на каждой карте, победитель выбирает сторону")
+            }
+          >
+            <Segments
+              value={s.sides}
+              disabled={ro}
+              onChange={(v) => patch({ sides: v })}
+              options={[
+                { value: "knife" as const, label: t("Нож") },
+                { value: "pick" as const, label: t("По пикам") },
+                { value: "swap" as const, label: t("Без ножа") },
+              ]}
+            />
           </Row>
           <Row icon={Icon.shuffle()} label={t("Всего раундов")}>
             <Segments value={s.max_rounds} disabled={ro} onChange={(v) => patch({ max_rounds: v })} options={[16, 24, 30, 60].map((n) => ({ value: n as 16 | 24 | 30 | 60, label: n }))} />

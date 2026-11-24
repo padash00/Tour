@@ -12,7 +12,8 @@ import {
   isOnline,
   lobbyHasDue,
   lobbyTimeouts,
-  lobbyVetoState,
+  lobbyTurn,
+  sidesByPick,
   vetoUntimed,
   type GameMap,
   type GameTeam,
@@ -59,7 +60,11 @@ export type ViewGame = {
   veto_pool: string[];
   veto_deadline: string | null;
   veto_turn: 1 | 2 | null;
-  veto_action: "ban" | "pick" | null;
+  /** side — капитан выбирает сторону на карте side_map, которую только что пикнул соперник */
+  veto_action: "ban" | "pick" | "side" | null;
+  side_map: string | null;
+  /** стороны «по пикам»: под картами серии показываем, кто за кого начинает */
+  sides_by_pick: boolean;
   team1_score: number;
   team2_score: number;
   winner: 1 | 2 | null;
@@ -264,7 +269,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
     const [ip, port] = game.server_address.split(":");
     gotv = `${ip}:${Number(port) + 5}`;
   }
-  const vstate = game?.status === "veto" ? lobbyVetoState(game) : null;
+  const turn = game?.status === "veto" ? lobbyTurn(game) : null;
 
   return {
     access,
@@ -334,8 +339,10 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             veto_pool: game.veto_pool,
             // без ограничения по времени — срока нет, таймер в комнате не показывается
             veto_deadline: vetoUntimed(game) ? null : game.veto_deadline,
-            veto_turn: vstate?.current && vstate.current.action !== "decider" ? vstate.current.team : null,
-            veto_action: vstate?.current && vstate.current.action !== "decider" ? vstate.current.action : null,
+            veto_turn: turn?.team ?? null,
+            veto_action: turn?.action ?? null,
+            side_map: turn?.action === "side" ? turn.map : null,
+            sides_by_pick: game.veto_pool.length > 0 && sidesByPick(game),
             team1_score: game.team1_score,
             team2_score: game.team2_score,
             winner: game.winner,

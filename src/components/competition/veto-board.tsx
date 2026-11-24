@@ -1,7 +1,7 @@
-import { vetoAct } from "@/app/actions/match";
+import { vetoAct, vetoSide } from "@/app/actions/match";
 import type { MatchFull } from "@/lib/matches";
 import { mapName } from "@/lib/format";
-import type { vetoState } from "@/lib/veto";
+import { ctTeamOf, sidePending, type vetoState } from "@/lib/veto";
 import { ActionForm } from "../forms";
 import { Callout, CriticalSurface, Panel, SubsectionTitle, Timer, cn } from "@/components/ds";
 import { MapTile, type MapTileState } from "./map-tile";
@@ -30,8 +30,15 @@ export async function VetoBoard({
 }) {
   const t = await getT();
   const active = m.status === "veto";
-  const turnTeam = state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
   const tag = (id: string | null) => (id === m.team1_id ? m.team1?.tag : id === m.team2_id ? m.team2?.tag : null);
+  const teams = { team1: m.team1_id, team2: m.team2_id };
+  // стороны «по пикам»: после пика соперник выбирает сторону — до этого следующего хода нет
+  const pending = active ? sidePending(m.veto, m.tournament.side_choice) : null;
+  const picker = pending ? (pending.team_id === m.team1_id ? m.team1 : m.team2) : null;
+  const chooser = pending ? (pending.team_id === m.team1_id ? m.team2 : m.team1) : null;
+  const turnTeam = pending ? chooser : state.current?.team === 1 ? m.team1 : state.current?.team === 2 ? m.team2 : null;
+  /** «CT · TAG» для пикнутой карты, на которой сторона уже выбрана */
+  const ctTag = (a: (typeof m.veto)[number] | undefined) => tag(ctTeamOf(a, teams));
 
   const turnContent =
     active && state.current ? (
@@ -41,12 +48,21 @@ export async function VetoBoard({
             {myTurn ? t("Ваш ход") : t("Ход соперника")} · BO{m.best_of}
           </div>
           <div className="mt-2 text-heading text-fg">
-            {turnTeam?.name ?? "—"} · <span className={state.current.action === "ban" ? "text-danger" : "text-accent"}>{state.current.action === "ban" ? t("бан карты") : t("пик карты")}</span>
+            {turnTeam?.name ?? "—"} ·{" "}
+            {pending ? (
+              <span className="text-accent">{t("выбор стороны")}</span>
+            ) : (
+              <span className={state.current.action === "ban" ? "text-danger" : "text-accent"}>{state.current.action === "ban" ? t("бан карты") : t("пик карты")}</span>
+            )}
           </div>
           <p className="mt-2 max-w-read text-[14px] text-fg-2">
-            {myTurn
-              ? t("Выберите карту ниже. Если время закончится, система выберет допустимую карту автоматически.")
-              : t("Дождитесь выбора соперника. Страница обновится автоматически.")}
+            {pending
+              ? myTurn
+                ? t("{team} пикнули {map}. Выберите, за какую сторону вы начнёте эту карту. Если время закончится, сторона будет CT.", { team: picker?.name ?? "—", map: mapName(pending.map_name) })
+                : t("{team} пикнули {map} — сторону на этой карте выбирает соперник.", { team: picker?.name ?? "—", map: mapName(pending.map_name) })
+              : myTurn
+                ? t("Выберите карту ниже. Если время закончится, система выберет допустимую карту автоматически.")
+                : t("Дождитесь выбора соперника. Страница обновится автоматически.")}
           </p>
         </div>
         {m.veto_deadline && (
@@ -67,6 +83,44 @@ export async function VetoBoard({
           <Panel className="border-line">{turnContent}</Panel>
         ))}
 
+      {pending && (
+        <div className="mt-4 grid items-stretch gap-3 sm:grid-cols-[minmax(0,240px)_1fr_1fr]">
+          <MapTile map={pending.map_name} state="picked" caption={`${t("Пик")} · ${tag(pending.team_id) ?? "—"}`} image={images[pending.map_name]} />
+          {(["ct", "t"] as const).map((side) => {
+            const card = (
+              <div
+                className={cn(
+                  "h-full rounded-surface border-2 px-5 py-4 text-left transition-colors",
+                  side === "ct" ? "border-side-ct/40 bg-side-ct/10" : "border-side-t/40 bg-side-t/10",
+                  myTurn ? (side === "ct" ? "group-hover/side:border-side-ct group-hover/side:bg-side-ct/20" : "group-hover/side:border-side-t group-hover/side:bg-side-t/20") : "opacity-60",
+                )}
+              >
+                <div className={cn("text-[32px] font-bold leading-none", side === "ct" ? "text-side-ct" : "text-side-t")}>{side === "ct" ? "CT" : "T"}</div>
+                <div className="mt-2 text-[15px] font-semibold text-fg">{side === "ct" ? t("Начать за защиту") : t("Начать за атаку")}</div>
+                <div className="mt-0.5 text-meta text-fg-3">
+                  {side === "ct" ? t("Спецназ: первая половина в обороне") : t("Террористы: первая половина в нападении")}
+                </div>
+              </div>
+            );
+            return myTurn ? (
+              <ActionForm key={side} action={vetoSide}>
+                <input type="hidden" name="matchId" value={m.id} />
+                <input type="hidden" name="side" value={side} />
+                <button
+                  type="submit"
+                  aria-label={side === "ct" ? t("Начать за защиту") : t("Начать за атаку")}
+                  className="group/side block h-full w-full rounded-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                >
+                  {card}
+                </button>
+              </ActionForm>
+            ) : (
+              <div key={side}>{card}</div>
+            );
+          })}
+        </div>
+      )}
+
       {!compact && (
         <>
           {turnContent && <div className="h-5" />}
@@ -77,9 +131,9 @@ export async function VetoBoard({
               const caption = act
                 ? act.action === "decider"
                   ? "Decider"
-                  : `${act.action === "ban" ? t("Бан") : t("Пик")} · ${tag(act.team_id) ?? t("авто")}${act.auto ? ` · ${t("таймер")}` : ""}`
+                  : `${act.action === "ban" ? t("Бан") : t("Пик")} · ${tag(act.team_id) ?? t("авто")}${act.auto ? ` · ${t("таймер")}` : ""}${ctTag(act) ? ` · CT ${ctTag(act)}` : ""}`
                 : undefined;
-              const clickable = !act && active && myTurn;
+              const clickable = !act && active && myTurn && !pending;
 
               return clickable ? (
                 <ActionForm key={map} action={vetoAct}>
@@ -113,14 +167,23 @@ export async function VetoBoard({
           {state.plan.map((step) => {
             const done = m.veto.find((a) => a.step === step.step);
             const teamTag = step.team === 1 ? m.team1?.tag : step.team === 2 ? m.team2?.tag : null;
-            const current = state.current?.step === step.step && active;
+            const current = !pending && state.current?.step === step.step && active;
+            const choosing = !!pending && pending.step === step.step;
+            const ct = ctTag(done);
+            const sideNote = choosing
+              ? t("сторону выбирает {team}", { team: chooser?.tag ?? "—" })
+              : ct
+                ? `CT — ${ct}`
+                : m.tournament.side_choice && step.action === "decider"
+                  ? t("стороны — нож")
+                  : null;
             const action = step.action === "ban" ? t("Бан") : step.action === "pick" ? t("Пик") : "Decider";
             return (
               <li
                 key={step.step}
                 className={cn(
                   "rounded-control border px-3 py-2.5",
-                  current ? "border-accent/45 bg-accent-dim" : done ? "border-line-subtle bg-surface" : "border-dashed border-line-subtle",
+                  current || choosing ? "border-accent/45 bg-accent-dim" : done ? "border-line-subtle bg-surface" : "border-dashed border-line-subtle",
                 )}
               >
                 <div className="flex items-center justify-between gap-2 text-micro">
@@ -133,6 +196,7 @@ export async function VetoBoard({
                   {done ? mapName(done.map_name) : current ? t("выбирает…") : "—"}
                 </div>
                 <div className="mt-0.5 truncate text-meta text-fg-3">{teamTag ?? t("по остатку")}</div>
+                {sideNote && <div className={cn("mt-0.5 truncate text-meta font-medium", choosing ? "text-accent" : ct ? "text-side-ct" : "text-fg-3")}>{sideNote}</div>}
               </li>
             );
           })}

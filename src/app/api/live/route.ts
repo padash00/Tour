@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         .eq("id", id)
         .maybeSingle(),
       db().from("match_maps").select("map_number, map_name, status, team1_score, team2_score").eq("match_id", id).order("map_number"),
-      db().from("veto_actions").select("step").eq("match_id", id),
+      db().from("veto_actions").select("step, side").eq("match_id", id),
       db().from("player_map_stats").select("map_number", { count: "exact", head: true }).eq("match_id", id),
       // лента раундов: раунды пишутся из лога сервера чуть позже счёта — следим и за ними
       db()
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         .order("round_number", { ascending: false })
         .limit(1),
     ]);
-    parts = [m.data, maps.data, veto.data?.length ?? 0, stats.count ?? 0, rounds.count ?? 0, rounds.data?.[0] ?? null, hall && [hall.calledAt, hall.seat1, hall.seat2, hall.ready1, hall.ready2]];
+    parts = [m.data, maps.data, veto.data?.length ?? 0, veto.data?.filter((v) => v.side).length ?? 0, stats.count ?? 0, rounds.count ?? 0, rounds.data?.[0] ?? null, hall && [hall.calledAt, hall.seat1, hall.seat2, hall.ready1, hall.ready2]];
   } else if (k.startsWith("tournament:") && UUID.test(k.slice(11))) {
     // режим ТВ: всё, что видно на экране турнира — статусы, счёт серий и карт идущих матчей, этап турнира
     const id = k.slice(11);

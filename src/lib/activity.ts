@@ -2,10 +2,10 @@ import "server-only";
 import { db } from "./supabase";
 import type { VetoActionRow } from "./types";
 import { checkinWindowError } from "./data";
-import { vetoState } from "./veto";
+import { vetoTurn } from "./veto";
 import { getT } from "./i18n/server";
 import type { T } from "./i18n/core";
-import { getGame, getLobby, getMembers, lobbyVetoState, playerLobby, vetoUntimed } from "./lobby";
+import { getGame, getLobby, getMembers, lobbyTurn, playerLobby, vetoUntimed } from "./lobby";
 
 /**
  * Глобальная активность шапки — ОДНО самое срочное действие игрока прямо сейчас (не центр уведомлений).
@@ -65,7 +65,7 @@ async function tournamentActivity(playerId: string, tx: T): Promise<Activity[]> 
 
   const [{ data: teams }, { data: tours }, { data: ms }] = await Promise.all([
     db().from("teams").select("id, name, captain_id").in("id", teamIds),
-    db().from("tournaments").select("id, name, slug, status, map_pool, checkin_opens_at, checkin_closes_at").in("id", tIds),
+    db().from("tournaments").select("id, name, slug, status, map_pool, side_choice, checkin_opens_at, checkin_closes_at").in("id", tIds),
     db()
       .from("matches")
       .select("id, number, status, tournament_id, best_of, team1_id, team2_id, veto_deadline, server_state, server_address, server_password, team1:teams!matches_team1_id_fkey(name), team2:teams!matches_team2_id_fkey(name)")
@@ -84,10 +84,10 @@ async function tournamentActivity(playerId: string, tx: T): Promise<Activity[]> 
   const { data: vetoRows } = vetoIds.length
     ? await db()
         .from("veto_actions")
-        .select("match_id, step, team_id, action, map_name")
+        .select("match_id, step, team_id, action, map_name, side")
         .in("match_id", vetoIds)
         .overrideTypes<Pick<VetoActionRow, "action">[]>()
-    : { data: [] as Pick<VetoActionRow, "match_id" | "step" | "team_id" | "action" | "map_name">[] };
+    : { data: [] as Pick<VetoActionRow, "match_id" | "step" | "team_id" | "action" | "map_name" | "side">[] };
 
   for (const m of matches) {
     const mine = regs.find((r) => r.tournament_id === m.tournament_id && (r.registration.team_id === m.team1_id || r.registration.team_id === m.team2_id))!;
@@ -96,19 +96,18 @@ async function tournamentActivity(playerId: string, tx: T): Promise<Activity[]> 
     const href = `/matches/${m.id}`;
     if (m.status === "veto") {
       const t = tour.get(m.tournament_id);
-      const st = vetoState(m.best_of, t?.map_pool ?? [], (vetoRows ?? []).filter((v) => v.match_id === m.id));
-      const turnTeam = st.current?.team === 1 ? m.team1_id : st.current?.team === 2 ? m.team2_id : null;
-      if (turnTeam === myTeam && captainOf.get(myTeam) === playerId && st.current?.action !== "decider") {
+      const turn = vetoTurn(m.best_of, t?.map_pool ?? [], (vetoRows ?? []).filter((v) => v.match_id === m.id), { sideChoice: !!t?.side_choice, team1: m.team1_id, team2: m.team2_id });
+      if (turn && turn.teamId === myTeam && captainOf.get(myTeam) === playerId) {
         out.push({
           kind: "veto_turn",
           priority: 1,
-          label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"),
+          label: turn.action === "side" ? tx("Ваш ход · выбор стороны") : turn.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"),
           detail: tx("Вето матча #{n} против {opp}", { n: m.number, opp: opponent }),
           href,
           deadline: m.veto_deadline,
           tone: "accent",
           connect: null,
-          key: `veto:${m.id}:${(vetoRows ?? []).filter((v) => v.match_id === m.id).length}`,
+          key: `veto:${m.id}:${(vetoRows ?? []).filter((v) => v.match_id === m.id).length}:${turn.action}`,
         });
       }
     } else if (m.status === "ready" && m.server_state === "ready" && m.server_address) {
@@ -171,11 +170,11 @@ async function lobbyActivity(playerId: string, tx: T): Promise<Activity[]> {
   if (game && ["veto", "waiting", "live"].includes(game.status)) {
     const inGame = [...game.team1.players, ...game.team2.players].some((p) => p.id === playerId);
     if (game.status === "veto") {
-      const st = lobbyVetoState(game);
-      const team = st.current?.team === 1 ? game.team1 : st.current?.team === 2 ? game.team2 : null;
+      const turn = lobbyTurn(game);
+      const team = turn?.team === 1 ? game.team1 : turn?.team === 2 ? game.team2 : null;
       const captain = team ? (team.players[0]?.id ?? lobby.host_id) : null;
-      if (captain === playerId && st.current?.action !== "decider") {
-        out.push({ kind: "lobby_veto_turn", priority: 1, label: st.current?.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"), detail: tx("Вето в лобби #{code}", { code: lobby.code }), href, deadline: vetoUntimed(game) ? null : game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
+      if (captain === playerId && turn) {
+        out.push({ kind: "lobby_veto_turn", priority: 1, label: turn.action === "side" ? tx("Ваш ход · выбор стороны") : turn.action === "pick" ? tx("Ваш ход · пик карты") : tx("Ваш ход · бан карты"), detail: tx("Вето в лобби #{code}", { code: lobby.code }), href, deadline: vetoUntimed(game) ? null : game.veto_deadline, tone: "accent", connect: null, key: `lobby-veto:${game.id}:${game.veto.length}` });
       }
     } else if (inGame && game.status === "waiting" && game.server_state === "ready" && game.server_address) {
       out.push({ kind: "lobby_server_ready", priority: 3, label: tx("Сервер готов"), detail: tx("Лобби #{code}", { code: lobby.code }), href, deadline: null, tone: "ok", connect: game.server_address, key: `lobby-ready:${game.id}` });

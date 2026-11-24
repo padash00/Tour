@@ -8,7 +8,7 @@ import { modeOf } from "./modes";
 import { makeT, tr, type T } from "./i18n/core";
 import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
-import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, type LobbySettings } from "./lobby-settings";
+import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, sideMode, type LobbySettings } from "./lobby-settings";
 import { tierOf, tierRange, TIER_MIN_ELO } from "./tiers";
 import { cupTeams, snakeTurnN } from "./cup-core";
 import type { Tables, TablesUpdate } from "./database.types";
@@ -39,8 +39,10 @@ export type LobbyMember = Narrow<Tables<"lobby_members">, { slot: Slot }>;
 
 export type GamePlayer = { id: string; steam_id: string; nickname: string };
 export type GameTeam = { name: string; players: GamePlayer[]; bots: string[] };
-export type GameMap = { map: string; team1_score: number; team2_score: number; status: "pending" | "live" | "finished"; winner: 1 | 2 | null };
-export type GameVeto = { step: number; team: 1 | 2 | null; action: "ban" | "pick" | "decider"; map: string; auto: boolean };
+/** ct — команда, которая начинает карту за CT (стороны «по пикам»); нет — ножевой раунд или чередование */
+export type GameMap = { map: string; team1_score: number; team2_score: number; status: "pending" | "live" | "finished"; winner: 1 | 2 | null; ct?: 1 | 2 | null };
+/** side — сторона, которую на пикнутой карте выбрал соперник пикнувшего (стороны «по пикам») */
+export type GameVeto = { step: number; team: 1 | 2 | null; action: "ban" | "pick" | "decider"; map: string; auto: boolean; side?: "ct" | "t"; side_auto?: boolean };
 
 export type LobbyGame = Narrow<
   Tables<"lobby_games">,
@@ -480,19 +482,36 @@ export function lobbyVetoState(g: LobbyGame) {
   return vetoState(g.best_of, g.veto_pool, toVeto(g));
 }
 
-/** Шаг вето (капитан или авто по таймеру). Последняя карта — decider, дальше ждём сервер. */
-export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: T = makeT("ru")) {
-  const state = lobbyVetoState(g);
-  if (!state.current || state.current.action === "decider") return t("Вето завершено");
-  if (!state.remaining.includes(map)) return t("Эта карта уже выбрана");
-  const veto = [...g.veto, { step: state.current.step, team: state.current.team, action: state.current.action, map, auto }];
+/** Стороны «по пикам»: на пикнутой карте сторону выбирает соперник пикнувшего, решающая карта — ножевой */
+export const sidesByPick = (g: Pick<LobbyGame, "settings" | "best_of">) =>
+  !!g.settings && sideMode({ ...g.settings, map_choice: "veto", best_of: g.best_of as 1 | 3 | 5 }) === "pick";
+
+/** Пик, после которого соперник ещё не выбрал сторону (вето ждёт этого выбора); null — такого нет */
+export function lobbySidePending(g: LobbyGame): GameVeto | null {
+  const last = g.veto[g.veto.length - 1];
+  return last && last.action === "pick" && !last.side && last.team && sidesByPick(g) ? last : null;
+}
+
+/** Чей сейчас ход в выборе карт: бан, пик или выбор стороны на только что пикнутой карте */
+export function lobbyTurn(g: LobbyGame): { team: 1 | 2; action: "ban" | "pick" | "side"; map: string | null } | null {
+  const pending = lobbySidePending(g);
+  if (pending) return { team: pending.team === 1 ? 2 : 1, action: "side", map: pending.map };
+  const cur = lobbyVetoState(g).current;
+  return cur && cur.team && cur.action !== "decider" ? { team: cur.team, action: cur.action, map: null } : null;
+}
+
+/** Кто начинает карту за CT: сторону выбирал соперник пикнувшего */
+const ctTeam = (v: GameVeto): 1 | 2 | null => (v.action === "pick" && v.team && v.side ? (v.side === "ct" ? (v.team === 1 ? 2 : 1) : v.team) : null);
+
+/** Сохраняет шаги; если карт для выбора не осталось — дописывает decider, карты серии, и игра ждёт сервер */
+async function saveVeto(g: LobbyGame, veto: GameVeto[], t: T) {
   const next = vetoState(g.best_of, g.veto_pool, toVeto({ ...g, veto }));
   const patch: TablesUpdate<"lobby_games"> = { veto, veto_deadline: vetoDeadline(g.settings ?? { veto_seconds: 30 }) };
-  if (next.current?.action === "decider") {
+  if (next.current?.action === "decider" && !lobbySidePending({ ...g, veto })) {
     veto.push({ step: next.current.step, team: null, action: "decider", map: next.remaining[0], auto: true });
     const maps = veto
       .filter((v) => v.action === "pick" || v.action === "decider")
-      .map((v) => ({ map: v.map, team1_score: 0, team2_score: 0, status: "pending" as const, winner: null }));
+      .map((v) => ({ map: v.map, team1_score: 0, team2_score: 0, status: "pending" as const, winner: null, ...(ctTeam(v) && { ct: ctTeam(v) }) }));
     Object.assign(patch, { veto, maps, status: "waiting", veto_deadline: null, note: tr("ждём свободный сервер") });
   }
   // защита от двойного шага: дедлайн меняется на каждом шаге — обновляем, только если он тот же, что мы прочитали
@@ -500,6 +519,30 @@ export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: 
   q = g.veto_deadline ? q.eq("veto_deadline", g.veto_deadline) : q.is("veto_deadline", null);
   const { data } = await q.select("id");
   if (!data?.length) return t("Не удалось — обновите страницу");
+  return null;
+}
+
+/** Шаг вето (капитан или авто по таймеру). Последняя карта — decider, дальше ждём сервер. */
+export async function lobbyVetoAct(g: LobbyGame, map: string, auto: boolean, t: T = makeT("ru")) {
+  if (lobbySidePending(g)) return t("Сначала соперник выбирает сторону на пикнутой карте");
+  const state = lobbyVetoState(g);
+  if (!state.current || state.current.action === "decider") return t("Вето завершено");
+  if (!state.remaining.includes(map)) return t("Эта карта уже выбрана");
+  return saveVeto(g, [...g.veto, { step: state.current.step, team: state.current.team, action: state.current.action, map, auto }], t);
+}
+
+/** Выбор стороны на только что пикнутой карте (капитан соперника или авто по таймеру — тогда CT) */
+export async function lobbySideAct(g: LobbyGame, side: "ct" | "t", auto: boolean, t: T = makeT("ru")) {
+  const pending = lobbySidePending(g);
+  if (!pending) return t("Сейчас выбирать сторону не нужно");
+  return saveVeto(g, g.veto.map((v) => (v === pending ? { ...v, side, ...(auto && { side_auto: true }) } : v)), t);
+}
+
+/** Время хода вышло: сторона — CT, карта — случайная */
+async function vetoTimeout(g: LobbyGame) {
+  if (lobbySidePending(g)) return lobbySideAct(g, "ct", true);
+  const st = lobbyVetoState(g);
+  if (st.remaining.length) return lobbyVetoAct(g, st.remaining[randomInt(st.remaining.length)], true);
   return null;
 }
 
@@ -528,11 +571,7 @@ export async function lobbyTick() {
   const now = Date.now();
   // вето: время хода вышло → случайная карта
   const { data: vetoGames } = await db().from("lobby_games").select("*").eq("status", "veto").lt("veto_deadline", new Date(now).toISOString());
-  for (const row of vetoGames ?? []) {
-    const g = row as LobbyGame;
-    const st = lobbyVetoState(g);
-    if (st.remaining.length) await lobbyVetoAct(g, st.remaining[randomInt(st.remaining.length)], true);
-  }
+  for (const row of vetoGames ?? []) await vetoTimeout(row as LobbyGame);
   // драфт и проверка готовности
   const { data: due } = await db()
     .from("lobbies")
@@ -590,10 +629,7 @@ export async function lobbyTimeouts(lobby: Lobby) {
   }
   if (lobby.status === "playing" && lobby.current_game_id) {
     const g = await getGame(lobby.current_game_id);
-    if (g?.status === "veto" && g.veto_deadline && new Date(g.veto_deadline).getTime() <= now) {
-      const st = lobbyVetoState(g);
-      if (st.remaining.length) await lobbyVetoAct(g, st.remaining[randomInt(st.remaining.length)], true);
-    }
+    if (g?.status === "veto" && g.veto_deadline && new Date(g.veto_deadline).getTime() <= now) await vetoTimeout(g);
   }
 }
 
@@ -770,7 +806,12 @@ export async function buildLobbyConfig(gameId: string, observers: [string, strin
     team2: { name: g.team2.name, tag: "B", players: players(g.team2) },
     num_maps: g.best_of,
     maplist: g.maps.map((m) => (m.map.includes("@") ? m.map.split("@")[1] : m.map)),
-    map_sides: g.maps.map((_, i) => (s.knife ? "knife" : i % 2 === 0 ? "team1_ct" : "team2_ct")),
+    // по пикам: сторону на карте выбрал соперник пикнувшего, на решающей (и без выбора) — ножевой
+    map_sides: g.maps.map((m, i) => {
+      const mode = sideMode({ ...s, best_of: g.best_of as 1 | 3 | 5 });
+      if (mode === "pick" && g.veto_pool.length) return m.ct ? `team${m.ct}_ct` : "knife";
+      return mode === "swap" ? (i % 2 === 0 ? "team1_ct" : "team2_ct") : "knife";
+    }),
     skip_veto: true,
     clinch_series: true,
     players_per_team: perTeam,

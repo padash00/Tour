@@ -13,6 +13,7 @@ export async function MatchExplain({
   m,
   turnTeam,
   myTurn,
+  choosingSide = false,
   participant,
   next,
   winsToMap,
@@ -22,6 +23,8 @@ export async function MatchExplain({
   /** чей ход в вето */
   turnTeam: string | null;
   myTurn: boolean;
+  /** ход — выбор стороны на пикнутой карте, а не карты */
+  choosingSide?: boolean;
   /** смотрит участник матча или администратор — ему виден адрес сервера */
   participant: boolean;
   /** куда проходит победитель: «Полуфинал», «Финал» */
@@ -56,7 +59,7 @@ export async function MatchExplain({
       break;
     case "veto":
       tone = myTurn ? "live" : "neutral";
-      title = myTurn ? t("Ваш ход — выберите карту ниже") : turnTeam ? t("Идёт выбор карт. Сейчас ход: {team}", { team: turnTeam }) : t("Идёт выбор карт");
+      title = myTurn ? (choosingSide ? t("Ваш ход — выберите сторону ниже") : t("Ваш ход — выберите карту ниже")) : turnTeam ? t("Идёт выбор карт. Сейчас ход: {team}", { team: turnTeam }) : t("Идёт выбор карт");
       text = (
         <>
           {t("Капитаны по очереди убирают карты, оставшаяся будет сыграна.")}

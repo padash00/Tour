@@ -22,6 +22,8 @@ import {
   getMembers,
   hashPassword,
   isOnline,
+  lobbySideAct,
+  lobbyTurn,
   lobbyVetoAct,
   lobbyVetoState,
   maybeStartOnReady,
@@ -862,6 +864,26 @@ export async function lobbyVeto(code: string, map: string): Promise<LobbyResult>
   const captain = team.players[0]?.id ?? lobby.host_id;
   if (captain !== player.id) return { error: team.players.length ? t("Сейчас выбирает капитан {name}", { name: team.name }) : t("За команду ботов выбирает хост") };
   const err = await lobbyVetoAct(g, map, false, t);
+  return err ? { error: err } : { ok: true };
+}
+
+/** Капитан выбирает сторону на карте, которую только что пикнул соперник (стороны «по пикам») */
+export async function lobbySide(code: string, side: "ct" | "t"): Promise<LobbyResult> {
+  const t = await getT();
+  const bad = invalid([Code, code]);
+  if (bad) return bad;
+  if (side !== "ct" && side !== "t") return { error: t("Неверные данные") };
+  const player = await me();
+  if ("error" in player) return player;
+  const lobby = await getLobbyByCode(code);
+  const g = lobby?.current_game_id ? await getGame(lobby.current_game_id) : null;
+  if (!lobby || !g || g.status !== "veto") return { error: t("Вето сейчас не идёт") };
+  const turn = lobbyTurn(g);
+  if (turn?.action !== "side") return { error: t("Сейчас выбирать сторону не нужно") };
+  const team = turn.team === 1 ? g.team1 : g.team2;
+  const captain = team.players[0]?.id ?? lobby.host_id;
+  if (captain !== player.id) return { error: team.players.length ? t("Сейчас выбирает капитан {name}", { name: team.name }) : t("За команду ботов выбирает хост") };
+  const err = await lobbySideAct(g, side, false, t);
   return err ? { error: err } : { ok: true };
 }
 

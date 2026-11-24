@@ -419,7 +419,7 @@ async function Overview({ t, lite, mapImages }: { t: Tournament; lite: Tournamen
           columns={4}
           className="mt-6 border-t border-line-subtle pt-6"
           items={[
-            { label: tx("Стороны"), value: t.knife_round ? tx("Ножевой раунд") : tx("Фиксированные") },
+            { label: tx("Стороны"), value: t.side_choice ? tx("По пикам, решающая карта — нож") : t.knife_round ? tx("Ножевой раунд") : tx("Фиксированные") },
             { label: tx("Овертайм"), value: t.overtime ? tx("MR3 при {score}", { score: mode.size === 2 ? "8:8" : "12:12" }) : tx("Нет") },
             { label: tx("Тактические паузы"), value: <span className="num">{tx("{n} × {s} с", { n: t.timeouts_per_team, s: t.timeout_seconds })}</span> },
             { label: tx("Технические паузы"), value: <span className="num">{tx("{n} × {m} мин", { n: t.tech_pauses, m: Math.round(t.tech_pause_seconds / 60) })}</span> },

@@ -4,6 +4,7 @@ import { buildLobbyConfig } from "../lobby";
 import { modeOf } from "../modes";
 import { getSetting } from "../settings";
 import { db } from "../supabase";
+import { seriesSides } from "../veto";
 import { adminPlayers } from "./admins";
 
 // ───────────────────────── конфиг матча для MatchZy
@@ -52,7 +53,13 @@ export async function buildMatchzyConfig(matchId: string) {
     // workshop-карта хранится как «name@id» — MatchZy грузит её по числовому ID (host_workshop_map)
     maplist: m.maps.map((x) => (x.map_name.includes("@") ? x.map_name.split("@")[1] : x.map_name)),
     // нож — победитель выбирает сторону; без ножа стороны чередуются (team1 начинает за CT на нечётных картах)
-    map_sides: m.maps.map((_, i) => (m.tournament.knife_round ? "knife" : i % 2 === 0 ? "team1_ct" : "team2_ct")),
+    // по пикам — сторону на карте выбрал соперник пикнувшего, решающая — нож (seriesSides)
+    map_sides: seriesSides(m.maps.map((x) => x.map_name), m.veto, {
+      sideChoice: m.tournament.side_choice,
+      knife: m.tournament.knife_round,
+      team1: m.team1_id,
+      team2: m.team2_id,
+    }),
     skip_veto: true, // вето уже прошло на сайте
     clinch_series: true,
     players_per_team: modeOf(m.tournament.format).size,
