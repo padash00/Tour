@@ -154,7 +154,7 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
 
   return Promise.all(commands.map(async (c) => {
     if (c.type === "load_match" && c.payload.lobby) {
-      // игра лобби: cvars — из настроек лобби; HTTP-лог (статистика раундов) — только если включён, см. ниже
+      // игра лобби: cvars — из настроек лобби; HTTP-лог нужен для статистики раундов
       return {
         ...c,
         payload: {
@@ -163,9 +163,9 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
           header_key: MATCHZY_HEADER,
           header_value: token,
           events_url: `${siteOrigin}/api/matchzy/events`,
-          // журнал раундов для игр лобби выключен: в первой же игре с ним (24.11.2026) игроки пожаловались на лаги.
-          // Причина не установлена — включается переменной LOBBY_ROUND_LOG=1 для проверки на тестовой игре
-          ...(process.env.LOBBY_ROUND_LOG === "1" && { log_url: `${siteOrigin}/api/cs2/log?${signedLogQuery(String(c.payload.matchzy_id), token)}` }),
+          // журнал раундов (первые убийства, KAST, оружие, стороны). 24.11.2026 его выключали из-за жалоб на лаги —
+          // причиной оказалась нагрузка на серверный ПК, а не журнал. Аварийное выключение: LOBBY_ROUND_LOG=0
+          ...(process.env.LOBBY_ROUND_LOG !== "0" && { log_url: `${siteOrigin}/api/cs2/log?${signedLogQuery(String(c.payload.matchzy_id), token)}` }),
           post_cmds: [],
           enforce: await lobbyEnforce(String(c.payload.match_id)),
         },
