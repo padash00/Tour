@@ -91,7 +91,7 @@ export function TeamCard({
         </span>
       </div>
       {/* карточка не обрезает содержимое: меню игрока выходит за её край; низ последней строки скругляем сами */}
-      <div className="divide-y divide-line-subtle [&>*:last-child]:rounded-b-surface">
+      <div className="divide-y divide-line [&>*:last-child]:rounded-b-surface">
         {members.map((m) => (
           <div key={m.id}>
             <PlayerLine m={m} view={view} isHost={isHost} run={run} code={code} big captain={m.id === captain} />
@@ -135,7 +135,7 @@ export function TeamCard({
  */
 function MixStats({ mix }: { mix: ViewMember["mix"] }) {
   const t = useT();
-  if (!mix) return <div className="px-4 pb-2.5 text-[12px] text-fg-4">{t("В Миксе ещё не играл")}</div>;
+  if (!mix) return <div className="mx-3 mb-3 rounded-control bg-ink/[0.045] px-3 py-2 text-[12px] text-fg-3">{t("В Миксе ещё не играл")}</div>;
   const cells: [string, string, string?][] = [
     [String(mix.maps), t("Карт")],
     [mix.matches ? `${Math.round((100 * mix.wins) / mix.matches)}%` : "—", t("Побед")],
@@ -145,7 +145,7 @@ function MixStats({ mix }: { mix: ViewMember["mix"] }) {
     [`${mix.hsPct}%`, "HS%"],
   ];
   return (
-    <div className="grid grid-cols-[repeat(6,auto)_minmax(0,1fr)] items-end gap-x-3.5 overflow-hidden px-4 pb-2.5 sm:gap-x-4" title={t("Статистика игрока в Миксе")}>
+    <div className="mx-3 mb-3 grid grid-cols-[repeat(6,auto)_minmax(0,1fr)] items-end gap-x-3 overflow-hidden rounded-control bg-ink/[0.045] px-3 py-2 sm:gap-x-4" title={t("Статистика игрока в Миксе")}>
       {cells.map(([value, label, tone]) => (
         <span key={label}>
           <span className={cn("num block text-[14px] font-bold leading-tight", tone ?? "text-fg")}>{value}</span>
