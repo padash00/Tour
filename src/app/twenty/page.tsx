@@ -6,17 +6,14 @@ import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { getMapImages } from "@/lib/settings";
-import { SEASON_MIN_MAPS, TWENTY_MIN_MAPS, currentSeason, getTwenty } from "@/lib/twenty";
-import { Avatar, Button, Container, ContextNav, EmptyState, PageTitle, Section, cn } from "@/components/ds";
-import { Icon } from "@/components/lobby/icons";
+import { SEASON_MIN_MAPS, SEASON_PRIZES, TWENTY_MIN_MAPS, currentSeason, getTwenty } from "@/lib/twenty";
+import { Button, Container, ContextNav, EmptyState, PageTitle, Section } from "@/components/ds";
 import { CreatePotButton } from "@/components/lobby/pot";
-import { RankBadge } from "@/components/public/data-table";
-import { BestMapChip, RoleChip, Streak, Trend } from "@/components/twenty/bits";
 import { SelectNav } from "@/components/public/select-nav";
-import { money } from "@/components/twenty/money";
 import { LiveGames } from "@/components/twenty/live-games";
-import { AchievementsTab, HallOfFame, SeasonBanner, seasonLabel } from "@/components/twenty/season";
-import { MapsTab, Nominations, RatingTable, RecordsTab, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
+import { Nominations, Podium, RecordsTab, SectionHead } from "@/components/twenty/panels";
+import { AchievementsTab, HallOfFame, seasonDaysLeft, seasonLabel } from "@/components/twenty/season";
+import { MapsTab, RatingTable, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +60,6 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
   // игры на банк («Десятка») и большие лобби; комнаты отдельных матчей сетки не показываем — в них ведёт само лобби
   const open = lobbies.filter((l) => (l.settings.pot || cupTeams(l.settings.players) > 0) && !l.settings.cup_of);
   const king = rows[0];
-  const kingWho = king ? who(king.steam_id, king.name) : null;
 
   /** ссылка внутри раздела: вкладка и выбранный вечер сохраняются */
   const href = (target: Tab, params: Record<string, string> = {}) => {
@@ -78,7 +74,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
   };
 
   return (
-    <Container className="space-y-8 pb-16 pt-8 sm:pt-10">
+    <Container className="space-y-10 pb-16 pt-8 sm:pt-10">
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <PageTitle>{code ? t("Рейтинг лобби #{code}", { code }) : t("Микс")}</PageTitle>
@@ -132,78 +128,34 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         />
       )}
 
-      {season && tab === "rating" && <SeasonBanner season={season} rows={rows} who={who} t={t} live={season === nowSeason} />}
-
-      {king && kingWho && tab === "rating" && (
+      {king && tab === "rating" && (
         <>
-          {/* король слева — главный объект страницы; справа узкая колонка: что идёт сейчас и следующие два места */}
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-            <section aria-label={t("Король")} className="relative overflow-hidden rounded-surface border border-gold/40 bg-gradient-to-br from-gold/[0.14] via-gold/[0.05] to-transparent p-6 sm:p-8">
-              <div className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.14em] text-gold">
-                {Icon.crown("size-4")} {code ? t("Лучший игрок вечера") : !season ? t("Король микса") : season === nowSeason ? t("Лидер сезона") : t("Чемпион сезона")}
-                {king.prize != null && <span className="num rounded-chip bg-gold/25 px-2 py-0.5 normal-case tracking-normal">{money(king.prize, t)}</span>}
-              </div>
-              <div className="mt-5 flex flex-wrap items-center gap-5">
-                <span className="rounded-full p-1 ring-2 ring-gold/60">
-                  <Avatar src={kingWho.avatar_url} name={kingWho.nickname} size="xl" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <Link href={`/players/${king.steam_id}`} className="block truncate text-[30px] font-extrabold leading-tight text-fg hover:text-accent sm:text-[36px]">
-                    {kingWho.nickname}
-                  </Link>
-                  <div className="mt-1 text-meta text-fg-3">{t("Карт: {maps} · побед {wins} из {matches}", { maps: king.maps, wins: king.wins, matches: king.matches })}</div>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                    <RoleChip role={king.role} t={t} />
-                    <BestMapChip cell={king.best} t={t} />
-                    <Streak n={king.streak} t={t} />
-                    <Trend value={king.trend} t={t} />
-                  </div>
-                </div>
-              </div>
-              <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  [t("Рейтинг"), king.rating.toFixed(2)],
-                  ["K/D", king.kd.toFixed(2)],
-                  ["ADR", String(Math.round(king.adr))],
-                  ["HS%", `${Math.round(king.hsPct)}%`],
-                ].map(([label, value], i) => (
-                  <div key={label} className={cn("rounded-control border px-4 py-3", i === 0 ? "border-gold/50 bg-gold/[0.12]" : "border-line-subtle bg-surface/70")}>
-                    <dt className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{label}</dt>
-                    <dd className="num mt-1 text-[26px] font-extrabold leading-none text-fg">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            <div className="flex flex-col gap-4">
-              {rows.slice(1, 3).map((r, i) => {
-                const p = who(r.steam_id, r.name);
-                return (
-                  <Link key={r.steam_id} href={`/players/${r.steam_id}`} className="flex items-center gap-3 rounded-surface border border-line-subtle bg-surface p-4 transition-colors hover:border-line-strong">
-                    <RankBadge n={i + 2} />
-                    <Avatar src={p.avatar_url} name={p.nickname} size="md" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold text-fg">{p.nickname}</span>
-                      <span className="num block text-micro text-fg-3">
-                        K/D {r.kd.toFixed(2)} · ADR {Math.round(r.adr)}
-                      </span>
-                    </span>
-                    <span className="num text-[22px] font-extrabold text-fg">{r.rating.toFixed(2)}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+          {/* тройка лидеров — один раз: место, приз, игрок и его цифры */}
+          <Podium
+            who={who}
+            t={t}
+            eyebrow={code ? t("Лучшие игроки вечера") : !season ? t("За всё время") : season === nowSeason ? t("Сезон идёт") : t("Сезон завершён")}
+            title={code ? t("Лобби #{code}", { code }) : season ? seasonLabel(season, t) : t("Король микса")}
+            meta={
+              code
+                ? t("Матчей в лобби: {n}", { n: matches })
+                : season
+                  ? `${season === nowSeason ? `${t.plural(seasonDaysLeft(season), "Остался {n} день", "Осталось {n} дня", "Осталось {n} дней").replace("{n}", String(seasonDaysLeft(season)))}. ` : ""}${t("Сезон — календарный месяц: первого числа таблица начинается заново. В зачёт идут сыгравшие за сезон от {n} карт.", { n: SEASON_MIN_MAPS })}`
+                  : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })
+            }
+            places={[0, 1, 2].map((i) => (season ? rows.filter((r) => r.qualified) : rows)[i] ?? null)}
+            prizes={season ? SEASON_PRIZES : null}
+            emptyText={season ? t("Место свободно — никто не набрал {n} карт", { n: SEASON_MIN_MAPS }) : t("Место свободно")}
+            note={season ? (season === nowSeason ? t("Места меняются до конца сезона. Призы за 1–3 места вручает F16 Arena по итогам месяца.") : t("Итоги сезона окончательные. Призы за 1–3 места вручает F16 Arena.")) : undefined}
+          />
 
           <Nominations items={twenty.nominations} who={who} t={t} evening={!!code} />
 
           <section aria-label={t("Все игроки")}>
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-              <h2 className="text-title text-fg">{t("Все игроки")}</h2>
-              <p className="text-meta text-fg-3">
-                {code ? t("Матчей в лобби: {n}", { n: matches }) : season ? t("Места и призы — среди сыгравших за сезон от {n} карт. Матчей в сезоне: {m}", { n: SEASON_MIN_MAPS, m: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}
-              </p>
-            </div>
+            <SectionHead
+              title={t("Все игроки")}
+              meta={code ? t("Матчей в лобби: {n}", { n: matches }) : season ? t("Места и призы — среди сыгравших за сезон от {n} карт. Матчей в сезоне: {m}", { n: SEASON_MIN_MAPS, m: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}
+            />
             <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} season={!!season} sort={sort} sortHref={(key) => href("rating", key === "rating" ? {} : { sort: key })} />
             <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")} {t("Нажмите на заголовок столбца, чтобы отсортировать по нему.")}</p>
           </section>
@@ -216,9 +168,9 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
       {tab === "records" && twenty.records.length > 0 && (
         <>
-          {(code || season) && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному сезону или вечеру.")}</p>}
-          <HallOfFame seasons={twenty.seasons} who={who} t={t} />
           <RecordsTab records={twenty.records} duos={twenty.duos} who={who} t={t} />
+          <HallOfFame seasons={twenty.seasons} who={who} t={t} />
+          {(code || season) && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному сезону или вечеру.")}</p>}
         </>
       )}
 

@@ -826,6 +826,16 @@ const ACHIEVEMENTS: AchDef[] = [
   { key: "champion", label: tr("Чемпион сезона"), hint: tr("Закончить сезон на первом месте"), tier: "gold", need: 1, have: (p, c) => c.champions.get(p.steam_id) ?? 0 },
 ];
 
+export type AchGroup = "played" | "wins" | "aim" | "support" | "team" | "titles";
+export const ACH_GROUPS: { key: AchGroup; label: string; keys: string[] }[] = [
+  { key: "titles", label: tr("Звания"), keys: ["champion", "podium", "eveningKing", "mapOwner", "record"] },
+  { key: "aim", label: tr("Стрельба"), keys: ["kills250", "kills500", "kills1000", "map30", "map40", "rating15", "rating20", "adr120", "hs70", "ace1", "ace3", "multi25", "multi75", "mvp50", "mvp150", "carry", "ghost", "allround"] },
+  { key: "support", label: tr("Клатчи и поддержка"), keys: ["clutchMap3", "clutch10", "clutch25", "flash20", "nade300", "defuse10", "plant25"] },
+  { key: "wins", label: tr("Победы"), keys: ["wins5", "wins15", "wins30", "streak3", "streak5", "streak7", "blowout", "overtime"] },
+  { key: "played", label: tr("Сколько сыграно"), keys: ["maps10", "maps25", "maps50", "maps100", "days3", "days10", "pool5"] },
+  { key: "team", label: tr("С кем играет"), keys: ["mate5", "duo5"] },
+];
+
 export type Achievement = { key: string; label: string; hint: string; tier: Tier; earned: boolean; have: string; need: string; progress: number };
 export type AchievementBoard = { key: string; label: string; hint: string; tier: Tier; holders: string[] };
 export const ACHIEVEMENTS_TOTAL = ACHIEVEMENTS.length;

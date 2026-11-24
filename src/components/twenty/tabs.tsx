@@ -5,12 +5,12 @@ import { Icon } from "@/components/lobby/icons";
 import { MapThumb } from "@/components/lobby/settings";
 import { DATA_TABLE, NUM_CELL, RankBadge, SortedHead, tableBox } from "@/components/public/data-table";
 import { SelectNav } from "@/components/public/select-nav";
-import { formatDate } from "@/lib/format";
 import type { T } from "@/lib/i18n/core";
 import { mapLabel } from "@/lib/maps";
-import { SEASON_MIN_MAPS, DUO_MIN, MAP_MIN, NOMINATIONS, RADAR_AXES, RECORDS, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type Duo, type MapBoard, type Nomination, type RecordItem, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
+import { SEASON_MIN_MAPS, MAP_MIN, RADAR_AXES, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type MapBoard, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
 import type { TwentyPlayer } from "@/lib/twenty";
 import { money } from "./money";
+import { MapHero, SectionHead } from "./panels";
 import { BestMapChip, Radar, RatingPill, RoleChip, Streak, Trend, heatTone } from "./bits";
 
 /* Вкладки раздела «Микс». Все — серверные: данные и переводчик приходят со страницы. */
@@ -25,52 +25,6 @@ export const whoOf =
 const pct = (a: number, b: number) => (b ? Math.round((100 * a) / b) : 0);
 
 // ───────────────────────── рейтинг
-
-function nominationNote(n: Nomination, t: T) {
-  const d = n.detail;
-  if (d.kind === "total") return t("за вечер");
-  if (d.kind === "perMap") return t("в среднем за карту · всего {n}", { n: d.n ?? 0 });
-  if (d.kind === "kills") return t("убийств: {n}", { n: d.kills ?? 0 });
-  if (d.kind === "map") return `${d.map ? mapLabel(d.map) : "—"} · ${d.kills}–${d.deaths}`;
-  return t("рейтинг {from} → {to}", { from: (d.from ?? 0).toFixed(2), to: (d.to ?? 0).toFixed(2) });
-}
-
-export function Nominations({ items, who, t, evening }: { items: Nomination[]; who: Who; t: T; evening: boolean }) {
-  if (!items.length) return null;
-  return (
-    <section aria-label={t("Номинации")}>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <h2 className="text-title text-fg">{evening ? t("Номинации вечера") : t("Номинации")}</h2>
-        <p className="text-meta text-fg-3">{evening ? t("Лучшие в своём деле за этот вечер") : t("Лучшие в своём деле — в среднем за карту, от {n} карт", { n: ROLE_MIN_MAPS })}</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((n) => {
-          const p = who(n.steam_id, n.name);
-          const body = (
-            <>
-              <div className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3" title={t(NOMINATIONS[n.key].hint)}>
-                {t(NOMINATIONS[n.key].label)}
-              </div>
-              <div className="mt-3 flex items-center gap-3">
-                <Avatar src={p.avatar_url} name={p.nickname} size="md" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold text-fg">{p.nickname}</span>
-                  <span className="block truncate text-micro text-fg-3">{nominationNote(n, t)}</span>
-                </span>
-                <span className="num text-[22px] font-extrabold text-fg">{n.value}</span>
-              </div>
-            </>
-          );
-          return (
-            <Link key={n.key} href={n.game_id ? `/lobbies/games/${n.game_id}` : `/players/${n.steam_id}`} className="rounded-surface border border-line-subtle bg-surface p-4 transition-colors hover:border-line-strong">
-              {body}
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
 
 export const SORTS = ["rating", "maps", "wins", "kills", "diff", "kd", "adr", "hs", "mvp"] as const;
 export type SortKey = (typeof SORTS)[number];
@@ -110,7 +64,7 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
         <thead>
           <tr>
             <th className="w-14">#</th>
-            <th>{t("Игрок")}</th>
+            <th className="min-w-[230px]">{t("Игрок")}</th>
             {columns.map(([key, label]) => (
               <th key={key} className="w-[74px] !text-right">
                 {head(key, label)}
@@ -136,10 +90,10 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
                         <span className={cn("truncate", n != null && n <= 3 ? "text-[16px] font-bold" : "font-semibold")}>{p.nickname}</span>
                         {n === 1 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
                         {me && <span className="shrink-0 rounded-chip bg-accent px-1.5 py-0.5 text-micro font-semibold text-accent-ink">{t("вы")}</span>}
+                        {r.prize != null && <span className="num shrink-0 rounded-chip bg-gold/20 px-1.5 py-0.5 text-micro font-bold text-gold">{money(r.prize, t)}</span>}
                       </Link>
-                      {(r.role || r.best || r.streak >= 3 || r.prize != null || !r.qualified) && (
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          {r.prize != null && <span className="num shrink-0 rounded-chip bg-gold/20 px-1.5 py-0.5 text-micro font-bold text-gold">{money(r.prize, t)}</span>}
+                      {(r.role || r.best || r.streak >= 3 || !r.qualified) && (
+                        <div className="mt-1 flex items-center gap-1.5 overflow-hidden">
                           {season && !r.qualified && <span className="shrink-0 rounded-chip bg-ink/[0.06] px-1.5 py-0.5 text-micro font-semibold text-fg-3">{t("до зачёта карт: {n}", { n: SEASON_MIN_MAPS - r.maps })}</span>}
                           <RoleChip role={r.role} t={t} />
                           <BestMapChip cell={r.best} t={t} />
@@ -182,25 +136,21 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
 export function MapsTab({ boards, rows, who, t, images, selected, href, meSteamId }: { boards: MapBoard[]; rows: TwentyRow[]; who: Who; t: T; images: Record<string, string>; selected: string | null; href: (params: Record<string, string>) => string; meSteamId: string | null }) {
   if (!boards.length) return <EmptyState title={t("Карт пока нет")} text={t("Рейтинг по картам появится после первых сыгранных матчей.")} />;
   const board = boards.find((b) => b.map === selected) ?? boards[0];
-  const owner = board.rows[0];
-  const ownerWho = owner ? who(owner.steam_id, owner.name) : null;
   const maps = boards.map((b) => b.map);
   // в матрице — те, у кого есть хотя бы одна карта с порогом; остальным показывать нечего
   const matrix = rows.filter((r) => r.byMap.some((c) => c.maps >= MAP_MIN)).slice(0, 40);
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {boards.map((b) => {
-          const top = b.rows[0];
           const active = b.map === board.map;
           return (
             <Link key={b.map} href={href({ map: b.map })} scroll={false} aria-current={active ? "true" : undefined}>
-              <MapThumb map={b.map} image={images[b.map]} className={cn("h-24 rounded-surface border-2 transition-colors", active ? "border-accent" : "border-transparent hover:border-line-strong")}>
-                <span className="absolute right-2.5 top-2 rounded-chip bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-white">{t("игр: {n}", { n: b.played })}</span>
-                <span className="absolute inset-x-3 bottom-2 grid gap-0.5">
-                  <span className="truncate text-[15px] font-bold text-white">{mapLabel(b.map)}</span>
-                  {top && <span className="truncate text-[11px] font-medium text-white/85">{who(top.steam_id, top.name).nickname}</span>}
+              <MapThumb map={b.map} image={images[b.map]} className={cn("h-16 rounded-control border-2 transition-[border-color,opacity]", active ? "border-accent" : "border-transparent opacity-75 hover:opacity-100")}>
+                <span className="absolute inset-x-2.5 bottom-1.5 flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[14px] font-bold text-white">{mapLabel(b.map)}</span>
+                  <span className="num shrink-0 text-[11px] font-semibold text-white/80">{b.played}</span>
                 </span>
               </MapThumb>
             </Link>
@@ -208,29 +158,10 @@ export function MapsTab({ boards, rows, who, t, images, selected, href, meSteamI
         })}
       </div>
 
-      {owner && ownerWho && (
-        <section aria-label={t("Хозяин карты")} className="flex flex-wrap items-center gap-5 rounded-surface border border-gold/40 bg-gradient-to-br from-gold/[0.14] via-gold/[0.05] to-transparent p-5 sm:p-6">
-          <span className="rounded-full p-1 ring-2 ring-gold/60">
-            <Avatar src={ownerWho.avatar_url} name={ownerWho.nickname} size="lg" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.14em] text-gold">
-              {Icon.crown("size-4")} {t("Хозяин карты {map}", { map: mapLabel(board.map) })}
-            </div>
-            <Link href={`/players/${owner.steam_id}`} className="mt-1 block truncate text-[26px] font-extrabold leading-tight text-fg hover:text-accent">
-              {ownerWho.nickname}
-            </Link>
-            <div className="mt-1 text-meta text-fg-3">{t("Игр на карте: {n} · побед {wins} · K/D {kd} · ADR {adr}", { n: owner.maps, wins: owner.wins, kd: owner.kd.toFixed(2), adr: Math.round(owner.adr) })}</div>
-          </div>
-          <span className="num text-[40px] font-extrabold leading-none text-fg">{owner.rating.toFixed(2)}</span>
-        </section>
-      )}
+      <MapHero board={board} image={images[board.map]} who={who} t={t} />
 
       <section aria-label={mapLabel(board.map)}>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-title text-fg">{t("Рейтинг на {map}", { map: mapLabel(board.map) })}</h2>
-          <p className="text-meta text-fg-3">{board.minMaps > 1 ? t("В таблице — сыгравшие на карте от {n} игр", { n: board.minMaps }) : t("Карту играли редко — в таблице все, кто на ней был")}</p>
-        </div>
+        <SectionHead title={t("Рейтинг на {map}", { map: mapLabel(board.map) })} meta={t("Игроков в таблице: {n}", { n: board.rows.length })} />
         <div className={tableBox()}>
           <table className={cn(DATA_TABLE, "min-w-[760px]")}>
             <thead>
@@ -283,10 +214,7 @@ export function MapsTab({ boards, rows, who, t, images, selected, href, meSteamI
 
       {matrix.length > 0 && (
         <section aria-label={t("Кто на какой карте силён")}>
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <h2 className="text-title text-fg">{t("Кто на какой карте силён")}</h2>
-            <p className="text-meta text-fg-3">{t("Рейтинг игрока на каждой карте. Бледные числа — одна игра, это ещё не показатель.")}</p>
-          </div>
+          <SectionHead title={t("Кто на какой карте силён")} meta={t("Рейтинг игрока на каждой карте. Бледные числа — одна игра, это ещё не показатель.")} />
           <div className={tableBox()}>
             <table className={cn(DATA_TABLE, "min-w-[720px] [&_td]:!h-12")}>
               <thead>
@@ -499,73 +427,6 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
           {t("Оси паутинки")}: {RADAR_AXES.map((x) => `${t(x.label)} — ${t(x.hint).toLowerCase()}`).join("; ")}.
         </p>
       </Section>
-    </div>
-  );
-}
-
-// ───────────────────────── рекорды и связки
-
-export function RecordsTab({ records, duos, who, t }: { records: RecordItem[]; duos: Duo[]; who: Who; t: T }) {
-  if (!records.length) return <EmptyState title={t("Рекордов пока нет")} text={t("Они появятся после первых сыгранных матчей.")} />;
-  return (
-    <div className="space-y-8">
-      <section aria-label={t("Рекорды")}>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-title text-fg">{t("Рекорды")}</h2>
-          <p className="text-meta text-fg-3">{t("За всё время. Побьёте — запись перейдёт к вам.")}</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {records.map((r) => {
-            const p = who(r.steam_id, r.name);
-            return (
-              <Link key={r.key} href={r.game_id ? `/lobbies/games/${r.game_id}` : `/players/${r.steam_id}`} className="rounded-surface border border-line-subtle bg-surface p-4 transition-colors hover:border-line-strong">
-                <div className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t(RECORDS[r.key])}</div>
-                <div className="num mt-2 text-[34px] font-extrabold leading-none text-fg">{r.value}</div>
-                <div className="mt-3 flex items-center gap-2.5">
-                  <Avatar src={p.avatar_url} name={p.nickname} size="sm" />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-semibold text-fg">{p.nickname}</span>
-                    <span className="block truncate text-micro text-fg-3">{[r.map ? mapLabel(r.map) : null, r.note, r.at ? formatDate(r.at, t.lang) : null].filter(Boolean).join(" · ")}</span>
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section aria-label={t("Лучшие связки")}>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-title text-fg">{t("Лучшие связки")}</h2>
-          <p className="text-meta text-fg-3">{t("Пары, которые чаще всего выигрывают в одной команде. От {n} матчей вместе.", { n: DUO_MIN })}</p>
-        </div>
-        {duos.length === 0 ? (
-          <p className="rounded-surface border border-line-subtle bg-surface p-5 text-meta text-fg-3">{t("Пока никто не сыграл вместе {n} матча.", { n: DUO_MIN })}</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
-            {duos.map((d, i) => {
-              const pa = who(d.a);
-              const pb = who(d.b);
-              return (
-                <div key={`${d.a}:${d.b}`} className="flex min-w-0 items-center gap-3 rounded-surface border border-line-subtle bg-surface px-4 py-3">
-                  <RankBadge n={i + 1} />
-                  <span className="flex shrink-0 -space-x-2">
-                    <Avatar src={pa.avatar_url} name={pa.nickname} size="sm" className="ring-2 ring-surface" />
-                    <Avatar src={pb.avatar_url} name={pb.nickname} size="sm" className="ring-2 ring-surface" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">
-                    <Link href={`/players/${d.a}`} className="hover:text-accent">{pa.nickname}</Link>
-                    <span className="text-fg-3"> + </span>
-                    <Link href={`/players/${d.b}`} className="hover:text-accent">{pb.nickname}</Link>
-                  </span>
-                  <span className="num hidden shrink-0 text-meta text-fg-3 sm:inline">{t("{wins} из {games}", { wins: d.wins, games: d.games })}</span>
-                  <span className={cn("num w-14 shrink-0 text-right text-[18px] font-extrabold", pct(d.wins, d.games) >= 60 ? "text-ok" : "text-fg")}>{pct(d.wins, d.games)}%</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

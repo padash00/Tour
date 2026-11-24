@@ -3,7 +3,6 @@ import { buttonClass, cn } from "@/components/ds";
 import { MapThumb } from "@/components/lobby/settings";
 import type { T } from "@/lib/i18n/core";
 import { playersNeeded, potBank, type LobbySettings } from "@/lib/lobby-settings";
-import { mapLabel } from "@/lib/maps";
 import { money } from "./money";
 
 export type LiveGame = {
@@ -44,7 +43,7 @@ export function LiveGames({ games, images, t, mineCode }: { games: LiveGame[]; i
                     {playing ? t("Идёт игра") : t("Идёт набор")}
                   </div>
                   <div className="mt-3 text-[26px] font-extrabold leading-tight text-white sm:truncate sm:text-[32px]">
-                    {playing && l.game ? `${mapLabel(map)} · ${l.game.team1_score}:${l.game.team2_score}` : left > 0 ? t.plural(left, "Нужен ещё {n} игрок", "Нужны ещё {n} игрока", "Нужно ещё {n} игроков").replace("{n}", String(left)) : t("Все в сборе — скоро начало")}
+                    {playing && l.game ? t("Счёт серии {a}:{b}", { a: l.game.team1_score, b: l.game.team2_score }) : left > 0 ? t.plural(left, "Нужен ещё {n} игрок", "Нужны ещё {n} игрока", "Нужно ещё {n} игроков").replace("{n}", String(left)) : t("Все в сборе — скоро начало")}
                   </div>
                   <div className="num mt-1.5 text-[14px] text-white/80">
                     #{l.code} · {l.host?.nickname ?? "—"} · {t("{n} игроков", { n: need })} · BO{l.settings.best_of}
