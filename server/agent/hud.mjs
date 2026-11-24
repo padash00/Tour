@@ -52,7 +52,7 @@ export function createHud({ serverDir, stateDir, siteUrl, instances, rc, log }) 
 
   /** Разминка матча: карта, счёт серии, кого ждём — по центру экрана, обновляется на каждом тике */
   async function warmup(inst, a, get5, extra) {
-    const active = a && get5 && get5.matchid === a.matchid && get5.gamestate === "warmup";
+    const active = a && get5 && get5.matchid === a.matchid && ["warmup", "pending_restore"].includes(get5.gamestate);
     if (!active) return clear(inst);
     const cfg = readMatchConfig(stateDir, a.match_id);
     const mapNo = get5.map_number ?? 0;

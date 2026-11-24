@@ -42,7 +42,8 @@ export function createAutostart({ stateDir, rc, log, hud }) {
 
   async function tick(inst, a, info, get5) {
     const mapNo = get5?.map_number ?? 0;
-    if (!a || !get5 || get5.matchid !== a.matchid || get5.gamestate !== "warmup") {
+    // pending_restore — та же разминка: MatchZy ждёт игроков, чтобы вернуть раунд или продолжить серию после перезапуска
+    if (!a || !get5 || get5.matchid !== a.matchid || !["warmup", "pending_restore"].includes(get5.gamestate)) {
       delete state[inst.name];
       await hud.warmup(inst, a, get5, null);
       return;

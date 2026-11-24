@@ -964,12 +964,23 @@ export async function finishGame(gameId: string) {
 
 /** Отменить игру (хост, пока она не началась на сервере, или админ) */
 const NO_START_MS = 20 * 60_000;
+/** «Матча на сервере нет» должно держаться столько подряд: перезапуск сервера и загрузка матча заново — не конец игры */
+const GONE_CONFIRM_MS = 2 * 60_000;
+/** Лобби закрыто, а на сервере столько времени подряд никого — игру бросили */
+const EMPTY_SERVER_MS = 10 * 60_000;
+// с какого момента сторож видит «матча нет» / «сервер пуст» (в памяти процесса сайта: после его перезапуска отсчёт заново)
+const goneSince = new Map<string, number>();
+const emptySince = new Map<string, number>();
 
 /**
  * Сторож игр лобби (на каждой синхронизации агента):
  *  - сервер готов, но за 20 минут матч так и не начался — отменяем, сервер освобождается;
  *  - сервер явно говорит, что этого матча на нём больше нет (сняли из админки, MatchZy закончил без series_end) —
  *    засчитываем сыгранное или отменяем. Пустой ответ сервера (RCON не ответил) за «нет матча» не считаем.
+ *    Обслуживание хоста (обновление CS2, перезапуск серверов), подъём сервера после падения и события в буфере
+ *    агента тоже не «нет матча»: агент загружает матч заново. Поэтому ждём 2 минуты подряд;
+ *  - лобби закрыто, а на сервере 10 минут подряд никого (игроки разошлись посреди серии) — так же засчитываем
+ *    сыгранное или отменяем и снимаем матч с сервера. Иначе игра вечно «идёт» и не даёт серверам обновляться.
  */
 export async function lobbyGameWatchdog() {
   const { data } = await db()
@@ -979,25 +990,57 @@ export async function lobbyGameWatchdog() {
     .eq("server_state", "ready")
     .not("server_instance", "is", null);
   if (!data?.length) return;
-  const { data: insts } = await db().from("server_instances").select("name, running, gamestate, matchzy_match_id, last_seen_at");
+  const [{ data: insts }, { data: host }, { data: closed }] = await Promise.all([
+    db().from("server_instances").select("name, running, gamestate, players, matchzy_match_id, last_seen_at"),
+    db().from("server_host").select("info").eq("id", "main").maybeSingle(),
+    db().from("lobbies").select("id").in("id", [...new Set(data.map((r) => r.lobby_id))]).eq("status", "closed"),
+  ]);
   const byName = new Map((insts ?? []).map((i) => [i.name, i]));
+  const info = (host?.info ?? {}) as { busy?: string | null; recovering?: string[]; relay?: { queued?: number; oldest_age_s?: number } | null };
+  const recovering = new Set(info.recovering ?? []);
+  // события ещё в буфере агента (обрыв связи) — series_end может быть среди них; ждём до 5 минут
+  const relayBacklog = (info.relay?.queued ?? 0) > 0 && (info.relay?.oldest_age_s ?? 0) < 300;
+  const closedLobbies = new Set((closed ?? []).map((l) => l.id));
   const now = Date.now();
+  const lasted = (since: Map<string, number>, id: string, on: boolean) => {
+    if (!on) {
+      since.delete(id);
+      return 0;
+    }
+    if (!since.has(id)) since.set(id, now);
+    return now - since.get(id)!;
+  };
+  /** Игра кончилась без series_end: сыграна хоть одна карта — итог по картам, иначе отмена */
+  const settle = async (g: LobbyGame, reason: string) => {
+    goneSince.delete(g.id);
+    emptySince.delete(g.id);
+    if (g.maps.some((m) => m.status === "finished")) {
+      const s1 = g.maps.filter((m) => m.winner === 1).length;
+      const s2 = g.maps.filter((m) => m.winner === 2).length;
+      await db().from("lobby_games").update({ team1_score: s1, team2_score: s2, winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }).eq("id", g.id);
+      await finishGame(g.id);
+    } else {
+      await cancelGame(g, reason);
+    }
+  };
   for (const row of data) {
     const g = row as LobbyGame;
     const readyFor = g.server_ready_at ? now - new Date(g.server_ready_at).getTime() : 0;
     const inst = byName.get(g.server_instance!);
-    const fresh = inst?.last_seen_at && now - new Date(inst.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
-    const gone =
-      fresh && inst.running && readyFor > 60_000 && (inst.gamestate === "none" || (inst.matchzy_match_id != null && Number(inst.matchzy_match_id) !== Number(g.matchzy_id)));
-    if (gone) {
-      if (g.maps.some((m) => m.status === "finished")) {
-        const s1 = g.maps.filter((m) => m.winner === 1).length;
-        const s2 = g.maps.filter((m) => m.winner === 2).length;
-        await db().from("lobby_games").update({ team1_score: s1, team2_score: s2, winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }).eq("id", g.id);
-        await finishGame(g.id);
-      } else {
-        await cancelGame(g, tr("матч снят с сервера"));
-      }
+    const fresh = !!inst?.last_seen_at && now - new Date(inst.last_seen_at).getTime() < AGENT_OFFLINE_AFTER_MS;
+    const up = !!inst && fresh && inst.running && readyFor > 60_000 && !info.busy && !recovering.has(inst.name);
+    const gone = up && !relayBacklog && (inst.gamestate === "none" || (inst.matchzy_match_id != null && Number(inst.matchzy_match_id) !== Number(g.matchzy_id)));
+    // в ответе A2S один «игрок» — бот SourceTV
+    const empty = up && !gone && closedLobbies.has(g.lobby_id) && (inst.players ?? 0) <= 1;
+    const goneFor = lasted(goneSince, g.id, gone);
+    const emptyFor = lasted(emptySince, g.id, empty);
+    if (goneFor >= GONE_CONFIRM_MS) {
+      await settle(g, tr("матч снят с сервера"));
+    } else if (emptyFor >= EMPTY_SERVER_MS) {
+      // матч ещё загружен на сервере — снимаем, сервер освобождается
+      const played = g.maps.some((m) => m.status === "finished");
+      await settle(g, tr("лобби закрыто"));
+      if (played) await db().from("agent_commands").insert({ instance: g.server_instance!, type: "end_match", payload: {} });
     } else if (g.status === "waiting" && readyFor > NO_START_MS) {
       await cancelGame(g, tr("за 20 минут матч так и не начался"));
     }

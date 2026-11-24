@@ -233,7 +233,11 @@ async function probeInstance(inst) {
   const quiet = status == null || laneActive.has(inst.name) || recovery.recovering.has(inst.name) || !!maintenance;
   if (!quiet) await enforce.apply(inst, get5).catch(() => {});
   if (!quiet) await applyOpenJoin(inst).catch(() => {});
-  recovery.track(inst, true, get5);
+  // обслуживание хоста: серверы только что запущены без матча — назначение не снимаем, матч вернёт reloadAssigned
+  const restarting = RESTARTING_COMMANDS.includes(busy);
+  if (!restarting) recovery.track(inst, true, get5);
+  // матч возвращается на сервер (подъём после падения или обслуживания): для сайта он не «пропал с сервера»
+  const held = recovery.holding(inst.name) ?? (restarting ? (recovery.assignments[inst.name]?.matchid ?? null) : null);
   if (!quiet) await autostart.tick(inst, recovery.assignments[inst.name], info, get5).catch((e) => log(`автостарт ${inst.name}: ${e.message}`));
   if (!quiet && recorder) await recorder.tick(inst, recovery.assignments[inst.name], get5, info).catch((e) => log(`демо ${inst.name}: ${e.message}`));
   snapshots[inst.name] = {
@@ -246,6 +250,8 @@ async function probeInstance(inst) {
       // сервер занят прогревом карт: для сайта он не свободен, матч на него не назначат
       get5: maintenance
         ? { gamestate: "maintenance", matchid: null, map_number: null }
+        : held != null
+        ? { gamestate: "maintenance", matchid: held, map_number: null }
         : get5 && { gamestate: get5.gamestate, matchid: get5.matchid, map_number: get5.map_number },
     },
   };
@@ -383,6 +389,17 @@ const completeCommand = async (cmd, r) => {
   await flushCommandResults().catch((e) => log("ack failed; сохранён для повтора", e.message));
 };
 
+const RESTARTING_COMMANDS = ["update_cs2", "update_plugins", "restart_all"];
+
+/** После обслуживания, которое перезапускает серверы: вернуть на них назначенные матчи (карта и счёт серии — как были) */
+async function reloadAssigned() {
+  await Promise.all(Object.keys(recovery.assignments).map(async (name) => {
+    const inst = INSTANCES.find((i) => i.name === name);
+    if (!inst) return;
+    await inLane(name, () => recovery.recoverNow(inst, { reason: "maintenance" })).catch((e) => log(`автоподъём ${name}: ${e?.message ?? e}`));
+  }));
+}
+
 /** Долгие команды обслуживания выполняются в фоне, агент продолжает отчитываться сайту */
 function runHostCommand(cmd) {
   // прогрев занимает один инстанс, остальное обслуживание — весь хост
@@ -400,6 +417,8 @@ function runHostCommand(cmd) {
     .then((result) => ({ ok: true, result }))
     .catch((e) => ({ ok: false, result: String(e?.message ?? e) }))
     .then(async (r) => {
+      // серверы перезапущены — назначенные матчи загружаем заново, пока хост ещё «занят» (сайт их не закроет)
+      if (RESTARTING_COMMANDS.includes(cmd.type)) await reloadAssigned();
       if (exclusive) busy = null;
       else prefetching = false;
       hostInfoAt = 0;

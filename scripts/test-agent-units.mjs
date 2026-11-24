@@ -12,6 +12,8 @@ import path from "node:path";
 import { onlineRosterCount, rosterIds } from "../server/agent/autostart.mjs";
 import { installBundle, localBundleVersion, missingImports, rejectedBundleVersion, rollbackBundle } from "../server/agent/bundle.mjs";
 import { createRecorder, demoFileName } from "../server/agent/recorder.mjs";
+process.env.F16_STATE_POLL_MS = "5";
+const { createRecovery, latestMatchBackup, seriesBackup } = await import("../server/agent/recovery.mjs");
 import { CommandJournal } from "../server/agent/command-journal.mjs";
 import { createEnforce } from "../server/agent/enforce.mjs";
 import { encodePacket, parseGet5, rcon, rconSession, steamIdsFromStatus, takePackets } from "../server/agent/lib.mjs";
@@ -284,6 +286,81 @@ try {
     // чужой матч на сервере (без назначения) не пишем
     await recorder.tick(inst, undefined, { matchid: 5, gamestate: "live", map_number: 0 }, info);
     assert.equal(sent.length, 4);
+  });
+  await test("подъём между картами серии: матч возвращается на свою карту со счётом серии, а не на первую при 0:0", async () => {
+    const root = path.join(dir, "recovery");
+    const stateDir = path.join(root, "state");
+    const backups = path.join(root, "server", "game", "csgo", "MatchZyDataBackup");
+    mkdirSync(path.join(stateDir, "match-configs"), { recursive: true });
+    mkdirSync(backups, { recursive: true });
+    writeFileSync(path.join(stateDir, "match-configs", "game-1.json"), JSON.stringify({ num_maps: 5, maplist: ["de_mirage", "de_dust2", "de_ancient", "de_anubis", "de_nuke"] }));
+    const team = (name, score) => JSON.stringify({ teamName: name, teamPlayers: { 1: "a" }, seriesScore: score });
+    const backup = (map, round) => ({
+      matchid: "77", map_name: "de_ancient", mapnumber: String(map), round, team1: team("A", 1), team2: team("B", 1),
+      team1_score: "12", team2_score: "5", team1_series_score: "1", team2_series_score: "1", bomb_stats: '{"1":[3,2]}',
+      match_loaded: "True", match_config: JSON.stringify({ MatchId: 77, NumMaps: 5, CurrentMapNumber: map }), valve_backup: "",
+    });
+    writeFileSync(path.join(backups, "matchzy_77_1_round20.json"), JSON.stringify(backup(1, "20")));
+    writeFileSync(path.join(backups, "matchzy_77_2_round17.json"), JSON.stringify(backup(2, "17")));
+    writeFileSync(path.join(backups, "matchzy_78_4_round03.json"), JSON.stringify(backup(4, "03")));
+    assert.equal(latestMatchBackup(backups, 77), "matchzy_77_2_round17.json");
+
+    const made = seriesBackup(backup(2, "17"), { mapNumber: 3, mapName: "de_anubis", s1: 2, s2: 1 });
+    assert.equal(made.mapnumber, "3");
+    assert.equal(made.map_name, "de_anubis");
+    assert.equal(JSON.parse(made.team1).seriesScore, 2);
+    assert.equal(JSON.parse(made.team2).seriesScore, 1);
+    assert.equal(JSON.parse(made.match_config).CurrentMapNumber, 3);
+    assert.equal(made.team1_score, "0");
+    assert.match(made.valve_backup, /\{\s*\}\s*$/);
+
+    // поддельный сервер: после загрузки матча — первая карта 0:0; бэкап серии переводит его на карту из файла
+    let server = { gamestate: "none", matchid: null, map_number: null, team1: { series_score: 0 }, team2: { series_score: 0 } };
+    const sent = [];
+    let seenFile = null;
+    const rc = async (_inst, command) => {
+      sent.push(command);
+      if (command === "get5_status") return JSON.stringify(server);
+      const m = /^matchzy_loadbackup (\S+)$/.exec(command);
+      if (m) {
+        const b = JSON.parse(readFileSync(path.join(backups, path.basename(m[1])), "utf8"));
+        seenFile = path.basename(m[1]);
+        if (!b.valve_backup) return "нет данных раунда"; // как настоящий MatchZy: без данных раунда бэкап не берёт
+        server = { gamestate: "pending_restore", matchid: 77, map_number: Number(b.mapnumber), team1: { series_score: Number(b.team1_series_score) }, team2: { series_score: Number(b.team2_series_score) } };
+        return "";
+      }
+      return "";
+    };
+    const events = [];
+    const recovery = createRecovery({
+      stateDir, serverDir: path.join(root, "server"), rc, a2sInfo: async () => null, log: () => {},
+      runStart: async () => {}, inLane: (_n, fn) => fn(),
+      loadMatch: async () => ((server = { gamestate: "warmup", matchid: 77, map_number: 0, team1: { series_score: 0 }, team2: { series_score: 0 } }), { ok: true, result: "" }),
+    });
+    const inst = { name: "CS2-01", port: 27015 };
+    recovery.assign(inst, { matchzy_id: 77, match_id: "game-1" });
+    // третья карта сыграна, сервер стоит в разминке четвёртой при 2:1
+    recovery.track(inst, true, { gamestate: "live", matchid: 77, map_number: 2, team1: { series_score: 1 }, team2: { series_score: 1 } });
+    recovery.track(inst, true, { gamestate: "warmup", matchid: 77, map_number: 3, team1: { series_score: 2 }, team2: { series_score: 1 } });
+    assert.deepEqual(recovery.assignments["CS2-01"].pos, { map: 3, s1: 2, s2: 1 });
+    assert.equal(recovery.holding("CS2-01"), null);
+
+    const r = await recovery.recoverNow(inst, { reason: "maintenance" });
+    assert.equal(r.ok, true, r.result);
+    assert.match(r.result, /обслуживанием.*серия продолжается: карта 4, счёт серии 2:1/);
+    assert.equal(seenFile, "f16_series_77_3.json");
+    assert.deepEqual([server.gamestate, server.map_number, server.team1.series_score, server.team2.series_score], ["pending_restore", 3, 2, 1]);
+    assert.equal(existsSync(path.join(backups, "f16_series_77_3.json")), false, "файл серии должен быть удалён до старта карты");
+    assert.equal(sent.some((c) => /matchzy_loadbackup .*round17/.test(c)), false, "раунд сыгранной карты восстанавливать нельзя");
+    void events;
+
+    // падение посреди карты, а данных раунда нет: серия всё равно встаёт на свою карту
+    recovery.track(inst, true, { gamestate: "live", matchid: 77, map_number: 2, team1: { series_score: 1 }, team2: { series_score: 1 } });
+    sent.length = 0;
+    const r2 = await recovery.recoverNow(inst, { reason: "crash" });
+    assert.equal(r2.ok, true, r2.result);
+    assert.match(r2.result, /карта 3, счёт серии 1:1.*Раунд восстановить не удалось/);
+    assert.equal(server.map_number, 2);
   });
 } finally {
   rmSync(dir, { recursive: true, force: true });

@@ -61,7 +61,8 @@ async function applyInstance(inst: ReportedInstance, now: string, lanIp: string 
   const { data: match } = matchzyId
     ? await db().from("matches").select("*").eq("matchzy_id", matchzyId).maybeSingle().throwOnError()
     : { data: null };
-  if (matchzyId && !match && gamestate && gamestate !== "none") {
+  // «maintenance» с номером матча — агент возвращает матч на сервер после перезапуска: он ещё не загружен
+  if (matchzyId && !match && gamestate && gamestate !== "none" && gamestate !== "maintenance") {
     await lobbyHealthCheck(matchzyId, inst.name, inst.map ?? null, reportLanIp, upnpIp);
   }
 

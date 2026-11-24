@@ -31,6 +31,9 @@ foreach ($i in $targets) {
 
   $argList = @(
     "-dedicated", "-console", "-usercon",
+    # без этого ключа CS2 не пишет файлы раундов (mp_backup_round_auto): не работают откат раунда (.stop),
+    # переигровка при вылете и восстановление матча после падения сервера
+    "-allow_round_backup_files",
     "-ip", "0.0.0.0",
     "-port", $port,
     "+tv_port", ($port + 5),
