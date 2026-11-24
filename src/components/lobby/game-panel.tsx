@@ -130,8 +130,10 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
         {choosing && game.side_map && (
           <div className="mt-5 grid items-stretch gap-3 sm:grid-cols-[minmax(0,220px)_1fr_1fr]">
             <MapThumb map={game.side_map} image={view.mapImages[game.side_map]} className="h-24 rounded-control border border-accent sm:h-full sm:min-h-28">
-              <span className="absolute bottom-2 left-2 text-[14px] font-semibold text-fg">{mapLabel(game.side_map)}</span>
-              <span className="absolute right-2 top-2 text-micro font-semibold uppercase text-accent">{t("пик")} · {picker.name}</span>
+              <span className="absolute inset-x-3 bottom-2.5 grid gap-0.5">
+                <span className="truncate text-[16px] font-semibold text-white">{mapLabel(game.side_map)}</span>
+                <span className="truncate text-[12px] font-medium text-white/85">{t("пик")} · {picker.name}</span>
+              </span>
             </MapThumb>
             {(["ct", "t"] as const).map((side) => (
               <button
@@ -181,13 +183,15 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
                         : "border-line-subtle",
                   )}
                 >
-                  <span className="absolute bottom-2 left-2 text-[12px] font-medium text-fg">{mapLabel(map)}</span>
-                  {action && ctName(action) && (
-                    <span className="absolute bottom-2 right-2 flex max-w-[60%] items-center gap-1 text-[11px] font-medium text-fg">
-                      <SideTag side="ct" />
-                      <span className="truncate">{ctName(action)}</span>
-                    </span>
-                  )}
+                  <span className="absolute inset-x-2 bottom-2 grid gap-0.5">
+                    <span className="truncate text-[12px] font-medium text-white">{mapLabel(map)}</span>
+                    {action && ctName(action) && (
+                      <span className="flex min-w-0 items-center gap-1 text-[11px] font-medium text-white/90">
+                        <span className="rounded-full bg-side-ct px-1.5 text-[10px] font-bold leading-4 text-white">CT</span>
+                        <span className="truncate">{ctName(action)}</span>
+                      </span>
+                    )}
+                  </span>
                   {action && (
                     <span className={cn("absolute right-2 top-2 text-micro font-semibold uppercase", action.action === "ban" ? "text-danger" : "text-accent")}>
                       {action.action === "ban" ? t("бан") : action.action === "pick" ? t("пик") : "decider"}

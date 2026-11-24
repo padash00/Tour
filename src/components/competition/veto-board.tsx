@@ -196,7 +196,7 @@ export async function VetoBoard({
                   {done ? mapName(done.map_name) : current ? t("выбирает…") : "—"}
                 </div>
                 <div className="mt-0.5 truncate text-meta text-fg-3">{teamTag ?? t("по остатку")}</div>
-                {sideNote && <div className={cn("mt-0.5 truncate text-meta font-medium", choosing ? "text-accent" : ct ? "text-side-ct" : "text-fg-3")}>{sideNote}</div>}
+                {sideNote && <div className={cn("mt-0.5 text-meta font-medium leading-snug", choosing ? "text-accent" : ct ? "text-side-ct" : "text-fg-3")}>{sideNote}</div>}
               </li>
             );
           })}
