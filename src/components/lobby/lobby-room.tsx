@@ -18,6 +18,7 @@ import { Chat } from "./chat";
 import { Countdown, LobbyClock } from "./countdown";
 import { Gate, JoinGate } from "./join-gate";
 import { EmptySlot, Panel, PlayerLine, TeamCard } from "./team-card";
+import { BalanceStrip } from "./balance";
 import { CupBoard, CupBracket, CupRoomBanner, CupTeams, MyMatchBanner } from "./cup";
 import { playersNeeded } from "@/lib/lobby-settings";
 import { phaseOf, useLobbyView, type Run } from "./use-lobby-view";
@@ -326,6 +327,8 @@ export function LobbyRoom({
                 )}
               </>
             )}
+
+            {view.balance && !many && <BalanceStrip balance={view.balance} team1={lobby.team1_name} team2={lobby.team2_name} />}
 
             {/* составы по бокам, в центре — главное действие и сводка, как в комнате матча */}
             <div className={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)_minmax(0,1fr)]", many && "hidden")}>

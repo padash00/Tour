@@ -29,7 +29,7 @@ import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
 import { voiceOnline } from "./voice";
 import { twentyBriefs, vetoEdge, type TwentyBrief } from "./twenty";
-import type { RoleKey } from "./twenty-core";
+import { playerStrength, teamBalance, type Balance, type RoleKey } from "./twenty-core";
 
 /** Как часто обновлять last_seen_at зрителя (мс) — с запасом меньше ONLINE_MS */
 const SEEN_WRITE_MS = 10_000;
@@ -50,7 +50,7 @@ export type ViewMember = {
   tier: TierKey | null;
   paid: boolean;
   /** «Микс»: рейтинг, роль и коронная карта игрока — подсказка капитанам при разборе (null — в «Миксе» не играл) */
-  mix: { rating: number; role: RoleKey | null; best: { map: string; rating: number } | null } | null;
+  mix: { rating: number; maps: number; wins: number; matches: number; kd: number; adr: number; hsPct: number; role: RoleKey | null; best: { map: string; rating: number } | null } | null;
 };
 
 export type ViewGame = {
@@ -105,6 +105,8 @@ export type LobbyView = {
     created_at: string;
   };
   captains: (string | null)[];
+  /** сравнение двух составов по рейтингу в «Миксе» (null — команд больше двух или игроков пока мало) */
+  balance: Balance | null;
   /** команды лобби по порядку: две или столько, на сколько игроков оно создано */
   teams: { slot: TeamSlot; name: string }[];
   /** лобби на несколько команд: сетка или круг матчей (null — обычное лобби или матчи ещё не начинались) */
@@ -245,8 +247,8 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   const seesAddress = opts.admin || inGame || mine?.slot === "spec";
 
   // подсказки из «Микса» — из кэша; если он недоступен, комната работает без них
-  const briefsLoad: Promise<Record<string, TwentyBrief>> = hidden ? Promise.resolve({}) : twentyBriefs().catch(() => ({}));
-  const [inVoice, { data: msgs }, { data: bans }, { data: past }, mapImages, briefs] = await Promise.all([
+  const mixLoad = hidden ? Promise.resolve({ players: {} as Record<string, TwentyBrief>, fit: null }) : twentyBriefs().catch(() => ({ players: {} as Record<string, TwentyBrief>, fit: null }));
+  const [inVoice, { data: msgs }, { data: bans }, { data: past }, mapImages, mixData] = await Promise.all([
     hidden ? new Set<string>() : voiceOnline(members.map((m) => m.player_id)),
     access === "ok"
       ? db()
@@ -269,8 +271,17 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
           .limit(5)
       : Promise.resolve({ data: [] }),
     getMapImages(),
-    briefsLoad,
+    mixLoad,
   ]);
+  const briefs = mixData.players;
+  // игроку в комнате — его цифры из «Микса» без рейтинга по всем картам (тот нужен только для вето)
+  const mixOf = (b: TwentyBrief | undefined): ViewMember["mix"] => (b ? { rating: b.rating, maps: b.maps, wins: b.wins, matches: b.matches, kd: b.kd, adr: b.adr, hsPct: b.hsPct, role: b.role, best: b.best } : null);
+  // баланс составов: только когда команд две; сила — рейтинг в «Миксе», у новичков — оценка по ELO
+  const strengthOf = (slot: Slot) =>
+    members
+      .filter((m) => m.slot === slot)
+      .map((m) => playerStrength(briefs[m.player.steam_id] ?? null, (lobby!.settings.pot ? lobby!.settings.pot_elo[m.player_id] : null) ?? m.player.faceit_elo ?? null, mixData.fit));
+  const balance = hidden || teamSlotsOf(lobby.settings).length !== 2 ? null : teamBalance(strengthOf("team1"), strengthOf("team2"));
 
   const host = members.find((m) => m.player_id === lobby.host_id);
   let gotv: string | null = null;
@@ -308,6 +319,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
       created_at: lobby.created_at,
     },
     captains: captainsOf(lobby, members),
+    balance,
     teams: teamSlotsOf(lobby.settings).map((slot, i) => ({
       slot,
       name: cupTeams(lobby.settings.players) > 0 ? ((lobby.bracket as Cup | null)?.names?.[i] ?? `Команда ${i + 1}`) : i === 0 ? lobby.team1_name : lobby.team2_name,
@@ -334,7 +346,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе; без рейтинга FACEIT — тоже D
             tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : !elo ? "D" : tierOf(elo, m.player.faceit_level),
             paid: pot && lobby.settings.pot_paid.includes(m.player_id),
-            mix: briefs[m.player.steam_id] ? { rating: briefs[m.player.steam_id].rating, role: briefs[m.player.steam_id].role, best: briefs[m.player.steam_id].best } : null,
+            mix: mixOf(briefs[m.player.steam_id]),
           };
         }),
     bans: (bans ?? []).map((b) => b.player),

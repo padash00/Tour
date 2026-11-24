@@ -1,6 +1,6 @@
 // «Двадцатка» без базы: рейтинг по картам, коронная карта, роли, форма, номинации, рекорды, связки, перевес для вето.
 // Запуск: npx tsx scripts/test-twenty.mts
-import { ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
+import { eloFit, playerStrength, teamBalance, ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -116,6 +116,23 @@ const jan = buildTwenty(games, stats, { now: Date.parse("2027-01-10T12:00:00Z") 
 check(jan.seasons[0].finished && jan.seasons[0].podium.map((x) => x.steam_id)[0] === "ACE" && jan.seasons[0].podium[0].prize === SEASON_PRIZES[0], "после конца месяца у сезона есть призёры");
 check(jan.achievements("ACE").find((x) => x.key === "champion")!.earned && jan.achievements("X").find((x) => x.key === "podium")!.earned && !jan.achievements("X").find((x) => x.key === "champion")!.earned, "достижения «чемпион сезона» и «призёр сезона» выдаются по завершённым сезонам");
 check(jan.rows.every((r) => r.qualified && r.prize === null), "за всё время зачёта и призов нет");
+
+// ───────────────────────── баланс составов
+const fitRows = Array.from({ length: 10 }, (_, i) => ({ rating: 0.9 + i * 0.04, maps: 8, elo: 2000 + i * 100 }));
+const fit = eloFit(fitRows)!;
+check(Math.abs(fit.perPoint - 0.0004) < 1e-9 && Math.abs(fit.elo - 2450) < 1e-9, "связь ELO и рейтинга: +100 ELO = +0.04 рейтинга");
+check(eloFit(fitRows.slice(0, 5)) === null && eloFit(fitRows.map((r) => ({ ...r, maps: 2 }))) === null, "по малому числу игроков связь не строится");
+check(playerStrength({ rating: 1.3, maps: 10 }, 1500, fit).by === "mix" && playerStrength({ rating: 1.3, maps: 10 }, 1500, fit).value === 1.3, "сила игрока — его рейтинг в Миксе, когда игр хватает");
+const newbie = playerStrength({ rating: 2.0, maps: 1 }, 2950, fit);
+check(newbie.by === "elo" && Math.abs(newbie.value - (fit.rating + 0.2)) < 1e-9, "одна удачная карта силой не считается — берётся оценка по ELO");
+check(playerStrength(null, null, fit).by === "none" && playerStrength(null, null, null).value < 1, "без истории и без ELO — чуть ниже среднего");
+const S = (v: number) => ({ value: v, by: "mix" as const });
+check(teamBalance([S(1), S(1)], [S(1), S(1), S(1)]) === null, "пока в команде меньше трёх игроков, составы не сравниваются");
+check(teamBalance([S(1), S(1.02), S(1)], [S(1.01), S(1), S(1)])!.level === "even" && teamBalance([S(1), S(1), S(1)], [S(1), S(1), S(1)])!.favored === null, "близкие составы — равны, перевеса ни у кого");
+const slight = teamBalance([S(1.05), S(1.05), S(1.05)], [S(1), S(1), S(1)])!;
+const clear = teamBalance([S(1), S(1), S(1)], [S(1.1), S(1.1), S(1.1)])!;
+check(slight.level === "slight" && slight.favored === 1 && clear.level === "clear" && clear.favored === 2, "небольшой и заметный перевес — у той команды, что сильнее");
+check(teamBalance([S(1), S(1), newbie], [S(1), S(1), S(1)])!.estimated === 1, "сколько игроков оценено не по Миксу — сообщается отдельно");
 
 if (failed) {
   console.error(`\nне прошло проверок: ${failed}`);

@@ -947,3 +947,63 @@ export function mapEdge(rows: { steam_id: string; byMap: Pick<MapCell, "map" | "
   };
   return Object.fromEntries(pool.map((map) => [map, { team1: avg(team1, map), team2: avg(team2, map) }])) as Record<string, { team1: { rating: number; known: number } | null; team2: { rating: number; known: number } | null }>;
 }
+
+// ───────────────────────── баланс составов
+
+/*
+ * Сила игрока для сравнения составов. Проверка на 19 сыгранных играх (24.11.2026, рейтинг считался без самой игры):
+ * рейтинг «Микса» угадал победителя в 14 играх, ELO FACEIT — в 13, а при заметном перевесе по ELO победитель
+ * угадан только в 3 случаях из 8. Поэтому основа — рейтинг «Микса», ELO — только для тех, у кого здесь мало игр.
+ * Выборка мала для процентов: показываем перевес словами, а не шансом на победу.
+ */
+
+/** С этого числа карт рейтингу игрока в «Миксе» доверяем больше, чем его ELO */
+export const STRENGTH_MIN_MAPS = 3;
+/** Разница средней силы составов: до первой — равны, до второй — небольшой перевес, дальше — заметный */
+export const BALANCE_SLIGHT = 0.03;
+export const BALANCE_CLEAR = 0.07;
+
+/** Как ELO FACEIT переводится в ожидаемый рейтинг «Микса»: по игрокам, у которых есть и то и другое */
+export type EloFit = { rating: number; elo: number; perPoint: number };
+
+export function eloFit(rows: { rating: number; maps: number; elo: number | null }[]): EloFit | null {
+  const pool = rows.filter((r) => r.maps >= 6 && r.elo);
+  if (pool.length < 8) return null;
+  const mx = mean(pool.map((r) => r.elo!));
+  const my = mean(pool.map((r) => r.rating));
+  const varX = pool.reduce((s, r) => s + (r.elo! - mx) ** 2, 0);
+  if (!varX) return null;
+  // отрицательной связи не допускаем: тогда ELO просто не используется
+  const perPoint = Math.max(0, pool.reduce((s, r) => s + (r.elo! - mx) * (r.rating - my), 0) / varX);
+  return { rating: my, elo: mx, perPoint };
+}
+
+export type Strength = { value: number; by: "mix" | "elo" | "none" };
+
+/** Сила игрока: его рейтинг в «Миксе», а пока игр мало — оценка по ELO; без ELO — чуть ниже среднего */
+export function playerStrength(mix: { rating: number; maps: number } | null, elo: number | null, fit: EloFit | null): Strength {
+  if (mix && mix.maps >= STRENGTH_MIN_MAPS) return { value: mix.rating, by: "mix" };
+  const base = fit?.rating ?? 1;
+  if (elo && fit) return { value: Math.max(0.6, Math.min(1.5, base + fit.perPoint * (elo - fit.elo))), by: "elo" };
+  return { value: base - 0.08, by: "none" };
+}
+
+export type Balance = {
+  team1: number;
+  team2: number;
+  /** у кого перевес (null — составы равны) */
+  favored: 1 | 2 | null;
+  level: "even" | "slight" | "clear";
+  /** у скольких игроков сила взята не из «Микса» */
+  estimated: number;
+};
+
+/** Сравнение двух составов; null — пока в какой-то команде меньше трёх игроков, сравнивать рано */
+export function teamBalance(a: Strength[], b: Strength[]): Balance | null {
+  if (a.length < 3 || b.length < 3) return null;
+  const team1 = mean(a.map((x) => x.value));
+  const team2 = mean(b.map((x) => x.value));
+  const gap = Math.abs(team1 - team2);
+  const level = gap < BALANCE_SLIGHT ? "even" : gap < BALANCE_CLEAR ? "slight" : "clear";
+  return { team1, team2, favored: level === "even" ? null : team1 > team2 ? 1 : 2, level, estimated: [...a, ...b].filter((x) => x.by !== "mix").length };
+}

@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
-import { buildTwenty, currentSeason, mapEdge, type CoreGame, type CoreStat, type RoleKey, type TwentyScope } from "./twenty-core";
+import { buildTwenty, currentSeason, eloFit, mapEdge, type EloFit, type CoreGame, type CoreStat, type RoleKey, type TwentyScope } from "./twenty-core";
 
 /*
  * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
@@ -12,7 +12,7 @@ export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relatio
 
 export type TwentyEvening = { code: string; finished_at: string; matches: number };
 export type TwentyPlayer = { nickname: string; avatar_url: string | null };
-export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer> };
+export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer>; elo: Record<string, number> };
 
 type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
 type StatRow = Pick<CoreStat, "game_id" | "map_number" | "steam_id" | "name" | "team" | "kills" | "deaths" | "assists" | "damage" | "headshot_kills" | "rounds_played" | "kast" | "mvp" | "clutch_wins" | "first_kills"> & { raw: Record<string, unknown> | null };
@@ -69,11 +69,15 @@ export async function loadTwentyData(): Promise<TwentyData> {
 
   const steamIds = [...new Set(stats.map((s) => s.steam_id))];
   const players: Record<string, TwentyPlayer> = {};
+  const elo: Record<string, number> = {};
   for (let i = 0; i < steamIds.length; i += 200) {
-    const { data: rows } = await db().from("players").select("steam_id, nickname, avatar_url").in("steam_id", steamIds.slice(i, i + 200));
-    for (const p of rows ?? []) players[p.steam_id] = { nickname: p.nickname, avatar_url: p.avatar_url };
+    const { data: rows } = await db().from("players").select("steam_id, nickname, avatar_url, faceit_elo").in("steam_id", steamIds.slice(i, i + 200));
+    for (const p of rows ?? []) {
+      players[p.steam_id] = { nickname: p.nickname, avatar_url: p.avatar_url };
+      if (p.faceit_elo) elo[p.steam_id] = p.faceit_elo;
+    }
   }
-  return { games, stats, players };
+  return { games, stats, players, elo };
 }
 
 /**
@@ -127,28 +131,35 @@ export async function getTwenty(opts: TwentyScope = {}) {
 }
 
 /** Короткая справка по игроку для комнаты лобби: рейтинг, роль, коронная карта и рейтинг по картам */
-export type TwentyBrief = { rating: number; maps: number; role: RoleKey | null; best: { map: string; rating: number } | null; byMap: { map: string; rating: number; rounds: number }[] };
+export type TwentyBrief = { rating: number; maps: number; wins: number; matches: number; kd: number; adr: number; hsPct: number; role: RoleKey | null; best: { map: string; rating: number } | null; byMap: { map: string; rating: number; rounds: number }[] };
 
 /**
  * Справки по всем игрокам «Двадцатки» — комната лобби опрашивается раз в 1,5 с, поэтому результат лежит в кэше 5 минут:
  * подсказки капитанам не обязаны меняться в ту же секунду, когда закончилась карта.
  */
 export const twentyBriefs = unstable_cache(
-  async (): Promise<Record<string, TwentyBrief>> => {
+  async (): Promise<{ players: Record<string, TwentyBrief>; fit: EloFit | null }> => {
     const data = await loadTwentyData();
     const out: Record<string, TwentyBrief> = {};
-    for (const r of buildTwenty(data.games, data.stats).rows) {
+    const rows = buildTwenty(data.games, data.stats).rows;
+    for (const r of rows) {
       out[r.steam_id] = {
         rating: Math.round(r.rating * 100) / 100,
         maps: r.maps,
+        wins: r.wins,
+        matches: r.matches,
+        kd: Math.round(r.kd * 100) / 100,
+        adr: Math.round(r.adr),
+        hsPct: Math.round(r.hsPct),
         role: r.role,
         best: r.best ? { map: r.best.map, rating: Math.round(r.best.rating * 100) / 100 } : null,
         byMap: r.byMap.map((c) => ({ map: c.map, rating: c.rating, rounds: c.rounds })),
       };
     }
-    return out;
+    // связь ELO → рейтинг нужна, чтобы оценить силу тех, кто в «Миксе» ещё почти не играл
+    return { players: out, fit: eloFit(rows.map((r) => ({ rating: r.rating, maps: r.maps, elo: data.elo[r.steam_id] ?? null }))) };
   },
-  ["twenty-briefs", "v1"],
+  ["twenty-briefs", "v3"],
   { revalidate: 300 },
 );
 

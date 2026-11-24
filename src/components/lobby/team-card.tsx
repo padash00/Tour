@@ -93,7 +93,10 @@ export function TeamCard({
       {/* карточка не обрезает содержимое: меню игрока выходит за её край; низ последней строки скругляем сами */}
       <div className="divide-y divide-line-subtle [&>*:last-child]:rounded-b-surface">
         {members.map((m) => (
-          <PlayerLine key={m.id} m={m} view={view} isHost={isHost} run={run} code={code} big captain={m.id === captain} />
+          <div key={m.id}>
+            <PlayerLine m={m} view={view} isHost={isHost} run={run} code={code} big captain={m.id === captain} />
+            <MixStats mix={m.mix} />
+          </div>
         ))}
         {bots.map((b) => (
           <div key={b} className="flex h-[64px] items-center gap-3 px-4">
@@ -122,6 +125,37 @@ export function TeamCard({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Цифры игрока из «Микса» под его строкой в составе — как в комнате матча: капитан сразу видит, кто как играет.
+ * Те, кто в «Миксе» ещё не играл, отмечены отдельно, чтобы пустая строка не выглядела как нулевая статистика.
+ */
+function MixStats({ mix }: { mix: ViewMember["mix"] }) {
+  const t = useT();
+  if (!mix) return <div className="px-4 pb-2.5 text-[12px] text-fg-4">{t("В Миксе ещё не играл")}</div>;
+  const cells: [string, string, string?][] = [
+    [String(mix.maps), t("Карт")],
+    [mix.matches ? `${Math.round((100 * mix.wins) / mix.matches)}%` : "—", t("Побед")],
+    [mix.rating.toFixed(2), t("Рейтинг"), mix.rating >= 1.15 ? "text-ok" : mix.rating >= 1 ? "text-fg" : "text-fg-3"],
+    [mix.kd.toFixed(2), "K/D"],
+    [String(mix.adr), "ADR"],
+    [`${mix.hsPct}%`, "HS%"],
+  ];
+  return (
+    <div className="grid grid-cols-[repeat(6,auto)_minmax(0,1fr)] items-end gap-x-3.5 overflow-hidden px-4 pb-2.5 sm:gap-x-4" title={t("Статистика игрока в Миксе")}>
+      {cells.map(([value, label, tone]) => (
+        <span key={label}>
+          <span className={cn("num block text-[14px] font-bold leading-tight", tone ?? "text-fg")}>{value}</span>
+          <span className="block whitespace-nowrap text-[10.5px] leading-tight text-fg-3">{label}</span>
+        </span>
+      ))}
+      <span className="min-w-0 text-right">
+        <span className="block truncate text-[13px] font-bold leading-tight text-gold">{mix.best ? mapLabel(mix.best.map) : "—"}</span>
+        <span className="block truncate text-[10.5px] leading-tight text-fg-3">{mix.role ? t(ROLES[mix.role].label) : t("Карта")}</span>
+      </span>
     </div>
   );
 }
@@ -192,7 +226,7 @@ export function PlayerLine({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">
           {m.tier && <TierBadge tier={m.tier} />}
           {m.faceit_elo ? <span className="num whitespace-nowrap">{m.faceit_elo} ELO</span> : <span className="whitespace-nowrap">{t("без FACEIT")}</span>}
-          {m.mix && (
+          {m.mix && !big && (
             <span
               className="num whitespace-nowrap rounded-chip bg-gold/[0.14] px-1.5 text-[11px] font-semibold leading-[18px] text-gold"
               title={[t("Рейтинг в Миксе: {n}", { n: m.mix.rating.toFixed(2) }), m.mix.role ? t(ROLES[m.mix.role].label) : null, m.mix.best ? t("коронная карта — {map} ({n})", { map: mapLabel(m.mix.best.map), n: m.mix.best.rating.toFixed(2) }) : null].filter(Boolean).join(" · ")}
