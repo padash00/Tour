@@ -76,7 +76,7 @@ const RADAR_COLORS = ["text-accent", "text-warn"];
  */
 export function Radar({ series, t, size = 280 }: { series: { name: string; values: Record<RadarKey, number> }[]; t: T; size?: number }) {
   const c = size / 2;
-  const r = size / 2 - 46;
+  const r = size / 2 - 58;
   const n = RADAR_AXES.length;
   const at = (i: number, v: number) => {
     const a = (Math.PI * 2 * i) / n - Math.PI / 2;
@@ -95,7 +95,7 @@ export function Radar({ series, t, size = 280 }: { series: { name: string; value
         return (
           <g key={a.key}>
             <line x1={c} y1={c} x2={x} y2={y} stroke="var(--color-line-subtle)" strokeWidth={1} />
-            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-fg-3 text-[11px] font-semibold">
+            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" className="fill-fg-2 text-[12px] font-semibold">
               <title>{t(a.hint)}</title>
               {t(a.label)}
             </text>

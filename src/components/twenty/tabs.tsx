@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Avatar, EmptyState, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { MapThumb } from "@/components/lobby/settings";
@@ -9,7 +10,7 @@ import type { T } from "@/lib/i18n/core";
 import { mapLabel } from "@/lib/maps";
 import { DUO_MIN, MAP_MIN, NOMINATIONS, RADAR_AXES, RECORDS, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type Duo, type MapBoard, type Nomination, type RecordItem, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
 import type { TwentyPlayer } from "@/lib/twenty";
-import { BestMapChip, Radar, RadarLegend, RatingPill, RoleChip, Streak, Trend, heatTone } from "./bits";
+import { BestMapChip, Radar, RatingPill, RoleChip, Streak, Trend, heatTone } from "./bits";
 
 /* Вкладки раздела «Микс». Все — серверные: данные и переводчик приходят со страницы. */
 
@@ -306,6 +307,48 @@ export function MapsTab({ boards, rows, who, t, images, selected, href, meSteamI
 
 // ───────────────────────── стиль игры
 
+/** цвета сторон сравнения — те же, что у фигур на паутинке */
+const SIDE_BG = ["bg-accent", "bg-warn"];
+
+function CompareGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mt-2 first-of-type:mt-0">
+      <div className="border-b border-line-subtle pb-2 pt-3 text-center text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{title}</div>
+      <div className="divide-y divide-line-subtle">{children}</div>
+    </div>
+  );
+}
+
+/** Строка сравнения: число слева и справа, между ними подпись и полоска — чья доля больше. null — у игрока значения нет */
+function CompareRow({ label, a, b, show, neutral }: { label: string; a: number | null; b: number | null; show: (v: number) => string; neutral?: boolean }) {
+  const both = a != null && b != null;
+  const sum = (a ?? 0) + (b ?? 0);
+  const share = both && sum > 0 ? Math.max(6, Math.min(94, (100 * (a ?? 0)) / sum)) : 50;
+  const win = neutral || !both || a === b ? 0 : (a ?? 0) > (b ?? 0) ? 1 : 2;
+  const value = (v: number | null, side: 1 | 2) => (
+    <span className={cn("num text-[17px]", side === 1 ? "text-right" : "text-left", v == null ? "text-fg-4" : win === side ? "font-extrabold text-fg" : win === 0 ? "font-semibold text-fg-2" : "font-medium text-fg-3")}>{v == null ? "—" : show(v)}</span>
+  );
+  return (
+    <div className="grid grid-cols-[64px_minmax(0,1fr)_64px] items-center gap-4 py-2.5">
+      {value(a, 1)}
+      <div className="min-w-0">
+        <div className="truncate text-center text-meta text-fg-2">{label}</div>
+        <div className="mt-1.5 flex h-1.5 gap-[3px]" aria-hidden>
+          {both ? (
+            <>
+              <span className={cn("rounded-full", SIDE_BG[0], win === 2 && "opacity-35")} style={{ width: `${share}%` }} />
+              <span className={cn("flex-1 rounded-full", SIDE_BG[1], win === 1 && "opacity-35")} />
+            </>
+          ) : (
+            <span className="flex-1 rounded-full bg-ink/[0.06]" />
+          )}
+        </div>
+      </div>
+      {value(b, 2)}
+    </div>
+  );
+}
+
 const ROLE_ORDER: RoleKey[] = ["fragger", "entry", "multi", "clutch", "headshot", "support", "survivor", "bomber", "stable", "universal"];
 
 export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who: Who; t: T; a: string | null; b: string | null; href: (params: Record<string, string>) => string }) {
@@ -331,7 +374,8 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
     [t("Побед в матчах"), (r) => pct(r.wins, r.matches), (v) => `${v}%`],
     [t("Карт сыграно"), (r) => r.maps, (v) => String(v), true],
   ];
-  const sharedMaps = [...new Set(pair.flatMap((r) => r.byMap.map((c) => c.map)))];
+  const hasMap = (r: TwentyRow, m: string) => r.byMap.some((c) => c.map === m);
+  const sharedMaps = [...new Set(pair.flatMap((r) => r.byMap.map((c) => c.map)))].sort((x, y) => Number(hasMap(first, y) && hasMap(second, y)) - Number(hasMap(first, x) && hasMap(second, x)));
   const byRole = ROLE_ORDER.map((role) => ({ role, list: styled.filter((r) => r.role === role) })).filter((g) => g.list.length);
 
   return (
@@ -348,56 +392,40 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
             <SelectNav value={second.steam_id} options={options("b")} label={t("Второй игрок")} />
           </div>
         </div>
-        <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-          <div>
-            <Radar t={t} series={pair.map((r, i) => ({ name: names[i], values: r.radar! }))} />
-            <div className="mt-2">
-              <RadarLegend names={names} />
-            </div>
+        <div className="mt-6 grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+          <div className="lg:sticky lg:top-24">
+            <Radar t={t} size={400} series={pair.map((r, i) => ({ name: names[i], values: r.radar! }))} />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[15px]">
-              <thead>
-                <tr>
-                  {pair.map((r, i) => [
-                    i === 1 ? <th key="mid" style={{ width: "30%" }} /> : null,
-                    <th key={r.steam_id} className={cn("pb-3 font-semibold", i === 0 ? "text-right" : "text-left")} style={{ width: "35%" }}>
-                      <Link href={`/players/${r.steam_id}`} className={cn("inline-flex items-center gap-2 text-fg hover:text-accent", i === 0 && "flex-row-reverse")}>
-                        <Avatar src={who(r.steam_id, r.name).avatar_url} name={names[i]} size="sm" />
-                        <span className="max-w-[160px] truncate">{names[i]}</span>
-                      </Link>
-                      <div className={cn("mt-1.5 flex", i === 0 && "justify-end")}>
-                        <RoleChip role={r.role} t={t} />
-                      </div>
-                    </th>,
-                  ])}
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map(([label, f, show, neutral]) => {
-                  const va = f(first);
-                  const vb = f(second);
-                  return (
-                    <tr key={label} className="border-t border-line-subtle">
-                      <td className={cn("num py-2.5 text-right text-[16px] font-semibold", !neutral && va > vb ? "text-ok" : "text-fg-2")}>{show(va)}</td>
-                      <td className="px-3 py-2.5 text-center text-meta text-fg-3">{label}</td>
-                      <td className={cn("num py-2.5 text-left text-[16px] font-semibold", !neutral && vb > va ? "text-ok" : "text-fg-2")}>{show(vb)}</td>
-                    </tr>
-                  );
-                })}
-                {sharedMaps.map((m) => {
-                  const ca = first.byMap.find((c) => c.map === m);
-                  const cb = second.byMap.find((c) => c.map === m);
-                  return (
-                    <tr key={m} className="border-t border-line-subtle">
-                      <td className={cn("num py-2.5 text-right text-[16px] font-semibold", ca && cb && ca.rating > cb.rating ? "text-ok" : "text-fg-2")}>{ca ? ca.rating.toFixed(2) : "—"}</td>
-                      <td className="px-3 py-2.5 text-center text-meta text-fg-3">{mapLabel(m)}</td>
-                      <td className={cn("num py-2.5 text-left text-[16px] font-semibold", ca && cb && cb.rating > ca.rating ? "text-ok" : "text-fg-2")}>{cb ? cb.rating.toFixed(2) : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="mx-auto w-full max-w-[640px]">
+            {/* шапка: цвет точки — тот же, что у фигуры игрока на паутинке и у его половины полосок */}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pb-4">
+              {pair.map((r, i) => [
+                i === 1 ? <span key="vs" className="text-meta font-semibold text-fg-3">vs</span> : null,
+                <Link key={r.steam_id} href={`/players/${r.steam_id}`} className={cn("group flex min-w-0 items-center gap-3", i === 1 && "flex-row-reverse text-right")}>
+                  <Avatar src={who(r.steam_id, r.name).avatar_url} name={names[i]} size="md" />
+                  <span className="min-w-0">
+                    <span className={cn("flex min-w-0 items-center gap-2", i === 1 && "flex-row-reverse")}>
+                      <span className={cn("size-2.5 shrink-0 rounded-full", SIDE_BG[i])} />
+                      <span className="truncate text-[16px] font-bold text-fg group-hover:text-accent">{names[i]}</span>
+                    </span>
+                    <span className={cn("mt-1 flex", i === 1 && "justify-end")}>
+                      <RoleChip role={r.role} t={t} />
+                    </span>
+                  </span>
+                </Link>,
+              ])}
+            </div>
+
+            <CompareGroup title={t("Показатели")}>
+              {metrics.map(([label, f, show, neutral]) => (
+                <CompareRow key={label} label={label} a={f(first)} b={f(second)} show={show} neutral={neutral} />
+              ))}
+            </CompareGroup>
+            <CompareGroup title={t("Рейтинг по картам")}>
+              {sharedMaps.map((m) => (
+                <CompareRow key={m} label={mapLabel(m)} a={first.byMap.find((c) => c.map === m)?.rating ?? null} b={second.byMap.find((c) => c.map === m)?.rating ?? null} show={(v) => v.toFixed(2)} />
+              ))}
+            </CompareGroup>
           </div>
         </div>
       </section>
