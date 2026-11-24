@@ -637,6 +637,38 @@ export type Database = {
           },
         ]
       }
+      lobby_log_batches: {
+        Row: {
+          created_at: string
+          events: Json
+          game_id: string
+          id: number
+          key: string
+        }
+        Insert: {
+          created_at?: string
+          events: Json
+          game_id: string
+          id?: number
+          key: string
+        }
+        Update: {
+          created_at?: string
+          events?: Json
+          game_id?: string
+          id?: number
+          key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_log_batches_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "lobby_games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lobby_members: {
         Row: {
           joined_at: string
@@ -967,6 +999,59 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lobby_round_facts: {
+        Row: {
+          first_deaths: number
+          first_kills: number
+          flash_assists: number
+          game_id: string
+          kast: number
+          map_number: number
+          rounds: number
+          sides: Json
+          steam_id: string
+          trade_kills: number
+          updated_at: string
+          weapons: Json
+        }
+        Insert: {
+          first_deaths?: number
+          first_kills?: number
+          flash_assists?: number
+          game_id: string
+          kast?: number
+          map_number: number
+          rounds?: number
+          sides?: Json
+          steam_id: string
+          trade_kills?: number
+          updated_at?: string
+          weapons?: Json
+        }
+        Update: {
+          first_deaths?: number
+          first_kills?: number
+          flash_assists?: number
+          game_id?: string
+          kast?: number
+          map_number?: number
+          rounds?: number
+          sides?: Json
+          steam_id?: string
+          trade_kills?: number
+          updated_at?: string
+          weapons?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lobby_round_facts_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "lobby_games"
             referencedColumns: ["id"]
           },
         ]

@@ -114,6 +114,23 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
                 </span>
               </Link>
             )}
+            {row.sides && (
+              <div>
+                <h3 className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("Стороны")}</h3>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {([["ct", t("Защита"), "text-side-ct"], ["t", t("Атака"), "text-side-t"]] as const).map(([key, label, tone]) => {
+                    const s = row.sides![key];
+                    return (
+                      <div key={key} className="rounded-control border border-line-subtle px-3 py-2.5">
+                        <div className={cn("text-micro font-bold uppercase tracking-[0.1em]", tone)}>{label}</div>
+                        <div className="num mt-1 text-[18px] font-extrabold leading-none text-fg">K/D {s.kd.toFixed(2)}</div>
+                        <div className="num mt-1.5 text-micro text-fg-3">{t("раундов выиграно: {n}%", { n: s.rounds ? Math.round((100 * s.wins) / s.rounds) : 0 })}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <dl className="grid grid-cols-3 gap-3 text-center">
               {[
                 [t("Клатчи"), row.clutches],

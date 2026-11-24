@@ -154,7 +154,7 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
 
   return Promise.all(commands.map(async (c) => {
     if (c.type === "load_match" && c.payload.lobby) {
-      // игра лобби: без HTTP-лога (раунды для Swing не нужны), cvars из настроек лобби
+      // игра лобби: HTTP-лог нужен для статистики раундов (первые убийства, KAST, оружие, стороны); cvars — из настроек лобби
       return {
         ...c,
         payload: {
@@ -163,6 +163,7 @@ export async function takePendingCommands(siteOrigin: string, replay = false) {
           header_key: MATCHZY_HEADER,
           header_value: token,
           events_url: `${siteOrigin}/api/matchzy/events`,
+          log_url: `${siteOrigin}/api/cs2/log?${signedLogQuery(String(c.payload.matchzy_id), token)}`,
           post_cmds: [],
           enforce: await lobbyEnforce(String(c.payload.match_id)),
         },

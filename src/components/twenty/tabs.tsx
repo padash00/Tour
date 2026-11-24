@@ -382,7 +382,7 @@ function CompareRow({ label, a, b, show, neutral }: { label: string; a: number |
   );
 }
 
-const ROLE_ORDER: RoleKey[] = ["fragger", "entry", "multi", "clutch", "headshot", "support", "survivor", "bomber", "stable", "universal"];
+const ROLE_ORDER: RoleKey[] = ["fragger", "sniper", "entry", "multi", "clutch", "headshot", "support", "survivor", "bomber", "stable", "universal"];
 
 export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who: Who; t: T; a: string | null; b: string | null; href: (params: Record<string, string>) => string }) {
   const styled = rows.filter((r) => r.radar && r.role);
@@ -406,6 +406,16 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
     [t("Побед в матчах"), (r) => pct(r.wins, r.matches), (v) => `${v}%`],
     [t("Карт сыграно"), (r) => r.maps, (v) => String(v), true],
   ];
+  // из лога раундов — только когда он есть у обоих: иначе сравнение с нулём ничего не значит
+  if (pair.every((r) => r.sides)) {
+    metrics.splice(
+      metrics.length - 2,
+      0,
+      [t("Первых убийств за карту"), (r) => r.entries / r.maps, (v) => v.toFixed(2)],
+      [t("K/D за защиту"), (r) => r.sides!.ct.kd, (v) => v.toFixed(2)],
+      [t("K/D за атаку"), (r) => r.sides!.t.kd, (v) => v.toFixed(2)],
+    );
+  }
   const hasMap = (r: TwentyRow, m: string) => r.byMap.some((c) => c.map === m);
   const sharedMaps = [...new Set(pair.flatMap((r) => r.byMap.map((c) => c.map)))].sort((x, y) => Number(hasMap(first, y) && hasMap(second, y)) - Number(hasMap(first, x) && hasMap(second, x)));
   const byRole = ROLE_ORDER.map((role) => ({ role, list: styled.filter((r) => r.role === role) })).filter((g) => g.list.length);

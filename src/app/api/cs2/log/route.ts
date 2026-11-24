@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifyLogSignature } from "@/lib/server/ingest-signature";
 import { claimIngest, completeIngest, ingestKey, releaseIngest } from "@/lib/server/ops";
 import { ingestLog } from "@/lib/swing-ingest";
+import { ingestLobbyLog } from "@/lib/lobby-rounds";
 import { scanDisconnects } from "@/lib/server/disconnect-guard";
 
 /**
@@ -25,7 +26,9 @@ export async function POST(request: NextRequest) {
   if (claim.status === "done") return NextResponse.json({ ok: true, duplicate: true });
   if (claim.status === "busy" || !claim.token) return NextResponse.json({ error: "processing" }, { status: 503, headers: { "Retry-After": "5" } });
   try {
-    const result = await ingestLog(matchzyId, body, { key, token: claim.token });
+    let result: object = await ingestLog(matchzyId, body, { key, token: claim.token });
+    // не турнирный матч — возможно, игра лобби: её раунды нужны для статистики «Микса»
+    if ("ignored" in result && result.ignored === "unknown match") result = (await ingestLobbyLog(matchzyId, body, key)) ?? result;
     await completeIngest(key, claim.token);
     // вылеты игроков: переигровка раунда по п. 5.8.1 (своя ошибка не ломает приём журнала)
     await scanDisconnects(matchzyId, body).catch((e) => console.error("disconnect guard", e));

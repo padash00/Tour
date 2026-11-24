@@ -18,7 +18,7 @@ function game(id: string, at: string, code: string | null, maps: [string, 1 | 2]
   maps.forEach((_, i) => {
     for (const [team, list] of [[1, team1], [2, team2]] as const)
       for (const { id: steam, k, d, ...rest } of list)
-        stats.push({ game_id: id, map_number: i + base, steam_id: steam, name: steam, team, kills: k, deaths: d, assists: 3, damage: k * 100, headshot_kills: Math.round(k / 2), rounds_played: 20, kast: 0, mvp: 1, clutch_wins: 0, first_kills: 0, k3: 0, k4: 0, k5: 0, utility_damage: 20, enemies_flashed: 2, bomb_plants: 1, bomb_defuses: 0, ...rest });
+        stats.push({ game_id: id, map_number: i + base, steam_id: steam, name: steam, team, kills: k, deaths: d, assists: 3, damage: k * 100, headshot_kills: Math.round(k / 2), rounds_played: 20, kast: 0, mvp: 1, clutch_wins: 0, first_kills: 0, k3: 0, k4: 0, k5: 0, utility_damage: 20, enemies_flashed: 2, bomb_plants: 1, bomb_defuses: 0, first_deaths: 0, trade_kills: 0, sniper_kills: 0, ct_rounds: 0, ct_wins: 0, ct_kills: 0, ct_deaths: 0, t_rounds: 0, t_wins: 0, t_kills: 0, t_deaths: 0, ...rest });
   });
 }
 const p = (id: string, k: number, d: number, extra: Partial<CoreStat> = {}): P => ({ id, k, d, ...extra });

@@ -42,6 +42,19 @@ export type CoreStat = {
   enemies_flashed: number;
   bomb_plants: number;
   bomb_defuses: number;
+  // из лога раундов; у игр, сыгранных до его включения, — нули
+  first_deaths: number;
+  trade_kills: number;
+  /** убийства из снайперских винтовок */
+  sniper_kills: number;
+  ct_rounds: number;
+  ct_wins: number;
+  ct_kills: number;
+  ct_deaths: number;
+  t_rounds: number;
+  t_wins: number;
+  t_kills: number;
+  t_deaths: number;
 };
 
 // ───────────────────────── пороги
@@ -84,9 +97,22 @@ type Sum = {
   flashed: number;
   plants: number;
   defuses: number;
+  /** раунды карт, по которым KAST известен: на остальных картах его нет, и делить на все раунды нельзя */
+  kastRounds: number;
+  firstDeaths: number;
+  trades: number;
+  sniper: number;
+  ctR: number;
+  ctW: number;
+  ctK: number;
+  ctD: number;
+  tR: number;
+  tW: number;
+  tK: number;
+  tD: number;
 };
 
-const zero = (): Sum => ({ maps: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, hs: 0, kast: 0, mvp: 0, clutches: 0, firstKills: 0, k3: 0, k4: 0, k5: 0, utility: 0, flashed: 0, plants: 0, defuses: 0 });
+const zero = (): Sum => ({ maps: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, hs: 0, kast: 0, mvp: 0, clutches: 0, firstKills: 0, k3: 0, k4: 0, k5: 0, utility: 0, flashed: 0, plants: 0, defuses: 0, kastRounds: 0, firstDeaths: 0, trades: 0, sniper: 0, ctR: 0, ctW: 0, ctK: 0, ctD: 0, tR: 0, tW: 0, tK: 0, tD: 0 });
 
 function add(a: Sum, s: CoreStat) {
   a.maps++;
@@ -107,15 +133,28 @@ function add(a: Sum, s: CoreStat) {
   a.flashed += s.enemies_flashed;
   a.plants += s.bomb_plants;
   a.defuses += s.bomb_defuses;
+  if (s.kast > 0) a.kastRounds += s.rounds_played;
+  a.firstDeaths += s.first_deaths;
+  a.trades += s.trade_kills;
+  a.sniper += s.sniper_kills;
+  a.ctR += s.ct_rounds;
+  a.ctW += s.ct_wins;
+  a.ctK += s.ct_kills;
+  a.ctD += s.ct_deaths;
+  a.tR += s.t_rounds;
+  a.tW += s.t_wins;
+  a.tK += s.t_kills;
+  a.tD += s.t_deaths;
 }
 
 /** Та же база, что у рейтинга турниров (аппроксимация HLTV 2.0): средний игрок ≈ 1.00 */
-export function ratingOf(a: Pick<Sum, "rounds" | "kills" | "deaths" | "assists" | "damage" | "kast" | "clutches">) {
+export function ratingOf(a: Pick<Sum, "rounds" | "kills" | "deaths" | "assists" | "damage" | "kast" | "clutches"> & { kastRounds?: number }) {
   if (!a.rounds) return 0;
   const r = a.rounds;
   const kpr = a.kills / r;
   // KAST приходит не со всех матчей: без него берём типичные 70%, чтобы рейтинг оставался около 1.00
-  const kast = a.kast > 0 ? (100 * a.kast) / r : 70;
+  // KAST известен не по всем картам: доля считается по тем раундам, где он есть
+  const kast = a.kast > 0 ? (100 * a.kast) / (a.kastRounds || r) : 70;
   const impact = 2.13 * kpr + (0.42 * a.assists) / r - 0.41 + (1.5 * a.clutches) / r;
   return 0.0073 * kast + 0.3591 * kpr - (0.5329 * a.deaths) / r + 0.2372 * impact + (0.0032 * a.damage) / r + 0.1587;
 }
@@ -124,9 +163,10 @@ export function ratingOf(a: Pick<Sum, "rounds" | "kills" | "deaths" | "assists" 
 
 export type MapCell = { map: string; maps: number; wins: number; rounds: number; kills: number; deaths: number; kd: number; adr: number; hsPct: number; rating: number };
 
-export type RoleKey = "fragger" | "entry" | "clutch" | "support" | "headshot" | "multi" | "survivor" | "bomber" | "stable" | "universal";
+export type RoleKey = "fragger" | "sniper" | "entry" | "clutch" | "support" | "headshot" | "multi" | "survivor" | "bomber" | "stable" | "universal";
 export const ROLES: Record<RoleKey, { label: string; hint: string }> = {
   fragger: { label: tr("Фраггер"), hint: tr("Больше всех убивает за раунд") },
+  sniper: { label: tr("Снайпер"), hint: tr("Большая доля убийств из AWP и других снайперских винтовок") },
   entry: { label: tr("Открывашка"), hint: tr("Чаще других делает первое убийство в раунде") },
   clutch: { label: tr("Клатчер"), hint: tr("Выигрывает раунды, оставшись один") },
   support: { label: tr("Опорник"), hint: tr("Ассисты, ослепления и урон гранатами") },
@@ -174,6 +214,14 @@ export type TwentyRow = {
   aces: number;
   utility: number;
   flashed: number;
+  /** первые убийства и первые смерти в раунде, размены; нули — лог раундов для этих игр не вёлся */
+  entries: number;
+  entryDeaths: number;
+  trades: number;
+  /** доля убийств из снайперских винтовок, 0–1 */
+  sniperShare: number;
+  /** игра за защиту и за атаку (null — лог раундов не вёлся) */
+  sides: Record<"ct" | "t", { rounds: number; wins: number; kills: number; deaths: number; kd: number }> | null;
   /** по картам: лучшая сверху */
   byMap: MapCell[];
   /** коронная и слабая карта (от MAP_MIN игр на карте) */
@@ -293,7 +341,7 @@ function toLines(games: CoreGame[], stats: CoreStat[]): Line[] {
     const m = game.maps[s.map_number - (base.get(s.game_id) ?? 0)] ?? null;
     const winner = m ? (m.winner ?? (m.team1_score > m.team2_score ? 1 : m.team2_score > m.team1_score ? 2 : null)) : null;
     const [scoreFor, scoreAgainst] = m ? (s.team === 1 ? [m.team1_score, m.team2_score] : [m.team2_score, m.team1_score]) : [0, 0];
-    out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
+    out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins, kastRounds: s.rounds_played }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
   }
   return out;
 }
@@ -405,6 +453,9 @@ function styles(players: Player[]) {
   const hs = pool.map((p) => (p.sum.kills ? p.sum.hs / p.sum.kills : 0));
   const spread = pool.map((p) => stdev(p.lines.map((l) => l.rating)));
   const hasEntry = entry.some((x) => x > 0);
+  // снайпер — только тот, у кого из винтовки хотя бы каждое пятое убийство
+  const sniper = pool.map((p) => (p.sum.kills ? p.sum.sniper / p.sum.kills : 0));
+  const zSniper = zScores(sniper).map((x, i) => (sniper[i] >= 0.2 ? x : -9));
 
   const zk = zScores(kpr);
   const zd = zScores(dpr);
@@ -415,6 +466,7 @@ function styles(players: Player[]) {
   const fire = zScores(adr).map((x, i) => (x + zk[i]) / 2);
   const z: Record<Exclude<RoleKey, "universal" | "stable">, number[]> = {
     fragger: zk,
+    sniper: zSniper,
     entry: hasEntry ? zScores(entry) : entry.map(() => -9),
     clutch: zScores(clutch),
     support: zScores(support),
@@ -472,7 +524,7 @@ function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[]
         kd: a.deaths ? a.kills / a.deaths : a.kills,
         adr: a.damage / r,
         hsPct: a.kills ? (100 * a.hs) / a.kills : 0,
-        kast: a.kast > 0 ? (100 * a.kast) / r : 0,
+        kast: a.kast > 0 ? (100 * a.kast) / (a.kastRounds || r) : 0,
         mvp: a.mvp,
         rating: ratingOf(a),
         clutches: a.clutches,
@@ -480,6 +532,14 @@ function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[]
         aces: a.k5,
         utility: a.utility,
         flashed: a.flashed,
+        entries: a.firstKills,
+        entryDeaths: a.firstDeaths,
+        trades: a.trades,
+        sniperShare: a.kills ? a.sniper / a.kills : 0,
+        sides:
+          a.ctR + a.tR > 0
+            ? { ct: { rounds: a.ctR, wins: a.ctW, kills: a.ctK, deaths: a.ctD, kd: a.ctD ? a.ctK / a.ctD : a.ctK }, t: { rounds: a.tR, wins: a.tW, kills: a.tK, deaths: a.tD, kd: a.tD ? a.tK / a.tD : a.tK } }
+            : null,
         byMap,
         best: solid[0] ?? null,
         // слабая карта — только если есть с чем сравнить

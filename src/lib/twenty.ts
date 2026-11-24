@@ -15,7 +15,10 @@ export type TwentyPlayer = { nickname: string; avatar_url: string | null };
 export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer> };
 
 type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
-type StatRow = Omit<CoreStat, "k3" | "k4" | "k5" | "utility_damage" | "enemies_flashed" | "bomb_plants" | "bomb_defuses"> & { raw: Record<string, unknown> | null };
+type StatRow = Pick<CoreStat, "game_id" | "map_number" | "steam_id" | "name" | "team" | "kills" | "deaths" | "assists" | "damage" | "headshot_kills" | "rounds_played" | "kast" | "mvp" | "clutch_wins" | "first_kills"> & { raw: Record<string, unknown> | null };
+type SideFact = { rounds?: number; wins?: number; kills?: number; deaths?: number };
+type FactRow = { game_id: string; map_number: number; steam_id: string; kast: number; first_kills: number; first_deaths: number; trade_kills: number; weapons: Record<string, number> | null; sides: { CT?: SideFact; T?: SideFact } | null };
+const SNIPERS = ["awp", "ssg08", "scar20", "g3sg1"];
 
 /** Все сыгранные игры на банк со статистикой по картам и никами игроков */
 export async function loadTwentyData(): Promise<TwentyData> {
@@ -37,9 +40,30 @@ export async function loadTwentyData(): Promise<TwentyData> {
       .select("game_id, map_number, steam_id, name, team, kills, deaths, assists, damage, headshot_kills, rounds_played, kast, mvp, clutch_wins, first_kills, raw")
       .in("game_id", ids.slice(i, i + 15))
       .limit(1000);
+    // факты по раундам из лога сервера: то, чего MatchZy для лобби не присылает (у старых игр их нет)
+    const { data: factRows } = await db()
+      .from("lobby_round_facts")
+      .select("game_id, map_number, steam_id, kast, first_kills, first_deaths, trade_kills, weapons, sides")
+      .in("game_id", ids.slice(i, i + 15))
+      .limit(1000);
+    const facts = new Map(((factRows ?? []) as unknown as FactRow[]).map((f) => [`${f.game_id}:${f.map_number}:${f.steam_id}`, f]));
     for (const { raw, ...s } of (rows ?? []) as unknown as StatRow[]) {
       const n = (k: string) => Number(raw?.[k] ?? 0) || 0;
-      stats.push({ ...s, k3: n("3k"), k4: n("4k"), k5: n("5k"), utility_damage: n("utility_damage"), enemies_flashed: n("enemies_flashed"), bomb_plants: n("bomb_plants"), bomb_defuses: n("bomb_defuses") });
+      const f = facts.get(`${s.game_id}:${s.map_number}:${s.steam_id}`);
+      const ct = f?.sides?.CT ?? {};
+      const t = f?.sides?.T ?? {};
+      stats.push({
+        ...s,
+        // KAST и первые убийства — из лога, если MatchZy их не дал; KAST не больше числа сыгранных раундов
+        kast: s.kast || Math.min(f?.kast ?? 0, s.rounds_played),
+        first_kills: s.first_kills || (f?.first_kills ?? 0),
+        k3: n("3k"), k4: n("4k"), k5: n("5k"), utility_damage: n("utility_damage"), enemies_flashed: n("enemies_flashed"), bomb_plants: n("bomb_plants"), bomb_defuses: n("bomb_defuses"),
+        first_deaths: f?.first_deaths ?? 0,
+        trade_kills: f?.trade_kills ?? 0,
+        sniper_kills: SNIPERS.reduce((sum, w) => sum + (f?.weapons?.[w] ?? 0), 0),
+        ct_rounds: ct.rounds ?? 0, ct_wins: ct.wins ?? 0, ct_kills: ct.kills ?? 0, ct_deaths: ct.deaths ?? 0,
+        t_rounds: t.rounds ?? 0, t_wins: t.wins ?? 0, t_kills: t.kills ?? 0, t_deaths: t.deaths ?? 0,
+      });
     }
   }
 
