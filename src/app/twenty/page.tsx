@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentPlayer } from "@/lib/auth";
 import { cupTeams } from "@/lib/cup-core";
-import { playersNeeded } from "@/lib/lobby-settings";
 import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
@@ -15,6 +14,7 @@ import { RankBadge } from "@/components/public/data-table";
 import { BestMapChip, RoleChip, Streak, Trend } from "@/components/twenty/bits";
 import { SelectNav } from "@/components/public/select-nav";
 import { money } from "@/components/twenty/money";
+import { LiveGames } from "@/components/twenty/live-games";
 import { AchievementsTab, HallOfFame, SeasonBanner, seasonLabel } from "@/components/twenty/season";
 import { MapsTab, Nominations, RatingTable, RecordsTab, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
 
@@ -57,7 +57,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
   const season = code || allTime ? undefined : SEASON.test(str(sp.season)) ? str(sp.season) : nowSeason;
 
   const player = await getCurrentPlayer();
-  const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code, season }), listOpenLobbies(), player ? playerLobby(player.id) : null, tab === "maps" ? getMapImages() : {}]);
+  const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code, season }), listOpenLobbies(), player ? playerLobby(player.id) : null, getMapImages()]);
   const { rows, evenings, matches } = twenty;
   const who = whoOf(twenty.players);
   // игры на банк («Десятка») и большие лобби; комнаты отдельных матчей сетки не показываем — в них ведёт само лобби
@@ -116,6 +116,9 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </div>
       </header>
 
+      {/* идущая игра — первым экраном на любой вкладке: её не должны пропустить */}
+      {!code && <LiveGames games={open} images={images} t={t} mineCode={mine?.code ?? null} />}
+
       {(king || twenty.seasons.length > 0) && (
         <ContextNav
           match="tab"
@@ -173,27 +176,6 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             </section>
 
             <div className="flex flex-col gap-4">
-              {!code && (
-                <section aria-label={t("Идут сейчас")} className="rounded-surface border border-line-subtle bg-surface p-4">
-                  <h2 className="text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{t("Идут сейчас")}</h2>
-                  <div className="mt-3 flex flex-col gap-2">
-                    {open.length === 0 && <p className="text-meta text-fg-3">{t("Сейчас игр нет — соберите свою.")}</p>}
-                    {open.map((l) => (
-                      <Link key={l.code} href={`/lobby/${l.code}`} className="flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-shell/60 px-3 py-2.5 transition-colors hover:border-line-strong">
-                        <span className="min-w-0">
-                          <span className="block truncate text-[14px] font-semibold text-fg">
-                            <span className="num text-fg-3">#{l.code}</span> {l.host.nickname}
-                          </span>
-                          <span className="block truncate text-micro text-fg-3">
-                            {t("{n} игроков", { n: playersNeeded(l.settings) })} · BO{l.settings.best_of} · {l.status === "playing" ? t("идёт игра") : t("набор: {have} из {need}", { have: l.pool, need: playersNeeded(l.settings) })}
-                          </span>
-                        </span>
-                        <span className={cn("shrink-0 text-meta font-semibold", l.status === "playing" ? "text-live" : "text-accent")}>{l.status === "playing" ? t("Смотреть") : t("Войти")}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              )}
               {rows.slice(1, 3).map((r, i) => {
                 const p = who(r.steam_id, r.name);
                 return (
@@ -244,20 +226,6 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
       {!king && (tab === "rating" || twenty.records.length === 0) && (
         <>
-          {!code && open.length > 0 && (
-            <Section title={t("Идут сейчас")}>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {open.map((l) => (
-                  <Link key={l.code} href={`/lobby/${l.code}`} className="flex items-center justify-between gap-3 rounded-surface border border-line-subtle bg-surface px-4 py-3 transition-colors hover:border-line-strong">
-                    <span className="min-w-0 truncate text-[15px] font-semibold text-fg">
-                      <span className="num text-fg-3">#{l.code}</span> {l.host.nickname}
-                    </span>
-                    <span className={cn("shrink-0 text-meta font-medium", l.status === "playing" ? "text-live" : "text-accent")}>{l.status === "playing" ? t("Смотреть") : t("Войти")}</span>
-                  </Link>
-                ))}
-              </div>
-            </Section>
-          )}
           <EmptyState
             title={code ? t("В этом лобби ещё нет сыгранных матчей") : season ? t("В этом сезоне ещё не играли") : t("Рейтинга пока нет")}
             text={code ? t("Таблица появится после первой сыгранной карты.") : season ? t("Таблица сезона появится после первой сыгранной игры. Прошлые сезоны — в списке сверху.") : t("Он появится после первых сыгранных матчей.")}
