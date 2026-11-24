@@ -127,6 +127,8 @@ export function LobbyRoom({
   const isHost = !!me?.isHost || !!me?.isAdmin;
   const isMember = !!me?.slot;
   const editable = isHost && lobby.status === "waiting";
+  // куда ведёт «назад»: игра на банк, большое лобби и комнаты его матчей создаются в «Миксе» — туда и возвращаем
+  const home = s.pot || s.cup_of || view.teams.length > 2 ? { href: "/twenty", label: t("В Микс") } : { href: "/lobbies", label: t("К списку лобби") };
 
   const patch = useCallback(
     (p: Partial<LobbySettings>) => {
@@ -153,8 +155,8 @@ export function LobbyRoom({
   if (view.access === "closed_lobby") {
     return (
       <Gate title={t("Лобби закрыто")} text={t("Это лобби уже закрыто. Создайте новое или найдите открытое в списке.")}>
-        <Link href="/lobbies" className={btnClass("primary", "md")}>
-          {t("К списку лобби")}
+        <Link href={home.href} className={btnClass("primary", "md")}>
+          {home.label}
         </Link>
       </Gate>
     );
@@ -221,9 +223,9 @@ export function LobbyRoom({
               <div className="relative flex min-h-[148px] flex-col justify-between gap-6 p-3 sm:p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5">
-                    <Link href="/lobbies" className="inline-flex h-10 items-center gap-2 rounded-control bg-bg/70 px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
+                    <Link href={home.href} className="inline-flex h-10 items-center gap-2 rounded-control bg-bg/70 px-3 text-[14px] font-medium text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
                       {Icon.back("size-4")}
-                      <span className="hidden sm:inline">{t("К списку лобби")}</span>
+                      <span className="hidden sm:inline">{home.label}</span>
                     </Link>
                     {copyInvite && (
                       <button type="button" onClick={copyInvite} title={t("Скопировать ссылку-приглашение")} aria-label={t("Скопировать ссылку-приглашение")} className="grid size-10 place-items-center rounded-control bg-bg/70 text-fg backdrop-blur-sm transition-colors hover:bg-bg/90">
@@ -241,7 +243,7 @@ export function LobbyRoom({
                       onClick={() =>
                         run(async () => {
                           const r = await A.leaveLobby(code);
-                          if (!r?.error) router.push("/lobbies");
+                          if (!r?.error) router.push(home.href);
                           return r;
                         })
                       }

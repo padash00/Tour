@@ -72,7 +72,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
     });
 
   const trigger = () => {
-    if (!loggedIn) return router.push(`/login?next=${encodeURIComponent("/lobbies")}`);
+    if (!loggedIn) return router.push(`/login?next=${encodeURIComponent("/twenty")}`);
     setOpen(true);
   };
 
