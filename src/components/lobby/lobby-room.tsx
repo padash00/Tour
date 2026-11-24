@@ -22,6 +22,7 @@ import { CupBoard, CupBracket, CupRoomBanner, CupTeams, MyMatchBanner } from "./
 import { playersNeeded } from "@/lib/lobby-settings";
 import { phaseOf, useLobbyView, type Run } from "./use-lobby-view";
 import { useT } from "@/lib/i18n/client";
+import { useSetNavSection } from "@/components/shell/section";
 import { tr } from "@/lib/i18n/core";
 
 type Slot = ViewMember["slot"];
@@ -128,7 +129,9 @@ export function LobbyRoom({
   const isMember = !!me?.slot;
   const editable = isHost && lobby.status === "waiting";
   // куда ведёт «назад»: игра на банк, большое лобби и комнаты его матчей создаются в «Миксе» — туда и возвращаем
-  const home = s.pot || s.cup_of || view.teams.length > 2 ? { href: "/twenty", label: t("В Микс") } : { href: "/lobbies", label: t("К списку лобби") };
+  const mix = !!(s.pot || s.cup_of || view.teams.length > 2);
+  useSetNavSection(mix ? "/twenty" : null);
+  const home = mix ? { href: "/twenty", label: t("В Микс") } : { href: "/lobbies", label: t("К списку лобби") };
 
   const patch = useCallback(
     (p: Partial<LobbySettings>) => {

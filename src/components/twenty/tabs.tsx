@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Avatar, EmptyState, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { MapThumb } from "@/components/lobby/settings";
@@ -307,44 +307,44 @@ export function MapsTab({ boards, rows, who, t, images, selected, href, meSteamI
 
 // ───────────────────────── стиль игры
 
-/** цвета сторон сравнения — те же, что у фигур на паутинке */
-const SIDE_BG = ["bg-accent", "bg-warn"];
+/** цвета сторон сравнения — как стороны в CS: синий против оранжевого; те же у фигур на паутинке */
+const SIDE = [
+  { bg: "bg-side-ct", text: "text-side-ct", ring: "ring-side-ct/50", soft: "bg-side-ct/[0.07] border-side-ct/30" },
+  { bg: "bg-side-t", text: "text-side-t", ring: "ring-side-t/50", soft: "bg-side-t/[0.08] border-side-t/30" },
+];
+const SIDE_TEXT = SIDE.map((x) => x.text);
 
 function CompareGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mt-2 first-of-type:mt-0">
-      <div className="border-b border-line-subtle pb-2 pt-3 text-center text-micro font-semibold uppercase tracking-[0.12em] text-fg-3">{title}</div>
+    <div className="rounded-control border border-line-subtle bg-shell/50 px-3 py-3 sm:px-5 sm:py-4">
+      <div className="pb-2 text-center text-micro font-semibold uppercase tracking-[0.14em] text-fg-3">{title}</div>
       <div className="divide-y divide-line-subtle">{children}</div>
     </div>
   );
 }
 
-/** Строка сравнения: число слева и справа, между ними подпись и полоска — чья доля больше. null — у игрока значения нет */
+/**
+ * Строка сравнения «бабочкой»: подпись в середине, полоски расходятся от неё в стороны — у кого длиннее, тот сильнее.
+ * Длина — доля от большего из двух значений; null — у игрока значения нет.
+ */
 function CompareRow({ label, a, b, show, neutral }: { label: string; a: number | null; b: number | null; show: (v: number) => string; neutral?: boolean }) {
-  const both = a != null && b != null;
-  const sum = (a ?? 0) + (b ?? 0);
-  const share = both && sum > 0 ? Math.max(6, Math.min(94, (100 * (a ?? 0)) / sum)) : 50;
-  const win = neutral || !both || a === b ? 0 : (a ?? 0) > (b ?? 0) ? 1 : 2;
-  const value = (v: number | null, side: 1 | 2) => (
-    <span className={cn("num text-[17px]", side === 1 ? "text-right" : "text-left", v == null ? "text-fg-4" : win === side ? "font-extrabold text-fg" : win === 0 ? "font-semibold text-fg-2" : "font-medium text-fg-3")}>{v == null ? "—" : show(v)}</span>
-  );
+  const max = Math.max(a ?? 0, b ?? 0);
+  const win = neutral || a == null || b == null || a === b ? 0 : a > b ? 1 : 2;
+  const side = (v: number | null, n: 1 | 2) => {
+    const lost = win !== 0 && win !== n;
+    const number = <span className={cn("num w-[52px] shrink-0 text-[16px] sm:text-[17px]", n === 1 ? "text-right" : "text-left", v == null ? "text-fg-4" : win === n ? "font-extrabold text-fg" : lost ? "font-medium text-fg-3" : "font-semibold text-fg-2")}>{v == null ? "—" : show(v)}</span>;
+    const bar = (
+      <span className={cn("flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-ink/[0.06]", n === 1 && "justify-end")} aria-hidden>
+        {v != null && max > 0 && <span className={cn("rounded-full", SIDE[n - 1].bg, lost && "opacity-40")} style={{ width: `${Math.max(3, (100 * v) / max)}%` }} />}
+      </span>
+    );
+    return <div className="flex min-w-0 items-center gap-2.5">{n === 1 ? [<Fragment key="n">{number}</Fragment>, <Fragment key="b">{bar}</Fragment>] : [<Fragment key="b">{bar}</Fragment>, <Fragment key="n">{number}</Fragment>]}</div>;
+  };
   return (
-    <div className="grid grid-cols-[64px_minmax(0,1fr)_64px] items-center gap-4 py-2.5">
-      {value(a, 1)}
-      <div className="min-w-0">
-        <div className="truncate text-center text-meta text-fg-2">{label}</div>
-        <div className="mt-1.5 flex h-1.5 gap-[3px]" aria-hidden>
-          {both ? (
-            <>
-              <span className={cn("rounded-full", SIDE_BG[0], win === 2 && "opacity-35")} style={{ width: `${share}%` }} />
-              <span className={cn("flex-1 rounded-full", SIDE_BG[1], win === 1 && "opacity-35")} />
-            </>
-          ) : (
-            <span className="flex-1 rounded-full bg-ink/[0.06]" />
-          )}
-        </div>
-      </div>
-      {value(b, 2)}
+    <div className="grid grid-cols-[minmax(0,1fr)_108px_minmax(0,1fr)] items-center gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_150px_minmax(0,1fr)] sm:gap-3">
+      {side(a, 1)}
+      <div className="text-center text-[12px] leading-tight text-fg-2 sm:text-meta">{label}</div>
+      {side(b, 2)}
     </div>
   );
 }
@@ -363,7 +363,6 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
       .sort((x, y) => who(x.steam_id, x.name).nickname.localeCompare(who(y.steam_id, y.name).nickname))
       .map((r) => ({ value: r.steam_id, label: who(r.steam_id, r.name).nickname, href: href(self === "a" ? { a: r.steam_id, b: second.steam_id } : { a: first.steam_id, b: r.steam_id }) }));
   const metrics: [string, (r: TwentyRow) => number, (v: number) => string, boolean?][] = [
-    [t("Рейтинг"), (r) => r.rating, (v) => v.toFixed(2)],
     ["K/D", (r) => r.kd, (v) => v.toFixed(2)],
     ["ADR", (r) => r.adr, (v) => String(Math.round(v))],
     ["HS%", (r) => r.hsPct, (v) => `${Math.round(v)}%`],
@@ -392,41 +391,43 @@ export function StyleTab({ rows, who, t, a, b, href }: { rows: TwentyRow[]; who:
             <SelectNav value={second.steam_id} options={options("b")} label={t("Второй игрок")} />
           </div>
         </div>
-        <div className="mt-6 grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
-          <div className="lg:sticky lg:top-24">
-            <Radar t={t} size={400} series={pair.map((r, i) => ({ name: names[i], values: r.radar! }))} />
-          </div>
-          <div className="mx-auto w-full max-w-[640px]">
-            {/* шапка: цвет точки — тот же, что у фигуры игрока на паутинке и у его половины полосок */}
-            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pb-4">
-              {pair.map((r, i) => [
-                i === 1 ? <span key="vs" className="text-meta font-semibold text-fg-3">vs</span> : null,
-                <Link key={r.steam_id} href={`/players/${r.steam_id}`} className={cn("group flex min-w-0 items-center gap-3", i === 1 && "flex-row-reverse text-right")}>
-                  <Avatar src={who(r.steam_id, r.name).avatar_url} name={names[i]} size="md" />
-                  <span className="min-w-0">
-                    <span className={cn("flex min-w-0 items-center gap-2", i === 1 && "flex-row-reverse")}>
-                      <span className={cn("size-2.5 shrink-0 rounded-full", SIDE_BG[i])} />
-                      <span className="truncate text-[16px] font-bold text-fg group-hover:text-accent">{names[i]}</span>
-                    </span>
-                    <span className={cn("mt-1 flex", i === 1 && "justify-end")}>
-                      <RoleChip role={r.role} t={t} />
-                    </span>
+        {/* игроки по бокам, паутинка между ними: цвет карточки = цвет фигуры = цвет полосок ниже */}
+        <div className="mt-6 grid items-center gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)_minmax(0,1fr)]">
+          {pair.map((r, i) => {
+            const p = who(r.steam_id, r.name);
+            return (
+              <Link key={r.steam_id} href={`/players/${r.steam_id}`} className={cn("group flex items-center gap-4 rounded-surface border p-4 transition-colors hover:border-line-strong sm:p-5", SIDE[i].soft, i === 0 ? "lg:order-1 lg:flex-row-reverse lg:text-right" : "lg:order-3")}>
+                <span className={cn("shrink-0 rounded-full p-1 ring-2", SIDE[i].ring)}>
+                  <Avatar src={p.avatar_url} name={p.nickname} size="lg" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[20px] font-extrabold leading-tight text-fg group-hover:text-accent">{p.nickname}</span>
+                  <span className={cn("mt-1.5 flex flex-wrap items-center gap-1.5", i === 0 && "lg:justify-end")}>
+                    <RoleChip role={r.role} t={t} />
+                    <BestMapChip cell={r.best} t={t} />
                   </span>
-                </Link>,
-              ])}
-            </div>
-
-            <CompareGroup title={t("Показатели")}>
-              {metrics.map(([label, f, show, neutral]) => (
-                <CompareRow key={label} label={label} a={f(first)} b={f(second)} show={show} neutral={neutral} />
-              ))}
-            </CompareGroup>
-            <CompareGroup title={t("Рейтинг по картам")}>
-              {sharedMaps.map((m) => (
-                <CompareRow key={m} label={mapLabel(m)} a={first.byMap.find((c) => c.map === m)?.rating ?? null} b={second.byMap.find((c) => c.map === m)?.rating ?? null} show={(v) => v.toFixed(2)} />
-              ))}
-            </CompareGroup>
+                  <span className="num mt-2 block text-meta text-fg-3">{t("Карт: {maps} · побед {wins} из {matches}", { maps: r.maps, wins: r.wins, matches: r.matches })}</span>
+                </span>
+                <span className={cn("num shrink-0 text-[40px] font-extrabold leading-none", SIDE[i].text)}>{r.rating.toFixed(2)}</span>
+              </Link>
+            );
+          })}
+          <div className="lg:order-2">
+            <Radar t={t} size={360} colors={SIDE_TEXT} series={pair.map((r, i) => ({ name: names[i], values: r.radar! }))} />
           </div>
+        </div>
+
+        <div className="mt-5 grid items-start gap-4 lg:grid-cols-2">
+          <CompareGroup title={t("Показатели")}>
+            {metrics.map(([label, f, show, neutral]) => (
+              <CompareRow key={label} label={label} a={f(first)} b={f(second)} show={show} neutral={neutral} />
+            ))}
+          </CompareGroup>
+          <CompareGroup title={t("Рейтинг по картам")}>
+            {sharedMaps.map((m) => (
+              <CompareRow key={m} label={mapLabel(m)} a={first.byMap.find((c) => c.map === m)?.rating ?? null} b={second.byMap.find((c) => c.map === m)?.rating ?? null} show={(v) => v.toFixed(2)} />
+            ))}
+          </CompareGroup>
         </div>
       </section>
 

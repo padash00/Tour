@@ -1,7 +1,7 @@
 import "server-only";
 import { gunzipSync } from "node:zlib";
 import { ANALYSIS_BUCKET } from "./analysis";
-import { isAdmin } from "./auth";
+import { isAdmin } from "./admin";
 import { db } from "./supabase";
 import type { Player } from "./types";
 

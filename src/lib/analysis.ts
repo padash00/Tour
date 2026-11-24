@@ -1,7 +1,7 @@
 import "server-only";
 import { privateMatchIds } from "./private-tournament";
 import { db } from "./supabase";
-import { isAdmin } from "./auth";
+import { isAdmin } from "./admin";
 import type { Player } from "./types";
 
 /*

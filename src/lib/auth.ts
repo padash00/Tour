@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./supabase";
-import { env } from "./env";
+import { isAdmin } from "./admin";
 import { readSession } from "./session";
 import type { Player } from "./types";
 
@@ -13,10 +13,7 @@ export const getCurrentPlayer = cache(async (): Promise<Player | null> => {
   return (data as Player | null) ?? null;
 });
 
-export function isAdmin(player: Player | null): boolean {
-  if (!player || player.is_banned) return false;
-  return player.is_admin || env.adminSteamIds.includes(player.steam_id);
-}
+export { isAdmin };
 
 export async function requirePlayer(next = "/me"): Promise<Player> {
   const player = await getCurrentPlayer();

@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { audit } from "./audit";
-import { isAdmin } from "./auth";
+import { isAdmin } from "./admin";
 import type { Player } from "./types";
 import { db } from "./supabase";
 import { SITE_URL, setAppSettings, tgCall, tgEscape } from "./telegram";

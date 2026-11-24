@@ -9,6 +9,7 @@ import { Avatar, Timer, cn } from "@/components/ds";
 import { useToast } from "../toast";
 import { useViewer, type Activity } from "../viewer";
 import { isActive, noChrome, type NavItem } from "./nav";
+import { useNavSection } from "./section";
 import { tr } from "@/lib/i18n/core";
 import { useT } from "@/lib/i18n/client";
 import { LangSwitch } from "../lang-switch";
@@ -143,6 +144,7 @@ export function MyMatchCard({ activity, more }: { activity: Activity; more: numb
 /** Боковое меню (от 1024px): логотип · «Мой матч» · разделы · второстепенное · игрок или вход */
 export function SiteSidebar() {
   const pathname = usePathname();
+  const section = useNavSection();
   const { status, player, activity, moreActivity } = useViewer();
   const t = useT();
   const hidden = wideRoom(pathname);
@@ -163,7 +165,7 @@ export function SiteSidebar() {
         <nav key={g.title} className="flex flex-col gap-px" aria-label={t(g.title)}>
           <div className="px-3 pb-1 text-[11.5px] font-bold uppercase tracking-[0.08em] text-fg-4">{t(g.title)}</div>
           {g.items.map((item) => {
-            const active = navActive(pathname, item);
+            const active = navActive(section ?? pathname, item);
             return (
               <Link
                 key={item.href}

@@ -74,7 +74,7 @@ const RADAR_COLORS = ["text-accent", "text-warn"];
  * Паутинка стиля: шесть осей, значение — место среди игроков (100 — лучший).
  * Один или два игрока; второй накладывается поверх для сравнения.
  */
-export function Radar({ series, t, size = 280 }: { series: { name: string; values: Record<RadarKey, number> }[]; t: T; size?: number }) {
+export function Radar({ series, t, size = 280, colors = RADAR_COLORS }: { series: { name: string; values: Record<RadarKey, number> }[]; t: T; size?: number; colors?: string[] }) {
   const c = size / 2;
   const r = size / 2 - 58;
   const n = RADAR_AXES.length;
@@ -103,7 +103,7 @@ export function Radar({ series, t, size = 280 }: { series: { name: string; value
         );
       })}
       {series.map((s, k) => (
-        <g key={k} className={RADAR_COLORS[k % RADAR_COLORS.length]}>
+        <g key={k} className={colors[k % colors.length]}>
           {/* совсем нулевое значение оставляет точку у центра, иначе фигура схлопывается в линию */}
           <polygon points={RADAR_AXES.map((a, i) => at(i, Math.max(0.06, s.values[a.key] / 100)).map((x) => x.toFixed(1)).join(",")).join(" ")} fill="currentColor" fillOpacity={0.16} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
           {RADAR_AXES.map((a, i) => {
