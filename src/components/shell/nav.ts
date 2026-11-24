@@ -12,7 +12,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: "/tournaments", label: tr("Турниры"), match: ["/tournaments"] },
   { href: "/matches", label: tr("Матчи"), match: ["/matches"] },
   { href: "/lobbies", label: tr("Лобби"), match: ["/lobbies", "/lobby"] },
-  { href: "/twenty", label: tr("Двадцатка"), match: ["/twenty"] },
+  { href: "/twenty", label: tr("Микс"), match: ["/twenty"] },
   { href: "/stats", label: tr("Рейтинг"), match: ["/stats", "/players"] },
   { href: "/teams", label: tr("Команды"), match: ["/teams", "/team", "/find", "/join"] },
 ];

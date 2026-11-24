@@ -6,43 +6,71 @@ import { playersNeeded } from "@/lib/lobby-settings";
 import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
-import { TWENTY_MIN_MAPS, twentyRating } from "@/lib/twenty";
-import { Avatar, Button, Container, EmptyState, PageTitle, Section, cn } from "@/components/ds";
+import { getMapImages } from "@/lib/settings";
+import { TWENTY_MIN_MAPS, getTwenty } from "@/lib/twenty";
+import { Avatar, Button, Container, ContextNav, EmptyState, PageTitle, Section, cn } from "@/components/ds";
 import { Icon } from "@/components/lobby/icons";
 import { CreatePotButton } from "@/components/lobby/pot";
-import { DATA_TABLE, NUM_CELL, RankBadge, tableBox } from "@/components/public/data-table";
+import { RankBadge } from "@/components/public/data-table";
+import { BestMapChip, RoleChip, Streak, Trend } from "@/components/twenty/bits";
+import { MapsTab, Nominations, RatingTable, RecordsTab, StyleTab, whoOf } from "@/components/twenty/tabs";
 
 export const dynamic = "force-dynamic";
 
 const CODE = /^[A-Z0-9]{4,10}$/;
+const STEAM = /^\d{17}$/;
+const MAP = /^[a-z0-9_]{3,40}$/;
+const TABS = ["rating", "maps", "style", "records"] as const;
+type Tab = (typeof TABS)[number];
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getT();
   return {
-    title: t("Двадцатка"),
-    description: "Двадцатка F16 Arena: большие лобби CS2 на 20, 30 и 40 игроков и общий рейтинг игроков — кто король.",
+    title: t("Микс"),
+    description: "Микс F16 Arena: игры CS2 на банк и большие лобби на 20, 30 и 40 игроков, общий рейтинг игроков, рейтинг по картам, роли и рекорды — кто король.",
     alternates: { canonical: "/twenty" },
   };
 }
 
-/** «Двадцатка»: рейтинг игроков больших лобби — общий или за один вечер (?lobby=КОД) — и сами лобби */
+/**
+ * «Микс»: игры на банк и рейтинг их игроков — общий или за один вечер (?lobby=КОД).
+ * Вкладки (?tab=): рейтинг и номинации, карты, стиль игры и сравнение, рекорды и связки.
+ */
 export default async function TwentyPage(props: PageProps<"/twenty">) {
   const t = await getT();
   const sp = await props.searchParams;
-  const raw = typeof sp.lobby === "string" ? sp.lobby.trim().toUpperCase() : "";
-  const code = CODE.test(raw) ? raw : undefined;
+  const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const rawCode = str(sp.lobby).toUpperCase();
+  const code = CODE.test(rawCode) ? rawCode : undefined;
+  const tab: Tab = (TABS as readonly string[]).includes(str(sp.tab)) ? (str(sp.tab) as Tab) : "rating";
+  const map = MAP.test(str(sp.map)) ? str(sp.map) : null;
+  const a = STEAM.test(str(sp.a)) ? str(sp.a) : null;
+  const b = STEAM.test(str(sp.b)) ? str(sp.b) : null;
 
   const player = await getCurrentPlayer();
-  const [{ rows, evenings, matches }, lobbies, mine] = await Promise.all([twentyRating({ code }), listOpenLobbies(), player ? playerLobby(player.id) : null]);
+  const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code }), listOpenLobbies(), player ? playerLobby(player.id) : null, tab === "maps" ? getMapImages() : {}]);
+  const { rows, evenings, matches } = twenty;
+  const who = whoOf(twenty.players);
   // игры на банк («Десятка») и большие лобби; комнаты отдельных матчей сетки не показываем — в них ведёт само лобби
   const open = lobbies.filter((l) => (l.settings.pot || cupTeams(l.settings.players) > 0) && !l.settings.cup_of);
   const king = rows[0];
+  const kingWho = king ? who(king.steam_id, king.name) : null;
+
+  /** ссылка внутри раздела: вкладка и выбранный вечер сохраняются */
+  const href = (target: Tab, params: Record<string, string> = {}) => {
+    const q = new URLSearchParams();
+    if (target !== "rating") q.set("tab", target);
+    if (code) q.set("lobby", code);
+    for (const [k, v] of Object.entries(params)) q.set(k, v);
+    const s = q.toString();
+    return s ? `/twenty?${s}` : "/twenty";
+  };
 
   return (
     <Container className="space-y-8 pb-16 pt-8 sm:pt-10">
       <header className="flex flex-wrap items-end justify-between gap-5">
         <div>
-          <PageTitle>{code ? t("Рейтинг лобби #{code}", { code }) : t("Двадцатка")}</PageTitle>
+          <PageTitle>{code ? t("Рейтинг лобби #{code}", { code }) : t("Микс")}</PageTitle>
           <p className="mt-1 max-w-read text-meta text-fg-3">
             {code
               ? t("Все игроки этого вечера по сыгранным картам. Рейтинг 1.00 — средний игрок.")
@@ -66,23 +94,41 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </div>
       </header>
 
-      {king ? (
+      {king && (
+        <ContextNav
+          match="tab"
+          items={[
+            { key: "rating", label: t("Рейтинг"), href: href("rating") },
+            { key: "maps", label: t("Карты"), href: href("maps") },
+            { key: "style", label: t("Стиль игры"), href: href("style") },
+            { key: "records", label: t("Рекорды"), href: href("records") },
+          ]}
+        />
+      )}
+
+      {king && kingWho && tab === "rating" && (
         <>
           {/* король слева — главный объект страницы; справа узкая колонка: что идёт сейчас и следующие два места */}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <section aria-label={t("Король")} className="relative overflow-hidden rounded-surface border border-gold/40 bg-gradient-to-br from-gold/[0.14] via-gold/[0.05] to-transparent p-6 sm:p-8">
               <div className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.14em] text-gold">
-                {Icon.crown("size-4")} {code ? t("Лучший игрок вечера") : t("Король двадцатки")}
+                {Icon.crown("size-4")} {code ? t("Лучший игрок вечера") : t("Король микса")}
               </div>
               <div className="mt-5 flex flex-wrap items-center gap-5">
                 <span className="rounded-full p-1 ring-2 ring-gold/60">
-                  <Avatar src={king.avatar_url} name={king.nickname} size="xl" />
+                  <Avatar src={kingWho.avatar_url} name={kingWho.nickname} size="xl" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <Link href={`/players/${king.steam_id}`} className="block truncate text-[30px] font-extrabold leading-tight text-fg hover:text-accent sm:text-[36px]">
-                    {king.nickname}
+                    {kingWho.nickname}
                   </Link>
                   <div className="mt-1 text-meta text-fg-3">{t("Карт: {maps} · побед {wins} из {matches}", { maps: king.maps, wins: king.wins, matches: king.matches })}</div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <RoleChip role={king.role} t={t} />
+                    <BestMapChip cell={king.best} t={t} />
+                    <Streak n={king.streak} t={t} />
+                    <Trend value={king.trend} t={t} />
+                  </div>
                 </div>
               </div>
               <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -122,91 +168,50 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
                   </div>
                 </section>
               )}
-              {rows.slice(1, 3).map((r, i) => (
-                <Link key={r.steam_id} href={`/players/${r.steam_id}`} className="flex items-center gap-3 rounded-surface border border-line-subtle bg-surface p-4 transition-colors hover:border-line-strong">
-                  <RankBadge n={i + 2} />
-                  <Avatar src={r.avatar_url} name={r.nickname} size="md" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold text-fg">{r.nickname}</span>
-                    <span className="num block text-micro text-fg-3">
-                      K/D {r.kd.toFixed(2)} · ADR {Math.round(r.adr)}
+              {rows.slice(1, 3).map((r, i) => {
+                const p = who(r.steam_id, r.name);
+                return (
+                  <Link key={r.steam_id} href={`/players/${r.steam_id}`} className="flex items-center gap-3 rounded-surface border border-line-subtle bg-surface p-4 transition-colors hover:border-line-strong">
+                    <RankBadge n={i + 2} />
+                    <Avatar src={p.avatar_url} name={p.nickname} size="md" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-fg">{p.nickname}</span>
+                      <span className="num block text-micro text-fg-3">
+                        K/D {r.kd.toFixed(2)} · ADR {Math.round(r.adr)}
+                      </span>
                     </span>
-                  </span>
-                  <span className="num text-[22px] font-extrabold text-fg">{r.rating.toFixed(2)}</span>
-                </Link>
-              ))}
+                    <span className="num text-[22px] font-extrabold text-fg">{r.rating.toFixed(2)}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
+
+          <Nominations items={twenty.nominations} who={who} t={t} evening={!!code} />
 
           <section aria-label={t("Все игроки")}>
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <h2 className="text-title text-fg">{t("Все игроки")}</h2>
               <p className="text-meta text-fg-3">{code ? t("Матчей в лобби: {n}", { n: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}</p>
             </div>
-            {/* одна белая карточка, как в «Рейтинге»: без серой подложки внутри, первые три места подсвечены */}
-            <div className={tableBox()}>
-              <table className={cn(DATA_TABLE, "min-w-[820px]")}>
-                <thead>
-                  <tr>
-                    <th className="w-14">#</th>
-                    <th>{t("Игрок")}</th>
-                    {[t("Карт"), t("Побед"), t("У–С"), "±", "K/D", "ADR", "HS%", "MVP"].map((h) => (
-                      <th key={h} className="w-[78px] !text-right">
-                        {h}
-                      </th>
-                    ))}
-                    <th className="w-[104px] !text-right">{t("Рейтинг")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => {
-                    const me = player?.steam_id === r.steam_id;
-                    const diff = r.kills - r.deaths;
-                    return (
-                      <tr key={r.steam_id} className={cn(me ? "bg-accent-dim/70" : i === 0 ? "bg-gold/[0.07]" : i < 3 ? "bg-ink/[0.02]" : undefined)}>
-                        <td>
-                          <RankBadge n={i + 1} />
-                        </td>
-                        <td>
-                          <Link href={`/players/${r.steam_id}`} className="flex min-w-0 items-center gap-3 text-fg hover:text-accent">
-                            <Avatar src={r.avatar_url} name={r.nickname} size="sm" />
-                            <span className={cn("truncate", i < 3 ? "text-[16px] font-bold" : "font-semibold")}>{r.nickname}</span>
-                            {i === 0 && <span className="shrink-0 text-gold">{Icon.crown("size-4")}</span>}
-                            {me && <span className="shrink-0 rounded-chip bg-accent px-1.5 py-0.5 text-micro font-semibold text-accent-ink">{t("вы")}</span>}
-                          </Link>
-                        </td>
-                        <td className={NUM_CELL}>{r.maps}</td>
-                        <td className={NUM_CELL}>
-                          <span className={cn(r.wins > 0 && "font-semibold text-fg")}>{r.wins}</span>
-                          <span className="text-fg-4">/{r.matches}</span>
-                        </td>
-                        <td className={NUM_CELL}>
-                          {r.kills}–{r.deaths}
-                        </td>
-                        <td className={cn(NUM_CELL, "font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-danger" : "text-fg-3")}>{diff > 0 ? `+${diff}` : diff}</td>
-                        <td className={cn(NUM_CELL, r.kd >= 1 ? "text-fg" : "text-fg-3")}>{r.kd.toFixed(2)}</td>
-                        <td className={NUM_CELL}>{Math.round(r.adr)}</td>
-                        <td className={NUM_CELL}>{Math.round(r.hsPct)}%</td>
-                        <td className={NUM_CELL}>{r.mvp}</td>
-                        <td className="text-right">
-                          <span
-                            className={cn(
-                              "num inline-flex min-w-[60px] justify-center rounded-chip px-2.5 py-1 text-[15px] font-extrabold",
-                              r.rating >= 1.15 ? "bg-ok/15 text-ok" : r.rating >= 1 ? "bg-accent-dim text-fg" : "bg-ink/[0.05] text-fg-3",
-                            )}
-                          >
-                            {r.rating.toFixed(2)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} />
+            <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")}</p>
           </section>
         </>
-      ) : (
+      )}
+
+      {king && tab === "maps" && <MapsTab boards={twenty.boards} rows={rows} who={who} t={t} images={images} selected={map} href={(params) => href("maps", params)} meSteamId={player?.steam_id ?? null} />}
+
+      {king && tab === "style" && <StyleTab rows={rows} who={who} t={t} a={a ?? player?.steam_id ?? null} b={b} href={(params) => href("style", params)} />}
+
+      {king && tab === "records" && (
+        <>
+          {code && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному вечеру.")}</p>}
+          <RecordsTab records={twenty.records} duos={twenty.duos} who={who} t={t} />
+        </>
+      )}
+
+      {!king && (
         <>
           {!code && open.length > 0 && (
             <Section title={t("Идут сейчас")}>
@@ -229,7 +234,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </>
       )}
 
-      {!code && evenings.length > 0 && (
+      {!code && tab === "rating" && evenings.length > 0 && (
         <Section title={t("Прошедшие игры")} description={t("Рейтинг каждого вечера отдельно")}>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {evenings.map((e) => (

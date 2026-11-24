@@ -9,6 +9,7 @@ import { getPlayerProgress } from "@/lib/progress";
 import { PlayerProfile } from "@/components/player-profile";
 import { ComparePicker, type PickPlayer } from "@/components/compare-picker";
 import { PlayerLobbyGames } from "@/components/lobby/player-lobby-games";
+import { PlayerTwenty } from "@/components/twenty/player-twenty";
 import { PlayerContact } from "@/components/public/player-contact";
 import { getT } from "@/lib/i18n/server";
 
@@ -78,6 +79,7 @@ export default async function PlayerPage(props: PageProps<"/players/[steamId]">)
           </>
         }
       />
+      <PlayerTwenty steamId={player.steam_id} />
       <PlayerLobbyGames playerId={player.id} />
     </>
   );

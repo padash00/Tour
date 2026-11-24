@@ -192,6 +192,16 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
                       </span>
                     )}
                   </span>
+                  {game.map_edge?.[map] && !action && (game.map_edge[map].team1 || game.map_edge[map].team2) && (
+                    <span
+                      className="num absolute left-2 top-2 flex items-center gap-1 rounded-chip bg-black/55 px-1.5 py-0.5 text-[11px] font-semibold text-white/70"
+                      title={t("Средний рейтинг команд на этой карте по играм Микса: {a} — {x}, {b} — {y}", { a: game.team1.name, x: game.map_edge[map].team1?.rating.toFixed(2) ?? "—", b: game.team2.name, y: game.map_edge[map].team2?.rating.toFixed(2) ?? "—" })}
+                    >
+                      <span className={cn((game.map_edge[map].team1?.rating ?? 0) > (game.map_edge[map].team2?.rating ?? 0) && "text-white")}>{game.map_edge[map].team1?.rating.toFixed(2) ?? "—"}</span>
+                      <span className="text-white/50">:</span>
+                      <span className={cn((game.map_edge[map].team2?.rating ?? 0) > (game.map_edge[map].team1?.rating ?? 0) && "text-white")}>{game.map_edge[map].team2?.rating.toFixed(2) ?? "—"}</span>
+                    </span>
+                  )}
                   {action && (
                     <span className={cn("absolute right-2 top-2 text-micro font-semibold uppercase", action.action === "ban" ? "text-danger" : "text-accent")}>
                       {action.action === "ban" ? t("бан") : action.action === "pick" ? t("пик") : "decider"}
@@ -202,6 +212,10 @@ export function GamePanel({ view, isHost, busy, run, code }: { view: LobbyView; 
             );
           })}
         </div>
+
+        {game.map_edge && (
+          <p className="mt-3 text-meta text-fg-3">{t("Числа на картах — средний рейтинг команд на этой карте по играм Микса: слева {a}, справа {b}. Прочерк — на карте ещё никто из команды не играл.", { a: game.team1.name, b: game.team2.name })}</p>
+        )}
 
         {isHost && (
           <div className="mt-4 flex flex-wrap items-center gap-3">

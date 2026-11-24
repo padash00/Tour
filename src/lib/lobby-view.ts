@@ -28,6 +28,8 @@ import type { LobbySettings } from "./lobby-settings";
 import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
 import { voiceOnline } from "./voice";
+import { twentyBriefs, vetoEdge, type TwentyBrief } from "./twenty";
+import type { RoleKey } from "./twenty-core";
 
 /** Как часто обновлять last_seen_at зрителя (мс) — с запасом меньше ONLINE_MS */
 const SEEN_WRITE_MS = 10_000;
@@ -47,6 +49,8 @@ export type ViewMember = {
   /** «Десятка»: тир по ELO (null — не «Десятка» или рейтинга нет) и отметка организатора о взносе */
   tier: TierKey | null;
   paid: boolean;
+  /** «Микс»: рейтинг, роль и коронная карта игрока — подсказка капитанам при разборе (null — в «Миксе» не играл) */
+  mix: { rating: number; role: RoleKey | null; best: { map: string; rating: number } | null } | null;
 };
 
 export type ViewGame = {
@@ -65,6 +69,8 @@ export type ViewGame = {
   side_map: string | null;
   /** стороны «по пикам»: под картами серии показываем, кто за кого начинает */
   sides_by_pick: boolean;
+  /** вето: средний рейтинг каждой команды на картах пула по играм «Микса» (null — данных нет ни по одной карте) */
+  map_edge: Record<string, { team1: { rating: number; known: number } | null; team2: { rating: number; known: number } | null }> | null;
   team1_score: number;
   team2_score: number;
   winner: 1 | 2 | null;
@@ -238,7 +244,9 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
   const inGame = !!viewer && !!game && [...game.team1.players, ...game.team2.players].some((p) => p.id === viewer.id);
   const seesAddress = opts.admin || inGame || mine?.slot === "spec";
 
-  const [inVoice, { data: msgs }, { data: bans }, { data: past }, mapImages] = await Promise.all([
+  // подсказки из «Микса» — из кэша; если он недоступен, комната работает без них
+  const briefsLoad: Promise<Record<string, TwentyBrief>> = hidden ? Promise.resolve({}) : twentyBriefs().catch(() => ({}));
+  const [inVoice, { data: msgs }, { data: bans }, { data: past }, mapImages, briefs] = await Promise.all([
     hidden ? new Set<string>() : voiceOnline(members.map((m) => m.player_id)),
     access === "ok"
       ? db()
@@ -261,6 +269,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
           .limit(5)
       : Promise.resolve({ data: [] }),
     getMapImages(),
+    briefsLoad,
   ]);
 
   const host = members.find((m) => m.player_id === lobby.host_id);
@@ -270,6 +279,11 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
     gotv = `${ip}:${Number(port) + 5}`;
   }
   const turn = game?.status === "veto" ? lobbyTurn(game) : null;
+  let mapEdge: ViewGame["map_edge"] = null;
+  if (game?.status === "veto" && game.veto_pool.length) {
+    const edge = vetoEdge(briefs, game.team1.players.map((p) => p.steam_id), game.team2.players.map((p) => p.steam_id), game.veto_pool);
+    if (Object.values(edge).some((e) => e.team1 || e.team2)) mapEdge = edge;
+  }
 
   return {
     access,
@@ -320,6 +334,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             // допущенный игрок с ELO ниже 2200 — тир D: уровень уже проверен на входе; без рейтинга FACEIT — тоже D
             tier: !pot ? null : admitted ? (tierOf(admitted, 10) ?? "D") : !elo ? "D" : tierOf(elo, m.player.faceit_level),
             paid: pot && lobby.settings.pot_paid.includes(m.player_id),
+            mix: briefs[m.player.steam_id] ? { rating: briefs[m.player.steam_id].rating, role: briefs[m.player.steam_id].role, best: briefs[m.player.steam_id].best } : null,
           };
         }),
     bans: (bans ?? []).map((b) => b.player),
@@ -343,6 +358,7 @@ export async function buildLobbyView(code: string, viewer: Player | null, opts: 
             veto_action: turn?.action ?? null,
             side_map: turn?.action === "side" ? turn.map : null,
             sides_by_pick: game.veto_pool.length > 0 && sidesByPick(game),
+            map_edge: mapEdge,
             team1_score: game.team1_score,
             team2_score: game.team2_score,
             winner: game.winner,

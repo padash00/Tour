@@ -12,6 +12,8 @@ import { Icon } from "./ui";
 import type { Run } from "./use-lobby-view";
 import { PaidChip, TierBadge } from "./pot";
 import { useT } from "@/lib/i18n/client";
+import { mapLabel } from "@/lib/maps";
+import { ROLES } from "@/lib/twenty-core";
 
 type Slot = ViewMember["slot"];
 
@@ -184,6 +186,15 @@ export function PlayerLine({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-3">
           {m.tier && <TierBadge tier={m.tier} />}
           {m.faceit_elo ? <span className="num whitespace-nowrap">{m.faceit_elo} ELO</span> : <span className="whitespace-nowrap">{t("без FACEIT")}</span>}
+          {m.mix && (
+            <span
+              className="num whitespace-nowrap rounded-chip bg-gold/[0.14] px-1.5 text-[11px] font-semibold leading-[18px] text-gold"
+              title={[t("Рейтинг в Миксе: {n}", { n: m.mix.rating.toFixed(2) }), m.mix.role ? t(ROLES[m.mix.role].label) : null, m.mix.best ? t("коронная карта — {map} ({n})", { map: mapLabel(m.mix.best.map), n: m.mix.best.rating.toFixed(2) }) : null].filter(Boolean).join(" · ")}
+            >
+              {m.mix.rating.toFixed(2)}
+              {m.mix.best && !slim ? ` · ${mapLabel(m.mix.best.map)}` : ""}
+            </span>
+          )}
           {!big && <PaidChip m={m} view={view} isHost={isHost} run={run} code={code} />}
         </div>
       </div>

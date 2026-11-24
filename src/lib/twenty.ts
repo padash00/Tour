@@ -1,137 +1,123 @@
+import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
+import { buildTwenty, mapEdge, type CoreGame, type CoreStat, type RoleKey } from "./twenty-core";
 
 /*
  * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
- * Считается по всем сыгранным картам таких лобби; с кодом лобби — только по одному вечеру.
- * Формула — та же база, что у рейтинга турниров (аппроксимация HLTV 2.0): средний игрок ≈ 1.00.
+ * Здесь только чтение из базы; сами расчёты (рейтинг, карты, роли, номинации, рекорды) — в twenty-core.ts.
  */
 
-export type TwentyRow = {
-  steam_id: string;
-  nickname: string;
-  avatar_url: string | null;
-  /** сыграно карт */
-  maps: number;
-  /** сыграно и выиграно матчей (серий) */
-  matches: number;
-  wins: number;
-  rounds: number;
-  kills: number;
-  deaths: number;
-  assists: number;
-  kd: number;
-  adr: number;
-  hsPct: number;
-  /** доля раундов с пользой, %; 0 — сервер её не прислал */
-  kast: number;
-  mvp: number;
-  rating: number;
-};
+export { TWENTY_MIN_MAPS, MAP_MIN, ROLE_MIN_MAPS, DUO_MIN } from "./twenty-core";
+export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relations, RoleKey } from "./twenty-core";
 
 export type TwentyEvening = { code: string; finished_at: string; matches: number };
+export type TwentyPlayer = { nickname: string; avatar_url: string | null };
+export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer> };
 
-/** В общий рейтинг попадают сыгравшие хотя бы столько карт — одна удачная карта не делает королём */
-export const TWENTY_MIN_MAPS = 2;
+type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
+type StatRow = Omit<CoreStat, "k3" | "k4" | "k5" | "utility_damage" | "enemies_flashed" | "bomb_plants" | "bomb_defuses"> & { raw: Record<string, unknown> | null };
 
-type Agg = { name: string | null; maps: number; games: Set<string>; wins: Set<string>; rounds: number; kills: number; deaths: number; assists: number; damage: number; hs: number; kast: number; mvp: number; clutches: number };
+/** Все сыгранные игры на банк со статистикой по картам и никами игроков */
+export async function loadTwentyData(): Promise<TwentyData> {
+  const { data } = await db()
+    .from("lobby_games")
+    .select("id, winner, finished_at, maps, settings")
+    .eq("status", "finished")
+    .or("settings->>pot.eq.true,settings->>cup_of.not.is.null")
+    .order("finished_at", { ascending: false })
+    .limit(600);
+  const games: CoreGame[] = ((data ?? []) as unknown as GameRow[]).map((g) => ({ id: g.id, code: g.settings?.cup_of?.code ?? null, winner: g.winner, finished_at: g.finished_at, maps: g.maps ?? [] }));
 
-function rate(a: Agg) {
-  const r = Math.max(1, a.rounds);
-  const kpr = a.kills / r;
-  const dpr = a.deaths / r;
-  const apr = a.assists / r;
-  const adr = a.damage / r;
-  // KAST приходит не со всех матчей: без него берём типичные 70%, чтобы рейтинг оставался около 1.00
-  const kast = a.kast > 0 ? (100 * a.kast) / r : 70;
-  const impact = 2.13 * kpr + 0.42 * apr - 0.41 + (1.5 * a.clutches) / r;
-  const rating = 0.0073 * kast + 0.3591 * kpr - 0.5329 * dpr + 0.2372 * impact + 0.0032 * adr + 0.1587;
-  return { adr, kast: a.kast > 0 ? kast : 0, rating: a.rounds ? rating : 0 };
-}
-
-type GameRow = { id: string; winner: number | null; finished_at: string | null; settings: { cup_of?: { code?: string } | null } | null };
-type StatRow = { game_id: string; steam_id: string; name: string | null; team: number; kills: number; deaths: number; assists: number; damage: number; headshot_kills: number; rounds_played: number; kast: number; mvp: number; clutch_wins: number };
-
-export async function twentyRating(opts: { code?: string } = {}): Promise<{ rows: TwentyRow[]; evenings: TwentyEvening[]; matches: number }> {
-  let q = db().from("lobby_games").select("id, winner, finished_at, settings").eq("status", "finished").or("settings->>pot.eq.true,settings->>cup_of.not.is.null").order("finished_at", { ascending: false }).limit(600);
-  if (opts.code) q = q.eq("settings->cup_of->>code", opts.code);
-  const { data } = await q;
-  const games = (data ?? []) as unknown as GameRow[];
-  const winnerOf = new Map(games.map((g) => [g.id, g.winner]));
-
-  // вечера: последние большие лобби, по которым есть сыгранные матчи
-  const byCode = new Map<string, TwentyEvening>();
-  for (const g of games) {
-    const code = g.settings?.cup_of?.code;
-    if (!code || !g.finished_at) continue;
-    const e = byCode.get(code);
-    if (!e) byCode.set(code, { code, finished_at: g.finished_at, matches: 1 });
-    else e.matches++;
-  }
-
-  // статистика по картам: порциями, чтобы не упереться в лимит строк ответа
-  const stats: StatRow[] = [];
+  // статистика по картам: порциями, чтобы не упереться в лимит строк ответа (BO5 — до 50 строк на игру)
+  const stats: CoreStat[] = [];
   const ids = games.map((g) => g.id);
-  for (let i = 0; i < ids.length; i += 25) {
+  for (let i = 0; i < ids.length; i += 15) {
     const { data: rows } = await db()
       .from("lobby_player_stats")
-      .select("game_id, steam_id, name, team, kills, deaths, assists, damage, headshot_kills, rounds_played, kast, mvp, clutch_wins")
-      .in("game_id", ids.slice(i, i + 25))
+      .select("game_id, map_number, steam_id, name, team, kills, deaths, assists, damage, headshot_kills, rounds_played, kast, mvp, clutch_wins, first_kills, raw")
+      .in("game_id", ids.slice(i, i + 15))
       .limit(1000);
-    stats.push(...((rows ?? []) as StatRow[]));
+    for (const { raw, ...s } of (rows ?? []) as unknown as StatRow[]) {
+      const n = (k: string) => Number(raw?.[k] ?? 0) || 0;
+      stats.push({ ...s, k3: n("3k"), k4: n("4k"), k5: n("5k"), utility_damage: n("utility_damage"), enemies_flashed: n("enemies_flashed"), bomb_plants: n("bomb_plants"), bomb_defuses: n("bomb_defuses") });
+    }
   }
 
-  const agg = new Map<string, Agg>();
-  for (const s of stats) {
-    if (!s.rounds_played) continue;
-    let a = agg.get(s.steam_id);
-    if (!a) agg.set(s.steam_id, (a = { name: s.name, maps: 0, games: new Set(), wins: new Set(), rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, hs: 0, kast: 0, mvp: 0, clutches: 0 }));
-    a.maps++;
-    a.games.add(s.game_id);
-    if (winnerOf.get(s.game_id) === s.team) a.wins.add(s.game_id);
-    a.rounds += s.rounds_played;
-    a.kills += s.kills;
-    a.deaths += s.deaths;
-    a.assists += s.assists;
-    a.damage += s.damage;
-    a.hs += s.headshot_kills;
-    a.kast += s.kast;
-    a.mvp += s.mvp;
-    a.clutches += s.clutch_wins;
-  }
-
-  const steamIds = [...agg.keys()];
-  const players = new Map<string, { nickname: string; avatar_url: string | null }>();
+  const steamIds = [...new Set(stats.map((s) => s.steam_id))];
+  const players: Record<string, TwentyPlayer> = {};
   for (let i = 0; i < steamIds.length; i += 200) {
     const { data: rows } = await db().from("players").select("steam_id, nickname, avatar_url").in("steam_id", steamIds.slice(i, i + 200));
-    for (const p of rows ?? []) players.set(p.steam_id, { nickname: p.nickname, avatar_url: p.avatar_url });
+    for (const p of rows ?? []) players[p.steam_id] = { nickname: p.nickname, avatar_url: p.avatar_url };
   }
+  return { games, stats, players };
+}
 
-  const minMaps = opts.code ? 1 : TWENTY_MIN_MAPS;
-  const rows: TwentyRow[] = [...agg.entries()]
-    .filter(([, a]) => a.maps >= minMaps)
-    .map(([steam_id, a]) => {
-      const r = rate(a);
-      const p = players.get(steam_id);
-      return {
-        steam_id,
-        nickname: p?.nickname ?? a.name ?? steam_id,
-        avatar_url: p?.avatar_url ?? null,
-        maps: a.maps,
-        matches: a.games.size,
-        wins: a.wins.size,
-        rounds: a.rounds,
-        kills: a.kills,
-        deaths: a.deaths,
-        assists: a.assists,
-        kd: a.deaths ? a.kills / a.deaths : a.kills,
-        adr: r.adr,
-        hsPct: a.kills ? (100 * a.hs) / a.kills : 0,
-        kast: r.kast,
-        mvp: a.mvp,
-        rating: r.rating,
+/**
+ * Игрок в «Миксе» для его профиля: место, строка рейтинга, напарник и соперники. null — в рейтинге его нет.
+ * В кэше до 2 минут и по одному игроку: свежесть до секунды профилю не нужна, а запись остаётся маленькой.
+ */
+export const getTwentyProfile = unstable_cache(
+  async (steamId: string) => {
+    const data = await loadTwentyData();
+    const twenty = buildTwenty(data.games, data.stats);
+    const place = twenty.rows.findIndex((r) => r.steam_id === steamId);
+    if (place < 0) return null;
+    const relations = twenty.relations(steamId);
+    const players: Record<string, TwentyPlayer> = {};
+    for (const id of [steamId, relations.partner?.steam_id, relations.nemesis?.steam_id, relations.victim?.steam_id]) if (id && data.players[id]) players[id] = data.players[id];
+    return { place: place + 1, total: twenty.rows.length, row: twenty.rows[place], relations, players };
+  },
+  ["twenty-profile", "v1"],
+  { revalidate: 120 },
+);
+
+/** Вечера: последние большие лобби, по которым есть сыгранные матчи */
+export function eveningsOf(games: CoreGame[]): TwentyEvening[] {
+  const byCode = new Map<string, TwentyEvening>();
+  for (const g of games) {
+    if (!g.code || !g.finished_at) continue;
+    const e = byCode.get(g.code);
+    if (!e) byCode.set(g.code, { code: g.code, finished_at: g.finished_at, matches: 1 });
+    else e.matches++;
+  }
+  return [...byCode.values()].slice(0, 12);
+}
+
+/** Рейтинг и всё остальное для страницы «Двадцатка»; с кодом лобби — только один вечер */
+export async function getTwenty(opts: { code?: string } = {}) {
+  const data = await loadTwentyData();
+  return { ...buildTwenty(data.games, data.stats, opts), players: data.players, evenings: eveningsOf(data.games) };
+}
+
+/** Короткая справка по игроку для комнаты лобби: рейтинг, роль, коронная карта и рейтинг по картам */
+export type TwentyBrief = { rating: number; maps: number; role: RoleKey | null; best: { map: string; rating: number } | null; byMap: { map: string; rating: number; rounds: number }[] };
+
+/**
+ * Справки по всем игрокам «Двадцатки» — комната лобби опрашивается раз в 1,5 с, поэтому результат лежит в кэше 5 минут:
+ * подсказки капитанам не обязаны меняться в ту же секунду, когда закончилась карта.
+ */
+export const twentyBriefs = unstable_cache(
+  async (): Promise<Record<string, TwentyBrief>> => {
+    const data = await loadTwentyData();
+    const out: Record<string, TwentyBrief> = {};
+    for (const r of buildTwenty(data.games, data.stats).rows) {
+      out[r.steam_id] = {
+        rating: Math.round(r.rating * 100) / 100,
+        maps: r.maps,
+        role: r.role,
+        best: r.best ? { map: r.best.map, rating: Math.round(r.best.rating * 100) / 100 } : null,
+        byMap: r.byMap.map((c) => ({ map: c.map, rating: c.rating, rounds: c.rounds })),
       };
-    })
-    .sort((x, y) => y.rating - x.rating || y.maps - x.maps);
+    }
+    return out;
+  },
+  ["twenty-briefs", "v1"],
+  { revalidate: 300 },
+);
 
-  return { rows, evenings: [...byCode.values()].slice(0, 12), matches: games.length };
+/** Перевес команд по картам пула — для вето (см. mapEdge) */
+export function vetoEdge(briefs: Record<string, TwentyBrief>, team1: string[], team2: string[], pool: string[]) {
+  const edge = mapEdge(Object.entries(briefs).map(([steam_id, b]) => ({ steam_id, byMap: b.byMap })), team1, team2, pool);
+  const round = (x: { rating: number; known: number } | null) => (x ? { rating: Math.round(x.rating * 100) / 100, known: x.known } : null);
+  return Object.fromEntries(Object.entries(edge).map(([map, e]) => [map, { team1: round(e.team1), team2: round(e.team2) }]));
 }

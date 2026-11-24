@@ -15,5 +15,6 @@ import lobby from "./lobby";
 import info from "./info";
 import actions from "./actions";
 import lib from "./lib";
+import twenty from "./twenty";
 
-export const KK: Record<string, string> = { ...common, ...shell, ...home, ...tournaments, ...matches, ...team, ...profile, ...players, ...lobby, ...info, ...actions, ...lib };
+export const KK: Record<string, string> = { ...common, ...shell, ...home, ...tournaments, ...matches, ...team, ...profile, ...players, ...lobby, ...info, ...actions, ...lib, ...twenty };
