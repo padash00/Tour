@@ -53,7 +53,7 @@ BIND_DESC = (
     "[b]1.[/b] Зайди в этот канал.\n"
     "[b]2.[/b] Бот пришлёт ссылку в личные сообщения.\n"
     "[b]3.[/b] Открой её и подтверди, что это ты, — профиль на [url=%s]tournament.f16-arena.kz[/url] привяжется к твоему TeamSpeak.\n\n"
-    "Привязка действует, пока ты на сервере. Сменить профиль — команда [b]!отвязать[/b].\n"
+    "Привязка сохраняется: в следующий раз привязывать заново не нужно. Сменить профиль — команда [b]!отвязать[/b].\n"
     "В этом канале не разговаривают." % TOUR
 )
 TELEPORT_TOPIC = "Жди игру здесь — бот перенесёт в комнату твоей команды"
@@ -72,6 +72,11 @@ PM_LINK = ("[b]Привязка профиля F16 Arena[/b]\n"
            "Ссылка действует 10 минут. После привязки перенесу тебя в «Телепорт».")
 PM_LINKED = "Готово! Ты привязан к профилю [b]%s[/b]. Жди игру в «Телепорте» — перед матчем перенесу в комнату твоей команды."
 PM_ALREADY = "Ты уже привязан к профилю [b]%s[/b]. Сменить профиль — напиши [b]!отвязать[/b] и зайди в «Привязку» снова."
+# привязка постоянная, а на ПК клуба TeamSpeak общий: севший следующим привязывается заново по этой же ссылке
+PM_RELINK = ("Этот TeamSpeak привязан к профилю [b]%s[/b]. Это ты — ничего делать не нужно.\n"
+             "Не ты? Открой ссылку, и он привяжется к твоему профилю: [url=%s]привязать к моему профилю[/url]\n"
+             "Ссылка действует 10 минут.")
+PM_RELINKED = "Готово! Теперь этот TeamSpeak привязан к профилю [b]%s[/b]."
 PM_NEED_BIND = "Чтобы я знал, в какую команду тебя перенести, сначала привяжи профиль — перенёс тебя в «Привязку»."
 PM_ROOM = "Твоя команда здесь: [b]%s[/b]. Удачи!"
 PM_BIND_HELP = ("Зайди в канал «Привязка» — пришлю ссылку, по ней TeamSpeak привяжется к твоему профилю на сайте турниров.\n"
@@ -312,8 +317,12 @@ class Bot:
             uid, clid = c["client_unique_identifier"], c["clid"]
             try:
                 if uid in links and self.described.get(clid) != links[uid]:
+                    was = self.described.get(clid)
                     self.described[clid] = links[uid]
                     self.ts.cmd("clientedit clid=%s client_description=%s" % (clid, esc("Профиль F16 Arena: " + links[uid])))
+                    if was:  # подключение перепривязали к другому профилю, не выходя с сервера
+                        self.pm(clid, PM_RELINKED % links[uid])
+                        log("relinked", c["client_nickname"], was, "->", links[uid])
                 if c["cid"] == tele and uid not in links:
                     self.move(c, bind)
                     self.pm(clid, PM_NEED_BIND)
@@ -325,7 +334,11 @@ class Bot:
                             log("linked", c["client_nickname"], "->", links[uid])
                         else:
                             self.move(c, self.cid[LOBBY])
-                            self.pm(clid, PM_ALREADY % links[uid])
+                            r = self.site("token", uid=uid, nick=c["client_nickname"])
+                            if r and r.get("url"):
+                                self.pm(clid, PM_RELINK % (links[uid], r["url"]))
+                            else:
+                                self.pm(clid, PM_ALREADY % links[uid])
                     elif time.time() - self.bind_sent.get(clid, 0) > LINK_TTL:
                         r = self.site("token", uid=uid, nick=c["client_nickname"])
                         if r and r.get("url"):
