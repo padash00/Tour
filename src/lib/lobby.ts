@@ -937,8 +937,6 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
       const winner = ev.winner?.team === "team1" ? 1 : ev.winner?.team === "team2" ? 2 : null;
       setMap({ team1_score: ev.team1?.score ?? 0, team2_score: ev.team2?.score ?? 0, status: "finished", winner });
       await upsertLobbyStats(g, idx + 1, ev);
-      // факты по раундам из лога (первые убийства, KAST, оружие, стороны) — не должны мешать итогу карты
-      await import("./lobby-rounds").then((m) => m.recomputeLobbyFacts(g.id)).catch((e) => console.error("lobby round facts", e));
       const s1 = maps.filter((m) => m.winner === 1).length;
       const s2 = maps.filter((m) => m.winner === 2).length;
       const need = Math.floor(g.best_of / 2) + 1;
@@ -947,6 +945,9 @@ export async function handleLobbyEvent(ev: LobbyEvent): Promise<{ instance: stri
         .from("lobby_games")
         .update({ maps, team1_score: s1, team2_score: s2, ...(done && { winner: s1 > s2 ? 1 : s2 > s1 ? 2 : null }) })
         .eq("id", g.id).throwOnError();
+      // факты по раундам из лога (первые убийства, KAST, оружие, стороны): только после записи итога карты —
+      // пересчёт читает карты из базы и несыгранные пропускает. Ошибка здесь итогу карты не мешает
+      await import("./lobby-rounds").then((m) => m.recomputeLobbyFacts(g.id)).catch((e) => console.error("lobby round facts", e));
       if (done) await finishGame(g.id);
       const m = maps[idx];
       const lines = [`Карта ${idx + 1} (${mapTitle(m?.map ?? "")}): ${g.team1.name} ${m?.team1_score ?? 0}:${m?.team2_score ?? 0} ${g.team2.name}`];

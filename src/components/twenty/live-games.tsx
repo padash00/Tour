@@ -7,6 +7,7 @@ import { money } from "./money";
 
 export type LiveGame = {
   code: string;
+  visibility?: string;
   status: string;
   settings: LobbySettings;
   host: { nickname: string } | null;
@@ -48,6 +49,7 @@ export function LiveGames({ games, images, t, mineCode }: { games: LiveGame[]; i
                   <div className="num mt-1.5 text-[14px] text-white/80">
                     #{l.code} · {l.host?.nickname ?? "—"} · {t("{n} игроков", { n: need })} · BO{l.settings.best_of}
                     {bank > 0 && ` · ${t("банк {sum}", { sum: money(bank, t) })}`}
+                    {!playing && l.visibility === "closed" && ` · ${t("по паролю")}`}
                   </div>
                   {!playing && (
                     <div className="mt-3 flex max-w-[420px] items-center gap-3">

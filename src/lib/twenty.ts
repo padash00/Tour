@@ -20,32 +20,50 @@ type SideFact = { rounds?: number; wins?: number; kills?: number; deaths?: numbe
 type FactRow = { game_id: string; map_number: number; steam_id: string; kast: number; first_kills: number; first_deaths: number; trade_kills: number; weapons: Record<string, number> | null; sides: { CT?: SideFact; T?: SideFact } | null };
 const SNIPERS = ["awp", "ssg08", "scar20", "g3sg1"];
 
-/** Все сыгранные игры на банк со статистикой по картам и никами игроков */
+/** Сколько порций статистики запрашиваем одновременно */
+const STAT_PARALLEL = 6;
+
+/**
+ * Все сыгранные игры на банк со статистикой по картам и никами игроков.
+ * Сбой базы — исключение, а не пустой ответ: иначе страница показала бы «рейтинга нет» и положила это в кэш.
+ */
 export async function loadTwentyData(): Promise<TwentyData> {
-  const { data } = await db()
-    .from("lobby_games")
-    .select("id, winner, finished_at, maps, settings")
-    .eq("status", "finished")
-    .or("settings->>pot.eq.true,settings->>cup_of.not.is.null")
-    .order("finished_at", { ascending: false })
-    .limit(600);
-  const games: CoreGame[] = ((data ?? []) as unknown as GameRow[]).map((g) => ({ id: g.id, code: g.settings?.cup_of?.code ?? null, winner: g.winner, finished_at: g.finished_at, maps: g.maps ?? [] }));
+  // игры — страницами, пока не кончатся: «за всё время» не должно обрезаться пределом строк ответа
+  const gameRows: GameRow[] = [];
+  for (;;) {
+    const { data } = await db()
+      .from("lobby_games")
+      .select("id, winner, finished_at, maps, settings")
+      .eq("status", "finished")
+      .or("settings->>pot.eq.true,settings->>cup_of.not.is.null")
+      .order("finished_at", { ascending: false })
+      .order("id")
+      .range(gameRows.length, gameRows.length + 999)
+      .throwOnError();
+    gameRows.push(...((data ?? []) as unknown as GameRow[]));
+    if (!data?.length) break;
+  }
+  const games: CoreGame[] = gameRows.map((g) => ({ id: g.id, code: g.settings?.cup_of?.code ?? null, winner: g.winner, finished_at: g.finished_at, maps: g.maps ?? [] }));
 
   // статистика по картам: порциями, чтобы не упереться в лимит строк ответа (BO5 — до 50 строк на игру)
-  const stats: CoreStat[] = [];
   const ids = games.map((g) => g.id);
-  for (let i = 0; i < ids.length; i += 15) {
-    const { data: rows } = await db()
-      .from("lobby_player_stats")
-      .select("game_id, map_number, steam_id, name, team, kills, deaths, assists, damage, headshot_kills, rounds_played, kast, mvp, clutch_wins, first_kills, raw")
-      .in("game_id", ids.slice(i, i + 15))
-      .limit(1000);
-    // факты по раундам из лога сервера: то, чего MatchZy для лобби не присылает (у старых игр их нет)
-    const { data: factRows } = await db()
-      .from("lobby_round_facts")
-      .select("game_id, map_number, steam_id, kast, first_kills, first_deaths, trade_kills, weapons, sides")
-      .in("game_id", ids.slice(i, i + 15))
-      .limit(1000);
+  const loadChunk = async (chunk: string[]): Promise<CoreStat[]> => {
+    const stats: CoreStat[] = [];
+    const [{ data: rows }, { data: factRows }] = await Promise.all([
+      db()
+        .from("lobby_player_stats")
+        .select("game_id, map_number, steam_id, name, team, kills, deaths, assists, damage, headshot_kills, rounds_played, kast, mvp, clutch_wins, first_kills, raw")
+        .in("game_id", chunk)
+        .limit(1000)
+        .throwOnError(),
+      // факты по раундам из лога сервера: то, чего MatchZy для лобби не присылает (у старых игр их нет)
+      db()
+        .from("lobby_round_facts")
+        .select("game_id, map_number, steam_id, kast, first_kills, first_deaths, trade_kills, weapons, sides")
+        .in("game_id", chunk)
+        .limit(1000)
+        .throwOnError(),
+    ]);
     const facts = new Map(((factRows ?? []) as unknown as FactRow[]).map((f) => [`${f.game_id}:${f.map_number}:${f.steam_id}`, f]));
     for (const { raw, ...s } of (rows ?? []) as unknown as StatRow[]) {
       const n = (k: string) => Number(raw?.[k] ?? 0) || 0;
@@ -65,13 +83,20 @@ export async function loadTwentyData(): Promise<TwentyData> {
         t_rounds: t.rounds ?? 0, t_wins: t.wins ?? 0, t_kills: t.kills ?? 0, t_deaths: t.deaths ?? 0,
       });
     }
+    return stats;
+  };
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 15) chunks.push(ids.slice(i, i + 15));
+  const stats: CoreStat[] = [];
+  for (let i = 0; i < chunks.length; i += STAT_PARALLEL) {
+    for (const part of await Promise.all(chunks.slice(i, i + STAT_PARALLEL).map(loadChunk))) stats.push(...part);
   }
 
   const steamIds = [...new Set(stats.map((s) => s.steam_id))];
   const players: Record<string, TwentyPlayer> = {};
   const elo: Record<string, number> = {};
   for (let i = 0; i < steamIds.length; i += 200) {
-    const { data: rows } = await db().from("players").select("steam_id, nickname, avatar_url, faceit_elo").in("steam_id", steamIds.slice(i, i + 200));
+    const { data: rows } = await db().from("players").select("steam_id, nickname, avatar_url, faceit_elo").in("steam_id", steamIds.slice(i, i + 200)).throwOnError();
     for (const p of rows ?? []) {
       players[p.steam_id] = { nickname: p.nickname, avatar_url: p.avatar_url };
       if (p.faceit_elo) elo[p.steam_id] = p.faceit_elo;

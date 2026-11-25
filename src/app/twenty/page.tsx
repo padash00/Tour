@@ -176,7 +176,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
       {tab === "awards" && twenty.records.length > 0 && <AchievementsTab board={twenty.achievementBoard()} who={who} t={t} players={Object.keys(twenty.players).length} />}
 
-      {!king && (tab === "rating" || twenty.records.length === 0) && (
+      {!king && (tab === "rating" || tab === "maps" || tab === "style" || twenty.records.length === 0) && (
         <>
           <EmptyState
             title={code ? t("В этом лобби ещё нет сыгранных матчей") : season ? t("В этом сезоне ещё не играли") : t("Рейтинга пока нет")}

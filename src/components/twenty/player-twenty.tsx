@@ -12,7 +12,10 @@ import { whoOf } from "./tabs";
 
 /** Игрок в «Миксе»: место и рейтинг, роль и паутинка, карты, напарник и неудобный соперник. Нет игр — блока нет */
 export async function PlayerTwenty({ steamId }: { steamId: string }) {
-  const profile = await getTwentyProfile(steamId);
+  const profile = await getTwentyProfile(steamId).catch((e) => {
+    console.error("twenty profile", e);
+    return null;
+  });
   if (!profile) return null;
   const t = await getT();
   const { row, relations: rel, season } = profile;

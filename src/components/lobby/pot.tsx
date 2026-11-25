@@ -86,7 +86,7 @@ export function CreatePotButton({ loggedIn, className }: { loggedIn: boolean; cl
         open={open}
         onClose={() => !pending && setOpen(false)}
         title={t("Собрать микс 5×5")}
-        description={t("Игра 5 на 5 на банк между игроками: BO3 через интернет. Капитанов назначает организатор (по умолчанию — самые высокие по ELO), игроков выбирают змейкой.")}
+        description={t("Игра 5 на 5 на банк между игроками: BO3 через интернет. Капитанов назначает организатор, игроков выбирают змейкой.")}
         size="lg"
         footer={
           <>
