@@ -339,6 +339,8 @@ function toLines(games: CoreGame[], stats: CoreStat[]): Line[] {
     const game = byId.get(s.game_id);
     if (!game || !s.rounds_played) continue;
     const m = game.maps[s.map_number - (base.get(s.game_id) ?? 0)] ?? null;
+    // карта начата, но не доиграна (серию закрыли раньше) — её цифры в рейтинг не идут
+    if (m?.status && m.status !== "finished") continue;
     const winner = m ? (m.winner ?? (m.team1_score > m.team2_score ? 1 : m.team2_score > m.team1_score ? 2 : null)) : null;
     const [scoreFor, scoreAgainst] = m ? (s.team === 1 ? [m.team1_score, m.team2_score] : [m.team2_score, m.team1_score]) : [0, 0];
     out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins, kastRounds: s.rounds_played }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
