@@ -117,6 +117,18 @@ check(jan.seasons[0].finished && jan.seasons[0].podium.map((x) => x.steam_id)[0]
 check(jan.achievements("ACE").find((x) => x.key === "champion")!.earned && jan.achievements("X").find((x) => x.key === "podium")!.earned && !jan.achievements("X").find((x) => x.key === "champion")!.earned, "достижения «чемпион сезона» и «призёр сезона» выдаются по завершённым сезонам");
 check(jan.rows.every((r) => r.qualified && r.prize === null), "за всё время зачёта и призов нет");
 
+// записанные итоги сезона: тройка берётся из записи, а не из пересчёта по истории
+const JAN = Date.parse("2027-01-10T12:00:00Z");
+const fixedDec = { "2026-12": [{ steam_id: "X", name: "X", rating: 1.11, maps: 10, prize: SEASON_PRIZES[0], paid: true }, { steam_id: "ACE", name: "ACE", rating: 1.5, maps: 10, prize: SEASON_PRIZES[1], paid: false }] };
+const janFixed = buildTwenty(games, stats, { now: JAN, fixed: fixedDec });
+check(janFixed.seasons[0].fixed === true && janFixed.seasons[0].podium.map((x) => x.steam_id).join() === "X,ACE" && janFixed.seasons[0].podium[0].paid === true, "у завершённого сезона с записью призёры — из записи, вместе с отметкой о выплате");
+check(janFixed.achievements("X").find((x) => x.key === "champion")!.earned && !janFixed.achievements("ACE").find((x) => x.key === "champion")!.earned, "«чемпион сезона» выдаётся по записанным итогам");
+check(!jan.seasons[0].fixed, "без записи сезон считается по истории и записанным не помечен");
+const decFixed = buildTwenty(games, stats, { season: "2026-12", now: JAN, fixed: fixedDec });
+check(decFixed.rows.slice(0, 2).map((r) => r.steam_id).join() === "X,ACE" && decFixed.rows.map((r) => r.prize ?? "").join() === [SEASON_PRIZES[0], SEASON_PRIZES[1], "", ""].join(), "таблица завершённого сезона: записанные призёры сверху, призы только у них");
+const decLive = buildTwenty(games, stats, { season: "2026-12", now: DEC, fixed: fixedDec });
+check(decLive.rows[0].steam_id === "ACE" && !decLive.seasons[0].fixed, "идущий сезон запись не трогает");
+
 // ───────────────────────── баланс составов
 const fitRows = Array.from({ length: 10 }, (_, i) => ({ rating: 0.9 + i * 0.04, maps: 8, elo: 2000 + i * 100 }));
 const fit = eloFit(fitRows)!;

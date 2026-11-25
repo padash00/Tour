@@ -6,6 +6,7 @@ import { intlLocale, tr, type T } from "@/lib/i18n/core";
 import { ACH_GROUPS, type Achievement, type AchievementBoard, type HistoryPoint, type Season, type Tier } from "@/lib/twenty-core";
 import { money } from "./money";
 import { CellGrid, SectionHead } from "./panels";
+import { PrizePaidButton, RefixSeasonButton } from "./season-admin";
 import type { Who } from "./tabs";
 
 /* Сезоны «Микса» (календарный месяц, призы за 1–3 места), достижения и график рейтинга по игровым дням. */
@@ -27,7 +28,7 @@ export function seasonDaysLeft(key: string, now = Date.now()) {
 const PLACE = ["text-gold", "text-silver", "text-bronze"];
 
 /** Зал славы: тройки завершённых сезонов */
-export function HallOfFame({ seasons, who, t }: { seasons: Season[]; who: Who; t: T }) {
+export function HallOfFame({ seasons, who, t, admin = false }: { seasons: Season[]; who: Who; t: T; admin?: boolean }) {
   const done = seasons.filter((s) => s.finished);
   return (
     <section aria-label={t("Зал славы сезонов")}>
@@ -42,22 +43,39 @@ export function HallOfFame({ seasons, who, t }: { seasons: Season[]; who: Who; t
                 <Link href={`/twenty?season=${s.key}`} className="text-[16px] font-bold text-fg hover:text-accent">
                   {seasonLabel(s.key, t)}
                 </Link>
-                <span className="text-meta text-fg-3">{t("матчей: {n}", { n: s.matches })}</span>
+                <span className="text-meta text-fg-3">
+                  {t("матчей: {n}", { n: s.matches })}
+                  {s.fixed && ` · ${t("итоги зафиксированы")}`}
+                </span>
               </div>
               <div className="mt-3 flex flex-col gap-2">
                 {s.podium.length === 0 && <p className="text-meta text-fg-3">{t("Никто не набрал карты для зачёта.")}</p>}
                 {s.podium.map((x, i) => {
                   const p = who(x.steam_id, x.name);
                   return (
-                    <Link key={x.steam_id} href={`/players/${x.steam_id}`} className="flex items-center gap-3 rounded-control px-1 py-1 transition-colors hover:bg-surface-2">
-                      <RankBadge n={i + 1} />
-                      <Avatar src={p.avatar_url} name={p.nickname} size="sm" />
-                      <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">{p.nickname}</span>
-                      <span className="num text-meta text-fg-3">{x.rating.toFixed(2)}</span>
-                      <span className={cn("num w-24 shrink-0 text-right text-[15px] font-extrabold", PLACE[i])}>{money(x.prize, t)}</span>
-                    </Link>
+                    <div key={x.steam_id}>
+                      <Link href={`/players/${x.steam_id}`} className="flex items-center gap-3 rounded-control px-1 py-1 transition-colors hover:bg-surface-2">
+                        <RankBadge n={i + 1} />
+                        <Avatar src={p.avatar_url} name={p.nickname} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-fg">{p.nickname}</span>
+                        <span className="num text-meta text-fg-3">{x.rating.toFixed(2)}</span>
+                        <span className={cn("num w-24 shrink-0 text-right text-[15px] font-extrabold", PLACE[i])}>{money(x.prize, t)}</span>
+                      </Link>
+                      {/* отметка о выплате видна всем; ставит и снимает её админ */}
+                      {(x.paid || (admin && s.fixed)) && (
+                        <div className="flex items-center justify-end gap-3 px-1 text-micro">
+                          {x.paid && <span className="font-semibold text-ok">{t("приз выплачен")}</span>}
+                          {admin && s.fixed && <PrizePaidButton season={s.key} place={i + 1} paid={!!x.paid} />}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
+                {admin && s.fixed && !s.podium.some((x) => x.paid) && (
+                  <div className="flex justify-end px-1">
+                    <RefixSeasonButton season={s.key} />
+                  </div>
+                )}
               </div>
             </div>
           ))}

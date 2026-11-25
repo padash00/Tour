@@ -1056,6 +1056,53 @@ export type Database = {
           },
         ]
       }
+      mix_season_results: {
+        Row: {
+          fixed_at: string
+          maps: number
+          name: string | null
+          paid_at: string | null
+          paid_by: string | null
+          place: number
+          prize: number
+          rating: number
+          season: string
+          steam_id: string
+        }
+        Insert: {
+          fixed_at?: string
+          maps: number
+          name?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          place: number
+          prize: number
+          rating: number
+          season: string
+          steam_id: string
+        }
+        Update: {
+          fixed_at?: string
+          maps?: number
+          name?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          place?: number
+          prize?: number
+          rating?: number
+          season?: string
+          steam_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mix_season_results_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lobby_templates: {
         Row: {
           created_at: string

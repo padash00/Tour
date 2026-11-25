@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCurrentPlayer } from "@/lib/auth";
+import { getCurrentPlayer, isAdmin } from "@/lib/auth";
 import { cupTeams } from "@/lib/cup-core";
 import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
@@ -169,7 +169,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
       {tab === "records" && twenty.records.length > 0 && (
         <>
           <RecordsTab records={twenty.records} duos={twenty.duos} who={who} t={t} />
-          <HallOfFame seasons={twenty.seasons} who={who} t={t} />
+          <HallOfFame seasons={twenty.seasons} who={who} t={t} admin={isAdmin(player)} />
           {(code || season) && <p className="text-meta text-fg-3">{t("Рекорды и связки считаются по всем играм, а не по одному сезону или вечеру.")}</p>}
         </>
       )}

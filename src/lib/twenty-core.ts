@@ -298,8 +298,14 @@ export type Season = {
   /** месяц уже закончился — места окончательные */
   finished: boolean;
   /** первые три места среди набравших карты для зачёта */
-  podium: { steam_id: string; name: string | null; rating: number; maps: number; prize: number }[];
+  podium: { steam_id: string; name: string | null; rating: number; maps: number; prize: number; paid?: boolean }[];
+  /** тройка записана в базе и больше не пересчитывается по истории игр */
+  fixed?: boolean;
 };
+/** Записанное место в итогах завершённого сезона */
+export type FixedPlace = { steam_id: string; name: string | null; rating: number; maps: number; prize: number; paid: boolean };
+/** Записанные итоги сезонов: «2026-11» → места по порядку */
+export type FixedSeasons = Record<string, FixedPlace[]>;
 
 export type Twenty = {
   /** сезоны, свежий первым */
@@ -741,7 +747,7 @@ function relationsOf(pairs: Pairs, steamId: string): Relations {
 
 // ───────────────────────── сезоны
 
-function seasonsOf(games: CoreGame[], lines: Line[], now: number): Season[] {
+function seasonsOf(games: CoreGame[], lines: Line[], now: number, fixed: FixedSeasons = {}): Season[] {
   const current = currentSeason(now);
   const keys = [...new Set(games.map((g) => seasonOf(g.finished_at)))].sort().reverse();
   return keys.map((key) => {
@@ -753,7 +759,9 @@ function seasonsOf(games: CoreGame[], lines: Line[], now: number): Season[] {
       .sort((x, y) => y.rating - x.rating || y.maps - x.maps)
       .slice(0, SEASON_PRIZES.length)
       .map((x, i) => ({ ...x, prize: SEASON_PRIZES[i] }));
-    return { key, matches: own.length, mapsPlayed: own.reduce((n, g) => n + g.maps.filter((m) => m.status === "finished").length, 0), finished: key < current, podium };
+    // у завершённого сезона с записанными итогами тройка берётся из записи, а не из пересчёта
+    const saved = key < current ? fixed[key] : undefined;
+    return { key, matches: own.length, mapsPlayed: own.reduce((n, g) => n + g.maps.filter((m) => m.status === "finished").length, 0), finished: key < current, podium: saved ?? podium, fixed: !!saved };
   });
 }
 
@@ -883,7 +891,7 @@ function historyOf(p: Player): HistoryPoint[] {
 
 // ───────────────────────── сборка
 
-export type TwentyScope = { code?: string; season?: string; now?: number };
+export type TwentyScope = { code?: string; season?: string; now?: number; fixed?: FixedSeasons | null };
 
 /**
  * Всё про «Микс» по сыгранным играм. С кодом лобби — только один вечер, с сезоном — только его месяц
@@ -900,7 +908,14 @@ export function buildTwenty(games: CoreGame[], stats: CoreStat[], opts: TwentySc
   const rows = rowsOf(scope, evening ? 1 : TWENTY_MIN_MAPS, season);
   const pairs = pairsOf(all);
   const records = recordsOf(all);
-  const seasons = seasonsOf(games, lines, opts.now ?? Date.now());
+  const seasons = seasonsOf(games, lines, opts.now ?? Date.now(), opts.fixed ?? {});
+  // таблица завершённого сезона с записанными итогами: призёры и призы — по записи, остальные идут следом как были
+  const saved = season ? seasons.find((x) => x.key === opts.season && x.fixed)?.podium : undefined;
+  if (saved) {
+    const place = new Map(saved.map((x, i) => [x.steam_id, i]));
+    rows.forEach((r) => (r.prize = saved[place.get(r.steam_id) ?? -1]?.prize ?? null));
+    rows.sort((x, y) => (place.get(x.steam_id) ?? saved.length) - (place.get(y.steam_id) ?? saved.length));
+  }
 
   // звания считаются по всем играм, а не по выбранному отрезку
   const allRows = evening || season ? rowsOf(all, TWENTY_MIN_MAPS) : rows;

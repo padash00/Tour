@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
-import { buildTwenty, currentSeason, eloFit, mapEdge, type EloFit, type CoreGame, type CoreStat, type RoleKey, type TwentyScope } from "./twenty-core";
+import { buildTwenty, currentSeason, eloFit, mapEdge, type EloFit, type CoreGame, type CoreStat, type FixedSeasons, type RoleKey, type TwentyScope } from "./twenty-core";
 
 /*
  * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
@@ -12,7 +12,20 @@ export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relatio
 
 export type TwentyEvening = { code: string; finished_at: string; matches: number };
 export type TwentyPlayer = { nickname: string; avatar_url: string | null };
-export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer>; elo: Record<string, number> };
+/** fixed — записанные итоги сезонов; null — таблицы итогов ещё нет или она не прочиталась (тогда считаем по истории) */
+export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer>; elo: Record<string, number>; fixed: FixedSeasons | null };
+
+/** Записанные итоги сезонов. Сбой здесь рейтинг не ломает: без записи тройка считается по истории, как раньше */
+async function loadFixedSeasons(): Promise<FixedSeasons | null> {
+  const { data, error } = await db().from("mix_season_results").select("season, place, steam_id, name, rating, maps, prize, paid_at").order("season").order("place");
+  if (error) {
+    console.error("mix season results", error.message);
+    return null;
+  }
+  const out: FixedSeasons = {};
+  for (const r of data ?? []) (out[r.season] ??= []).push({ steam_id: r.steam_id, name: r.name, rating: Number(r.rating), maps: r.maps, prize: r.prize, paid: !!r.paid_at });
+  return out;
+}
 
 type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
 type StatRow = Pick<CoreStat, "game_id" | "map_number" | "steam_id" | "name" | "team" | "kills" | "deaths" | "assists" | "damage" | "headshot_kills" | "rounds_played" | "kast" | "mvp" | "clutch_wins" | "first_kills"> & { raw: Record<string, unknown> | null };
@@ -102,7 +115,7 @@ export async function loadTwentyData(): Promise<TwentyData> {
       if (p.faceit_elo) elo[p.steam_id] = p.faceit_elo;
     }
   }
-  return { games, stats, players, elo };
+  return { games, stats, players, elo, fixed: await loadFixedSeasons() };
 }
 
 /**
@@ -112,7 +125,7 @@ export async function loadTwentyData(): Promise<TwentyData> {
 export const getTwentyProfile = unstable_cache(
   async (steamId: string) => {
     const data = await loadTwentyData();
-    const twenty = buildTwenty(data.games, data.stats);
+    const twenty = buildTwenty(data.games, data.stats, { fixed: data.fixed });
     const place = twenty.rows.findIndex((r) => r.steam_id === steamId);
     if (place < 0) return null;
     const relations = twenty.relations(steamId);
@@ -152,7 +165,20 @@ export function eveningsOf(games: CoreGame[]): TwentyEvening[] {
 /** Рейтинг и всё остальное для страницы «Микс»: за сезон, за один вечер (код лобби) или за всё время */
 export async function getTwenty(opts: TwentyScope = {}) {
   const data = await loadTwentyData();
-  return { ...buildTwenty(data.games, data.stats, opts), players: data.players, evenings: eveningsOf(data.games) };
+  let twenty = buildTwenty(data.games, data.stats, { ...opts, fixed: data.fixed });
+  // месяц закончился, а его итоги ещё не записаны — записываем один раз: дальше тройка от истории игр не зависит
+  const fresh = data.fixed ? twenty.seasons.filter((s) => s.finished && !s.fixed && s.podium.length > 0) : [];
+  if (data.fixed && fresh.length) {
+    const rows = fresh.flatMap((s) => s.podium.map((p, i) => ({ season: s.key, place: i + 1, steam_id: p.steam_id, name: p.name, rating: Math.round(p.rating * 1000) / 1000, maps: p.maps, prize: p.prize })));
+    const { error } = await db().from("mix_season_results").upsert(rows, { onConflict: "season,place", ignoreDuplicates: true });
+    if (error) console.error("mix season fix", error.message);
+    else {
+      // запись могла уже существовать (два открытия разом) — показываем то, что реально лежит в базе
+      const fixed = await loadFixedSeasons();
+      if (fixed) twenty = buildTwenty(data.games, data.stats, { ...opts, fixed });
+    }
+  }
+  return { ...twenty, players: data.players, evenings: eveningsOf(data.games) };
 }
 
 /** Короткая справка по игроку для комнаты лобби: рейтинг, роль, коронная карта и рейтинг по картам */
