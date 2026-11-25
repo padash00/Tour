@@ -7,7 +7,7 @@ import { DATA_TABLE, NUM_CELL, RankBadge, SortedHead, tableBox } from "@/compone
 import { SelectNav } from "@/components/public/select-nav";
 import type { T } from "@/lib/i18n/core";
 import { mapLabel } from "@/lib/maps";
-import { SEASON_MIN_MAPS, MAP_MIN, RADAR_AXES, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type MapBoard, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
+import { MAP_MIN, RADAR_AXES, ROLE_MIN_MAPS, ROLES, TWENTY_MIN_MAPS, type MapBoard, type RoleKey, type TwentyRow } from "@/lib/twenty-core";
 import type { TwentyPlayer } from "@/lib/twenty";
 import { money } from "./money";
 import { MapHero, SectionHead } from "./panels";
@@ -59,7 +59,7 @@ const hasPreview = (rows: TwentyRow[]) => rows.some((r) => r.rating3 != null && 
  * Таблица рейтинга. Место игрока — всегда его место по рейтингу, как бы таблица ни была отсортирована.
  * В сезоне места есть только у набравших карты для зачёта; остальные идут ниже с пометкой, сколько карт осталось.
  */
-export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref, season = false }: { rows: TwentyRow[]; who: Who; t: T; meSteamId: string | null; sort?: SortKey; sortHref?: (key: SortKey) => string; season?: boolean }) {
+export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref, season = false, need = 0 }: { rows: TwentyRow[]; who: Who; t: T; meSteamId: string | null; sort?: SortKey; sortHref?: (key: SortKey) => string; season?: boolean; /** сколько карт нужно для зачёта этого сезона */ need?: number }) {
   const place = new Map(rows.map((r, i) => [r.steam_id, r.qualified ? i + 1 : null]));
   const list = sort === "rating" ? rows : [...rows].sort((x, y) => SORT_VALUE[sort](y) - SORT_VALUE[sort](x) || y.rating - x.rating);
   const columns: [SortKey, string][] = [["maps", t("Карт")], ["wins", t("Побед")], ["kills", t("У–С")], ["diff", "±"], ["kd", "K/D"], ["adr", "ADR"], ["hs", "HS%"], ["mvp", "MVP"], ["swing", "Swing"]];
@@ -111,7 +111,7 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
                       </Link>
                       {(r.role || r.best || r.streak >= 3 || !r.qualified) && (
                         <div className="mt-1 flex items-center gap-1.5 overflow-hidden">
-                          {season && !r.qualified && <span className="shrink-0 rounded-chip bg-ink/[0.06] px-1.5 py-0.5 text-micro font-semibold text-fg-3">{t("до зачёта карт: {n}", { n: SEASON_MIN_MAPS - r.maps })}</span>}
+                          {season && !r.qualified && <span className="shrink-0 rounded-chip bg-ink/[0.06] px-1.5 py-0.5 text-micro font-semibold text-fg-3">{t("до зачёта карт: {n}", { n: Math.max(1, need - r.maps) })}</span>}
                           <RoleChip role={r.role} t={t} />
                           <BestMapChip cell={r.best} t={t} />
                           <Streak n={r.streak} t={t} />

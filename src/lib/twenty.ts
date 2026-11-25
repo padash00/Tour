@@ -7,7 +7,7 @@ import { buildTwenty, currentSeason, eloFit, mapEdge, type EloFit, type CoreGame
  * Здесь только чтение из базы; сами расчёты (рейтинг, карты, роли, номинации, рекорды) — в twenty-core.ts.
  */
 
-export { TWENTY_MIN_MAPS, MAP_MIN, ROLE_MIN_MAPS, DUO_MIN, SEASON_MIN_MAPS, SEASON_PRIZES, ACHIEVEMENTS_TOTAL, currentSeason } from "./twenty-core";
+export { TWENTY_MIN_MAPS, MAP_MIN, ROLE_MIN_MAPS, DUO_MIN, SEASON_MIN_MAPS, SEASON_PRIZES, ACHIEVEMENTS_TOTAL, currentSeason, nextSeason, seasonMinMaps } from "./twenty-core";
 export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relations, RoleKey, Season, Achievement, AchievementBoard, HistoryPoint } from "./twenty-core";
 
 export type TwentyEvening = { code: string; finished_at: string; matches: number };

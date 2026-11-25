@@ -3,7 +3,7 @@ import { Avatar, Button, Container, Section, cn } from "@/components/ds";
 import { FormStrip } from "@/components/public/form-strip";
 import { getT } from "@/lib/i18n/server";
 import { mapLabel } from "@/lib/maps";
-import { getTwentyProfile, MAP_MIN, SEASON_MIN_MAPS } from "@/lib/twenty";
+import { getTwentyProfile, MAP_MIN, seasonMinMaps } from "@/lib/twenty";
 import type { Versus } from "@/lib/twenty-core";
 import { Radar, RoleChip, Streak, Trend, ratingTone } from "./bits";
 import { money } from "./money";
@@ -111,7 +111,7 @@ export async function PlayerTwenty({ steamId }: { steamId: string }) {
               <Link href="/twenty" className="block rounded-control border border-line-subtle bg-shell/60 px-3 py-2.5 transition-colors hover:border-line-strong">
                 <span className="block text-micro font-semibold uppercase tracking-[0.1em] text-fg-3">{t("Сезон · {name}", { name: seasonLabel(season.key, t) })}</span>
                 <span className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[14px] font-semibold text-fg">
-                  {season.qualified ? t("{n} место", { n: season.place }) : t("вне зачёта — до него карт: {n}", { n: SEASON_MIN_MAPS - season.maps })}
+                  {season.qualified ? t("{n} место", { n: season.place }) : t("вне зачёта — до него карт: {n}", { n: Math.max(1, seasonMinMaps(season.key) - season.maps) })}
                   <span className="num text-fg-3">{season.rating.toFixed(2)}</span>
                   {season.prize != null && <span className="num rounded-chip bg-gold/20 px-1.5 py-0.5 text-micro font-bold text-gold">{money(season.prize, t)}</span>}
                 </span>

@@ -6,7 +6,7 @@ import { formatDateTime } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { listOpenLobbies, playerLobby } from "@/lib/lobby";
 import { getMapImages } from "@/lib/settings";
-import { SEASON_MIN_MAPS, SEASON_PRIZES, TWENTY_MIN_MAPS, currentSeason, getTwenty } from "@/lib/twenty";
+import { SEASON_PRIZES, TWENTY_MIN_MAPS, currentSeason, getTwenty, nextSeason, seasonMinMaps } from "@/lib/twenty";
 import { Button, Container, ContextNav, EmptyState, PageTitle, Section } from "@/components/ds";
 import { CreatePotButton } from "@/components/lobby/pot";
 import { SelectNav } from "@/components/public/select-nav";
@@ -54,6 +54,10 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
   const nowSeason = currentSeason();
   const allTime = str(sp.season) === "all";
   const season = code || allTime ? undefined : SEASON.test(str(sp.season)) ? str(sp.season) : nowSeason;
+
+  /** сколько карт нужно для зачёта выбранного сезона; со следующего сезона порог может быть другим — предупреждаем заранее */
+  const need = season ? seasonMinMaps(season) : 0;
+  const needNext = season === nowSeason && seasonMinMaps(nextSeason(nowSeason)) !== need ? seasonMinMaps(nextSeason(nowSeason)) : null;
 
   const player = await getCurrentPlayer();
   const [twenty, lobbies, mine, images] = await Promise.all([getTwenty({ code, season }), listOpenLobbies(), player ? playerLobby(player.id) : null, getMapImages()]);
@@ -143,12 +147,12 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
               code
                 ? t("Матчей в лобби: {n}", { n: matches })
                 : season
-                  ? `${season === nowSeason ? `${t.plural(seasonDaysLeft(season), "Остался {n} день", "Осталось {n} дня", "Осталось {n} дней").replace("{n}", String(seasonDaysLeft(season)))}. ` : ""}${t("Сезон — календарный месяц: первого числа таблица начинается заново. В зачёт идут сыгравшие за сезон от {n} карт.", { n: SEASON_MIN_MAPS })}`
+                  ? `${season === nowSeason ? `${t.plural(seasonDaysLeft(season), "Остался {n} день", "Осталось {n} дня", "Осталось {n} дней").replace("{n}", String(seasonDaysLeft(season)))}. ` : ""}${t("Сезон — календарный месяц: первого числа таблица начинается заново. В зачёт идут сыгравшие за сезон от {n} карт.", { n: need })}${needNext ? ` ${t("Со следующего сезона в зачёт идут сыгравшие от {n} карт.", { n: needNext })}` : ""}`
                   : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })
             }
             places={[0, 1, 2].map((i) => (season ? rows.filter((r) => r.qualified) : rows)[i] ?? null)}
             prizes={season ? SEASON_PRIZES : null}
-            emptyText={season ? t("Место свободно — никто не набрал {n} карт", { n: SEASON_MIN_MAPS }) : t("Место свободно")}
+            emptyText={season ? t("Место свободно — никто не набрал {n} карт", { n: need }) : t("Место свободно")}
             note={season ? (season === nowSeason ? t("Места меняются до конца сезона. Призы за 1–3 места вручает F16 Arena по итогам месяца.") : t("Итоги сезона окончательные. Призы за 1–3 места вручает F16 Arena.")) : undefined}
           />
 
@@ -157,9 +161,9 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
           <section aria-label={t("Все игроки")}>
             <SectionHead
               title={t("Все игроки")}
-              meta={code ? t("Матчей в лобби: {n}", { n: matches }) : season ? t("Места и призы — среди сыгравших за сезон от {n} карт. Матчей в сезоне: {m}", { n: SEASON_MIN_MAPS, m: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}
+              meta={code ? t("Матчей в лобби: {n}", { n: matches }) : season ? t("Места и призы — среди сыгравших за сезон от {n} карт. Матчей в сезоне: {m}", { n: need, m: matches }) : t("В таблице — сыгравшие от {n} карт. Матчей учтено: {m}", { n: TWENTY_MIN_MAPS, m: matches })}
             />
-            <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} season={!!season} sort={sort} sortHref={(key) => href("rating", key === "rating" ? {} : { sort: key })} />
+            <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} season={!!season} need={need} sort={sort} sortHref={(key) => href("rating", key === "rating" ? {} : { sort: key })} />
             <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")} {t("Нажмите на заголовок столбца, чтобы отсортировать по нему.")}</p>
             <RatingHelp rows={rows} who={who} t={t} average={RATING3_AVERAGE} official={!!season && season >= RATING3_FROM} />
           </section>

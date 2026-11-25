@@ -1,6 +1,6 @@
 // «Двадцатка» без базы: рейтинг по картам, коронная карта, роли, форма, номинации, рекорды, связки, перевес для вето.
 // Запуск: npx tsx scripts/test-twenty.mts
-import { rating2, rating3, rating3Parts, RATING3_AVERAGE, RATING3_FROM, weaponBoards, weaponGroup, eloFit, playerStrength, teamBalance, ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
+import { nextSeason, seasonMinMaps, rating2, rating3, rating3Parts, RATING3_AVERAGE, RATING3_FROM, weaponBoards, weaponGroup, eloFit, playerStrength, teamBalance, ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -104,8 +104,8 @@ check(nov.rows.length === 6 && nov.rows.every((r) => !r.qualified && r.prize ===
 check(nov.seasons.length === 1 && !nov.seasons[0].finished && nov.seasons[0].podium.length === 0, "идущий сезон не завершён, призёров ещё нет");
 
 // декабрь: две серии по пять карт — у четверых по 10 карт, они в зачёте
-game("d1", "2026-12-05T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 1], ["de_dust2", 2], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 22, 12), p("BUD", 14, 15)], [p("X", 16, 16), p("Y", 11, 18)]);
-game("d2", "2026-12-06T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 2], ["de_dust2", 1], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 21, 13), p("BUD", 15, 15)], [p("X", 17, 15), p("Y", 12, 19)]);
+game("d1", "2026-12-05T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 1], ["de_dust2", 2], ["de_ancient", 1], ["de_anubis", 2], ["de_mirage", 1], ["de_nuke", 1], ["de_dust2", 2], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 22, 12), p("BUD", 14, 15)], [p("X", 16, 16), p("Y", 11, 18)]);
+game("d2", "2026-12-06T15:00:00Z", null, [["de_mirage", 1], ["de_nuke", 2], ["de_dust2", 1], ["de_ancient", 1], ["de_anubis", 2], ["de_mirage", 1], ["de_nuke", 2], ["de_dust2", 1], ["de_ancient", 1], ["de_anubis", 2]], [p("ACE", 21, 13), p("BUD", 15, 15)], [p("X", 17, 15), p("Y", 12, 19)]);
 const DEC = Date.parse("2026-12-20T12:00:00Z");
 const dec = buildTwenty(games, stats, { season: "2026-12", now: DEC });
 check(dec.rows.length === 4 && dec.rows.every((r) => r.qualified) && dec.rows[0].steam_id === "ACE", "сезон считается только по своим играм: четверо в зачёте, лидер — ACE");
@@ -163,6 +163,16 @@ check(rating3({ ...avg3, ekills: 78 }) > rating3(avg3) && rating3({ ...avg3, ede
   const r = (b: ReturnType<typeof buildTwenty>, id: string) => b.rows.find((x) => x.steam_id === id)!;
   check(RATING3_FROM === "2026-12" && r(nov, "P").rating === r(nov, "Q").rating && Math.abs(r(nov, "P").swing! - 4) < 1e-9 && r(nov, "P").rating3 !== null && r(nov, "P").parts3!.swing > 0.13 && r(nov, "Q").swing === null && r(nov, "Q").rating3 === null, "до сезона декабря 2026 новый рейтинг и Swing показываются справочно, на места не влияют");
   check(r(dec, "P").rating > r(dec, "R").rating && Math.abs(r(dec, "P").rating - r(dec, "P").rating3!) < 1e-9 && r(dec, "Q").rating === r(nov, "Q").rating, "с декабря новый рейтинг — официальный; карта без записи раундов считается по прежней формуле");
+}
+
+// порог зачёта: с декабря 2026 — 20 карт, сыгранные сезоны остаются с 10
+check(seasonMinMaps("2026-11") === 10 && seasonMinMaps("2026-12") === 20 && seasonMinMaps("2027-03") === 20 && nextSeason("2026-11") === "2026-12" && nextSeason("2026-12") === "2027-01", "порог зачёта по сезонам и следующий сезон");
+{
+  const many = Array.from({ length: 15 }, () => ["de_mirage", 1] as [string, 1 | 2]);
+  const G: CoreGame[] = [{ id: "d", code: "DDDD", winner: 1, finished_at: "2026-12-10T15:00:00Z", maps: many.map(([map, winner]) => ({ map, status: "finished", winner, team1_score: 13, team2_score: 7 })) } as CoreGame];
+  const S: CoreStat[] = many.flatMap((_, i) => ["P", "Q"].map((id, k) => ({ ...stats[0], game_id: "d", map_number: i + 1, steam_id: id, name: id, team: k + 1 })));
+  const d = buildTwenty(G, S, { season: "2026-12", now: Date.parse("2026-12-11T12:00:00Z") });
+  check(d.rows.length === 2 && d.rows.every((r) => r.maps === 15 && !r.qualified) && d.seasons[0].podium.length === 0, "в декабре 15 карт — ещё вне зачёта: нужно 20");
 }
 
 // оружие: группы и лидеры

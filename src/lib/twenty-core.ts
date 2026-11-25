@@ -81,6 +81,16 @@ export const DUO_MIN = 3;
 export const SEASON_PRIZES = [15000, 10000, 5000];
 /** В зачёт сезона (и на призы) — сыгравшие за сезон не меньше стольких карт: две удачные карты приз не приносят */
 export const SEASON_MIN_MAPS = 10;
+/**
+ * Порог зачёта по сезонам. С декабря 2026 — 20 карт (решение владельца 25.11.2026): в большом миксе за вечер играют
+ * до девяти карт, и десять набирались за два вечера. Сыгранные сезоны остаются с прежним порогом.
+ */
+export const seasonMinMaps = (season: string) => (season >= "2026-12" ? 20 : SEASON_MIN_MAPS);
+/** Следующий сезон: «2026-12» → «2027-01» */
+export const nextSeason = (season: string) => {
+  const [y, m] = season.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
 /** Рекорды «за карту» — только полноценные карты (не обрывки по 5 раундов) */
 const RECORD_MIN_ROUNDS = 12;
 /** Насколько должен отличаться рейтинг последнего игрового дня, чтобы показать стрелку */
@@ -655,7 +665,7 @@ function styles(players: Player[]) {
   return out;
 }
 
-function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[] {
+function rowsOf(players: Player[], minMaps: number, season = false, need = SEASON_MIN_MAPS): TwentyRow[] {
   const style = styles(players);
   const rows: TwentyRow[] = players
     .filter((p) => p.sum.maps >= minMaps)
@@ -709,7 +719,7 @@ function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[]
         trend: trendOf(p),
         form: p.games.slice(-5).reverse().map((g): "W" | "L" => (g.won ? "W" : "L")),
         ...streaks(p.games),
-        qualified: !season || a.maps >= SEASON_MIN_MAPS,
+        qualified: !season || a.maps >= need,
         prize: null,
       };
     })
@@ -906,7 +916,7 @@ function seasonsOf(games: CoreGame[], lines: Line[], now: number, fixed: FixedSe
     const own = games.filter((g) => seasonOf(g.finished_at) === key);
     const players = collect(lines.filter((l) => seasonOf(l.game.finished_at) === key));
     const podium = players
-      .filter((p) => p.sum.maps >= SEASON_MIN_MAPS)
+      .filter((p) => p.sum.maps >= seasonMinMaps(key))
       .map((p) => ({ steam_id: p.steam_id, name: p.name, rating: ratingOf(p.sum), maps: p.sum.maps }))
       .sort((x, y) => y.rating - x.rating || y.maps - x.maps)
       .slice(0, SEASON_PRIZES.length)
@@ -1057,7 +1067,7 @@ export function buildTwenty(games: CoreGame[], stats: CoreStat[], opts: TwentySc
   const scopeGames = evening ? games.filter((g) => g.code === opts.code) : season ? games.filter((g) => seasonOf(g.finished_at) === opts.season) : games;
   const ids = new Set(scopeGames.map((g) => g.id));
   const scope = evening || season ? collect(lines.filter((l) => ids.has(l.game_id))) : all;
-  const rows = rowsOf(scope, evening ? 1 : TWENTY_MIN_MAPS, season);
+  const rows = rowsOf(scope, evening ? 1 : TWENTY_MIN_MAPS, season, season ? seasonMinMaps(opts.season!) : undefined);
   const pairs = pairsOf(all);
   const records = recordsOf(all);
   const seasons = seasonsOf(games, lines, opts.now ?? Date.now(), opts.fixed ?? {});
