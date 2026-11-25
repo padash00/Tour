@@ -5,6 +5,7 @@ import { requirePlayer } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { isRateLimited } from "@/lib/data";
 import { fetchFaceitBySteamId } from "@/lib/faceit";
+import { displayNick } from "@/lib/nick";
 import { fetchSteamProfile } from "@/lib/steam";
 import { db } from "@/lib/supabase";
 import { markLoginRefreshed } from "@/lib/profile-sync";
@@ -25,7 +26,8 @@ export async function refreshProfile(): Promise<ActionResult> {
   await db()
     .from("players")
     .update({
-      ...(profile.ok && { nickname: profile.nickname, avatar_url: profile.avatarUrl ?? player.avatar_url }),
+      ...((profile.ok || faceit) && { nickname: displayNick(profile.ok ? profile.nickname : player.steam_nickname, faceit?.nickname ?? player.faceit_nickname) ?? player.nickname }),
+      ...(profile.ok && { steam_nickname: profile.nickname, avatar_url: profile.avatarUrl ?? player.avatar_url }),
       ...(faceit && {
         faceit_id: faceit.id,
         faceit_nickname: faceit.nickname,

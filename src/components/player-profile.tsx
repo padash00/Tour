@@ -150,7 +150,7 @@ export async function PlayerProfile({
                   <span className="text-fg-3">{t("На платформе с {date}", { date: formatDate(player.created_at, t.lang) })}</span>
                   {player.profile_url && (
                     <a href={player.profile_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-accent">
-                      Steam <ExternalLink className="size-3.5" aria-hidden />
+                      Steam{player.steam_nickname && player.steam_nickname !== player.nickname ? ` · ${player.steam_nickname}` : ""} <ExternalLink className="size-3.5" aria-hidden />
                     </a>
                   )}
                 </div>

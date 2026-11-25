@@ -1754,6 +1754,7 @@ export type Database = {
           faceit_id: string | null
           faceit_level: number | null
           faceit_nickname: string | null
+          steam_nickname: string | null
           faceit_updated_at: string | null
           id: string
           is_admin: boolean
@@ -1776,6 +1777,7 @@ export type Database = {
           faceit_id?: string | null
           faceit_level?: number | null
           faceit_nickname?: string | null
+          steam_nickname?: string | null
           faceit_updated_at?: string | null
           id?: string
           is_admin?: boolean
@@ -1798,6 +1800,7 @@ export type Database = {
           faceit_id?: string | null
           faceit_level?: number | null
           faceit_nickname?: string | null
+          steam_nickname?: string | null
           faceit_updated_at?: string | null
           id?: string
           is_admin?: boolean

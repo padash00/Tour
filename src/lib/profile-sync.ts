@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { fetchFaceitBySteamId } from "./faceit";
+import { displayNick } from "./nick";
 import { getSetting } from "./settings";
 import { fetchSteamProfile } from "./steam";
 import { db } from "./supabase";
@@ -19,7 +20,8 @@ const TIMEOUT_MS = 3500;
 const BATCH = 3;
 const MIN_TICK_GAP_MS = 60_000;
 
-type Row = { id: string; steam_id: string; avatar_url: string | null };
+/** faceit_nickname и steam_nickname — что уже сохранено: если один из сервисов не ответил, ник собирается из сохранённого */
+type Row = { id: string; steam_id: string; avatar_url: string | null; faceit_nickname?: string | null; steam_nickname?: string | null };
 
 function withTimeout<T>(p: Promise<T>, fallback: T, ms = TIMEOUT_MS): Promise<T> {
   return Promise.race([p.catch(() => fallback), new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
@@ -93,10 +95,13 @@ export async function refreshPlayers(rows: Row[]): Promise<{ steam: number; face
     if (sp) s++;
     if (fc) f++;
     if (!sp && !fc) continue;
+    // основной ник — с FACEIT, без него — из Steam; чего не получили сейчас, берём из сохранённого
+    const nickname = displayNick(sp?.nickname ?? r.steam_nickname, fc?.nickname ?? r.faceit_nickname);
     await db()
       .from("players")
       .update({
-        ...(sp && { nickname: sp.nickname, avatar_url: sp.avatarUrl ?? r.avatar_url, profile_url: sp.profileUrl, country: sp.country }),
+        ...(nickname && { nickname }),
+        ...(sp && { steam_nickname: sp.nickname, avatar_url: sp.avatarUrl ?? r.avatar_url, profile_url: sp.profileUrl, country: sp.country }),
         ...(fc && {
           faceit_id: fc.id,
           faceit_nickname: fc.nickname,
@@ -121,7 +126,7 @@ async function stalePlayers(limit: number): Promise<Row[]> {
   if (hasRefreshedColumn !== false) {
     const { data, error } = await db()
       .from("players")
-      .select("id, steam_id, avatar_url")
+      .select("id, steam_id, avatar_url, faceit_nickname, steam_nickname")
       .or(`profile_refreshed_at.is.null,profile_refreshed_at.lt.${cutoff}`)
       .order("profile_refreshed_at", { ascending: true, nullsFirst: true })
       .limit(limit);
@@ -160,13 +165,13 @@ export async function refreshStaleProfilesTick() {
  * Если профиль старше STALE_MS — обновить после отправки страницы (не задерживает рендер).
  * Вызывать из серверных страниц профиля игрока и /me.
  */
-export function refreshIfStale(player: { id: string; steam_id: string; avatar_url: string | null } & Record<string, unknown>) {
+export function refreshIfStale(player: { id: string; steam_id: string; avatar_url: string | null; faceit_nickname?: string | null; steam_nickname?: string | null } & Record<string, unknown>) {
   const stamp = (player.profile_refreshed_at ?? player.faceit_updated_at ?? null) as string | null;
   if (stamp && Date.now() - new Date(stamp).getTime() < STALE_MS) return;
   try {
     after(async () => {
       try {
-        await refreshPlayers([{ id: player.id, steam_id: player.steam_id, avatar_url: player.avatar_url }]);
+        await refreshPlayers([{ id: player.id, steam_id: player.steam_id, avatar_url: player.avatar_url, faceit_nickname: player.faceit_nickname, steam_nickname: player.steam_nickname }]);
         revalidatePath(`/players/${player.steam_id}`);
         revalidatePath("/me");
       } catch {

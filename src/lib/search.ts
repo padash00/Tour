@@ -22,9 +22,11 @@ export async function searchAll(raw: string): Promise<SearchResult> {
   if (q.length < 2) return EMPTY_SEARCH;
   const pattern = like(q);
   const steamId = /^\d{17}$/.test(q) ? q : null;
+  // игрока ищут и по основному нику (FACEIT), и по нику из Steam; значение в кавычках — в запросе могут быть запятые и скобки
+  const quoted = `"${pattern.replace(/["\\]/g, "\\$&")}"`;
 
   const [byNick, bySteam, byName, byTag, tournaments] = await Promise.all([
-    db().from("players").select("id, nickname, avatar_url, steam_id, faceit_level").eq("is_banned", false).ilike("nickname", pattern).order("nickname").limit(6),
+    db().from("players").select("id, nickname, avatar_url, steam_id, faceit_level").eq("is_banned", false).or(`nickname.ilike.${quoted},steam_nickname.ilike.${quoted}`).order("nickname").limit(6),
     steamId ? db().from("players").select("id, nickname, avatar_url, steam_id, faceit_level").eq("steam_id", steamId).limit(1) : Promise.resolve({ data: [] }),
     db().from("teams").select("id, name, tag, logo_url").is("disbanded_at", null).ilike("name", pattern).order("name").limit(5),
     db().from("teams").select("id, name, tag, logo_url").is("disbanded_at", null).ilike("tag", pattern).order("tag").limit(5),

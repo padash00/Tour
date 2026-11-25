@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { fetchSteamProfile, verifySteamCallback } from "@/lib/steam";
 import { fetchFaceitBySteamId } from "@/lib/faceit";
+import { displayNick } from "@/lib/nick";
 import { createSession } from "@/lib/session";
 import { safeNext } from "@/lib/redirect";
 import { db } from "@/lib/supabase";
@@ -29,24 +30,26 @@ export async function GET(request: NextRequest) {
     faceit_updated_at: now,
   };
   const steamFields = {
-    nickname: profile.nickname,
+    steam_nickname: profile.nickname,
     avatar_url: profile.avatarUrl,
     profile_url: profile.profileUrl,
     country: profile.country,
   };
 
-  const { data: existing } = await db().from("players").select("id").eq("steam_id", steamId).maybeSingle();
+  const { data: existing } = await db().from("players").select("id, faceit_nickname, steam_nickname").eq("steam_id", steamId).maybeSingle();
+  // основной ник — с FACEIT, без него — из Steam; если сервис сейчас не ответил, берём сохранённое
+  const nickname = displayNick(profile.ok ? profile.nickname : (existing?.steam_nickname ?? profile.nickname), faceit?.nickname ?? existing?.faceit_nickname) ?? profile.nickname;
   // если Steam не ответил — не затираем сохранённые ник и аватар
   const { data: player, error } = existing
     ? await db()
         .from("players")
-        .update({ last_login_at: now, ...(profile.ok && steamFields), ...faceitFields })
+        .update({ last_login_at: now, ...(profile.ok && steamFields), ...faceitFields, ...((profile.ok || faceit) && { nickname }) })
         .eq("id", existing.id)
         .select("id, steam_id")
         .single()
     : await db()
         .from("players")
-        .insert({ steam_id: steamId, last_login_at: now, ...steamFields, ...faceitFields })
+        .insert({ steam_id: steamId, last_login_at: now, nickname, ...steamFields, ...faceitFields })
         .select("id, steam_id")
         .single();
 
