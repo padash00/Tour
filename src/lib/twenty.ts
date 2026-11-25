@@ -29,8 +29,27 @@ async function loadFixedSeasons(): Promise<FixedSeasons | null> {
 
 type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
 type StatRow = Pick<CoreStat, "game_id" | "map_number" | "steam_id" | "name" | "team" | "kills" | "deaths" | "assists" | "damage" | "headshot_kills" | "rounds_played" | "kast" | "mvp" | "clutch_wins" | "first_kills"> & { raw: Record<string, unknown> | null };
-type SideFact = { rounds?: number; wins?: number; kills?: number; deaths?: number };
-type FactRow = { game_id: string; map_number: number; steam_id: string; kast: number; first_kills: number; first_deaths: number; trade_kills: number; weapons: Record<string, number> | null; sides: { CT?: SideFact; T?: SideFact } | null };
+/**
+ * Swing, экономика и мультикиллы карты из лога раундов, приведённые к статистике MatchZy: лог мог потерять хвост карты,
+ * поэтому суммы за раунды растягиваются на сыгранные раунды, а вес экономики берётся долей от убийств и смертей по логу.
+ */
+function swingOf(s: { rounds_played: number; kills: number; deaths: number }, f: FactRow | undefined, ct: SideFact, t: SideFact) {
+  if (!f || (ct.swing == null && t.swing == null)) return { swing: null };
+  const sum = (k: keyof SideFact) => (ct[k] ?? 0) + (t[k] ?? 0);
+  const stretch = f.rounds > 0 ? s.rounds_played / f.rounds : 1;
+  const logKills = sum("kills");
+  const logDeaths = sum("deaths");
+  return {
+    swing: sum("swing") * stretch,
+    eco_kills: logKills > 0 ? (s.kills * sum("ekills")) / logKills : s.kills,
+    eco_deaths: logDeaths > 0 ? (s.deaths * sum("edeaths")) / logDeaths : s.deaths,
+    multi: sum("multi") * stretch,
+    eco_duels: sum("eco"),
+  };
+}
+
+type SideFact = { rounds?: number; wins?: number; kills?: number; deaths?: number; swing?: number; ekills?: number; edeaths?: number; multi?: number; eco?: number };
+type FactRow = { game_id: string; map_number: number; steam_id: string; rounds: number; kast: number; first_kills: number; first_deaths: number; trade_kills: number; weapons: Record<string, number> | null; sides: { CT?: SideFact; T?: SideFact } | null };
 const SNIPERS = ["awp", "ssg08", "scar20", "g3sg1"];
 
 /** Сколько порций статистики запрашиваем одновременно */
@@ -72,7 +91,7 @@ export async function loadTwentyData(): Promise<TwentyData> {
       // факты по раундам из лога сервера: то, чего MatchZy для лобби не присылает (у старых игр их нет)
       db()
         .from("lobby_round_facts")
-        .select("game_id, map_number, steam_id, kast, first_kills, first_deaths, trade_kills, weapons, sides")
+        .select("game_id, map_number, steam_id, rounds, kast, first_kills, first_deaths, trade_kills, weapons, sides")
         .in("game_id", chunk)
         .limit(1000)
         .throwOnError(),
@@ -92,6 +111,9 @@ export async function loadTwentyData(): Promise<TwentyData> {
         first_deaths: f?.first_deaths ?? 0,
         trade_kills: f?.trade_kills ?? 0,
         sniper_kills: SNIPERS.reduce((sum, w) => sum + (f?.weapons?.[w] ?? 0), 0),
+        weapons: f?.weapons ?? {},
+        // у карт, посчитанных до появления Swing, его в записи нет — такие карты идут по прежней формуле
+        ...swingOf(s, f, ct, t),
         ct_rounds: ct.rounds ?? 0, ct_wins: ct.wins ?? 0, ct_kills: ct.kills ?? 0, ct_deaths: ct.deaths ?? 0,
         t_rounds: t.rounds ?? 0, t_wins: t.wins ?? 0, t_kills: t.kills ?? 0, t_deaths: t.deaths ?? 0,
       });

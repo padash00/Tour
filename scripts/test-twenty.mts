@@ -1,6 +1,6 @@
 // «Двадцатка» без базы: рейтинг по картам, коронная карта, роли, форма, номинации, рекорды, связки, перевес для вето.
 // Запуск: npx tsx scripts/test-twenty.mts
-import { eloFit, playerStrength, teamBalance, ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
+import { rating2, rating3, rating3Parts, RATING3_AVERAGE, RATING3_FROM, weaponBoards, weaponGroup, eloFit, playerStrength, teamBalance, ACHIEVEMENTS_TOTAL, SEASON_MIN_MAPS, SEASON_PRIZES, buildTwenty, currentSeason, mapEdge, ratingOf, seasonOf, type CoreGame, type CoreStat } from "../src/lib/twenty-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -145,6 +145,35 @@ const slight = teamBalance([S(1.05), S(1.05), S(1.05)], [S(1), S(1), S(1)])!;
 const clear = teamBalance([S(1), S(1), S(1)], [S(1.1), S(1.1), S(1.1)])!;
 check(slight.level === "slight" && slight.favored === 1 && clear.level === "clear" && clear.favored === 2, "небольшой и заметный перевес — у той команды, что сильнее");
 check(teamBalance([S(1), S(1), newbie], [S(1), S(1), S(1)])!.estimated === 1, "сколько игроков оценено не по Миксу — сообщается отдельно");
+
+// рейтинг с учётом Swing
+const avg = { rounds: 100, kills: 68, deaths: 68, assists: 13, damage: 7600, kast: 70, clutches: 0, kastRounds: 100 };
+const avg3 = { ...avg, swing: 0, ekills: 68, edeaths: 68, multi: 26 };
+check(Math.abs(rating3(avg3) - rating2(avg)) < 0.01 && Math.abs(rating3(avg3) - RATING3_AVERAGE) < 1e-9, "средний игрок с нулевым Swing получает по новой формуле столько же, сколько по прежней");
+check(rating3({ ...avg3, swing: 4 }) - rating3(avg3) > 0.13 && rating3({ ...avg3, swing: -4 }) < rating3(avg3), "Swing +4 п.п. за раунд поднимает рейтинг примерно на 0.14, отрицательный — опускает");
+check(rating3({ ...avg3, ekills: 78 }) > rating3(avg3) && rating3({ ...avg3, edeaths: 78 }) < rating3(avg3) && rating3({ ...avg3, multi: 50 }) > rating3(avg3), "убийства лучше вооружённых и мультикиллы поднимают оценку, смерти от слабее вооружённых — опускают");
+{
+  const parts = rating3Parts({ ...avg3, swing: 4, ekills: 80 });
+  const total = RATING3_AVERAGE + Object.values(parts).reduce((a, b) => a + b, 0);
+  check(Math.abs(total - rating3({ ...avg3, swing: 4, ekills: 80 })) < 1e-9 && Math.abs(parts.swing - 0.14) < 1e-9 && Math.abs(parts.deaths) < 1e-9, "оценка раскладывается на части: средний игрок плюс вклад каждой");
+  const g = (id: string, at: string): CoreGame => ({ ...games[0], id, finished_at: at });
+  const line = (game_id: string, steam_id: string, swing: number | null): CoreStat => ({ ...stats[0], game_id, steam_id, name: steam_id, kills: 20, deaths: 15, swing });
+  const nov = buildTwenty([g("old", "2026-11-20T15:00:00Z")], [line("old", "P", 0.8), line("old", "Q", null)], { code: "AAAA" });
+  const dec = buildTwenty([g("new", "2026-12-05T15:00:00Z")], [line("new", "P", 0.8), line("new", "Q", null), line("new", "R", -0.8)], { code: "AAAA" });
+  const r = (b: ReturnType<typeof buildTwenty>, id: string) => b.rows.find((x) => x.steam_id === id)!;
+  check(RATING3_FROM === "2026-12" && r(nov, "P").rating === r(nov, "Q").rating && Math.abs(r(nov, "P").swing! - 4) < 1e-9 && r(nov, "P").rating3 !== null && r(nov, "P").parts3!.swing > 0.13 && r(nov, "Q").swing === null && r(nov, "Q").rating3 === null, "до сезона декабря 2026 новый рейтинг и Swing показываются справочно, на места не влияют");
+  check(r(dec, "P").rating > r(dec, "R").rating && Math.abs(r(dec, "P").rating - r(dec, "P").rating3!) < 1e-9 && r(dec, "Q").rating === r(nov, "Q").rating, "с декабря новый рейтинг — официальный; карта без записи раундов считается по прежней формуле");
+}
+
+// оружие: группы и лидеры
+check(weaponGroup("weapon_AK47") === "ak47" && weaponGroup("m4a1_silencer") === "m4" && weaponGroup("knife_karambit") === "melee" && weaponGroup("usp_silencer") === "pistols" && weaponGroup("world") === null, "оружие из лога раскладывается по группам, неизвестное пропускается");
+const wb = weaponBoards([
+  { steam_id: "A", name: "A", weapons: { ak47: 30, m4a1: 5, m4a1_silencer: 7, glock: 2 } },
+  { steam_id: "B", name: "B", weapons: { ak47: 41, awp: 12, usp_silencer: 3, p250: 1 } },
+  { steam_id: "C", name: "C", weapons: {} },
+]);
+check(wb.map((b) => b.key).join() === "ak47,m4,awp,pistols" && wb[0].rows.map((r) => r.steam_id + r.kills).join() === "B41,A30" && wb[0].total === 71 && wb[1].rows[0].kills === 12 && wb[3].rows[0].steam_id === "B" && wb[3].rows[0].kills === 4, "лидеры по оружию: M4A4 и M4A1-S вместе, пистолеты суммой, пустые группы скрыты");
+check(Object.keys(t.rows[0].weapons).length === 0, "у игр без лога раундов убийств по оружию нет");
 
 if (failed) {
   console.error(`\nне прошло проверок: ${failed}`);

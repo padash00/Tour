@@ -1,6 +1,6 @@
 // Раунды игр лобби по HTTP-логу CS2 без базы: разбор пачки, раунды, первые убийства, размены, KAST, оружие, стороны.
 // Запуск: npx tsx scripts/test-lobby-rounds.mts
-import { parseLogBatch, roundFacts } from "../src/lib/lobby-rounds-core";
+import { ecoBias, ecoWeight, equipValue, parseLogBatch, roundFacts } from "../src/lib/lobby-rounds-core";
 
 let failed = 0;
 const check = (ok: boolean, what: string) => {
@@ -68,6 +68,33 @@ check(f(A1).kast === 13 && f(A2).kast === 13 && f(B2).kast === 14 && f(B1).kast 
 check(f(B2).flash_assists === 1 && f(A1).flash_assists === 0, "флеш-ассисты");
 check(f(A1).sides.CT.rounds === 14 && f(A1).sides.CT.wins === 13 && f(A1).sides.CT.kills === 13 && f(A1).sides.CT.deaths === 14 && f(A1).sides.T.rounds === 0, "стороны: раунды, победы, убийства и смерти за защиту");
 check(f(B1).sides.T.rounds === 14 && f(B1).sides.T.wins === 1 && f(B1).sides.T.kills === 2, "стороны: то же за атаку");
+const swingAll = [...map1!.values()].reduce((n, x) => n + x.sides.CT.swing + x.sides.T.swing, 0);
+check(f(A2).sides.CT.swing > 0 && f(A1).sides.T.swing === 0 && f(A2).sides.CT.swing > f(B1).sides.T.swing && Math.abs(swingAll) < 1e-6, "Swing: считается по сторонам, у выигравших раунды он выше, сумма по всем игрокам — ноль");
+check(f(A1).sides.CT.traded === 13 && f(A1).sides.CT.swing > 0, "размен: погибшему достаётся часть заслуги за ответное убийство");
+check(f(A1).sides.CT.ekills === 13 && f(A1).sides.CT.edeaths === 14 && f(A1).sides.CT.eco === 0 && f(B1).sides.T.multi === 1 && f(A1).sides.CT.multi === 0, "без записи закупки убийство считается за одно; два убийства в раунде — мультикилл");
+check(equipValue("weapon_knife weapon_ak47 kevlar(100) helmet weapon_smokegrenade") === 4000 && equipValue("weapon_knife_t weapon_glock weapon_c4") === 200, "стоимость снаряжения по списку из лога");
+check(ecoWeight(4000, 800) === 0.65 && ecoWeight(800, 4000) === 1.5 && ecoWeight(undefined, 4000) === 1 && Math.abs(ecoWeight(4000, 4000) - 1) < 1e-9, "вес убийства по экономике: пистолет против автомата — больше, автомат против пистолета — меньше");
+check(ecoBias([5000, 5000, 5000, 5000, 5000], [1000, 1000, 1000, 1000, 1000], 5) > 1 && ecoBias([1000, 1000, 1000], [5000, 5000, 5000], 5) < -1 && ecoBias([5000, 5000], [1000, 1000, 1000, 1000, 1000], 5) === 0, "перевес в закупке сдвигает шанс раунда; закупка известна меньше чем у половины команды — не учитывается");
+{
+  // эко-раунд: T с пистолетами выигрывают у полной закупки — их убийства и Swing весят больше
+  const L: string[] = ["L 11/25/2026 - 21:00:00: World triggered \"Match_Start\" on \"de_mirage\""];
+  const one = (rich: "CT" | "TERRORIST") => {
+    const [a, b] = rich === "CT" ? [A1, B1] : [B1, A1];
+    const poor = rich === "CT" ? "TERRORIST" : "CT";
+    L.push('L 11/25/2026 - 21:01:00: World triggered "Round_Start"');
+    L.push(`L 11/25/2026 - 21:01:05: ${actor(a, rich)} left buyzone with [ weapon_knife weapon_ak47 kevlar(100) helmet ]`);
+    L.push(`L 11/25/2026 - 21:01:05: ${actor(b, poor)} left buyzone with [ weapon_knife weapon_glock ]`);
+    L.push(`L 11/25/2026 - 21:01:30: ${actor(b, poor)} [1 2 3] killed ${actor(a, rich)} [4 5 6] with "glock"`);
+    L.push(`L 11/25/2026 - 21:01:35: Team "${poor}" triggered "SFUI_Notice_${poor === "CT" ? "CTs_Win" : "Terrorists_Win"}" (CT "1") (T "0")`);
+  };
+  for (let i = 0; i < 4; i++) one("CT");
+  const ev = parseLogBatch(L.join("\n"));
+  const eq = ev.find((e) => e.type === "equip");
+  const duo = [{ steam_id: A1, team: 1 }, { steam_id: B1, team: 2 }];
+  const [m] = roundFacts(ev, [{ total: 4, players: duo }]);
+  check(!!eq && eq.type === "equip" && eq.value === 3700 && eq.actor.steamId === A1, "строка «left buyzone» разбирается: игрок и стоимость снаряжения");
+  check(!!m && m.get(B1)!.sides.T.ekills === 6 && m.get(A1)!.sides.CT.edeaths === 6 && m.get(B1)!.sides.T.eco === 4 && m.get(B1)!.sides.T.swing > 4 * 0.5, "убийство с пистолета игрока с полной закупкой весит 1.5, а победа в таком раунде даёт Swing больше половины");
+}
 
 // хвост лога не дошёл (последний раунд без итога) — карта всё равно находится
 const cutAt = lines.map((l) => l.includes("Terrorists_Win")).lastIndexOf(true);

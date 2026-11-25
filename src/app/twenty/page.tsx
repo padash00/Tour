@@ -13,7 +13,9 @@ import { SelectNav } from "@/components/public/select-nav";
 import { LiveGames } from "@/components/twenty/live-games";
 import { Nominations, Podium, RecordsTab, SectionHead } from "@/components/twenty/panels";
 import { AchievementsTab, HallOfFame, seasonDaysLeft, seasonLabel } from "@/components/twenty/season";
-import { MapsTab, RatingTable, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
+import { MapsTab, RatingHelp, RatingTable, SORTS, StyleTab, whoOf, type SortKey } from "@/components/twenty/tabs";
+import { RATING3_AVERAGE, RATING3_FROM } from "@/lib/twenty-core";
+import { WeaponsTab } from "@/components/twenty/weapons";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ const CODE = /^[A-Z0-9]{4,10}$/;
 const STEAM = /^\d{17}$/;
 const MAP = /^[a-z0-9_]{3,40}$/;
 const SEASON = /^\d{4}-(0[1-9]|1[0-2])$/;
-const TABS = ["rating", "maps", "style", "records", "awards"] as const;
+const TABS = ["rating", "maps", "style", "weapons", "records", "awards"] as const;
 type Tab = (typeof TABS)[number];
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -122,6 +124,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             { key: "rating", label: t("Рейтинг"), href: href("rating") },
             { key: "maps", label: t("Карты"), href: href("maps") },
             { key: "style", label: t("Стиль игры"), href: href("style") },
+            { key: "weapons", label: t("Оружие"), href: href("weapons") },
             { key: "records", label: t("Рекорды"), href: href("records") },
             { key: "awards", label: t("Достижения"), href: href("awards") },
           ]}
@@ -158,6 +161,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
             />
             <RatingTable rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} season={!!season} sort={sort} sortHref={(key) => href("rating", key === "rating" ? {} : { sort: key })} />
             <p className="mt-2 text-meta text-fg-3">{t("Под ником — роль игрока и его коронная карта. Стрелка у рейтинга — форма: последний игровой день против прежних.")} {t("Нажмите на заголовок столбца, чтобы отсортировать по нему.")}</p>
+            <RatingHelp rows={rows} who={who} t={t} average={RATING3_AVERAGE} official={!!season && season >= RATING3_FROM} />
           </section>
         </>
       )}
@@ -165,6 +169,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
       {king && tab === "maps" && <MapsTab boards={twenty.boards} rows={rows} who={who} t={t} images={images} selected={map} href={(params) => href("maps", params)} meSteamId={player?.steam_id ?? null} />}
 
       {king && tab === "style" && <StyleTab rows={rows} who={who} t={t} a={a ?? player?.steam_id ?? null} b={b} href={(params) => href("style", params)} />}
+
+      {king && tab === "weapons" && <WeaponsTab rows={rows} who={who} t={t} meSteamId={player?.steam_id ?? null} />}
 
       {tab === "records" && twenty.records.length > 0 && (
         <>
@@ -176,7 +182,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
 
       {tab === "awards" && twenty.records.length > 0 && <AchievementsTab board={twenty.achievementBoard()} who={who} t={t} players={Object.keys(twenty.players).length} />}
 
-      {!king && (tab === "rating" || tab === "maps" || tab === "style" || twenty.records.length === 0) && (
+      {!king && (tab === "rating" || tab === "maps" || tab === "style" || tab === "weapons" || twenty.records.length === 0) && (
         <>
           <EmptyState
             title={code ? t("В этом лобби ещё нет сыгранных матчей") : season ? t("В этом сезоне ещё не играли") : t("Рейтинга пока нет")}

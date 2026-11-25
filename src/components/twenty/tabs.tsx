@@ -26,7 +26,7 @@ const pct = (a: number, b: number) => (b ? Math.round((100 * a) / b) : 0);
 
 // ───────────────────────── рейтинг
 
-export const SORTS = ["rating", "maps", "wins", "kills", "diff", "kd", "adr", "hs", "mvp"] as const;
+export const SORTS = ["rating", "maps", "wins", "kills", "diff", "kd", "adr", "hs", "mvp", "swing", "r3"] as const;
 export type SortKey = (typeof SORTS)[number];
 const SORT_VALUE: Record<SortKey, (r: TwentyRow) => number> = {
   rating: (r) => r.rating,
@@ -38,7 +38,22 @@ const SORT_VALUE: Record<SortKey, (r: TwentyRow) => number> = {
   adr: (r) => r.adr,
   hs: (r) => r.hsPct,
   mvp: (r) => r.mvp,
+  swing: (r) => r.swing ?? -1e9,
+  r3: (r) => r.rating3 ?? -1e9,
 };
+
+const signed = (v: number, digits = 2) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(digits)}`;
+/** Части рейтинга с учётом Swing — по порядку веса */
+const PARTS = [
+  ["swing", "Swing"],
+  ["kills", "Убийства"],
+  ["deaths", "Смерти"],
+  ["damage", "Урон"],
+  ["kast", "KAST"],
+  ["multi", "Мультикиллы"],
+] as const;
+/** Новый рейтинг ещё не официальный в этой таблице, но уже посчитан — показываем его отдельным столбцом */
+const hasPreview = (rows: TwentyRow[]) => rows.some((r) => r.rating3 != null && Math.abs(r.rating3 - r.rating) >= 0.005);
 
 /**
  * Таблица рейтинга. Место игрока — всегда его место по рейтингу, как бы таблица ни была отсортирована.
@@ -47,7 +62,9 @@ const SORT_VALUE: Record<SortKey, (r: TwentyRow) => number> = {
 export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref, season = false }: { rows: TwentyRow[]; who: Who; t: T; meSteamId: string | null; sort?: SortKey; sortHref?: (key: SortKey) => string; season?: boolean }) {
   const place = new Map(rows.map((r, i) => [r.steam_id, r.qualified ? i + 1 : null]));
   const list = sort === "rating" ? rows : [...rows].sort((x, y) => SORT_VALUE[sort](y) - SORT_VALUE[sort](x) || y.rating - x.rating);
-  const columns: [SortKey, string][] = [["maps", t("Карт")], ["wins", t("Побед")], ["kills", t("У–С")], ["diff", "±"], ["kd", "K/D"], ["adr", "ADR"], ["hs", "HS%"], ["mvp", "MVP"]];
+  const columns: [SortKey, string][] = [["maps", t("Карт")], ["wins", t("Побед")], ["kills", t("У–С")], ["diff", "±"], ["kd", "K/D"], ["adr", "ADR"], ["hs", "HS%"], ["mvp", "MVP"], ["swing", "Swing"]];
+  const preview = hasPreview(rows);
+  if (preview) columns.push(["r3", "3.0"]);
   const head = (key: SortKey, label: string) => {
     const inner = sort === key ? <SortedHead>{label}</SortedHead> : label;
     return sortHref ? (
@@ -60,7 +77,7 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
   };
   return (
     <div className={tableBox()}>
-      <table className={cn(DATA_TABLE, "min-w-[900px]")}>
+      <table className={cn(DATA_TABLE, preview ? "min-w-[1060px]" : "min-w-[980px]")}>
         <thead>
           <tr>
             <th className="w-14">#</th>
@@ -116,6 +133,14 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
                 <td className={NUM_CELL}>{Math.round(r.adr)}</td>
                 <td className={NUM_CELL}>{Math.round(r.hsPct)}%</td>
                 <td className={NUM_CELL}>{r.mvp}</td>
+                <td className={cn(NUM_CELL, r.swing == null ? "text-fg-4" : r.swing >= 1 ? "font-semibold text-ok" : r.swing <= -1 ? "text-danger" : "text-fg-3")} title={r.swing == null ? t("Нет данных: Swing считается по играм с 24 ноября 2026 года") : undefined}>
+                  {r.swing == null ? "—" : `${r.swing > 0 ? "+" : ""}${r.swing.toFixed(1)}%`}
+                </td>
+                {preview && (
+                  <td className={cn(NUM_CELL, r.rating3 == null ? "text-fg-4" : "font-semibold text-fg")} title={r.parts3 ? PARTS.map(([k, label]) => `${t(label)} ${signed(r.parts3![k])}`).join(" · ") : t("Нет игр с записью раундов")}>
+                    {r.rating3 == null ? "—" : r.rating3.toFixed(2)}
+                  </td>
+                )}
                 <td className="text-right">
                   <span className="inline-flex items-center justify-end gap-2">
                     <Trend value={r.trend} t={t} />
@@ -128,6 +153,79 @@ export function RatingTable({ rows, who, t, meSteamId, sort = "rating", sortHref
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Как считается рейтинг и из чего он сложился у каждого игрока: вклад каждой части относительно среднего игрока.
+ * Разбор — по картам с записью раундов (с 24 ноября 2026 года); до сезона декабря новый рейтинг справочный.
+ */
+export function RatingHelp({ rows, who, t, average, official }: { rows: TwentyRow[]; who: Who; t: T; average: number; official: boolean }) {
+  const list = rows.filter((r) => r.parts3 && r.rating3 != null).sort((x, y) => y.rating3! - x.rating3!);
+  const b = (c: ReactNode) => <span className="font-semibold text-fg">{c}</span>;
+  return (
+    <details className="group mt-4 rounded-surface border border-line-subtle bg-surface">
+      <summary className="cursor-pointer select-none px-4 py-3 text-[14px] font-semibold text-fg hover:text-accent">{t("Как считается рейтинг — простыми словами")}</summary>
+      <div className="max-w-none space-y-3 border-t border-line-subtle px-4 py-4 text-[14px] leading-relaxed text-fg-2">
+        <p>{t("Рейтинг показывает, насколько игрок помогает команде выигрывать. 1.00 — обычный средний игрок. Выше 1.15 — играет сильно, ниже 0.90 — слабее среднего.")}</p>
+        <p>{t("Он складывается из шести вещей. Главное — не сколько вы убили, а насколько это помогло выиграть раунд.")}</p>
+        <ol className="list-decimal space-y-2 pl-5">
+          <li>{t.rich("<b>Польза для раунда (Swing)</b> — самое важное, около трети рейтинга. Каждое убийство меняет шанс команды выиграть раунд. Убили первым при пяти на пять — шанс заметно вырос. Остались один против троих и убили — шанс вырос сильно. Добили последнего впятером — почти ничего не изменилось, раунд и так был выигран. Умерли — шанс команды упал, это идёт в минус. Поставили или разминировали бомбу — в плюс.", { b })}</li>
+          <li>{t.rich("<b>Убийства</b> — чем больше убийств за раунд, тем выше рейтинг. Но убийства разные: убить с пистолета игрока с автоматом и бронёй ценится до полутора раз выше обычного, а убить с автомата игрока с пистолетом — ниже обычного.", { b })}</li>
+          <li>{t.rich("<b>Смерти</b> — чем реже умираете, тем лучше. Умереть от игрока с пистолетом, когда у вас автомат, хуже обычной смерти.", { b })}</li>
+          <li>{t.rich("<b>Урон</b> — средний урон за раунд. Не добили, но попали — урон всё равно засчитан.", { b })}</li>
+          <li>{t.rich("<b>Полезные раунды (KAST)</b> — доля раундов, где вы сделали хоть что-то полезное: убили, помогли убить, выжили или за вашу смерть сразу отомстили.", { b })}</li>
+          <li>{t.rich("<b>Несколько убийств за раунд</b> — два, три и больше убийств в одном раунде дают небольшую прибавку.", { b })}</li>
+        </ol>
+        <p>{t("Помощь товарищам тоже считается. Ослепили или подстрелили врага, а товарищ добил — четверть пользы ваша. Вы умерли, а товарищ сразу убил вашего убийцу — пятая часть его пользы ваша.")}</p>
+        <p>{t("Что на рейтинг не влияет: победа или поражение команды на карте, попадания в голову, звёзды MVP и число сыгранных карт. Число карт нужно только для допуска к призам.")}</p>
+        <p className="rounded-control border border-line-subtle bg-surface-2 p-3">{t("Пример. Два игрока сделали по 20 убийств. Первый добивал, когда раунд уже был выигран. Второй открывал раунды первым убийством и дважды вытащил раунд в одиночку. У второго рейтинг будет заметно выше.")}</p>
+        <p>{t("Так рейтинг считается с сезона декабря 2026 года. В ноябре места считаются по прежней формуле — без пользы для раунда и силы оружия, — а новый рейтинг показан рядом, в столбце «3.0».")}</p>
+        <p>{t("Таблица ниже показывает, что подняло и что опустило рейтинг каждого игрока. Плюс — лучше среднего игрока, минус — хуже. Сложите все столбцы и прибавьте {avg} — получится рейтинг.", { avg: average.toFixed(2) })}</p>
+        {list.length === 0 ? (
+          <p className="rounded-control border border-line-subtle bg-surface-2 p-3">{t("Разбора пока нет: в выбранных играх нет записи раундов. Он появится после ближайшей игры.")}</p>
+        ) : (
+          <div className={tableBox()}>
+            <table className={cn(DATA_TABLE, "min-w-[820px]")}>
+              <thead>
+                <tr>
+                  <th className="min-w-[180px]">{t("Игрок")}</th>
+                  <th className="w-[70px] !text-right">{t("Раундов")}</th>
+                  {PARTS.map(([k, label]) => (
+                    <th key={k} className="w-[92px] !text-right">
+                      {t(label)}
+                    </th>
+                  ))}
+                  <th className="w-[80px] !text-right">{official ? t("Рейтинг") : "3.0"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.steam_id}>
+                    <td>
+                      <Link href={`/players/${r.steam_id}`} className="font-semibold text-fg hover:text-accent">
+                        {who(r.steam_id, r.name).nickname}
+                      </Link>
+                    </td>
+                    <td className={NUM_CELL}>{r.rounds3}</td>
+                    {PARTS.map(([k]) => {
+                      const v = r.parts3![k];
+                      return (
+                        <td key={k} className={cn(NUM_CELL, v >= 0.02 ? "text-ok" : v <= -0.02 ? "text-danger" : "text-fg-3")}>
+                          {signed(v)}
+                        </td>
+                      );
+                    })}
+                    <td className={cn(NUM_CELL, "font-bold text-fg")}>{r.rating3!.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="text-meta text-fg-3">{t("Сила оружия в дуэли учитывается в играх после 25 ноября 2026 года. В более ранних играх каждое убийство считается обычным.")}</p>
+      </div>
+    </details>
   );
 }
 

@@ -86,14 +86,14 @@ const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
  * Вероятность победы CT при текущем числе живых и состоянии бомбы.
  * v1 — экспертная модель; после ~300 сыгранных раундов откалибруем на собственных данных.
  */
-export function winProbCT(ct: number, t: number, planted: boolean): number {
+export function winProbCT(ct: number, t: number, planted: boolean, bias = 0): number {
   if (ct <= 0) return 0;
   if (planted) {
     if (t <= 0) return Math.min(0.95, 0.3 + 0.13 * ct); // надо успеть разминировать
-    return sigmoid(0.05 + 0.75 * (ct - t) - 1.4);
+    return sigmoid(0.05 + 0.75 * (ct - t) - 1.4 + bias);
   }
   if (t <= 0) return 1;
-  return sigmoid(0.05 + 0.75 * (ct - t));
+  return sigmoid(0.05 + 0.75 * (ct - t) + bias);
 }
 
 // ───────────────────────── расчёт Swing раунда
@@ -104,7 +104,21 @@ export type RoundSwing = Map<string, number>; // steamId → Δ в долях (0
  * События одного раунда (между round_start и round_end) → вклад каждого игрока.
  * roster — известные игроки карты и их текущая сторона (для дележа остатка между выжившими).
  */
-export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> = new Map(), teamSize = 5): RoundSwing {
+export type SwingOptions = {
+  /** перевес CT до первого выстрела в логитах (например, полная закупка против эко); 0 — стороны равны */
+  bias?: number;
+  /** заслуга за убийство соперника (в долях) — чтобы вызывающий мог поделить её при размене */
+  onKill?: (kill: Extract<LogEvent, { type: "kill" }>, credit: number) => void;
+  /**
+   * Сумма раунда по всем игрокам — ноль: чужая заслуга всегда чей-то убыток (так устроен Round Swing у HLTV).
+   * Плент: половина — заложившему, половина — всем живым атакующим, убыток — живым защитникам. Дефьюз — убыток живым
+   * атакующим. Самоубийство и смерть от своих — прибыль живым соперникам. Без флага — как раньше (турниры).
+   */
+  zeroSum?: boolean;
+};
+
+export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> = new Map(), teamSize = 5, opts: SwingOptions = {}): RoundSwing {
+  const bias = opts.bias ?? 0;
   const swing: RoundSwing = new Map();
   const add = (a: Actor | null | undefined, v: number) => {
     if (!a?.steamId || !Number.isFinite(v) || v === 0) return;
@@ -123,6 +137,12 @@ export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> 
     alive[a.side].add(key(a));
   };
   const forSide = (side: Side, pCt: number) => (side === "CT" ? pCt : 1 - pCt);
+  /** поровну всем живым стороны; живых не осталось — всем её игрокам из состава (раунд доигрывался уже без них) */
+  const share = (side: Side, v: number) => {
+    let ids = [...alive[side]];
+    if (!ids.length) ids = [...roster].filter(([, s]) => s === side).map(([id]) => id);
+    for (const id of ids) add({ name: id, steamId: id.startsWith("bot:") ? null : id, side }, v / ids.length);
+  };
 
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
@@ -130,16 +150,17 @@ export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> 
       const victim = e.victim;
       if (!victim.side) continue;
       seen(victim);
-      const before = winProbCT(ct, t, planted);
+      const before = winProbCT(ct, t, planted, bias);
       if (victim.side === "CT") ct = Math.max(0, ct - 1);
       else t = Math.max(0, t - 1);
       dead.add(key(victim));
       alive[victim.side].delete(key(victim));
-      const after = winProbCT(ct, t, planted);
+      const after = winProbCT(ct, t, planted, bias);
       const victimLoss = forSide(victim.side, before) - forSide(victim.side, after); // > 0
       add(victim, -victimLoss);
       if (e.type === "kill" && e.killer.side && e.killer.side !== victim.side) {
         seen(e.killer);
+        opts.onKill?.(e, victimLoss);
         const assist = events.slice(i + 1, i + 4).find(
           (x): x is Extract<LogEvent, { type: "assist" }> => x.type === "assist" && key(x.victim) === key(victim),
         );
@@ -149,25 +170,35 @@ export function computeRoundSwing(events: LogEvent[], roster: Map<string, Side> 
         } else {
           add(e.killer, victimLoss);
         }
+      } else if (opts.zeroSum) {
+        share(victim.side === "CT" ? "T" : "CT", victimLoss);
       }
     } else if (e.type === "plant") {
-      const before = winProbCT(ct, t, planted);
+      const before = winProbCT(ct, t, planted, bias);
       planted = true;
-      const after = winProbCT(ct, t, planted);
+      const after = winProbCT(ct, t, planted, bias);
       seen(e.actor);
-      add(e.actor, before - after); // для T рост шанса = падение шанса CT
+      if (opts.zeroSum) {
+        add(e.actor, (before - after) / 2);
+        share("T", (before - after) / 2);
+        share("CT", after - before);
+      } else add(e.actor, before - after); // для T рост шанса = падение шанса CT
     } else if (e.type === "defuse") {
-      const before = winProbCT(ct, t, planted);
+      const before = winProbCT(ct, t, planted, bias);
       seen(e.actor);
       add(e.actor, 1 - before);
+      if (opts.zeroSum) share("T", before - 1);
       ct = Math.max(ct, 1);
       t = 0;
       planted = false;
     } else if (e.type === "round_end" && e.winner) {
       // остаток до исхода раунда (время вышло, взрыв, сейвы) — выжившим
-      const pCt = winProbCT(ct, t, planted);
+      const pCt = winProbCT(ct, t, planted, bias);
       const residualCt = (e.winner === "CT" ? 1 : 0) - pCt;
-      if (Math.abs(residualCt) > 1e-9) {
+      if (Math.abs(residualCt) > 1e-9 && opts.zeroSum) {
+        share("CT", residualCt);
+        share("T", -residualCt);
+      } else if (Math.abs(residualCt) > 1e-9) {
         const ctAlive = [...alive.CT];
         const tAlive = [...alive.T];
         for (const id of ctAlive) add({ name: id, steamId: id.startsWith("bot:") ? null : id, side: "CT" }, residualCt / ctAlive.length);

@@ -47,6 +47,16 @@ export type CoreStat = {
   trade_kills: number;
   /** убийства из снайперских винтовок */
   sniper_kills: number;
+  /** оружие («ak47», «awp») → убийств; у игр до включения лога раундов поля нет */
+  weapons?: Record<string, number>;
+  /** Swing за карту — сумма вкладов в шанс команды выиграть раунд, в долях; null — лог раундов не вёлся или не пересчитан */
+  swing?: number | null;
+  /** убийства и смерти с весом по экономике дуэли и очки за мультикиллы — из того же лога, что и Swing */
+  eco_kills?: number;
+  eco_deaths?: number;
+  multi?: number;
+  /** дуэли, в которых закупка обоих игроков известна (сколько убийств посчитано с поправкой на экономику) */
+  eco_duels?: number;
   ct_rounds: number;
   ct_wins: number;
   ct_kills: number;
@@ -102,6 +112,11 @@ type Sum = {
   firstDeaths: number;
   trades: number;
   sniper: number;
+  weapons: Record<string, number>;
+  /** карты с логом раундов: по ним считается рейтинг с учётом Swing (показывается всегда) */
+  s3: Sub3;
+  /** те же карты, но только с сезона RATING3_FROM: по ним новый рейтинг — официальный */
+  e3: Sub3;
   ctR: number;
   ctW: number;
   ctK: number;
@@ -112,10 +127,33 @@ type Sum = {
   tD: number;
 };
 
-const zero = (): Sum => ({ maps: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, hs: 0, kast: 0, mvp: 0, clutches: 0, firstKills: 0, k3: 0, k4: 0, k5: 0, utility: 0, flashed: 0, plants: 0, defuses: 0, kastRounds: 0, firstDeaths: 0, trades: 0, sniper: 0, ctR: 0, ctW: 0, ctK: 0, ctD: 0, tR: 0, tW: 0, tK: 0, tD: 0 });
+/** Итог по картам, где есть лог раундов: всё, что нужно формуле с учётом Swing */
+export type Sub3 = { rounds: number; kills: number; deaths: number; assists: number; damage: number; kast: number; kastRounds: number; clutches: number; swing: number; ekills: number; edeaths: number; multi: number; duels: number };
+const zero3 = (): Sub3 => ({ rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, kast: 0, kastRounds: 0, clutches: 0, swing: 0, ekills: 0, edeaths: 0, multi: 0, duels: 0 });
+function add3(e: Sub3, s: CoreStat) {
+  e.rounds += s.rounds_played;
+  e.kills += s.kills;
+  e.deaths += s.deaths;
+  e.assists += s.assists;
+  e.damage += s.damage;
+  e.kast += s.kast;
+  if (s.kast > 0) e.kastRounds += s.rounds_played;
+  e.clutches += s.clutch_wins;
+  e.swing += s.swing ?? 0;
+  e.ekills += s.eco_kills ?? s.kills;
+  e.edeaths += s.eco_deaths ?? s.deaths;
+  e.multi += s.multi ?? 0;
+  e.duels += s.eco_duels ?? 0;
+}
 
-function add(a: Sum, s: CoreStat) {
+const zero = (): Sum => ({ maps: 0, rounds: 0, kills: 0, deaths: 0, assists: 0, damage: 0, hs: 0, kast: 0, mvp: 0, clutches: 0, firstKills: 0, k3: 0, k4: 0, k5: 0, utility: 0, flashed: 0, plants: 0, defuses: 0, kastRounds: 0, firstDeaths: 0, trades: 0, sniper: 0, weapons: {}, s3: zero3(), e3: zero3(), ctR: 0, ctW: 0, ctK: 0, ctD: 0, tR: 0, tW: 0, tK: 0, tD: 0 });
+
+function add(a: Sum, s: CoreStat & { r3?: boolean }) {
   a.maps++;
+  if (s.swing != null) {
+    add3(a.s3, s);
+    if (s.r3) add3(a.e3, s);
+  }
   a.rounds += s.rounds_played;
   a.kills += s.kills;
   a.deaths += s.deaths;
@@ -137,6 +175,7 @@ function add(a: Sum, s: CoreStat) {
   a.firstDeaths += s.first_deaths;
   a.trades += s.trade_kills;
   a.sniper += s.sniper_kills;
+  for (const [w, n] of Object.entries(s.weapons ?? {})) a.weapons[w] = (a.weapons[w] ?? 0) + n;
   a.ctR += s.ct_rounds;
   a.ctW += s.ct_wins;
   a.ctK += s.ct_kills;
@@ -147,8 +186,60 @@ function add(a: Sum, s: CoreStat) {
   a.tD += s.t_deaths;
 }
 
+/**
+ * С этого сезона рейтинг «Микса» учитывает Swing — свой аналог HLTV Rating 3.0. Игры прежних сезонов и игры без лога
+ * раундов считаются по прежней формуле (аппроксимация HLTV 2.0): места и призы уже сыгранных сезонов не меняются.
+ */
+export const RATING3_FROM = "2026-12";
+
+type RatingInput = Pick<Sum, "rounds" | "kills" | "deaths" | "assists" | "damage" | "kast" | "clutches"> & { kastRounds?: number };
+
+/**
+ * Рейтинг с учётом Swing — свой аналог HLTV Rating 3.0. HLTV формулу не публикует: известны состав и примерные веса
+ * (вклад в исход раунда около трети, убийства около четверти, дальше смерти, урон, KAST и мультикиллы; Impact из 2.0 убран,
+ * убийства и смерти считаются с поправкой на экономику). Здесь та же схема на коэффициентах 2.0:
+ *   Swing    — п.п. за раунд; модель шанса учитывает живых, бомбу и закупку команд, размен делится с погибшим;
+ *   убийства — с весом по экономике дуэли, коэффициент поднят с 0.36 до 0.55 (Impact больше не добавляет их вторым слагаемым);
+ *   смерти   — с тем же весом; урон и KAST — как в 2.0; мультикиллы — небольшая добавка.
+ * Оценка = средний игрок (RATING3_AVERAGE, столько же даёт формула 2.0 на средних цифрах) + отклонения по каждой части.
+ */
+export const R3 = { kills: 0.55, deaths: 0.5329, damage: 0.0032, kast: 0.0073, swing: 0.035, multi: 0.15 } as const;
+/** средние цифры, от которых считаются отклонения: убийств и смертей за раунд, урон, KAST, очки мультикиллов за раунд */
+export const R3_AVG = { kpr: 0.68, dpr: 0.68, adr: 76, kast: 70, multi: 0.26 } as const;
+export const RATING3_AVERAGE = 1.054;
+export type Rating3Parts = { kills: number; deaths: number; damage: number; kast: number; swing: number; multi: number };
+type Rating3Input = Pick<Sub3, "rounds" | "damage" | "kast" | "swing" | "ekills" | "edeaths" | "multi"> & { kastRounds?: number };
+
+/** Из чего сложилась оценка: вклад каждой части относительно среднего игрока */
+export function rating3Parts(a: Rating3Input): Rating3Parts {
+  const r = a.rounds || 1;
+  const kast = a.kast > 0 ? (100 * a.kast) / (a.kastRounds || r) : R3_AVG.kast;
+  return {
+    kills: R3.kills * (a.ekills / r - R3_AVG.kpr),
+    deaths: -R3.deaths * (a.edeaths / r - R3_AVG.dpr),
+    damage: R3.damage * (a.damage / r - R3_AVG.adr),
+    kast: R3.kast * (kast - R3_AVG.kast),
+    swing: R3.swing * ((100 * a.swing) / r),
+    multi: R3.multi * (a.multi / r - R3_AVG.multi),
+  };
+}
+export function rating3(a: Rating3Input) {
+  if (!a.rounds) return 0;
+  const p = rating3Parts(a);
+  return RATING3_AVERAGE + p.kills + p.deaths + p.damage + p.kast + p.swing + p.multi;
+}
+
+/** Рейтинг итога: раунды с учётом Swing — по новой формуле, остальные — по прежней, вместе — по числу раундов */
+export function ratingOf(a: RatingInput & { e3?: Sub3 }) {
+  const e = a.e3;
+  if (!e?.rounds) return rating2(a);
+  const rest = a.rounds - e.rounds;
+  const old = rest > 0 ? rating2({ rounds: rest, kills: a.kills - e.kills, deaths: a.deaths - e.deaths, assists: a.assists - e.assists, damage: a.damage - e.damage, kast: a.kast - e.kast, clutches: a.clutches - e.clutches, kastRounds: (a.kastRounds ?? a.rounds) - e.kastRounds }) : 0;
+  return (old * Math.max(0, rest) + rating3(e) * e.rounds) / Math.max(a.rounds, e.rounds);
+}
+
 /** Та же база, что у рейтинга турниров (аппроксимация HLTV 2.0): средний игрок ≈ 1.00 */
-export function ratingOf(a: Pick<Sum, "rounds" | "kills" | "deaths" | "assists" | "damage" | "kast" | "clutches"> & { kastRounds?: number }) {
+export function rating2(a: RatingInput) {
   if (!a.rounds) return 0;
   const r = a.rounds;
   const kpr = a.kills / r;
@@ -157,6 +248,47 @@ export function ratingOf(a: Pick<Sum, "rounds" | "kills" | "deaths" | "assists" 
   const kast = a.kast > 0 ? (100 * a.kast) / (a.kastRounds || r) : 70;
   const impact = 2.13 * kpr + (0.42 * a.assists) / r - 0.41 + (1.5 * a.clutches) / r;
   return 0.0073 * kast + 0.3591 * kpr - (0.5329 * a.deaths) / r + 0.2372 * impact + (0.0032 * a.damage) / r + 0.1587;
+}
+
+// ───────────────────────── оружие
+
+/** Группы оружия для вкладки «Оружие»: имена — как в логе сервера, без «weapon_» */
+export const WEAPON_GROUPS = [
+  { key: "ak47", label: tr("АК-47"), weapons: ["ak47"] },
+  { key: "m4", label: tr("M4A4 и M4A1-S"), weapons: ["m4a1", "m4a4", "m4a1_silencer", "m4a1_silencer_off"] },
+  { key: "awp", label: tr("AWP"), weapons: ["awp"] },
+  { key: "deagle", label: tr("Desert Eagle"), weapons: ["deagle"] },
+  { key: "pistols", label: tr("Пистолеты"), weapons: ["glock", "usp_silencer", "usp_silencer_off", "hkp2000", "p250", "fiveseven", "tec9", "cz75a", "elite", "revolver"] },
+  { key: "smg", label: tr("Пистолеты-пулемёты"), weapons: ["mac10", "mp9", "mp7", "mp5sd", "ump45", "p90", "bizon"] },
+  { key: "scout", label: tr("SSG 08"), weapons: ["ssg08"] },
+  { key: "rifles", label: tr("Другие винтовки"), weapons: ["famas", "galilar", "aug", "sg556", "scar20", "g3sg1"] },
+  { key: "heavy", label: tr("Дробовики и пулемёты"), weapons: ["nova", "xm1014", "mag7", "sawedoff", "negev", "m249"] },
+  { key: "grenades", label: tr("Гранаты и огонь"), weapons: ["hegrenade", "inferno", "molotov", "incgrenade", "flashbang", "smokegrenade", "decoy"] },
+  { key: "melee", label: tr("Нож и Zeus"), weapons: ["taser"] },
+] as const;
+export type WeaponGroupKey = (typeof WEAPON_GROUPS)[number]["key"];
+const WEAPON_GROUP_OF = new Map<string, WeaponGroupKey>(WEAPON_GROUPS.flatMap((g) => g.weapons.map((w) => [w, g.key] as [string, WeaponGroupKey])));
+/** Группа оружия по имени из лога; ножей много разных («knife_karambit», «bayonet») — все в одну */
+export function weaponGroup(weapon: string): WeaponGroupKey | null {
+  const w = weapon.toLowerCase().replace(/^weapon_/, "");
+  return WEAPON_GROUP_OF.get(w) ?? (w.startsWith("knife") || w.startsWith("bayonet") ? "melee" : null);
+}
+export type WeaponBoard = { key: WeaponGroupKey; label: string; total: number; rows: { steam_id: string; name: string | null; kills: number }[] };
+/** Кто больше всех убил из каждой группы оружия; группы без убийств не выводятся */
+export function weaponBoards(rows: { steam_id: string; name: string | null; weapons: Record<string, number> }[], top = 5): WeaponBoard[] {
+  const by = new Map<WeaponGroupKey, { steam_id: string; name: string | null; kills: number }[]>();
+  for (const r of rows) {
+    const mine = new Map<WeaponGroupKey, number>();
+    for (const [w, n] of Object.entries(r.weapons)) {
+      const g = weaponGroup(w);
+      if (g && n > 0) mine.set(g, (mine.get(g) ?? 0) + n);
+    }
+    for (const [g, kills] of mine) by.set(g, [...(by.get(g) ?? []), { steam_id: r.steam_id, name: r.name, kills }]);
+  }
+  return WEAPON_GROUPS.flatMap((g) => {
+    const list = (by.get(g.key) ?? []).sort((x, y) => y.kills - x.kills || x.steam_id.localeCompare(y.steam_id));
+    return list.length ? [{ key: g.key, label: g.label, total: list.reduce((n, x) => n + x.kills, 0), rows: list.slice(0, top) }] : [];
+  });
 }
 
 // ───────────────────────── выход
@@ -220,6 +352,16 @@ export type TwentyRow = {
   trades: number;
   /** доля убийств из снайперских винтовок, 0–1 */
   sniperShare: number;
+  /** оружие → убийств (только по играм, где вёлся лог раундов) */
+  weapons: Record<string, number>;
+  /** Swing: на сколько процентных пунктов за раунд игрок в среднем менял шанс команды выиграть; null — нет данных */
+  swing: number | null;
+  /** рейтинг с учётом Swing по картам с логом раундов (до сезона RATING3_FROM — справочно) и из чего он сложился */
+  rating3: number | null;
+  parts3: Rating3Parts | null;
+  /** сколько карт вошло в rating3 и какая доля убийств посчитана с поправкой на экономику */
+  rounds3: number;
+  ecoShare: number;
   /** игра за защиту и за атаку (null — лог раундов не вёлся) */
   sides: Record<"ct" | "t", { rounds: number; wins: number; kills: number; deaths: number; kd: number }> | null;
   /** по картам: лучшая сверху */
@@ -322,7 +464,7 @@ export type Twenty = {
 
 // ───────────────────────── подготовка
 
-type Line = CoreStat & { game: CoreGame; map: string | null; mapWon: boolean; rating: number; at: number; scoreFor: number; scoreAgainst: number };
+type Line = CoreStat & { /** карта считается по формуле с учётом Swing */ r3: boolean; game: CoreGame; map: string | null; mapWon: boolean; rating: number; at: number; scoreFor: number; scoreAgainst: number };
 
 /** Игровой день: игры после полуночи относятся к вечеру накануне (Казахстан, UTC+5; граница — 6 утра) */
 function playDay(iso: string | null) {
@@ -349,7 +491,11 @@ function toLines(games: CoreGame[], stats: CoreStat[]): Line[] {
     if (m?.status && m.status !== "finished") continue;
     const winner = m ? (m.winner ?? (m.team1_score > m.team2_score ? 1 : m.team2_score > m.team1_score ? 2 : null)) : null;
     const [scoreFor, scoreAgainst] = m ? (s.team === 1 ? [m.team1_score, m.team2_score] : [m.team2_score, m.team1_score]) : [0, 0];
-    out.push({ ...s, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: ratingOf({ rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins, kastRounds: s.rounds_played }), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
+    const base2 = { rounds: s.rounds_played, kills: s.kills, deaths: s.deaths, assists: s.assists, damage: s.damage, kast: s.kast, clutches: s.clutch_wins, kastRounds: s.rounds_played };
+    const r3 = s.swing != null && seasonOf(game.finished_at) >= RATING3_FROM;
+    let line3: Sub3 | null = null;
+    if (r3) add3((line3 = zero3()), s);
+    out.push({ ...s, r3, game, map: m?.map ?? null, mapWon: winner === s.team, scoreFor, scoreAgainst, rating: line3 ? rating3(line3) : rating2(base2), at: game.finished_at ? Date.parse(game.finished_at) : 0 });
   }
   return out;
 }
@@ -544,6 +690,12 @@ function rowsOf(players: Player[], minMaps: number, season = false): TwentyRow[]
         entryDeaths: a.firstDeaths,
         trades: a.trades,
         sniperShare: a.kills ? a.sniper / a.kills : 0,
+        weapons: a.weapons,
+        swing: a.s3.rounds ? (100 * a.s3.swing) / a.s3.rounds : null,
+        rating3: a.s3.rounds ? rating3(a.s3) : null,
+        parts3: a.s3.rounds ? rating3Parts(a.s3) : null,
+        rounds3: a.s3.rounds,
+        ecoShare: a.s3.kills ? Math.min(1, a.s3.duels / a.s3.kills) : 0,
         sides:
           a.ctR + a.tR > 0
             ? { ct: { rounds: a.ctR, wins: a.ctW, kills: a.ctK, deaths: a.ctD, kd: a.ctD ? a.ctK / a.ctD : a.ctK }, t: { rounds: a.tR, wins: a.tW, kills: a.tK, deaths: a.tD, kd: a.tD ? a.tK / a.tD : a.tK } }
