@@ -482,6 +482,8 @@ function playDay(iso: string | null) {
   return Math.floor((ts - 3_600_000) / 86_400_000);
 }
 const dayIso = (day: number) => new Date(day * 86_400_000).toISOString().slice(0, 10);
+/** Игровой день игры: «2026-11-25». Ночные игры относятся к вечеру, который их начал */
+export const playDayOf = (iso: string | null) => dayIso(playDay(iso));
 /** Сезон игры — месяц её игрового дня: «2026-11» */
 export const seasonOf = (iso: string | null) => dayIso(playDay(iso)).slice(0, 7);
 /** Сезон, который идёт сейчас */

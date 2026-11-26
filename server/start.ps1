@@ -56,18 +56,16 @@ foreach ($i in $targets) {
   }
   # высокий приоритет: другие программы на этом ПК не отнимают у сервера время (меньше фризов у игроков)
   try { (Get-Process -Id $r.ProcessId).PriorityClass = "High" } catch { Write-Host "приоритет $($i.name) не изменён: $_" }
-  # своё физическое ядро (оба его потока) на инстанс: два сервера не делят одно ядро. Ядро 0 остаётся Windows,
-  # агенту и остальным программам. Инстансов больше, чем ядер, — по кругу. -NoAffinity выключает.
+  # Все физические ядра, кроме нулевого (оно остаётся Windows, агенту и остальным программам), — общие для всех
+  # инстансов. Одно ядро на сервер не тянет: на миксе 25.11.2026 сервер с 10 игроками упирался в 140–205 % из 200,
+  # а на общих ядрах 1–7 пик был около 300 % на сервер при загрузке всего процессора ~40 %. -NoAffinity выключает.
   $affinity = ""
   $logical = [Environment]::ProcessorCount
-  $cores = [int]($logical / 2)
-  if (-not $NoAffinity -and $cores -ge 4 -and $logical -le 64) {
-    $k = [array]::IndexOf(@($instances.name), $i.name)
-    $core = 1 + ($k % ($cores - 1))
+  if (-not $NoAffinity -and $logical -ge 8 -and $logical -le 62) {
     try {
-      (Get-Process -Id $r.ProcessId).ProcessorAffinity = [IntPtr]([int64]3 -shl (2 * $core))
-      $affinity = " ядро $core"
-    } catch { Write-Host "ядро $($i.name) не закреплено: $_" }
+      (Get-Process -Id $r.ProcessId).ProcessorAffinity = [IntPtr]((([int64]1 -shl $logical) - 1) -band (-bnot [int64]3))
+      $affinity = " ядра 1-$([int]($logical / 2) - 1)"
+    } catch { Write-Host "ядра $($i.name) не закреплены: $_" }
   }
   Write-Host "START $($i.name) :$port pid $($r.ProcessId)$affinity"
 }

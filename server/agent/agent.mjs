@@ -35,7 +35,7 @@ import { cs2Patch, rebootPending, selfCheck } from "./checks.mjs";
 import { CommandJournal } from "./command-journal.mjs";
 import { createEnforce } from "./enforce.mjs";
 import { createHousekeeping } from "./housekeeping.mjs";
-import { createHud } from "./hud.mjs";
+import { createHud, readMatchConfig } from "./hud.mjs";
 import { a2sInfo, parseGet5, rcon } from "./lib.mjs";
 import { cs2Build, prefetchMaps, readVersions, restartAll, updateCs2, updatePlugins } from "./maintenance.mjs";
 import { createMatchLoader } from "./match-load.mjs";
@@ -43,6 +43,7 @@ import { createRecovery, latestBackup } from "./recovery.mjs";
 import { createRelay } from "./relay.mjs";
 import { createSkins } from "./skins.mjs";
 import { createSkinSync } from "./skin-sync.mjs";
+import { createTechPause } from "./techpause.mjs";
 import { ensureUpnp } from "./upnp.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -102,7 +103,12 @@ function inLane(name, fn) {
 // ───────────────────────── модули
 
 const enforce = createEnforce({ stateDir: STATE_DIR, instances: INSTANCES, rc, log });
-const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_DIR, siteUrl: config.siteUrl, log, onMatchzyEvent: (ev, token) => enforce.onMatchzyEvent(ev, token) });
+const relay = createRelay({ port: Number(config.relayPort ?? 27099), dir: STATE_DIR, siteUrl: config.siteUrl, log, onMatchzyEvent: async (ev, token) => {
+    await enforce.onMatchzyEvent(ev, token);
+    await techPause.onMatchzyEvent(ev, token);
+  },
+  onCs2Log: (matchid, body) => techPause.onCs2Log(matchid, body),
+});
 const loader = createMatchLoader({ rc, relay, enforce, log });
 const recovery = createRecovery({
   stateDir: STATE_DIR,
@@ -116,6 +122,18 @@ const recovery = createRecovery({
 });
 const hud = createHud({ serverDir: SERVER_DIR, stateDir: STATE_DIR, siteUrl: config.siteUrl, instances: INSTANCES, rc, log });
 const autostart = createAutostart({ stateDir: STATE_DIR, rc, log, hud });
+// банк техпаузы: 2 минуты на команду на карту (techpause.mjs)
+const techPause = createTechPause({
+  stateDir: STATE_DIR,
+  rc,
+  log,
+  find: (matchid, token) => INSTANCES.find((i) => {
+    const a = recovery.assignments[i.name];
+    return !!a && a.matchid === Number(matchid) && (token === undefined || a.payload?.header_value === token);
+  }),
+  teamName: (inst, team) => readMatchConfig(STATE_DIR, recovery.assignments[inst.name]?.match_id)?.[team]?.name ?? null,
+});
+setInterval(() => techPause.tick(INSTANCES).catch((e) => log(`техпауза: ${e?.message ?? e}`)), 1000);
 // запись демо карт ведёт агент: tv_record от MatchZy с полным путём CS2 не принимает (recorder.mjs)
 const recorder = config.demos === false ? null : createRecorder({ rc, log });
 const housekeeping = createHousekeeping({

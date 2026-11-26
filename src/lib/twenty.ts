@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db } from "./supabase";
-import { buildTwenty, currentSeason, eloFit, mapEdge, type EloFit, type CoreGame, type CoreStat, type FixedSeasons, type RoleKey, type TwentyScope } from "./twenty-core";
+import { buildTwenty, currentSeason, playDayOf, seasonOf, type CoreMap, eloFit, mapEdge, type EloFit, type CoreGame, type CoreStat, type FixedSeasons, type RoleKey, type TwentyScope } from "./twenty-core";
 
 /*
  * «Двадцатка»: общий рейтинг игроков по играм на банк — «Десятка» и матчи больших лобби (20, 30 и 40 игроков).
@@ -13,7 +13,21 @@ export type { TwentyRow, MapBoard, MapCell, Nomination, RecordItem, Duo, Relatio
 export type TwentyEvening = { code: string; finished_at: string; matches: number };
 export type TwentyPlayer = { nickname: string; avatar_url: string | null };
 /** fixed — записанные итоги сезонов; null — таблицы итогов ещё нет или она не прочиталась (тогда считаем по истории) */
-export type TwentyData = { games: CoreGame[]; stats: CoreStat[]; players: Record<string, TwentyPlayer>; elo: Record<string, number>; fixed: FixedSeasons | null };
+/** Сыгранная игра для вкладки «Игры»: кто с кем играл, счёт серии и карт, убийства и смерти каждого за матч */
+export type MixGame = {
+  id: string;
+  code: string | null;
+  finished_at: string | null;
+  /** игровой день: «2026-11-25» */
+  day: string;
+  winner: number | null;
+  score: [number, number];
+  maps: CoreMap[];
+  teams: [MixTeam, MixTeam];
+};
+export type MixTeam = { name: string; players: { steam_id: string; name: string | null; kills: number; deaths: number }[] };
+type GameInfo = { names: [string, string]; score: [number, number] };
+export type TwentyData = { games: CoreGame[]; info: Record<string, GameInfo>; stats: CoreStat[]; players: Record<string, TwentyPlayer>; elo: Record<string, number>; fixed: FixedSeasons | null };
 
 /** Записанные итоги сезонов. Сбой здесь рейтинг не ломает: без записи тройка считается по истории, как раньше */
 async function loadFixedSeasons(): Promise<FixedSeasons | null> {
@@ -27,7 +41,7 @@ async function loadFixedSeasons(): Promise<FixedSeasons | null> {
   return out;
 }
 
-type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; settings: { cup_of?: { code?: string } | null } | null };
+type GameRow = { id: string; winner: number | null; finished_at: string | null; maps: CoreGame["maps"] | null; team1: { name?: string } | null; team2: { name?: string } | null; team1_score: number | null; team2_score: number | null; settings: { cup_of?: { code?: string } | null } | null };
 type StatRow = Pick<CoreStat, "game_id" | "map_number" | "steam_id" | "name" | "team" | "kills" | "deaths" | "assists" | "damage" | "headshot_kills" | "rounds_played" | "kast" | "mvp" | "clutch_wins" | "first_kills"> & { raw: Record<string, unknown> | null };
 /**
  * Swing, экономика и мультикиллы карты из лога раундов, приведённые к статистике MatchZy: лог мог потерять хвост карты,
@@ -65,7 +79,7 @@ export async function loadTwentyData(): Promise<TwentyData> {
   for (;;) {
     const { data } = await db()
       .from("lobby_games")
-      .select("id, winner, finished_at, maps, settings")
+      .select("id, winner, finished_at, maps, team1, team2, team1_score, team2_score, settings")
       .eq("status", "finished")
       .or("settings->>pot.eq.true,settings->>cup_of.not.is.null")
       .order("finished_at", { ascending: false })
@@ -76,6 +90,9 @@ export async function loadTwentyData(): Promise<TwentyData> {
     if (!data?.length) break;
   }
   const games: CoreGame[] = gameRows.map((g) => ({ id: g.id, code: g.settings?.cup_of?.code ?? null, winner: g.winner, finished_at: g.finished_at, maps: g.maps ?? [] }));
+
+  const info: Record<string, GameInfo> = {};
+  for (const g of gameRows) info[g.id] = { names: [g.team1?.name || "Команда 1", g.team2?.name || "Команда 2"], score: [g.team1_score ?? 0, g.team2_score ?? 0] };
 
   // статистика по картам: порциями, чтобы не упереться в лимит строк ответа (BO5 — до 50 строк на игру)
   const ids = games.map((g) => g.id);
@@ -137,7 +154,7 @@ export async function loadTwentyData(): Promise<TwentyData> {
       if (p.faceit_elo) elo[p.steam_id] = p.faceit_elo;
     }
   }
-  return { games, stats, players, elo, fixed: await loadFixedSeasons() };
+  return { games, info, stats, players, elo, fixed: await loadFixedSeasons() };
 }
 
 /**
@@ -184,6 +201,28 @@ export function eveningsOf(games: CoreGame[]): TwentyEvening[] {
   return [...byCode.values()].slice(0, 12);
 }
 
+/** Сколько последних игр показывает вкладка «Игры» */
+export const MIX_GAMES_SHOWN = 60;
+
+/** Последние игры выбранного отрезка (сезон, вечер или всё время) с составами: состав — те, кто реально играл, по статистике карт */
+export function mixGames(data: TwentyData, opts: TwentyScope = {}): MixGame[] {
+  const scoped = (opts.code ? data.games.filter((g) => g.code === opts.code) : opts.season ? data.games.filter((g) => seasonOf(g.finished_at) === opts.season) : data.games).slice(0, MIX_GAMES_SHOWN);
+  const ids = new Set(scoped.map((g) => g.id));
+  const rosters = new Map<string, Map<string, { steam_id: string; name: string | null; team: number; kills: number; deaths: number }>>();
+  for (const s of data.stats) {
+    if (!ids.has(s.game_id)) continue;
+    const roster = rosters.get(s.game_id) ?? rosters.set(s.game_id, new Map()).get(s.game_id)!;
+    const p = roster.get(s.steam_id) ?? roster.set(s.steam_id, { steam_id: s.steam_id, name: s.name, team: s.team, kills: 0, deaths: 0 }).get(s.steam_id)!;
+    p.kills += s.kills;
+    p.deaths += s.deaths;
+  }
+  return scoped.map((g) => {
+    const roster = [...(rosters.get(g.id)?.values() ?? [])].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    const team = (n: number): MixTeam => ({ name: data.info[g.id]?.names[n - 1] ?? `Команда ${n}`, players: roster.filter((p) => p.team === n).map(({ steam_id, name, kills, deaths }) => ({ steam_id, name, kills, deaths })) });
+    return { id: g.id, code: g.code, finished_at: g.finished_at, day: playDayOf(g.finished_at), winner: g.winner, score: data.info[g.id]?.score ?? [0, 0], maps: g.maps.filter((m) => m.status === "finished"), teams: [team(1), team(2)] };
+  });
+}
+
 /** Рейтинг и всё остальное для страницы «Микс»: за сезон, за один вечер (код лобби) или за всё время */
 export async function getTwenty(opts: TwentyScope = {}) {
   const data = await loadTwentyData();
@@ -200,7 +239,7 @@ export async function getTwenty(opts: TwentyScope = {}) {
       if (fixed) twenty = buildTwenty(data.games, data.stats, { ...opts, fixed });
     }
   }
-  return { ...twenty, players: data.players, evenings: eveningsOf(data.games) };
+  return { ...twenty, players: data.players, evenings: eveningsOf(data.games), games: mixGames(data, opts) };
 }
 
 /** Короткая справка по игроку для комнаты лобби: рейтинг, роль, коронная карта и рейтинг по картам */

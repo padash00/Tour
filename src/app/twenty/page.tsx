@@ -10,6 +10,7 @@ import { SEASON_PRIZES, TWENTY_MIN_MAPS, currentSeason, getTwenty, nextSeason, s
 import { Button, Container, ContextNav, EmptyState, PageTitle, Section } from "@/components/ds";
 import { CreatePotButton } from "@/components/lobby/pot";
 import { SelectNav } from "@/components/public/select-nav";
+import { GamesTab } from "@/components/twenty/games";
 import { LiveGames } from "@/components/twenty/live-games";
 import { Nominations, Podium, RecordsTab, SectionHead } from "@/components/twenty/panels";
 import { AchievementsTab, HallOfFame, seasonDaysLeft, seasonLabel } from "@/components/twenty/season";
@@ -23,7 +24,7 @@ const CODE = /^[A-Z0-9]{4,10}$/;
 const STEAM = /^\d{17}$/;
 const MAP = /^[a-z0-9_]{3,40}$/;
 const SEASON = /^\d{4}-(0[1-9]|1[0-2])$/;
-const TABS = ["rating", "maps", "style", "weapons", "records", "awards"] as const;
+const TABS = ["rating", "games", "maps", "style", "weapons", "records", "awards"] as const;
 type Tab = (typeof TABS)[number];
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -37,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * «Микс»: игры на банк и рейтинг их игроков — общий или за один вечер (?lobby=КОД).
- * Вкладки (?tab=): рейтинг и номинации, карты, стиль игры и сравнение, рекорды и связки.
+ * Вкладки (?tab=): рейтинг и номинации, сыгранные игры (кто с кем играл), карты, стиль игры и сравнение, рекорды и связки.
  */
 export default async function TwentyPage(props: PageProps<"/twenty">) {
   const t = await getT();
@@ -126,6 +127,7 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
           match="tab"
           items={[
             { key: "rating", label: t("Рейтинг"), href: href("rating") },
+            { key: "games", label: t("Игры"), href: href("games") },
             { key: "maps", label: t("Карты"), href: href("maps") },
             { key: "style", label: t("Стиль игры"), href: href("style") },
             { key: "weapons", label: t("Оружие"), href: href("weapons") },
@@ -170,6 +172,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </>
       )}
 
+      {tab === "games" && <GamesTab games={twenty.games} total={matches} who={who} t={t} evening={!!code} />}
+
       {king && tab === "maps" && <MapsTab boards={twenty.boards} rows={rows} who={who} t={t} images={images} selected={map} href={(params) => href("maps", params)} meSteamId={player?.steam_id ?? null} />}
 
       {king && tab === "style" && <StyleTab rows={rows} who={who} t={t} a={a ?? player?.steam_id ?? null} b={b} href={(params) => href("style", params)} />}
@@ -195,8 +199,8 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
         </>
       )}
 
-      {!code && tab === "rating" && evenings.length > 0 && (
-        <Section title={t("Прошедшие игры")} description={t("Рейтинг каждого вечера отдельно")}>
+      {!code && tab === "games" && evenings.length > 0 && (
+        <Section title={t("Игровые вечера")} description={t("Рейтинг каждого вечера отдельно")}>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {evenings.map((e) => (
               <Link key={e.code} href={`/twenty?lobby=${e.code}`} className="flex items-center justify-between gap-3 rounded-control border border-line-subtle bg-surface px-4 py-3 text-[14px] transition-colors hover:border-line-strong">

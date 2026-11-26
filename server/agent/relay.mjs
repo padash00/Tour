@@ -52,6 +52,7 @@ export function createRelay({
   siteUrl,
   log = () => {},
   onMatchzyEvent = null,
+  onCs2Log = null,
   parkAfterMs = PARK_AFTER_MS,
   parkAfterAttempts = PARK_AFTER_ATTEMPTS,
   retryMaxMs = RETRY_MAX_MS,
@@ -118,6 +119,11 @@ export function createRelay({
       if (req.method === "POST" && url.pathname === "/cs2/log") {
         const body = await readBody(req);
         enqueue({ path: `/api/cs2/log?${url.searchParams.toString()}`, headers: { "Content-Type": "text/plain" }, body });
+        // банк техпаузы следит по логу за началом и концом закупки
+        if (onCs2Log) {
+          try { await onCs2Log(url.searchParams.get("m"), body); }
+          catch (e) { log(`локальный лог CS2: ${e?.message ?? e}`); }
+        }
         return send(200, { ok: true, queued: true });
       }
       if (req.method === "GET" && url.pathname.startsWith("/config/")) {

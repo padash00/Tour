@@ -16,6 +16,7 @@ process.env.F16_STATE_POLL_MS = "5";
 const { createRecovery, latestMatchBackup, seriesBackup } = await import("../server/agent/recovery.mjs");
 import { CommandJournal } from "../server/agent/command-journal.mjs";
 import { createEnforce } from "../server/agent/enforce.mjs";
+import { createTechPause } from "../server/agent/techpause.mjs";
 import { encodePacket, parseGet5, rcon, rconSession, steamIdsFromStatus, takePackets } from "../server/agent/lib.mjs";
 
 let checks = 0;
@@ -236,6 +237,68 @@ try {
     assert.equal(localBundleVersion(f16), "v1");
     assert.equal(rejectedBundleVersion(f16).version, "v2"); // агент не скачает её снова
     assert.equal(await rollbackBundle({ f16Dir: f16, serverDir }), null); // второй откат не нужен
+  });
+  await test("техпауза: банк 2 минуты на команду на карту, остаток переносится, по нулю пауза снимается", async () => {
+    const stateDir = path.join(dir, "techpause");
+    mkdirSync(stateDir, { recursive: true });
+    const inst = { name: "CS2-01", port: 1 };
+    const sent = [];
+    let t = 1_000_000;
+    const make = () => createTechPause({ stateDir, rc: async (_i, c) => (sent.push(c), ""), log: () => {}, now: () => t, find: (m, token) => (Number(m) === 5 && (token === undefined || token === "tok") ? inst : null), teamName: (_i, team) => (team === "team1" ? "Альфа" : "Бета") });
+    let tp = make();
+    const ev = (event, extra = {}) => tp.onMatchzyEvent({ event, matchid: 5, map_number: 0, ...extra }, "tok");
+    const said = () => sent.filter((c) => c.startsWith("css_asay")).join(" | ");
+    await ev("going_live");
+    assert.ok(sent.some((c) => /matchzy_max_tech_pauses 0/.test(c)));
+    // чужой токен — событие не наше
+    await tp.onMatchzyEvent({ event: "game_paused", matchid: 5, map_number: 0, team: "team1", pause_type: "technical" }, "чужой");
+    assert.equal(tp.state["CS2-01"].active, null);
+    // пауза посреди раунда: время идёт только с закупки
+    await tp.onCs2Log("5", 'L 11/26/2026 - 20:00:00: World triggered "Round_Start"\n');
+    sent.length = 0;
+    await ev("game_paused", { team: "team1", pause_type: "technical" });
+    assert.ok(sent.includes("matchzy_tech_pause_time 120"));
+    assert.match(said(), /Альфа.*2:00.*следующего раунда/);
+    t += 40_000; // раунд доигрывают — банк не тратится
+    await tp.tick([inst]);
+    await tp.onCs2Log("5", "L 11/26/2026 - 20:00:40: Starting Freeze period\n");
+    t += 35_000;
+    await tp.tick([inst]);
+    sent.length = 0;
+    await ev("game_unpaused", { team: "team1", pause_type: "technical" });
+    assert.equal(tp.state["CS2-01"].left.team1, 85);
+    assert.match(said(), /Альфа.*1:25/);
+    // тактический перерыв и пауза админа в банк не идут
+    await ev("game_paused", { team: "team1", pause_type: "tactical" });
+    t += 30_000;
+    await ev("game_unpaused", { team: "team1", pause_type: "tactical" });
+    assert.equal(tp.state["CS2-01"].left.team1, 85);
+    // вторая пауза той же команды — в закупке, агент за это время перезапустился
+    sent.length = 0;
+    await ev("game_paused", { team: "team1", pause_type: "technical" });
+    assert.ok(sent.includes("matchzy_tech_pause_time 85"));
+    tp = make();
+    t += 26_000;
+    await tp.tick([inst]);
+    assert.match(said(), /осталось 0:59/);
+    t += 30_000;
+    await tp.tick([inst]);
+    assert.match(said(), /осталось 0:29/);
+    t += 29_000;
+    sent.length = 0;
+    await tp.tick([inst]);
+    assert.ok(sent.includes("css_forceunpause"));
+    assert.equal(tp.state["CS2-01"].left.team1, 0);
+    await ev("game_unpaused", { team: "none", pause_type: "technical" }); // событие от снятия — списывать нечего
+    // банк пуст — .tech снимается сразу; у соперника свой банк цел
+    sent.length = 0;
+    await ev("game_paused", { team: "team1", pause_type: "technical" });
+    assert.ok(sent.includes("css_forceunpause"));
+    assert.match(said(), /израсходовано/);
+    assert.equal(tp.state["CS2-01"].left.team2, 120);
+    // следующая карта — банк новый
+    await tp.onMatchzyEvent({ event: "going_live", matchid: 5, map_number: 1 }, "tok");
+    assert.deepEqual(tp.state["CS2-01"].left, { team1: 120, team2: 120 });
   });
   await test("enforce: в ножевом раунде деньги и закупку не возвращает, в игре — возвращает", async () => {
     const stateDir = path.join(dir, "enforce");
