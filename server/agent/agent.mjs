@@ -19,7 +19,7 @@
 //   - версия CS2 и ожидающая перезагрузка Windows уходят на сайт для предупреждений в F16 Control.
 //
 // Конфиг: D:\cs2server\f16\agent.json  { "siteUrl": "...", "token": "...", "lanIp": "192.168.0.159", "relayPort": 27099,
-//   "demoPort": 27100, "demoRateMbit": 40 }  — "demos": false выключает раздачу демо
+//   "demoPort": 27100, "demoRateMbit": 40, "demoIdleRateMbit": 200 }  — "demos": false выключает раздачу демо
 // Запуск:  node agent.mjs   (или D:\cs2server\F16-agent.bat)
 
 import { execFile, spawn } from "node:child_process";
@@ -153,6 +153,9 @@ const demos = config.demos === false ? null : createDemos({
   port: DEMO_PORT,
   token: config.token,
   rateMbit: config.demoRateMbit,
+  idleRateMbit: config.demoIdleRateMbit,
+  // идёт хоть один матч — раздача притормаживает, чтобы не мешать игре
+  busy: () => Object.keys(recovery.assignments).length > 0,
   // карта ещё идёт на каком-то сервере — её запись не закончена
   isLive: (matchid, map) => Object.values(snapshots).some((s) => s.report.get5?.matchid === matchid && s.report.get5?.map_number === map),
   log,

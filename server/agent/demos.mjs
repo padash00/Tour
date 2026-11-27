@@ -3,8 +3,9 @@
 // подписанную HMAC на токене агента, агент отдаёт файл со своего порта (TCP, проброшен по UPnP).
 // В облако демо не уходят — на Vercel запрос ограничен 4.5 МБ, а демо 5×5 весит 80–150 МБ.
 //
-// Чтобы скачивание не мешало идущим матчам: не больше MAX_ACTIVE загрузок сразу и общий лимит скорости
-// (agent.json "demoRateMbit", по умолчанию 40 Мбит/с) — делится поровну между активными загрузками.
+// Чтобы скачивание не мешало идущим матчам: не больше MAX_ACTIVE загрузок сразу и общий лимит скорости —
+// делится поровну между активными загрузками. Пока на серверах идёт хоть один матч — agent.json "demoRateMbit"
+// (по умолчанию 40 Мбит/с); когда матчей нет — "demoIdleRateMbit" (по умолчанию 200 Мбит/с из 500 канала клуба).
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
 import http from "node:http";
@@ -22,7 +23,7 @@ export function demoSignature(token, file, exp, name) {
   return createHmac("sha256", token).update(`${file}\n${exp}\n${name}`).digest("hex");
 }
 
-export function createDemos({ dir, port, token, rateMbit, isLive, log }) {
+export function createDemos({ dir, port, token, rateMbit, idleRateMbit, isLive, busy = () => true, log }) {
   let active = 0;
   let listed = { at: 0, files: [] };
 
@@ -50,11 +51,13 @@ export function createDemos({ dir, port, token, rateMbit, isLive, log }) {
   }
 
   // общий лимит скорости: каждый кусок ждёт свою долю полосы
-  const bytesPerSec = Math.max(1, Number(rateMbit) || 40) * 125_000;
+  const busyBytes = Math.max(1, Number(rateMbit) || 40) * 125_000;
+  const idleBytes = Math.max(busyBytes, (Number(idleRateMbit) || 200) * 125_000);
   const throttle = () =>
     new Transform({
       transform(chunk, _enc, done) {
-        const share = bytesPerSec / Math.max(1, active);
+        // лимит пересчитывается на каждом куске: матч начался посреди загрузки — она сразу притормаживает
+        const share = (busy() ? busyBytes : idleBytes) / Math.max(1, active);
         setTimeout(() => done(null, chunk), Math.round((chunk.length / share) * 1000));
       },
     });
