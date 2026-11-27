@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
-import { getSetting } from "./settings";
+import { siteOrigin } from "./origin";
 import { db } from "./supabase";
 import { AGENT_OFFLINE_AFTER_MS } from "./server/state";
 
@@ -57,24 +57,18 @@ function signature(token: string, file: string, exp: number, name: string) {
 }
 
 /**
- * Подписанная ссылка на файл на серверном ПК. Адрес — тот же, что игроки видели для подключения к матчу;
- * у старых матчей без адреса — как для новых (настройка «IP сервера для игроков», затем UPnP, затем LAN).
- * null — файла нет в списке агента или адрес неизвестен.
+ * Подписанная ссылка на демо. Файл лежит на серверном ПК клуба, но порт раздачи (27100) из интернета закрыт,
+ * поэтому качаем через сайт: Caddy отдаёт /demo-file с серверного ПК по туннелю wg-f16 (10.66.0.2:27100).
+ * Ссылка одна и для зала, и для дома, и идёт по HTTPS — браузер не блокирует загрузку как небезопасную.
+ * null — файла нет в списке агента.
  */
-export async function demoDownloadUrl(matchzyId: number, file: string, name: string, serverAddress: string | null) {
+export async function demoDownloadUrl(matchzyId: number, file: string, name: string) {
   const token = process.env.AGENT_TOKEN;
   const list = await agentDemos();
   if (!token || !list?.files.some((f) => f.file === file && f.matchzy_id === matchzyId)) return null;
-  let host = serverAddress?.replace(/:\d+$/, "") || null;
-  if (!host) {
-    const { data } = await db().from("server_host").select("lan_ip, info").eq("id", "main").maybeSingle();
-    const upnpIp = (data?.info as { upnp?: { ip?: string | null } } | null)?.upnp?.ip ?? null;
-    host = ((await getSetting("PLAYER_IP")) ?? "").trim() || upnpIp || data?.lan_ip || null;
-  }
-  if (!host) return null;
   const exp = Math.floor(Date.now() / 1000) + LINK_TTL_S;
   const q = new URLSearchParams({ f: file, e: String(exp), n: name, s: signature(token, file, exp, name) });
-  return `http://${host}:${list.port}/demo?${q}`;
+  return `${await siteOrigin()}/demo-file?${q}`;
 }
 
 /** Имя файла для сохранения: только латиница — агент отдаёт его в Content-Disposition как есть */

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest, ctx: RouteContext<"/matches/[id]/dem
   if (!demo) return text(404, "Демо этого матча не найдено — возможно, оно уже удалено с сервера");
   if (!online) return text(503, "Серверный ПК сейчас не на связи — демо можно будет скачать, когда он включится");
   const mapName = m.maps.find((x) => x.map_number === demo.mapNumber)?.map_name ?? "map";
-  const url = await demoDownloadUrl(m.matchzy_id, demo.file, demoFileName(m.number, demo.mapNumber, mapName, demo.part, demo.parts), m.server_address);
+  const url = await demoDownloadUrl(m.matchzy_id, demo.file, demoFileName(m.number, demo.mapNumber, mapName, demo.part, demo.parts));
   if (!url) return text(503, "Адрес сервера неизвестен — демо пока нельзя скачать");
   return NextResponse.redirect(url, { status: 302, headers: { "Cache-Control": "private, no-store" } });
 }
