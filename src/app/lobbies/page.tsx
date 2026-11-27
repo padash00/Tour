@@ -99,12 +99,12 @@ export default async function LobbiesPage(props: PageProps<"/lobbies">) {
               {t("Неофициальные матчи на серверах F16. Создайте комнату, соберите игроков и настройте игру под себя.")}
             </p>
           </div>
-          {!mine && (
+          {(!mine || mine.released) && (
             <CreateLobbyButton loggedIn={!!player} />
           )}
         </header>
 
-        {mine && (
+        {mine && !mine.released && (
           <FeatureSurface className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-micro font-semibold uppercase tracking-[0.14em] text-accent">{t("Ваше лобби")}</div>

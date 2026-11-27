@@ -191,6 +191,16 @@ export function requeue(cup: Cup, matchId: string): Cup {
   return { ...cup, matches: cup.matches.map((m) => (m.id === matchId && m.state === "cancelled" ? { ...m, state: "pending" as const, code: null } : m)) };
 }
 
+/**
+ * Команда выбыла из идущей сетки: проиграла матч, других матчей у неё не будет (матча за 3-е место нет).
+ * В круговой все играют до последнего круга — там до конца никто не выбывает.
+ */
+export const teamOut = (cup: Cup | null | undefined, team: number): boolean =>
+  !!cup && team >= 0 && cup.format === "bracket" && cup.state === "playing" && cup.matches.some((m) => m.state === "done" && (m.a === team || m.b === team) && m.winner !== team);
+
+/** Игрок выбывшей команды: большое лобби его больше не держит */
+export const playerOut = (cup: Cup | null | undefined, playerId: string): boolean => !!cup && teamOut(cup, cup.rosters.findIndex((r) => r.includes(playerId)));
+
 export const roundTitle = (cup: Cup, round: number): string => {
   if (cup.format === "round") return `Круг ${round}`;
   const last = Math.max(...cup.matches.map((m) => m.round));

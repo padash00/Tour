@@ -23,7 +23,7 @@ import {
   type Slot,
   type TeamSlot,
 } from "./lobby";
-import { cupTeams, roundTitle, standings, type Cup, type CupMatch } from "./cup-core";
+import { cupTeams, roundTitle, standings, teamOut, type Cup, type CupMatch } from "./cup-core";
 import type { LobbySettings } from "./lobby-settings";
 import { tierOf, type TierKey } from "./tiers";
 import type { Player } from "./types";
@@ -129,6 +129,8 @@ export type ViewCup = {
   table: { team: number; played: number; wins: number; maps: number; mapsLost: number }[] | null;
   /** комната матча, в котором сейчас играет зритель */
   myRoom: string | null;
+  /** команда зрителя выбыла из сетки: он может выйти из лобби или открыть другое */
+  out: boolean;
 };
 
 /** Карта матча сетки: счёт по раундам (a — первая команда матча); live — карта идёт сейчас */
@@ -176,7 +178,7 @@ function viewCup(lobby: Lobby, viewerId: string | null, canOpen: boolean, mapSco
         return { id: m.id, a: m.a, b: m.b, state: m.state, winner: m.winner, score, maps, code: m.state === "playing" && (mine || canOpen) ? m.code : null, mine };
       }),
   }));
-  return { format: cup.format, state: cup.state, names: cup.names, champion: cup.champion, rounds: view, table: cup.format === "round" ? standings(cup) : null, myRoom };
+  return { format: cup.format, state: cup.state, names: cup.names, champion: cup.champion, rounds: view, table: cup.format === "round" ? standings(cup) : null, myRoom, out: teamOut(cup, team) };
 }
 
 /** Служебные пометки игры хранятся по-русски; игроку показываем на его языке (динамические — по шаблону) */

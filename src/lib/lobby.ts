@@ -10,7 +10,7 @@ import { getSetting } from "./settings";
 import { vetoState, type VetoAction } from "./veto";
 import { BOT_NAMES, lobbyCvars, mapsProblem, normalizeSettings, potBank, sideMode, type LobbySettings } from "./lobby-settings";
 import { tierOf, tierRange, TIER_MIN_ELO } from "./tiers";
-import { cupTeams, snakeTurnN } from "./cup-core";
+import { cupTeams, playerOut, snakeTurnN, type Cup } from "./cup-core";
 import type { Tables, TablesUpdate } from "./database.types";
 import type { Narrow, Player } from "./types";
 
@@ -155,13 +155,26 @@ export const isOnline = (m: Pick<LobbyMember, "last_seen_at">) => Date.now() - n
 export async function playerLobby(playerId: string) {
   const { data } = await db()
     .from("lobby_members")
-    .select("lobby_id, lobby:lobbies!inner(code, status, settings)")
+    .select("lobby_id, lobby:lobbies!inner(code, status, settings, bracket)")
     .eq("player_id", playerId)
     .neq("lobby.status", "closed");
   // игрок большого лобби во время матча состоит и в комнате матча — ведём его туда, где он сейчас играет
   const rows = data ?? [];
   const row = rows.find((r) => (r.lobby.settings as { cup_of?: unknown } | null)?.cup_of) ?? rows[0];
-  return row ? { id: row.lobby_id, code: row.lobby.code } : null;
+  if (!row) return null;
+  // released — команда игрока выбыла из сетки: лобби ещё открыто (сетка, чат), но открыть или занять другое не мешает
+  const released = rows.length === 1 && row.lobby.status === "playing" && playerOut(row.lobby.bracket as Cup | null, playerId);
+  return { id: row.lobby_id, code: row.lobby.code, released };
+}
+
+/** Игрок выбывшей команды уходит из большого лобби (сам или потому что открыл/занял другое). Сетка и составы в ней не меняются */
+export async function leaveReleased(lobbyId: string, player: { id: string; nickname: string }) {
+  const lobby = await getLobby(lobbyId);
+  if (!lobby) return;
+  await db().from("lobby_members").delete().eq("lobby_id", lobby.id).eq("player_id", player.id);
+  await systemMessage(lobby.id, `${player.nickname} вышел из лобби`);
+  if (lobby.host_id === player.id) await passHost(lobby, player.id);
+  else await touch(lobby.id);
 }
 
 /** Сколько матчей игрок сыграл на сайте (турниры + лобби) — для фильтра входа */

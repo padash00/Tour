@@ -202,7 +202,9 @@ export function CenterColumn({
         {t("Мой матч")}
       </Link>
     ) : (
-      <div className="grid h-12 place-items-center rounded-control border border-line bg-shell/60 text-[15px] font-medium text-fg-2">{t("Идут матчи")}</div>
+      <div className="grid min-h-12 place-items-center rounded-control border border-line bg-shell/60 px-3 py-2 text-center text-[15px] font-medium text-fg-2">
+        {view.cup?.out ? t("Ваша команда выбыла — можно выйти из лобби или открыть другое") : t("Идут матчи")}
+      </div>
     );
   } else if (canStart && snake && !potTeamsFull && !lobby.draft) {
     // пока составы не собраны, главное действие — назначить капитанов и начать выбор игроков

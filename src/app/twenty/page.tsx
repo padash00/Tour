@@ -108,9 +108,9 @@ export default async function TwentyPage(props: PageProps<"/twenty">) {
               ]}
             />
           )}
-          {!mine && !code && <CreatePotButton loggedIn={!!player} />}
+          {(!mine || mine.released) && !code && <CreatePotButton loggedIn={!!player} />}
           {/* кто уже сидит в лобби, новую игру собрать не может — показываем, куда вернуться, а не пустое место */}
-          {mine && !code && (
+          {mine && !mine.released && !code && (
             <div className="flex flex-col items-end gap-1">
               <Button href={`/lobby/${mine.code}`}>{t("Моё лобби #{code}", { code: mine.code })}</Button>
               <span className="text-micro text-fg-3">{t("Новую игру можно собрать после выхода из лобби")}</span>

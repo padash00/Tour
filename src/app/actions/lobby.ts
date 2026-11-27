@@ -32,6 +32,7 @@ import {
   nextBotName,
   passHost,
   playerLobby,
+  leaveReleased,
   potProblem,
   READY_CHECK_SECONDS,
   restartVeto,
@@ -46,7 +47,7 @@ import {
   type Slot,
 } from "@/lib/lobby";
 import { DEFAULT_SETTINGS, MAP_RE, normalizeSettings, playersNeeded, POT_FEE_MAX, POT_MAPS, type LobbySettings } from "@/lib/lobby-settings";
-import { cupFormatAllowed, cupTeams } from "@/lib/cup-core";
+import { cupFormatAllowed, cupTeams, playerOut, type Cup } from "@/lib/cup-core";
 import { cancelCup, cupOf, restartCupMatch, startCup } from "@/lib/cup";
 import { fetchFaceitLastKnown } from "@/lib/faceit";
 import { normalizeTiers, TIERS } from "@/lib/tiers";
@@ -188,7 +189,7 @@ export async function createLobby(visibility: Lobby["visibility"], password: str
   if (!["public", "closed", "private"].includes(visibility)) return { error: t("Неизвестный тип лобби") };
   const pw = password.trim();
   if (visibility !== "public" && (pw.length < PASSWORD_MIN || pw.length > 32)) return { error: passwordError(t) };
-  const other = await playerLobby(player.id);
+  const other = await otherLobby(player);
   if (other) return { error: t("Вы уже в другом лобби — выйдите из него"), code: other.code };
 
   // последние настройки этого хоста — удобно пересоздавать
@@ -240,7 +241,7 @@ export async function createPot(tiers: string[], fee: number, visibility: Lobby[
   if ("error" in player) return player;
   const pw = password.trim();
   if (visibility !== "public" && (pw.length < PASSWORD_MIN || pw.length > 32)) return { error: passwordError(t) };
-  const other = await playerLobby(player.id);
+  const other = await otherLobby(player);
   if (other) return { error: t("Вы уже в другом лобби — выйдите из него"), code: other.code };
 
   // карты, скрытые админом клуба, в пул не берём
@@ -341,7 +342,7 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
     if (problem) return { error: problem };
     potEloNow = rating.faceit_elo;
   }
-  const other = await playerLobby(player.id);
+  const other = await otherLobby(player);
   if (other) return { error: t("Вы уже в другом лобби — выйдите из него"), code: other.code };
 
   // куда встать: просили слот — туда, иначе в команду, где меньше (если можно), иначе в ожидание
@@ -378,6 +379,17 @@ export async function joinLobby(code: string, opts: { password?: string; invite?
   return { ok: true, code: lobby.code };
 }
 
+/**
+ * Лобби, которое мешает открыть или занять другое. Игрока выбывшей из сетки команды большое лобби не держит:
+ * он выходит из него сам собой в ту минуту, когда открывает новое или садится в чужое.
+ */
+async function otherLobby(player: { id: string; nickname: string }) {
+  const other = await playerLobby(player.id);
+  if (!other?.released) return other;
+  await leaveReleased(other.id, player);
+  return null;
+}
+
 export async function leaveLobby(code: string): Promise<LobbyResult> {
   const bad = invalid([Code, code]);
   if (bad) return bad;
@@ -385,7 +397,8 @@ export async function leaveLobby(code: string): Promise<LobbyResult> {
   if ("error" in ctx) return ctx;
   const { lobby, player, slot } = ctx;
   // идут матчи сетки: состав команды зафиксирован, выйти можно после них (или организатор остановит матчи)
-  if (lobby.status === "playing" && cupTeams(lobby.settings.players) > 0 && isTeamSlot(slot)) {
+  // команда выбыла из сетки — её игроков лобби не держит
+  if (lobby.status === "playing" && cupTeams(lobby.settings.players) > 0 && isTeamSlot(slot) && !playerOut(lobby.bracket as Cup | null, player.id)) {
     return { error: (await getT())("Идут матчи — выйти из лобби можно после них") };
   }
   await db().from("lobby_members").delete().eq("lobby_id", lobby.id).eq("player_id", player.id);

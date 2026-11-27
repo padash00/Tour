@@ -226,6 +226,28 @@ try {
   assert.equal(room(cup, "r2m2").code, null);
   ok("Six teams: two first-round matches, two teams wait in the semifinals, each semifinal opens when its pair is known");
 
+  // ── выбывшая команда: лобби её больше не держит, остальных держит
+  const lost = room(cup, "r1m1").b!;
+  const loser = cup.rosters[lost][1];
+  assert.equal(core.teamOut(cup, lost), true);
+  assert.equal(core.teamOut(cup, room(cup, "r1m1").a!), false, "the winner plays on");
+  assert.equal(core.teamOut(cup, room(cup, "r1m2").a!), false, "a team that has not played yet is not out");
+  assert.equal(core.teamOut(cup, 0), false, "a team waiting in the semifinal is not out");
+  const held = await L.playerLobby(loser);
+  assert.deepEqual([held?.code, held?.released], ["CUP030", true], "a knocked-out player is still shown his lobby, but is free to open another");
+  assert.equal((await L.playerLobby(cup.rosters[room(cup, "r1m2").a!][1]))?.released, false, "a player of a live match is held");
+  assert.equal((await L.playerLobby(cup.rosters[1][1]))?.released, false, "a player waiting for the semifinal is held");
+  await L.leaveReleased(sixId, { id: loser, nickname: "loser" });
+  assert.equal(await L.playerLobby(loser), null);
+  const after = await cupNow(sixId);
+  assert.deepEqual(after.rosters, cup.rosters, "the bracket keeps the roster of the team that left");
+  assert.equal((await L.getLobby(sixId))!.status, "playing");
+  await play(room(after, "r1m2").code!, 2, [0, 2]);
+  assert.ok(room(await cupNow(sixId), "r2m2").code, "the cup goes on after a knocked-out player left");
+  // круговая: до конца никто не выбывает
+  assert.equal(core.teamOut({ ...cup, format: "round" }, lost), false);
+  ok("Knocked-out team: its players may leave or open another lobby, everyone else is held, the cup goes on");
+
   console.log(`\n${checks} cup checks passed`);
 } finally {
   await sql.close();
