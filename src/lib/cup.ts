@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./supabase";
-import { buildCup, cupTeams, markCancelled, readyMatches, recordResult, requeue, roundTitle, standings, type Cup, type CupMatch } from "./cup-core";
+import { ROUND_FINAL_BEST_OF, buildCup, cupTeams, markCancelled, placements, readyMatches, recordResult, requeue, roundTitle, type Cup, type CupMatch } from "./cup-core";
 import { closeLobby, createGame, getLobby, getLobbyByCode, getMembers, hashPassword, newCode, newToken, systemMessage, type Lobby, type LobbyGame } from "./lobby";
 import { normalizeSettings, potBank } from "./lobby-settings";
 import type { Json } from "./database.types";
@@ -123,6 +123,8 @@ async function createRoom(parent: Lobby, cup: Cup, match: CupMatch, code: string
     allow_join_team: false,
     start: "host",
     cup_of: { code: parent.code, match: match.id },
+    // финал круговой — серия BO3 (матчи круга — BO1)
+    ...(match.final ? { best_of: ROUND_FINAL_BEST_OF } : {}),
   });
   const [a, b] = [match.a!, match.b!];
   const { data, error } = await db()
@@ -186,15 +188,22 @@ export async function cupGameFinished(room: Lobby, g: LobbyGame) {
   if (!done) return;
   const { cup } = done;
   await systemMessage(parent.id, `Матч окончен: ${score}.`);
-  if (cup.state !== "done") return launchReady(parent.id);
+  if (cup.state !== "done") {
+    // круг только что сыгран — объявляем финал первого и второго места
+    const final = cup.matches.find((m) => m.final);
+    if (final && final.state === "pending" && !cup.matches.find((m) => m.id === link.match)?.final) {
+      await systemMessage(parent.id, `Круг сыгран. Финал BO${ROUND_FINAL_BEST_OF}: ${cup.names[final.a!]} (1-е место) — ${cup.names[final.b!]} (2-е место).`);
+    }
+    return launchReady(parent.id);
+  }
 
   // всё сыграно: чемпион, таблица круговой, банк
   const champion = cup.names[cup.champion!];
   const diff = (n: number) => (n > 0 ? `+${n}` : `${n}`);
   const table =
     cup.format === "round"
-      ? ` Места: ${standings(cup)
-          .map((r, i) => `${i + 1}. ${cup.names[r.team]} — ${r.wins} оч., раунды ${diff(r.rounds - r.roundsLost)}`)
+      ? ` Места: ${placements(cup)
+          .map((r, i) => `${i + 1}. ${cup.names[r.team]} — ${r.points} оч., раунды ${diff(r.rounds - r.roundsLost)}`)
           .join("; ")}.`
       : "";
   const fresh = (await getLobby(parent.id)) ?? parent;

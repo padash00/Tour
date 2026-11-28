@@ -11,6 +11,9 @@ export const cupTeams = (players: number) => ((CUP_SIZES as readonly number[]).i
 /** Круговая играется в одну карту (BO1): на 6–8 команд это 15–28 матчей — сериями за день не сыграть */
 export const cupBestOf = <T extends number>(format: CupFormat, bestOf: T): T | 1 => (format === "round" ? 1 : bestOf);
 
+/** Финал круговой — серия до двух побед */
+export const ROUND_FINAL_BEST_OF = 3;
+
 export type CupMatch = {
   /** "r1m1" — круг и номер матча в нём */
   id: string;
@@ -30,6 +33,8 @@ export type CupMatch = {
   score: [number, number] | null;
   /** счёт по раундам за все карты матча: [a, b] (у старых матчей нет) */
   rounds?: [number, number] | null;
+  /** финал круговой: первое и второе место таблицы, серия BO3; в таблицу не идёт */
+  final?: boolean;
 };
 
 export type Cup = {
@@ -160,16 +165,20 @@ export function readyMatches(cup: Cup): CupMatch[] {
   return best(free).list;
 }
 
-export type CupRow = { team: number; played: number; wins: number; maps: number; mapsLost: number; rounds: number; roundsLost: number };
+/** Очки круговой за победу в матче (поражение — 0) */
+export const WIN_POINTS = 3;
+
+export type CupRow = { team: number; played: number; wins: number; points: number; maps: number; mapsLost: number; rounds: number; roundsLost: number };
 
 /**
- * Таблица круговой: очки (победа — очко), разница карт (в BO1 она равна очкам), разница раундов,
- * личная встреча (когда равны ровно две команды), выигранные раунды.
+ * Таблица круговой: очки (победа — 3 очка, поражение — 0), разница карт, разница раундов,
+ * личная встреча (когда равны ровно две команды), выигранные раунды. Первые двое потом играют финал BO3.
  */
 export function standings(cup: Cup): CupRow[] {
-  const rows: CupRow[] = cup.names.map((_, team) => ({ team, played: 0, wins: 0, maps: 0, mapsLost: 0, rounds: 0, roundsLost: 0 }));
+  const rows: CupRow[] = cup.names.map((_, team) => ({ team, played: 0, wins: 0, points: 0, maps: 0, mapsLost: 0, rounds: 0, roundsLost: 0 }));
   for (const m of cup.matches) {
-    if (m.state !== "done" || m.a === null || m.b === null) continue;
+    // финал — отдельная серия за первое место, в таблицу круга не идёт
+    if (m.final || m.state !== "done" || m.a === null || m.b === null) continue;
     const [sa, sb] = m.score ?? [0, 0];
     rows[m.a].played++;
     rows[m.b].played++;
@@ -182,18 +191,21 @@ export function standings(cup: Cup): CupRow[] {
     rows[m.a].roundsLost += rb;
     rows[m.b].rounds += rb;
     rows[m.b].roundsLost += ra;
-    if (m.winner !== null) rows[m.winner].wins++;
+    if (m.winner !== null) {
+      rows[m.winner].wins++;
+      rows[m.winner].points += WIN_POINTS;
+    }
   }
   const mapDiff = (r: CupRow) => r.maps - r.mapsLost;
   const roundDiff = (r: CupRow) => r.rounds - r.roundsLost;
-  const level = (x: CupRow, y: CupRow) => x.wins === y.wins && mapDiff(x) === mapDiff(y) && roundDiff(x) === roundDiff(y);
+  const level = (x: CupRow, y: CupRow) => x.points === y.points && mapDiff(x) === mapDiff(y) && roundDiff(x) === roundDiff(y);
   const h2h = (x: CupRow, y: CupRow) => {
     if (!level(x, y) || rows.filter((r) => level(r, x)).length !== 2) return 0;
-    const m = cup.matches.find((q) => q.state === "done" && ((q.a === x.team && q.b === y.team) || (q.a === y.team && q.b === x.team)));
+    const m = cup.matches.find((q) => !q.final && q.state === "done" && ((q.a === x.team && q.b === y.team) || (q.a === y.team && q.b === x.team)));
     return m?.winner === x.team ? -1 : m?.winner === y.team ? 1 : 0;
   };
   return [...rows].sort(
-    (x, y) => y.wins - x.wins || mapDiff(y) - mapDiff(x) || roundDiff(y) - roundDiff(x) || h2h(x, y) || y.rounds - x.rounds || y.maps - x.maps || x.team - y.team,
+    (x, y) => y.points - x.points || mapDiff(y) - mapDiff(x) || roundDiff(y) - roundDiff(x) || h2h(x, y) || y.rounds - x.rounds || y.maps - x.maps || x.team - y.team,
   );
 }
 
@@ -215,10 +227,30 @@ export function recordResult(cup: Cup, matchId: string, side: 1 | 2, score: [num
   }
   const next: Cup = { ...cup, matches };
   if (matches.every((x) => x.state === "done")) {
+    if (cup.format === "round" && !matches.some((x) => x.final)) {
+      // круг сыгран: первое и второе место таблицы играют финал, чемпион — его победитель
+      const [first, second] = standings(next);
+      // номер как у обычного матча («r6m1»): по нему комната финала возвращает итог в сетку
+      const round = Math.max(...matches.map((x) => x.round)) + 1;
+      const final = blank(`r${round}m1`, round);
+      final.a = first.team;
+      final.b = second.team;
+      final.final = true;
+      next.matches = [...matches, final];
+      return next;
+    }
     next.state = "done";
-    next.champion = cup.format === "round" ? standings(next)[0].team : m.winner;
+    next.champion = m.winner;
   }
   return next;
+}
+
+/** Места круговой: таблица круга, но первое место — победитель финала (когда он сыгран) */
+export function placements(cup: Cup): CupRow[] {
+  const rows = standings(cup);
+  const final = cup.matches.find((m) => m.final && m.state === "done");
+  if (!final || final.winner === null) return rows;
+  return [...rows.filter((r) => r.team === final.winner), ...rows.filter((r) => r.team !== final.winner)];
 }
 
 /** Матч отменён (сервер не поднялся, отменил организатор): комната закрыта, матч можно запустить заново */
@@ -242,7 +274,7 @@ export const teamOut = (cup: Cup | null | undefined, team: number): boolean =>
 export const playerOut = (cup: Cup | null | undefined, playerId: string): boolean => !!cup && teamOut(cup, cup.rosters.findIndex((r) => r.includes(playerId)));
 
 export const roundTitle = (cup: Cup, round: number): string => {
-  if (cup.format === "round") return `Круг ${round}`;
+  if (cup.format === "round") return cup.matches.some((m) => m.final && m.round === round) ? "Финал" : `Круг ${round}`;
   const last = Math.max(...cup.matches.map((m) => m.round));
   return round === last ? "Финал" : round === last - 1 ? "Полуфинал" : round === last - 2 ? "Четвертьфинал" : `Круг ${round}`;
 };

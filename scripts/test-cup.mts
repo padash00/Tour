@@ -128,7 +128,16 @@ try {
     win(1, 2, 13, 2);
     win(2, 0, 13, 9);
     assert.deepEqual(core.standings(c).map((r) => r.team), [1, 0, 2], "one win each: +9, -2, -7 by rounds");
-    assert.equal(c.champion, 1);
+    // круг сыгран — чемпиона ещё нет: первое и второе место играют финал
+    const final = c.matches.find((m) => m.final)!;
+    assert.ok(c.state === "playing" && c.champion === null && final.state === "pending", "the final is opened after the round robin");
+    assert.deepEqual([final.a, final.b], [1, 0], "the final: first place against second place");
+    assert.equal(core.roundTitle(c, final.round), "Финал");
+    assert.deepEqual(core.readyMatches(c).map((m) => m.id), [final.id]);
+    c = core.recordResult(c, final.id, 2, [1, 2], [30, 34]);
+    assert.ok(c.state === "done" && c.champion === 0, "the champion is the winner of the final");
+    assert.deepEqual(core.placements(c).map((r) => r.team), [0, 1, 2], "the final decides first place");
+    assert.deepEqual(core.standings(c).map((r) => [r.played, r.points]), [[2, 3], [2, 3], [2, 3]], "the final does not count in the table: a win is 3 points");
     // равны и очки, и разница раундов у двух команд — выше победитель личной встречи
     c = core.buildCup("round", ["a", "b", "c", "d"], []);
     win(1, 0, 13, 10);
@@ -253,6 +262,13 @@ try {
       await play(m.code!, side, side === 1 ? [2, 1] : [1, 2]);
     }
   }
+  cup = await cupNow(roundId);
+  // круг сыгран: первое и второе место (3 и 2 победы) играют финал BO3 в своей комнате
+  const rrFinal = cup.matches.find((m) => m.final)!;
+  assert.ok(cup.state === "playing" && rrFinal.state === "playing" && rrFinal.code, "the final room is open");
+  assert.deepEqual([rrFinal.a, rrFinal.b], [0, 3], "first place (3 wins) against second place (2 wins)");
+  assert.equal((await L.getLobbyByCode(rrFinal.code!))!.settings.best_of, 3, "the final is BO3");
+  await play(rrFinal.code!, 1, [2, 1]);
   cup = await cupNow(roundId);
   assert.equal(cup.state, "done");
   assert.equal(cup.champion, 0);

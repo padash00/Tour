@@ -348,7 +348,7 @@ export function CupBracket({ cup, isHost, busy, run, code }: { cup: ViewCup; isH
                 <td className={cn("num py-2 font-semibold", i < 3 ? "text-accent" : "text-fg-3")}>{i + 1}</td>
                 <td className="py-2 font-medium text-fg">{cup.names[row.team]}</td>
                 <td className="num py-2 text-right text-fg-2">{row.played}</td>
-                <td className="num py-2 text-right font-semibold text-fg">{row.wins}</td>
+                <td className="num py-2 text-right font-semibold text-fg">{row.points}</td>
                 <td className="num py-2 text-right text-fg-2">
                   {row.rounds}:{row.roundsLost}
                 </td>
