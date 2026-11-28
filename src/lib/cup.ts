@@ -78,15 +78,18 @@ export async function startCup(lobby: Lobby): Promise<string | null> {
 
 /** Комнаты для матчей, у которых известны обе команды */
 export async function launchReady(lobbyId: string) {
-  const parent = await getLobby(lobbyId);
-  const cup = parent && cupOf(parent);
-  if (!parent || !cup || parent.status !== "playing") return;
-  for (const match of readyMatches(cup)) {
+  // каждый раз перечитываем сетку: в круговой запуск одного матча занимает команды и меняет, какие матчи готовы
+  for (let step = 0; step < 40; step++) {
+    const parent = await getLobby(lobbyId);
+    const cup = parent && cupOf(parent);
+    if (!parent || !cup || parent.status !== "playing") return;
+    const match = readyMatches(cup)[0];
+    if (!match) return;
     // сначала занимаем матч (пишем код комнаты), потом создаём комнату: два одновременных вызова не создадут две
+    // и не поставят одну команду в два матча — готовность проверяется по свежей сетке
     const code = await freeCode();
     const claimed = await mutateCup(parent.id, (c) => {
-      const m = c.matches.find((x) => x.id === match.id);
-      if (!m || m.code || m.state !== "pending" || m.a === null || m.b === null) return null;
+      if (!readyMatches(c).some((x) => x.id === match.id)) return null;
       return { ...c, matches: c.matches.map((x) => (x.id === match.id ? { ...x, code, state: "playing" as const } : x)) };
     });
     if (!claimed) continue;

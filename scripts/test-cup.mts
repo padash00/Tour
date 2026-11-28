@@ -91,6 +91,32 @@ try {
   assert.equal(s20.best_of, 1, "round robin is always BO1");
   assert.equal(normalizeSettings({ ...s20, cup_format: "bracket", best_of: 3 }).best_of, 3);
   assert.equal(core.buildCup("round", Array(6).fill("x"), []).matches.length, 15);
+  for (const teams of [4, 6, 8]) {
+    // круговая без ожидания туров: освободившиеся команды сразу играют друг с другом, если ещё не встречались
+    let c = core.buildCup("round", Array(teams).fill("x"), []);
+    const playing = () => c.matches.filter((m) => m.state === "playing");
+    const launch = () => {
+      const ready = core.readyMatches(c);
+      c = { ...c, matches: c.matches.map((m) => (ready.some((r) => r.id === m.id) ? { ...m, state: "playing" as const, code: m.id } : m)) };
+      const seen = playing().flatMap((m) => [m.a, m.b]);
+      assert.equal(new Set(seen).size, seen.length, "a team never plays two matches at once");
+      return ready.length;
+    };
+    assert.equal(launch(), teams / 2, "everyone plays from the start");
+    let early = 0;
+    for (let step = 0; c.state !== "done"; step++) {
+      assert.ok(step < 100 && playing().length > 0, "the cup never stalls");
+      // матчи заканчиваются по одному, каждый раз — самый давний
+      const m = playing()[0];
+      c = core.recordResult(c, m.id, 1, [1, 0], [13, 7]);
+      if (c.state === "done") break;
+      const before = playing().length;
+      if (launch() > 0 && before > 0) early++;
+    }
+    assert.ok(c.matches.every((m) => m.state === "done"));
+    if (teams > 4) assert.ok(early > 0, "new matches start while other matches are still going");
+    assert.ok(core.standings(c).every((r) => r.played === teams - 1));
+  }
   {
     // равные очки: решает разница раундов
     let c = core.buildCup("round", ["a", "b", "c"], []);
@@ -216,7 +242,7 @@ try {
   assert.equal(await C.startCup((await L.getLobby(roundId))!), null);
   cup = await cupNow(roundId);
   assert.equal(cup.matches.length, 6);
-  assert.equal(cup.matches.filter((m) => m.code).length, 2, "only the first round is open: a team plays one match at a time");
+  assert.equal(cup.matches.filter((m) => m.code).length, 2, "two matches at the start: a team plays one match at a time");
   // побеждает команда с меньшим номером: 3, 2, 1 и 0 побед
   for (let round = 1; round <= 3; round++) {
     cup = await cupNow(roundId);

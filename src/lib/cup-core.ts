@@ -131,14 +131,33 @@ export function buildCup(format: CupFormat, names: string[], rosters: string[][]
 
 /**
  * Матчи, которые пора запускать: обе команды известны, комнаты ещё нет.
- * В круговой — только текущий круг: следующий начинается, когда доигран предыдущий (команда не играет два матча сразу).
+ * В круговой туров никто не ждёт: освободившаяся команда сразу играет со свободной командой, с которой ещё
+ * не встречалась (команда не играет два матча сразу). Из свободных команд собираем как можно больше пар;
+ * при равенстве — сначала те, у кого осталось больше матчей (чтобы никто не доигрывал хвост в одиночку),
+ * затем матчи более ранних кругов.
  */
 export function readyMatches(cup: Cup): CupMatch[] {
   if (cup.state !== "playing") return [];
   const open = cup.matches.filter((m) => m.state === "pending" && m.a !== null && m.b !== null && !m.code);
   if (cup.format !== "round") return open;
-  const current = Math.min(...cup.matches.filter((m) => m.state !== "done").map((m) => m.round));
-  return open.filter((m) => m.round === current);
+  const busy = new Set(cup.matches.filter((m) => m.state === "playing").flatMap((m) => [m.a, m.b]));
+  const free = open.filter((m) => !busy.has(m.a) && !busy.has(m.b));
+  const left = (team: number | null) => cup.matches.filter((m) => m.state !== "done" && (m.a === team || m.b === team)).length;
+  type Pick = { list: CupMatch[]; weight: number; rounds: number };
+  const better = (x: Pick, y: Pick) => x.list.length - y.list.length || x.weight - y.weight || y.rounds - x.rounds;
+  const best = (rest: CupMatch[]): Pick => {
+    if (!rest.length) return { list: [], weight: 0, rounds: 0 };
+    // первая по номеру команда из оставшихся: либо играет один из своих матчей, либо пропускает
+    const team = Math.min(...rest.flatMap((m) => [m.a!, m.b!]));
+    let top = best(rest.filter((m) => m.a !== team && m.b !== team));
+    for (const m of rest.filter((x) => x.a === team || x.b === team)) {
+      const sub = best(rest.filter((x) => x.a !== m.a && x.b !== m.a && x.a !== m.b && x.b !== m.b));
+      const pick = { list: [m, ...sub.list], weight: sub.weight + left(m.a) + left(m.b), rounds: sub.rounds + m.round };
+      if (better(pick, top) > 0) top = pick;
+    }
+    return top;
+  };
+  return best(free).list;
 }
 
 export type CupRow = { team: number; played: number; wins: number; maps: number; mapsLost: number; rounds: number; roundsLost: number };
