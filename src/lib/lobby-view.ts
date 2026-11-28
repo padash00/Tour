@@ -126,7 +126,7 @@ export type ViewCup = {
   champion: number | null;
   rounds: { round: number; title: string; matches: (Pick<CupMatch, "id" | "a" | "b" | "state" | "winner" | "score"> & { code: string | null; mine: boolean; maps: CupMapScore[] })[] }[];
   /** таблица круговой */
-  table: { team: number; played: number; wins: number; maps: number; mapsLost: number }[] | null;
+  table: import("./cup-core").CupRow[] | null;
   /** комната матча, в котором сейчас играет зритель */
   myRoom: string | null;
   /** команда зрителя выбыла из сетки: он может выйти из лобби или открыть другое */

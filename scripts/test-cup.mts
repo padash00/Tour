@@ -87,18 +87,43 @@ try {
   assert.equal(s20.player_pick, "captains");
   assert.equal(s20.rematch, false);
   assert.equal(playersNeeded(s20), 20);
-  assert.equal(normalizeSettings({ ...s20, players: 30 }).cup_format, "bracket", "round robin only for four teams");
+  assert.equal(normalizeSettings({ ...s20, players: 30 }).cup_format, "round", "round robin for any number of teams");
+  assert.equal(s20.best_of, 1, "round robin is always BO1");
+  assert.equal(normalizeSettings({ ...s20, cup_format: "bracket", best_of: 3 }).best_of, 3);
+  assert.equal(core.buildCup("round", Array(6).fill("x"), []).matches.length, 15);
+  {
+    // равные очки: решает разница раундов
+    let c = core.buildCup("round", ["a", "b", "c"], []);
+    const win = (w: number, l: number, rw: number, rl: number) => {
+      const m = c.matches.find((q) => (q.a === w && q.b === l) || (q.a === l && q.b === w))!;
+      c = core.recordResult(c, m.id, m.a === w ? 1 : 2, m.a === w ? [1, 0] : [0, 1], m.a === w ? [rw, rl] : [rl, rw]);
+    };
+    win(0, 1, 13, 11);
+    win(1, 2, 13, 2);
+    win(2, 0, 13, 9);
+    assert.deepEqual(core.standings(c).map((r) => r.team), [1, 0, 2], "one win each: +9, -2, -7 by rounds");
+    assert.equal(c.champion, 1);
+    // равны и очки, и разница раундов у двух команд — выше победитель личной встречи
+    c = core.buildCup("round", ["a", "b", "c", "d"], []);
+    win(1, 0, 13, 10);
+    win(0, 2, 13, 10);
+    win(0, 3, 13, 10);
+    win(1, 2, 13, 10);
+    win(3, 1, 13, 10);
+    win(2, 3, 13, 10);
+    assert.deepEqual(core.standings(c).slice(0, 2).map((r) => r.team), [1, 0], "a and b: two wins, +3 each; b beat a");
+  }
   assert.equal(normalizeSettings({ ...s20, players: 15 }).players, 0);
   assert.equal(potBank(normalizeSettings({ ...s20, pot: true, pot_fee: 5000 })), 100000);
   assert.equal([0, 1, 2, 3, 4, 5, 6, 7].map((n) => core.snakeTurnN(n, 4)).join(""), "12344321");
   assert.equal(core.buildCup("bracket", Array(6).fill("x"), []).matches.length, 5, "six teams: two first-round matches, two semis, final");
   assert.equal(core.buildCup("bracket", Array(8).fill("x"), []).matches.length, 7);
   assert.equal(core.buildCup("round", Array(4).fill("x"), []).matches.length, 6);
-  ok("Rules: 20/30/40 players make 4/6/8 teams of five, captains pick, bank counts every player, round robin only for four teams");
+  ok("Rules: 20/30/40 players make 4/6/8 teams of five, captains pick, bank counts every player, round robin is BO1 for any number of teams");
 
   // ── 20 игроков, сетка
   const p20 = await makePlayers(20, "a");
-  const bracketId = await makeLobby("CUP020", p20, normalizeSettings({ ...s20, cup_format: "bracket" }));
+  const bracketId = await makeLobby("CUP020", p20, normalizeSettings({ ...s20, cup_format: "bracket", best_of: 3 }));
   let lobby = (await L.getLobby(bracketId))!;
   assert.match(C.cupStartProblem(lobby, await L.getMembers(bracketId)) ?? "", /Не все команды собраны/);
   assert.match(L.startProblem(lobby, await L.getMembers(bracketId)) ?? "", /несколько команд/);

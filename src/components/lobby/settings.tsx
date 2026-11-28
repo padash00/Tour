@@ -132,7 +132,7 @@ export function QuickSettings({ s, editable, patch, maps, images, onAdvanced }: 
   return (
     <div className="space-y-1.5">
       <Row icon={Icon.layers()} label="Best of">
-        <Segments value={s.best_of} disabled={ro} onChange={(v) => patch({ best_of: v })} options={[1, 3, 5].map((n) => ({ value: n as 1 | 3 | 5, label: n }))} />
+        <Segments value={s.best_of} disabled={ro || (s.players > 0 && s.cup_format === "round")} onChange={(v) => patch({ best_of: v })} options={[1, 3, 5].map((n) => ({ value: n as 1 | 3 | 5, label: n }))} />
       </Row>
       {!s.pot && (
         <Row icon={Icon.swords()} label={t("Режим")}>
@@ -276,7 +276,7 @@ export function AdvancedSettings({
 
         <Section title={t("Карты")}>
           <Row icon={Icon.layers()} label="Best of">
-            <Segments value={s.best_of} disabled={ro} onChange={(v) => patch({ best_of: v })} options={[1, 3, 5].map((n) => ({ value: n as 1 | 3 | 5, label: n }))} />
+            <Segments value={s.best_of} disabled={ro || (s.players > 0 && s.cup_format === "round")} onChange={(v) => patch({ best_of: v })} options={[1, 3, 5].map((n) => ({ value: n as 1 | 3 | 5, label: n }))} />
           </Row>
           <Row icon={Icon.map()} label={t("Выбор карты")}>
             <Choice value={s.map_choice} disabled={ro} onChange={(v) => patch({ map_choice: v })} options={MAP_CHOICE} />

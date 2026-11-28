@@ -168,10 +168,13 @@ export async function cupGameFinished(room: Lobby, g: LobbyGame) {
     return;
   }
   const side = g.winner;
+  // раунды за все сыгранные карты — для таблицы круговой (при равенстве очков решает разница раундов)
+  const played = (g.maps ?? []).filter((m) => m.status === "finished");
+  const rounds: [number, number] = [played.reduce((s, m) => s + m.team1_score, 0), played.reduce((s, m) => s + m.team2_score, 0)];
   const done = await mutateCup(
     parent.id,
     (c) => {
-      const next = recordResult(c, link.match, side, [g.team1_score, g.team2_score]);
+      const next = recordResult(c, link.match, side, [g.team1_score, g.team2_score], rounds);
       return next === c ? null : next;
     },
     (c) => (c.state === "done" ? { status: "waiting" } : {}),
@@ -184,7 +187,13 @@ export async function cupGameFinished(room: Lobby, g: LobbyGame) {
 
   // всё сыграно: чемпион, таблица круговой, банк
   const champion = cup.names[cup.champion!];
-  const table = cup.format === "round" ? ` Таблица: ${standings(cup).map((r) => `${cup.names[r.team]} — ${r.wins} поб.`).join(", ")}.` : "";
+  const diff = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+  const table =
+    cup.format === "round"
+      ? ` Места: ${standings(cup)
+          .map((r, i) => `${i + 1}. ${cup.names[r.team]} — ${r.wins} оч., раунды ${diff(r.rounds - r.roundsLost)}`)
+          .join("; ")}.`
+      : "";
   const fresh = (await getLobby(parent.id)) ?? parent;
   const bank = fresh.settings.pot ? potBank(fresh.settings) : 0;
   const money = bank > 0 ? ` Банк ${bank.toLocaleString("ru-RU")} тг — как его делить, решает организатор.` : "";

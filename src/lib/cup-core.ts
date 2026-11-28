@@ -8,8 +8,8 @@ export type CupFormat = "bracket" | "round";
 /** Сколько команд по 5 в лобби на столько игроков (0 — обычное лобби на две команды) */
 export const cupTeams = (players: number) => ((CUP_SIZES as readonly number[]).includes(players) ? players / 5 : 0);
 
-/** Круговая — только на 4 команды (6 матчей); на 6–8 команд это 15–28 матчей, за вечер не сыграть */
-export const cupFormatAllowed = (teams: number, format: CupFormat) => format === "bracket" || teams === 4;
+/** Круговая играется в одну карту (BO1): на 6–8 команд это 15–28 матчей — сериями за день не сыграть */
+export const cupBestOf = <T extends number>(format: CupFormat, bestOf: T): T | 1 => (format === "round" ? 1 : bestOf);
 
 export type CupMatch = {
   /** "r1m1" — круг и номер матча в нём */
@@ -28,6 +28,8 @@ export type CupMatch = {
   winner: number | null;
   /** счёт по картам: [a, b] */
   score: [number, number] | null;
+  /** счёт по раундам за все карты матча: [a, b] (у старых матчей нет) */
+  rounds?: [number, number] | null;
 };
 
 export type Cup = {
@@ -139,11 +141,14 @@ export function readyMatches(cup: Cup): CupMatch[] {
   return open.filter((m) => m.round === current);
 }
 
-export type CupRow = { team: number; played: number; wins: number; maps: number; mapsLost: number };
+export type CupRow = { team: number; played: number; wins: number; maps: number; mapsLost: number; rounds: number; roundsLost: number };
 
-/** Таблица круговой: победы, затем разница карт, затем выигранные карты */
+/**
+ * Таблица круговой: очки (победа — очко), разница карт (в BO1 она равна очкам), разница раундов,
+ * личная встреча (когда равны ровно две команды), выигранные раунды.
+ */
 export function standings(cup: Cup): CupRow[] {
-  const rows: CupRow[] = cup.names.map((_, team) => ({ team, played: 0, wins: 0, maps: 0, mapsLost: 0 }));
+  const rows: CupRow[] = cup.names.map((_, team) => ({ team, played: 0, wins: 0, maps: 0, mapsLost: 0, rounds: 0, roundsLost: 0 }));
   for (const m of cup.matches) {
     if (m.state !== "done" || m.a === null || m.b === null) continue;
     const [sa, sb] = m.score ?? [0, 0];
@@ -153,22 +158,38 @@ export function standings(cup: Cup): CupRow[] {
     rows[m.a].mapsLost += sb;
     rows[m.b].maps += sb;
     rows[m.b].mapsLost += sa;
+    const [ra, rb] = m.rounds ?? [0, 0];
+    rows[m.a].rounds += ra;
+    rows[m.a].roundsLost += rb;
+    rows[m.b].rounds += rb;
+    rows[m.b].roundsLost += ra;
     if (m.winner !== null) rows[m.winner].wins++;
   }
-  return rows.sort((x, y) => y.wins - x.wins || y.maps - y.mapsLost - (x.maps - x.mapsLost) || y.maps - x.maps || x.team - y.team);
+  const mapDiff = (r: CupRow) => r.maps - r.mapsLost;
+  const roundDiff = (r: CupRow) => r.rounds - r.roundsLost;
+  const level = (x: CupRow, y: CupRow) => x.wins === y.wins && mapDiff(x) === mapDiff(y) && roundDiff(x) === roundDiff(y);
+  const h2h = (x: CupRow, y: CupRow) => {
+    if (!level(x, y) || rows.filter((r) => level(r, x)).length !== 2) return 0;
+    const m = cup.matches.find((q) => q.state === "done" && ((q.a === x.team && q.b === y.team) || (q.a === y.team && q.b === x.team)));
+    return m?.winner === x.team ? -1 : m?.winner === y.team ? 1 : 0;
+  };
+  return [...rows].sort(
+    (x, y) => y.wins - x.wins || mapDiff(y) - mapDiff(x) || roundDiff(y) - roundDiff(x) || h2h(x, y) || y.rounds - x.rounds || y.maps - x.maps || x.team - y.team,
+  );
 }
 
 /**
  * Итог матча: side — кто победил (1 — команда a, 2 — команда b). Победитель проходит в следующий матч сетки;
  * когда всё сыграно — определяется чемпион. Возвращает новую сетку (исходная не меняется).
  */
-export function recordResult(cup: Cup, matchId: string, side: 1 | 2, score: [number, number]): Cup {
+export function recordResult(cup: Cup, matchId: string, side: 1 | 2, score: [number, number], rounds: [number, number] | null = null): Cup {
   const matches = cup.matches.map((m) => ({ ...m }));
   const m = matches.find((x) => x.id === matchId);
   if (!m || m.a === null || m.b === null || m.state === "done") return cup;
   m.state = "done";
   m.winner = side === 1 ? m.a : m.b;
   m.score = score;
+  m.rounds = rounds;
   for (const next of matches) {
     if (next.fa === m.id) next.a = m.winner;
     if (next.fb === m.id) next.b = m.winner;

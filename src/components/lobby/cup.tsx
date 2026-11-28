@@ -334,20 +334,27 @@ export function CupBracket({ cup, isHost, busy, run, code }: { cup: ViewCup; isH
         <table className="mt-5 w-full text-[14px]">
           <thead>
             <tr className="text-left text-micro uppercase tracking-[0.1em] text-fg-3">
+              <th className="w-8 py-1.5 font-semibold">#</th>
               <th className="py-1.5 font-semibold">{t("Команда")}</th>
               <th className="py-1.5 text-right font-semibold">{t("Матчи")}</th>
-              <th className="py-1.5 text-right font-semibold">{t("Победы")}</th>
-              <th className="py-1.5 text-right font-semibold">{t("Карты")}</th>
+              <th className="py-1.5 text-right font-semibold">{t("Очки")}</th>
+              <th className="py-1.5 text-right font-semibold">{t("Раунды")}</th>
+              <th className="py-1.5 text-right font-semibold">{t("Разница")}</th>
             </tr>
           </thead>
           <tbody>
-            {cup.table.map((row) => (
+            {cup.table.map((row, i) => (
               <tr key={row.team} className="border-t border-line-subtle">
+                <td className={cn("num py-2 font-semibold", i < 3 ? "text-accent" : "text-fg-3")}>{i + 1}</td>
                 <td className="py-2 font-medium text-fg">{cup.names[row.team]}</td>
                 <td className="num py-2 text-right text-fg-2">{row.played}</td>
                 <td className="num py-2 text-right font-semibold text-fg">{row.wins}</td>
                 <td className="num py-2 text-right text-fg-2">
-                  {row.maps}:{row.mapsLost}
+                  {row.rounds}:{row.roundsLost}
+                </td>
+                <td className="num py-2 text-right text-fg-2">
+                  {row.rounds - row.roundsLost > 0 ? "+" : ""}
+                  {row.rounds - row.roundsLost}
                 </td>
               </tr>
             ))}

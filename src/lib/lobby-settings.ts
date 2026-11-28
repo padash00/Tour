@@ -5,7 +5,7 @@
 import { MODES, type ModeKey } from "./modes";
 import { makeT, tr, type T } from "./i18n/core";
 import { normalizeTiers, TIERS, type TierKey } from "./tiers";
-import { cupFormatAllowed, cupTeams, type CupFormat } from "./cup-core";
+import { cupBestOf, cupTeams, type CupFormat } from "./cup-core";
 
 export type LobbySettings = {
   // основные
@@ -80,7 +80,7 @@ export type LobbySettings = {
    * и сетка матчей между ними (см. cup-core.ts). Задаётся при создании.
    */
   players: number;
-  /** лобби на несколько команд: сетка на вылет или круговая (круговая — только на 4 команды) */
+  /** лобби на несколько команд: сетка на вылет или круговая (круговая — всегда BO1) */
   cup_format: CupFormat;
   /** комната одного матча большого лобби: код большого лобби и матч сетки. Пишет только сервер */
   cup_of: { code: string; match: string } | null;
@@ -150,7 +150,7 @@ function enforcePot(input: LobbySettings): LobbySettings {
   // несколько команд: всегда 5×5, игроков разбирают капитаны, реванша нет — после финала лобби собирается заново
   if (cupTeams(s.players) > 0) {
     s = { ...s, mode: "5v5", team_size: 5, player_pick: "captains", allow_join_team: false, start: "host", rematch: false, max_waiting: Math.max(s.max_waiting, s.players) };
-    if (!cupFormatAllowed(cupTeams(s.players), s.cup_format)) s = { ...s, cup_format: "bracket" };
+    s = { ...s, best_of: cupBestOf(s.cup_format, s.best_of) };
   }
   if (!s.pot) return { ...s, pot_paid: [], pot_elo: {} };
   return { ...s, mode: "5v5", team_size: 5, network: "internet", player_pick: "captains", allow_join_team: false, start: "host", filter: false };

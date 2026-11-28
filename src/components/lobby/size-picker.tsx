@@ -32,10 +32,7 @@ export function SizePicker({
         className="mt-2"
         label={t("Сколько игроков")}
         value={players}
-        onChange={(n) => {
-          onPlayers(n);
-          if (cupTeams(n) !== 4) onFormat("bracket");
-        }}
+        onChange={onPlayers}
         options={[
           { value: 0, label: small },
           { value: 20, label: "20" },
@@ -53,12 +50,12 @@ export function SizePicker({
             onChange={onFormat}
             options={[
               { value: "bracket", label: t("Сетка на вылет") },
-              ...(teams === 4 ? [{ value: "round" as const, label: t("Круговая") }] : []),
+              { value: "round", label: t("Круговая") },
             ]}
           />
           <p className="mt-2 text-meta text-fg-3">
             {t("{teams} команд по 5 игроков, матчей: {matches}. Игроков по командам разбирают капитаны, каждый матч идёт в своей комнате на своём сервере.", { teams, matches })}
-            {teams !== 4 ? ` ${t("Круговая доступна только на 20 игроков.")}` : ""}
+            {format === "round" ? ` ${t("Каждая команда играет с каждой, все матчи — BO1. Места — по таблице: очки, затем разница раундов.")}` : ""}
           </p>
         </>
       ) : (

@@ -47,7 +47,7 @@ import {
   type Slot,
 } from "@/lib/lobby";
 import { DEFAULT_SETTINGS, MAP_RE, normalizeSettings, playersNeeded, POT_FEE_MAX, POT_MAPS, type LobbySettings } from "@/lib/lobby-settings";
-import { cupFormatAllowed, cupTeams, playerOut, type Cup } from "@/lib/cup-core";
+import { cupTeams, playerOut, type Cup } from "@/lib/cup-core";
 import { cancelCup, cupOf, restartCupMatch, startCup } from "@/lib/cup";
 import { fetchFaceitLastKnown } from "@/lib/faceit";
 import { normalizeTiers, TIERS } from "@/lib/tiers";
@@ -183,7 +183,6 @@ export async function createLobby(visibility: Lobby["visibility"], password: str
   const bad = invalid([Visibility, visibility], [Password, password], [PlayersArg, players], [FormatArg, format]);
   if (bad) return bad;
   const many = cupTeams(players) > 0;
-  if (many && !cupFormatAllowed(cupTeams(players), format)) return { error: t("Круговая — только на 20 игроков: на большее число команд матчей слишком много") };
   const player = await me();
   if ("error" in player) return player;
   if (!["public", "closed", "private"].includes(visibility)) return { error: t("Неизвестный тип лобби") };
@@ -236,7 +235,6 @@ export async function createPot(tiers: string[], fee: number, visibility: Lobby[
   const bad = invalid([TiersArg, tiers], [FeeArg, fee], [Visibility, visibility], [Password, password], [PlayersArg, players], [FormatArg, format]);
   if (bad) return bad;
   const many = cupTeams(players) > 0;
-  if (many && !cupFormatAllowed(cupTeams(players), format)) return { error: t("Круговая — только на 20 игроков: на большее число команд матчей слишком много") };
   const player = await me();
   if ("error" in player) return player;
   const pw = password.trim();
